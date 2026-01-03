@@ -20,6 +20,7 @@ import {
   MdAssignment,
   MdAccountCircle,
 } from "react-icons/md";
+import logo from "../../assets/logos/easishift-logo-plus-text2.svg";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 
@@ -98,10 +99,17 @@ function Sidebar() {
       {/* Logo / Header */}
       <Box sx={{ p: 3, borderBottom: "1px solid #1f2937" }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          <MdCalendarToday size={24} />
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            Med Link
-          </Typography>
+          <Box
+            component="img"
+            src={logo}
+            alt="Easishift logo"
+            sx={{
+              width: 200,
+              height: "auto",
+              display: "block",
+              objectFit: "contain",
+            }}
+          />
         </Box>
         <Typography
           variant="caption"

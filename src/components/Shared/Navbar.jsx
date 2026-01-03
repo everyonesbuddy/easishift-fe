@@ -10,6 +10,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { MdNotifications, MdLogout } from "react-icons/md";
+import logo from "../../assets/logos/easishift-logo-plus-text1.svg";
 
 export default function Navbar() {
   const { user, isStaff, isAdmin, logout, role } = useAuth();
@@ -23,7 +24,6 @@ export default function Navbar() {
   return (
     <AppBar
       position="sticky"
-      elevation={0}
       sx={{
         bgcolor: "background.paper",
         borderBottom: 1,
@@ -35,14 +35,30 @@ export default function Navbar() {
         <Box sx={{ flex: 1 }}>
           {!user ? (
             <>
-              <Typography
-                variant="h6"
+              <Box
                 component={Link}
                 to="/"
-                sx={{ color: "black", textDecoration: "none" }}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  textDecoration: "none",
+                  color: "text.primary",
+                }}
               >
-                EasiShift
-              </Typography>
+                <Box
+                  component="img"
+                  src={logo}
+                  alt="Easishift logo"
+                  aria-label="Easishift"
+                  sx={{
+                    width: 220,
+                    height: 44,
+                    display: "block",
+                    objectFit: "contain",
+                  }}
+                />
+              </Box>
             </>
           ) : (
             <>

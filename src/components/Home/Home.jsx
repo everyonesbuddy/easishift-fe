@@ -172,7 +172,10 @@ export default function Home() {
                 variant="contained"
                 size="large"
                 startIcon={<FiPhoneCall />}
-                onClick={() => navigate("/signup-tenant")}
+                component="a"
+                href="https://calendly.com/easishift-info/30min?month=2026-01"
+                target="_blank"
+                rel="noopener noreferrer"
                 sx={{ fontWeight: 900, px: 4 }}
               >
                 Book a demo
@@ -348,7 +351,10 @@ export default function Home() {
                   variant="contained"
                   size="large"
                   startIcon={<FiPhoneCall />}
-                  onClick={() => navigate("/signup-tenant")}
+                  component="a"
+                  href="https://calendly.com/easishift-info/30min?month=2026-01"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   sx={{ fontWeight: 900 }}
                 >
                   Book a demo
@@ -385,7 +391,10 @@ export default function Home() {
           variant="contained"
           size="large"
           startIcon={<FiPhoneCall />}
-          onClick={() => navigate("/signup-tenant")}
+          component="a"
+          href="https://calendly.com/easishift-info/30min?month=2026-01"
+          target="_blank"
+          rel="noopener noreferrer"
           sx={{ fontWeight: 950 }}
         >
           Book a demo

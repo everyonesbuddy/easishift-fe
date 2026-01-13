@@ -53,10 +53,9 @@ export default function MessageList() {
 
   const fetchInbox = async () => {
     try {
-      const res = await axios.get(
-        `http://localhost:5000/api/v1/messages/receiver/${user._id}`,
-        { withCredentials: true }
-      );
+      const res = await axios.get(`/messages/receiver/${user._id}`, {
+        withCredentials: true,
+      });
       setInboxMessages(res.data || []);
     } catch (err) {
       console.error("Failed to fetch inbox", err);
@@ -65,10 +64,9 @@ export default function MessageList() {
 
   const fetchSent = async () => {
     try {
-      const res = await axios.get(
-        `http://localhost:5000/api/v1/messages/sender/${user._id}`,
-        { withCredentials: true }
-      );
+      const res = await axios.get(`/messages/sender/${user._id}`, {
+        withCredentials: true,
+      });
       setSentMessages(res.data || []);
     } catch (err) {
       console.error("Failed to fetch sent messages", err);
@@ -92,7 +90,7 @@ export default function MessageList() {
     if (!msg.read && mainTab === "inbox") {
       try {
         await axios.put(
-          `http://localhost:5000/api/v1/messages/${msg._id}/read`,
+          `/messages/${msg._id}/read`,
           {},
           { withCredentials: true }
         );

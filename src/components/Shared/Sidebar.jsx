@@ -47,6 +47,12 @@ function Sidebar() {
     },
     { id: "staff", icon: MdPeople, label: "Staff Management", to: "/staffs" },
     {
+      id: "subscription",
+      icon: MdSettings,
+      label: "Manage Subscription",
+      to: "/billing",
+    },
+    {
       id: "timeoff",
       icon: MdSchedule,
       label: "Time Off Approvals",

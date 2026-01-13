@@ -11,7 +11,7 @@ import {
   Paper,
   Stack,
 } from "@mui/material";
-import axios from "axios";
+import api from "../../../config/api";
 
 // Convert UTC → local string for <input type="datetime-local">
 function toLocalInputValue(dateString) {
@@ -114,9 +114,8 @@ export default function ScheduleForm({
       if (!selectedStaff) return;
 
       try {
-        const res = await axios.get(
-          `http://localhost:5000/api/v1/coverage/unfilled?role=${selectedStaff.role}`,
-          { withCredentials: true }
+        const res = await api.get(
+          `/coverage/unfilled?role=${selectedStaff.role}`
         );
 
         // Filter out past shifts (based on startTime)
@@ -151,16 +150,10 @@ export default function ScheduleForm({
 
     try {
       if (isEditing) {
-        await axios.put(
-          `http://localhost:5000/api/v1/schedules/${schedule._id}`,
-          payload,
-          { withCredentials: true }
-        );
+        await api.put(`/schedules/${schedule._id}`, payload);
         setMessage("✅ Schedule updated!");
       } else {
-        await axios.post("http://localhost:5000/api/v1/schedules", payload, {
-          withCredentials: true,
-        });
+        await api.post("/schedules", payload);
         setMessage("✅ Schedule created!");
       }
 

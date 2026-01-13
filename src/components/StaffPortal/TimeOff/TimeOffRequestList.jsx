@@ -10,7 +10,7 @@ import {
   IconButton,
   Tooltip,
 } from "@mui/material";
-import axios from "axios";
+import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 import TimeOffRequestModal from "./TimeOffRequestModal";
 import {
@@ -38,9 +38,7 @@ export default function TimeOffRequestList() {
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      const res = await axios.get("http://localhost:5000/api/v1/timeoff", {
-        withCredentials: true,
-      });
+      const res = await api.get("/timeoff");
       setRequests(res.data || []);
     } catch (err) {
       console.error(err);
@@ -62,7 +60,7 @@ export default function TimeOffRequestList() {
     try {
       setActionLoadingId(id);
       await axios.patch(
-        `http://localhost:5000/api/v1/timeoff/${id}/review`,
+        `/timeoff/${id}/review`,
         { status: newStatus },
         { withCredentials: true }
       );

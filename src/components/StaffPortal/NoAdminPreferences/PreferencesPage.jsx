@@ -30,12 +30,9 @@ export default function PreferencesPage() {
   useEffect(() => {
     async function fetchPrefs() {
       try {
-        const res = await axios.get(
-          "http://localhost:5000/api/v1/preferences/me",
-          {
-            withCredentials: true,
-          }
-        );
+        const res = await axios.get("/preferences/me", {
+          withCredentials: true,
+        });
         setPrefs(res.data || {});
       } catch (err) {
         console.error(err);
@@ -69,9 +66,7 @@ export default function PreferencesPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await axios.post("http://localhost:5000/api/v1/preferences/me", prefs, {
-        withCredentials: true,
-      });
+      await api.post("/preferences/me", prefs);
       setError("");
       // small confirmation
       setTimeout(() => {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { TextField, Button, Typography, MenuItem, Box } from "@mui/material";
-import axios from "axios";
+import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 
 export default function MessageComposer({ onSuccess }) {
@@ -18,9 +18,7 @@ export default function MessageComposer({ onSuccess }) {
   useEffect(() => {
     async function loadStaff() {
       try {
-        const res = await axios.get("http://localhost:5000/api/v1/auth/users", {
-          withCredentials: true,
-        });
+        const res = await api.get("/auth/users");
         setStaffList(res.data.filter((u) => u._id !== user._id)); // don't message yourself
       } catch (err) {
         console.error("Failed to load staff", err);
@@ -34,18 +32,14 @@ export default function MessageComposer({ onSuccess }) {
 
   const handleSubmit = async () => {
     try {
-      await axios.post(
-        "http://localhost:5000/api/v1/messages",
-        {
-          senderId: user._id,
-          senderModel: "User",
-          receiverId: form.receiverId,
-          receiverModel: "User",
-          subject: form.subject,
-          body: form.body,
-        },
-        { withCredentials: true }
-      );
+      await api.post("/messages", {
+        senderId: user._id,
+        senderModel: "User",
+        receiverId: form.receiverId,
+        receiverModel: "User",
+        subject: form.subject,
+        body: form.body,
+      });
 
       onSuccess(); // close
     } catch (err) {

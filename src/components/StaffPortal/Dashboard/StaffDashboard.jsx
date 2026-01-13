@@ -11,7 +11,7 @@ import {
 } from "@mui/material";
 
 import { useAuth } from "../../../context/AuthContext";
-import axios from "axios";
+import api from "../../../config/api";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -34,6 +34,7 @@ import MessageComposer from "../Messages/MessageComposer";
 import CoverageCreateForm from "../Coverage/CoverageCreateForm";
 import ScheduleForm from "../Schedule/ScheduleForm";
 import AutoGenerateScheduleForm from "../Schedule/AutoGenerateScheduleForm";
+import Paywall from "./Paywall";
 
 export default function StaffDashboard() {
   const { user, isAdmin } = useAuth();
@@ -63,25 +64,16 @@ export default function StaffDashboard() {
           : `/summary/staff/${user._id}`;
 
         // Summary
-        const summaryRes = await axios.get(
-          `http://localhost:5000/api/v1${endpoint}`,
-          { withCredentials: true }
-        );
+        const summaryRes = await api.get(`${endpoint}`);
 
         setSummary(summaryRes.data);
 
         // Tenant
-        const tenantRes = await axios.get(
-          `http://localhost:5000/api/v1/tenants/${user.tenantId}`,
-          { withCredentials: true }
-        );
+        const tenantRes = await api.get(`/tenants/${user.tenantId}`);
         setTenant(tenantRes.data);
 
         // Staff List (required for schedule form)
-        const staffRes = await axios.get(
-          `http://localhost:5000/api/v1/auth/users`,
-          { withCredentials: true }
-        );
+        const staffRes = await api.get(`/auth/users`);
         setStaffList(staffRes.data);
       } catch (err) {
         console.error("Failed to load dashboard", err);
@@ -180,6 +172,24 @@ export default function StaffDashboard() {
     },
   ];
 
+  // Determine a minWidth based on the longest label/title/subtitle across cards.
+  // We use 'ch' units (approx width of '0') as a simple heuristic.
+  const allCardLabels = [...adminCards, ...staffCards]
+    .map((c) => `${c.title} ${c.subtitle || ""} ${c.value}`)
+    .filter(Boolean);
+
+  const longestLabelLength = allCardLabels.reduce((max, s) => {
+    return Math.max(max, s.length);
+  }, 0);
+
+  // Add some padding characters to avoid tight fit
+  const minWidthCh = Math.max(
+    28,
+    Math.min(60, Math.ceil(longestLabelLength * 0.9))
+  );
+
+  console.log("Tenant data on dashboard:", tenant);
+  console.log("User subscription status:", tenant.tenant.subscriptionStatus);
   return (
     <Container sx={{ mt: 5, mb: 5 }}>
       {/* Welcome Banner */}
@@ -254,7 +264,8 @@ export default function StaffDashboard() {
       {/* Cards */}
       <Grid container spacing={4} alignItems="center" justifyContent="center">
         {(isAdmin ? adminCards : staffCards).map((card) => (
-          <Grid item xs={12} md={6} lg={3} key={card.title}>
+          // Use 4 columns on medium+ screens so all 4 cards stay on a single row
+          <Grid item xs={12} sm={6} md={3} lg={3} key={card.title}>
             <StatCard
               title={card.title}
               value={card.value}

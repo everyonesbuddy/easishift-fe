@@ -171,14 +171,11 @@ export default function Home() {
               <Button
                 variant="contained"
                 size="large"
-                startIcon={<FiPhoneCall />}
-                component="a"
-                href="https://calendly.com/easishift-info/30min?month=2026-01"
-                target="_blank"
-                rel="noopener noreferrer"
-                sx={{ fontWeight: 900, px: 4 }}
+                startIcon={<FiUser />}
+                onClick={() => navigate("/signup-tenant")}
+                sx={{ fontWeight: 900 }}
               >
-                Book a demo
+                Sign Up
               </Button>
               <Button
                 variant="outlined"

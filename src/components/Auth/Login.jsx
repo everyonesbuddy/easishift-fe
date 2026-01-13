@@ -10,7 +10,7 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import axios from "axios";
+import api from "../../config/api";
 
 export default function Login() {
   const { login } = useAuth();
@@ -29,11 +29,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const res = await axios.post(
-        "http://localhost:5000/api/v1/auth/login/staff",
-        form,
-        { withCredentials: true }
-      );
+      const res = await api.post("/auth/login/staff", form);
 
       login(res.data.user);
       navigate("/dashboard");

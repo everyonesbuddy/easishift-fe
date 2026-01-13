@@ -9,7 +9,7 @@ import {
   Paper,
   Stack,
 } from "@mui/material";
-import axios from "axios";
+import api from "../../../config/api";
 
 const roles = ["doctor", "nurse", "receptionist", "billing", "staff", "other"];
 
@@ -48,19 +48,15 @@ export default function CoverageCreateForm({ tenantId, onSuccess }) {
       const startUTC = toUTC(date, startTime);
       const endUTC = toUTC(date, endTime);
 
-      await axios.post(
-        "http://localhost:5000/api/v1/coverage",
-        {
-          tenantId,
-          role,
-          date, // raw, backend normalizes
-          startTime: startUTC,
-          endTime: endUTC,
-          requiredCount,
-          note,
-        },
-        { withCredentials: true }
-      );
+      await api.post("/coverage", {
+        tenantId,
+        role,
+        date, // raw, backend normalizes
+        startTime: startUTC,
+        endTime: endUTC,
+        requiredCount,
+        note,
+      });
 
       setSuccess("Coverage added successfully!");
       setRole("");

@@ -23,7 +23,7 @@ import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
-import axios from "axios";
+import api from "../../../config/api";
 import { FiCalendar, FiList, FiPlus } from "react-icons/fi";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import { useAuth } from "../../../context/AuthContext";
@@ -77,9 +77,7 @@ export default function CoveragePlanningPage() {
   const fetchCoverages = async () => {
     setLoading(true);
     try {
-      const res = await axios.get("http://localhost:5000/api/v1/coverage", {
-        withCredentials: true,
-      });
+      const res = await api.get("/coverage");
       setCoverages(res.data || []);
       setError("");
     } catch (err) {
@@ -98,9 +96,7 @@ export default function CoveragePlanningPage() {
 
   const confirmDelete = async () => {
     try {
-      await axios.delete(`http://localhost:5000/api/v1/coverage/${deleteId}`, {
-        withCredentials: true,
-      });
+      await api.delete(`/coverage/${deleteId}`);
       fetchCoverages();
     } catch (err) {
       console.error("Failed to delete coverage", err);

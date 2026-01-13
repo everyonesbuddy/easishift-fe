@@ -64,9 +64,7 @@ export default function StaffList() {
 
   const fetchStaff = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/v1/auth/users", {
-        withCredentials: true,
-      });
+      const res = await api.get("/auth/users");
       setStaff(res.data || []);
     } catch (err) {
       console.error("Failed to fetch staff", err);
@@ -85,9 +83,7 @@ export default function StaffList() {
 
   const handleConfirmDelete = async () => {
     try {
-      await axios.delete(`http://localhost:5000/api/v1/auth/${deleteId}`, {
-        withCredentials: true,
-      });
+      await api.delete(`/auth/${deleteId}`);
       await fetchStaff();
     } catch (err) {
       console.error("Failed to delete staff", err);

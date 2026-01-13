@@ -26,7 +26,7 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
-import axios from "axios";
+import api from "../../../config/api";
 import { FiCalendar, FiList, FiPlus } from "react-icons/fi";
 import ScheduleForm from "./ScheduleForm";
 import AutoGenerateScheduleForm from "./AutoGenerateScheduleForm";
@@ -96,9 +96,7 @@ export default function ScheduleList() {
   // ---------------------------
   const fetchSchedules = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/v1/schedules", {
-        withCredentials: true,
-      });
+      const res = await api.get("/schedules");
 
       const raw = isAdmin
         ? res.data
@@ -122,9 +120,7 @@ export default function ScheduleList() {
   // ---------------------------
   const fetchStaff = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/v1/auth/users", {
-        withCredentials: true,
-      });
+      const res = await api.get("/auth/users");
       setStaff(res.data);
     } catch (err) {
       console.error("Failed to fetch staff", err);
@@ -163,9 +159,7 @@ export default function ScheduleList() {
 
   const confirmDelete = async () => {
     try {
-      await axios.delete(`http://localhost:5000/api/v1/schedules/${deleteId}`, {
-        withCredentials: true,
-      });
+      await api.delete(`/schedules/${deleteId}`);
       fetchSchedules();
     } catch (err) {
       console.error("Failed to delete schedule", err);

@@ -1,11 +1,4 @@
-import {
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  Box,
-  Badge,
-} from "@mui/material";
+import { Card, Typography, Button, Box, Badge } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
 // Props:
@@ -26,11 +19,13 @@ export default function StatCard({
   layout = "center",
   bgColor = "#e3f2fd",
   badge,
+  // optional minWidth (e.g. '28ch' or '240px') to keep all cards equal width
+  minWidth,
 }) {
   const navigate = useNavigate();
 
-  // center layout: icon above value
-  // side layout: icon left, value/title on right
+  // Use two distinct layouts to avoid flex shrink/grow inconsistencies.
+  // Also enforce a minHeight so cards appear visually consistent.
   return (
     <Card
       sx={{
@@ -38,18 +33,27 @@ export default function StatCard({
         borderRadius: 2,
         p: 2,
         border: "1px solid rgba(0,0,0,0.04)",
+        position: "relative",
+        minHeight: 120,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        width: "100%", // ensure card fills the Grid cell width
+        maxWidth: "100%",
+        boxSizing: "border-box",
+        minWidth: minWidth || 0, // allow content to shrink unless minWidth provided
+        alignSelf: "stretch",
       }}
     >
-      <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems={layout === "center" ? "center" : "flex-start"}
-      >
-        <Box
-          display="flex"
-          alignItems="center"
-          gap={layout === "center" ? 0 : 2}
-        >
+      {/* Badge positioned absolutely so it doesn't affect sizing */}
+      {badge ? (
+        <Box sx={{ position: "absolute", top: 12, right: 12 }}>
+          <Badge badgeContent={badge} color="warning" />
+        </Box>
+      ) : null}
+
+      {layout === "center" ? (
+        <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
           <Box
             sx={{
               width: 48,
@@ -64,37 +68,41 @@ export default function StatCard({
             {icon}
           </Box>
 
-          {layout === "side" && (
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                {value}
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#666" }}>
-                {subtitle || title}
-              </Typography>
-            </Box>
-          )}
+          <Box mt={1} textAlign="center">
+            <Typography variant="h4" sx={{ fontWeight: 700 }}>
+              {value}
+            </Typography>
+            <Typography variant="body2" sx={{ color: "#666" }}>
+              {subtitle || title}
+            </Typography>
+          </Box>
         </Box>
-
-        {layout === "center" && (
-          <Box textAlign="center" width="100%">
-            <Box mt={1}>
-              <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                {value}
-              </Typography>
-              <Typography variant="body2" sx={{ color: "#666" }}>
-                {subtitle || title}
-              </Typography>
-            </Box>
+      ) : (
+        <Box display="flex" alignItems="center" gap={2}>
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: 1.5,
+              backgroundColor: bgColor,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {icon}
           </Box>
-        )}
 
-        {badge ? (
-          <Box sx={{ ml: 1 }}>
-            <Badge badgeContent={badge} color="warning" />
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              {value}
+            </Typography>
+            <Typography variant="body2" sx={{ color: "#666" }}>
+              {subtitle || title}
+            </Typography>
           </Box>
-        ) : null}
-      </Box>
+        </Box>
+      )}
 
       {to && (
         <Box mt={2}>

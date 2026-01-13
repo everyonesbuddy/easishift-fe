@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
+import axios from "axios";
+import api from "../config/api";
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -6,6 +8,7 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(""); // always string
+  const [tenant, setTenant] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -14,6 +17,19 @@ export const AuthProvider = ({ children }) => {
       const parsedUser = JSON.parse(savedUser);
       setUser(parsedUser);
       setRole(parsedUser.role || "staff"); // ✅ always a string
+      // try to fetch tenant if available
+      if (parsedUser.tenantId) {
+        (async () => {
+          try {
+            const res = await api.get(`/tenants/${parsedUser.tenantId}`);
+            // Normalize: API may return { tenant: {...} } or raw tenant
+            setTenant(res.data?.tenant || res.data || null);
+          } catch (err) {
+            // swallow — tenant can be fetched later
+            console.error("Failed to fetch tenant in AuthProvider", err);
+          }
+        })();
+      }
     }
     setLoading(false);
   }, []);
@@ -43,14 +59,43 @@ export const AuthProvider = ({ children }) => {
 
     setUser(userData);
     setRole(detectedRole);
+    // fetch tenant for global state if present
+    if (userData && userData.tenantId) {
+      (async () => {
+        try {
+          const res = await api.get(`/tenants/${userData.tenantId}`);
+          setTenant(res.data?.tenant || res.data || null);
+        } catch (err) {
+          console.error("Failed to fetch tenant after login", err);
+          setTenant(null);
+        }
+      })();
+    } else {
+      setTenant(null);
+    }
 
     localStorage.setItem("user", JSON.stringify(userData));
     localStorage.setItem("role", detectedRole);
   };
 
+  // Allow manual refresh of tenant data
+  const refreshTenant = async () => {
+    if (!user || !user.tenantId) return null;
+    try {
+      const res = await api.get(`/tenants/${user.tenantId}`);
+      const t = res.data?.tenant || res.data || null;
+      setTenant(t);
+      return t;
+    } catch (err) {
+      console.error("Failed to refresh tenant", err);
+      return null;
+    }
+  };
+
   const logout = () => {
     setUser(null);
     setRole("");
+    setTenant(null);
     localStorage.removeItem("user");
     localStorage.removeItem("role");
   };
@@ -71,6 +116,8 @@ export const AuthProvider = ({ children }) => {
       value={{
         user,
         role,
+        tenant,
+        refreshTenant,
         isPatient,
         isStaff,
         isAdmin,

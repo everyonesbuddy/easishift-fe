@@ -44,17 +44,11 @@ export default function StaffCreateAndEditForm({ staff, onSuccess }) {
           role: disableRoleChange ? staff.role : form.role,
         };
 
-        await axios.put(
-          `http://localhost:5000/api/v1/auth/${staff._id}`,
-          payload,
-          { withCredentials: true }
-        );
+        await axios.put(`/auth/${staff._id}`, payload, {
+          withCredentials: true,
+        });
       } else {
-        await axios.post(
-          "http://localhost:5000/api/v1/auth/signup/staff",
-          form,
-          { withCredentials: true }
-        );
+        await axios.post("/auth/signup/staff", form, { withCredentials: true });
       }
 
       onSuccess();

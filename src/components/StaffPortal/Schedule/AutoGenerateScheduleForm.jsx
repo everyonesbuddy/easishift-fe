@@ -30,13 +30,10 @@ export default function AutoGenerateScheduleForm({ onSuccess }) {
     async function loadCoverages() {
       setFetching(true);
       try {
-        const res = await axios.get(
-          "http://localhost:5000/api/v1/coverage/unfilled-auto",
-          {
-            withCredentials: true,
-            params: selectedRole ? { role: selectedRole } : {},
-          }
-        );
+        const res = await axios.get("/coverage/unfilled-auto", {
+          withCredentials: true,
+          params: selectedRole ? { role: selectedRole } : {},
+        });
 
         // Filter out past coverages
         const now = new Date();
@@ -74,7 +71,7 @@ export default function AutoGenerateScheduleForm({ onSuccess }) {
 
     try {
       const res = await axios.post(
-        "http://localhost:5000/api/v1/schedules/auto-generate",
+        "/schedules/auto-generate",
         { coverageIds: selectedIds },
         { withCredentials: true }
       );

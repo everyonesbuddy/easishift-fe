@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import axios from "axios";
+import api from "../../../config/api";
 import {
   Paper,
   Typography,
@@ -119,14 +119,12 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
     async function load() {
       try {
         const scheduleURL = isAdmin
-          ? `http://localhost:5000/api/v1/schedules`
-          : `http://localhost:5000/api/v1/schedules?staffId=${userId}`;
+          ? `/schedules`
+          : `/schedules?staffId=${userId}`;
 
         const [scheduleRes, coverageRes] = await Promise.all([
-          axios.get(scheduleURL, { withCredentials: true }),
-          axios.get(`http://localhost:5000/api/v1/coverage`, {
-            withCredentials: true,
-          }),
+          api.get(scheduleURL),
+          api.get(`/coverage`),
         ]);
 
         setSchedules(scheduleRes.data || []);

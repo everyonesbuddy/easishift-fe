@@ -26,17 +26,14 @@ export default function SignupTenant() {
     setError("");
 
     try {
-      const res = await axios.post(
-        "http://localhost:5000/api/v1/auth/signup/tenant",
-        {
-          name: hospitalName,
-          email: adminEmail,
-          password: adminPassword,
-          phone,
-          address,
-          adminName,
-        }
-      );
+      const res = await axios.post("/auth/signup/tenant", {
+        name: hospitalName,
+        email: adminEmail,
+        password: adminPassword,
+        phone,
+        address,
+        adminName,
+      });
 
       console.log("Tenant created:", res.data);
       navigate("/login");

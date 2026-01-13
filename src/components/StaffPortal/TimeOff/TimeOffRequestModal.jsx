@@ -26,7 +26,7 @@ export default function TimeOffRequestModal({ open, onClose, onSuccess }) {
     try {
       setSubmitting(true);
       await axios.post(
-        "http://localhost:5000/api/v1/timeoff",
+        "/timeoff",
         { startTime, endTime, reason },
         { withCredentials: true }
       );

@@ -9,7 +9,7 @@ import {
   Paper,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../config/api";
 
 export default function SignupTenant() {
   const [hospitalName, setHospitalName] = useState("");
@@ -26,7 +26,7 @@ export default function SignupTenant() {
     setError("");
 
     try {
-      const res = await axios.post("/auth/signup/tenant", {
+      const res = await api.post("/auth/signup/tenant", {
         name: hospitalName,
         email: adminEmail,
         password: adminPassword,

@@ -31,6 +31,17 @@ export default function Login() {
     try {
       const res = await api.post("/auth/login/staff", form);
 
+      // if server returns a token, persist it and attach to api defaults
+      const token = res.data?.token;
+      if (token) {
+        try {
+          localStorage.setItem("token", token);
+          api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+        } catch (err) {
+          // LocalStorage may be unavailable in some environments
+        }
+      }
+
       login(res.data.user);
       navigate("/dashboard");
     } catch (err) {

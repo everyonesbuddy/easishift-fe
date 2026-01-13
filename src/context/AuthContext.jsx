@@ -13,6 +13,16 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
+    // If a token exists from previous login, attach it to api defaults
+    try {
+      const existingToken = localStorage.getItem("token");
+      if (existingToken)
+        api.defaults.headers.common[
+          "Authorization"
+        ] = `Bearer ${existingToken}`;
+    } catch (err) {
+      // ignore storage errors
+    }
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser);
       setUser(parsedUser);
@@ -98,6 +108,10 @@ export const AuthProvider = ({ children }) => {
     setTenant(null);
     localStorage.removeItem("user");
     localStorage.removeItem("role");
+    try {
+      localStorage.removeItem("token");
+      delete api.defaults.headers.common["Authorization"];
+    } catch (err) {}
   };
 
   const isPatient = role === "patient";

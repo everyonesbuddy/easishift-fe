@@ -21,7 +21,7 @@ import {
   Tab,
 } from "@mui/material";
 import { FiEye, FiSearch, FiPlus, FiMail, FiSend } from "react-icons/fi";
-import axios from "axios";
+import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 import MessageComposer from "./MessageComposer";
 
@@ -53,9 +53,7 @@ export default function MessageList() {
 
   const fetchInbox = async () => {
     try {
-      const res = await axios.get(`/messages/receiver/${user._id}`, {
-        withCredentials: true,
-      });
+      const res = await api.get(`/messages/receiver/${user._id}`);
       setInboxMessages(res.data || []);
     } catch (err) {
       console.error("Failed to fetch inbox", err);
@@ -64,9 +62,7 @@ export default function MessageList() {
 
   const fetchSent = async () => {
     try {
-      const res = await axios.get(`/messages/sender/${user._id}`, {
-        withCredentials: true,
-      });
+      const res = await api.get(`/messages/sender/${user._id}`);
       setSentMessages(res.data || []);
     } catch (err) {
       console.error("Failed to fetch sent messages", err);
@@ -89,11 +85,7 @@ export default function MessageList() {
   const handleViewMessage = async (msg) => {
     if (!msg.read && mainTab === "inbox") {
       try {
-        await axios.put(
-          `/messages/${msg._id}/read`,
-          {},
-          { withCredentials: true }
-        );
+        await api.put(`/messages/${msg._id}/read`, {});
         setInboxMessages((prev) =>
           prev.map((m) => (m._id === msg._id ? { ...m, read: true } : m))
         );

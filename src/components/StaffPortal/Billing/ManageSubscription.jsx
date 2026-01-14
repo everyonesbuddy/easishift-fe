@@ -45,13 +45,13 @@ export default function ManageSubscription() {
       seats: 30,
       highlight: false,
     },
-    {
-      key: "test",
-      name: "Test",
-      priceLabel: "$2.00/yr",
-      seats: 12,
-      desc: "12 seats — yearly",
-    },
+    // {
+    //   key: "test",
+    //   name: "Test",
+    //   priceLabel: "$2.00/yr",
+    //   seats: 12,
+    //   desc: "12 seats — yearly",
+    // },
   ];
 
   const handleChoosePlan = async (planKey) => {
@@ -69,6 +69,42 @@ export default function ManageSubscription() {
     } catch (err) {
       console.error(err);
       setError(err?.response?.data?.message || err.message || "Request failed");
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
+
+  const handleCancelSubscription = async (opts = { atPeriodEnd: true }) => {
+    setError(null);
+    // simple confirmation
+    const ok = window.confirm(
+      opts.atPeriodEnd
+        ? "Cancel subscription at period end? Your users will keep access until the billing period ends."
+        : "Cancel subscription immediately? This will stop access now."
+    );
+    if (!ok) return;
+
+    try {
+      setLoadingPlan("cancel");
+      const res = await api.post("/stripe/cancel-subscription", {
+        tenantId: tenant._id,
+        atPeriodEnd: !!opts.atPeriodEnd,
+      });
+
+      // Refresh tenant state (webhook may still update later)
+      await refreshTenant();
+
+      // show success message briefly
+      alert(
+        "Subscription cancellation requested. Changes may take a moment to appear."
+      );
+    } catch (err) {
+      console.error("Failed to cancel subscription", err);
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to cancel subscription"
+      );
     } finally {
       setLoadingPlan(null);
     }
@@ -119,9 +155,11 @@ export default function ManageSubscription() {
               </Button>
               <Button
                 variant="contained"
-                onClick={() => (window.location.href = "/billing")}
+                onClick={() => handleCancelSubscription()}
               >
-                Billing center
+                {loadingPlan === "cancel"
+                  ? "Processing..."
+                  : "Cancel subscription"}
               </Button>
             </Box>
           </Paper>

@@ -44,13 +44,13 @@ export default function Paywall({ tenant }) {
       seats: 30,
       highlight: false,
     },
-    {
-      key: "test",
-      name: "Test",
-      priceLabel: "$2/yr",
-      seats: 12,
-      highlight: false,
-    },
+    // {
+    //   key: "test",
+    //   name: "Test",
+    //   priceLabel: "$2/yr",
+    //   seats: 12,
+    //   highlight: false,
+    // },
   ];
 
   const handleChoosePlan = async (planKey) => {

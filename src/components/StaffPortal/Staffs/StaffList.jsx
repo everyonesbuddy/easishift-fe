@@ -20,7 +20,7 @@ import {
   InputLabel,
   Avatar,
 } from "@mui/material";
-import axios from "axios";
+import api from "../../../config/api";
 import { FiUserPlus, FiMail, FiPhone, FiSearch } from "react-icons/fi";
 import { AiOutlineCalendar } from "react-icons/ai";
 import { useAuth } from "../../../context/AuthContext";

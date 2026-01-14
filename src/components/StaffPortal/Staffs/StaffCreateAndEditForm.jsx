@@ -8,7 +8,7 @@ import {
   Paper,
   Stack,
 } from "@mui/material";
-import axios from "axios";
+import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 
 export default function StaffCreateAndEditForm({ staff, onSuccess }) {
@@ -44,11 +44,9 @@ export default function StaffCreateAndEditForm({ staff, onSuccess }) {
           role: disableRoleChange ? staff.role : form.role,
         };
 
-        await axios.put(`/auth/${staff._id}`, payload, {
-          withCredentials: true,
-        });
+        await api.put(`/auth/${staff._id}`, payload);
       } else {
-        await axios.post("/auth/signup/staff", form, { withCredentials: true });
+        await api.post("/auth/signup/staff", form);
       }
 
       onSuccess();

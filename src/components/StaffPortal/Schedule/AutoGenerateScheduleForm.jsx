@@ -13,7 +13,7 @@ import {
   Paper,
   Stack,
 } from "@mui/material";
-import axios from "axios";
+import api from "../../../config/api";
 
 const roles = ["doctor", "nurse", "receptionist", "billing", "staff", "other"];
 
@@ -30,8 +30,7 @@ export default function AutoGenerateScheduleForm({ onSuccess }) {
     async function loadCoverages() {
       setFetching(true);
       try {
-        const res = await axios.get("/coverage/unfilled-auto", {
-          withCredentials: true,
+        const res = await api.get("/coverage/unfilled-auto", {
           params: selectedRole ? { role: selectedRole } : {},
         });
 
@@ -70,11 +69,9 @@ export default function AutoGenerateScheduleForm({ onSuccess }) {
     setLoading(true);
 
     try {
-      const res = await axios.post(
-        "/schedules/auto-generate",
-        { coverageIds: selectedIds },
-        { withCredentials: true }
-      );
+      const res = await api.post("/schedules/auto-generate", {
+        coverageIds: selectedIds,
+      });
 
       alert(`Generated ${res.data.generatedCount} shifts.`);
       onSuccess?.();

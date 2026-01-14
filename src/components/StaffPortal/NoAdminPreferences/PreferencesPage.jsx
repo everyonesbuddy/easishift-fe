@@ -17,7 +17,7 @@ import {
   IconButton,
 } from "@mui/material";
 import { FiSave, FiInfo } from "react-icons/fi";
-import axios from "axios";
+import api from "../../../config/api";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -30,9 +30,7 @@ export default function PreferencesPage() {
   useEffect(() => {
     async function fetchPrefs() {
       try {
-        const res = await axios.get("/preferences/me", {
-          withCredentials: true,
-        });
+        const res = await api.get("/preferences/me");
         setPrefs(res.data || {});
       } catch (err) {
         console.error(err);

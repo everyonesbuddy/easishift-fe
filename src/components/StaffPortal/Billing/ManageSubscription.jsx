@@ -80,7 +80,7 @@ export default function ManageSubscription() {
     const ok = window.confirm(
       opts.atPeriodEnd
         ? "Cancel subscription at period end? Your users will keep access until the billing period ends."
-        : "Cancel subscription immediately? This will stop access now."
+        : "Cancel subscription immediately? This will stop access now.",
     );
     if (!ok) return;
 
@@ -96,14 +96,14 @@ export default function ManageSubscription() {
 
       // show success message briefly
       alert(
-        "Subscription cancellation requested. Changes may take a moment to appear."
+        "Subscription cancellation requested. Changes may take a moment to appear.",
       );
     } catch (err) {
       console.error("Failed to cancel subscription", err);
       setError(
         err?.response?.data?.message ||
           err?.message ||
-          "Failed to cancel subscription"
+          "Failed to cancel subscription",
       );
     } finally {
       setLoadingPlan(null);
@@ -168,7 +168,12 @@ export default function ManageSubscription() {
             Upgrade options
           </Typography>
 
-          <Grid container spacing={3} alignItems="stretch">
+          <Grid
+            container
+            spacing={3}
+            alignItems="stretch"
+            justifyContent="center"
+          >
             {plans.map((p) => (
               <Grid item xs={12} md={4} key={p.key}>
                 <Paper
@@ -230,8 +235,8 @@ export default function ManageSubscription() {
                         {loadingPlan === p.key
                           ? "Redirecting..."
                           : p.highlight
-                          ? "Choose plan"
-                          : "Upgrade"}
+                            ? "Choose plan"
+                            : "Upgrade"}
                       </Button>
                     )}
                   </Box>

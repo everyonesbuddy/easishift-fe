@@ -121,7 +121,7 @@ function Sidebar() {
           variant="caption"
           sx={{ color: "#9ca3af", mt: 0.5, display: "block" }} // gray-400
         >
-          Healthcare Scheduling
+          Outpatient Scheduling
         </Typography>
       </Box>
 

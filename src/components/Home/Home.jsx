@@ -143,7 +143,7 @@ export default function Home() {
           {/* LEFT */}
           <Box>
             <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
-              <Chip icon={<FiZap />} label="Outpatient scheduling" />
+              <Chip icon={<FiZap />} label="Healthcare scheduling" />
               <Chip icon={<FiShield />} label="Designed for change" />
               <Chip icon={<FiCalendar />} label="No enterprise overhead" />
             </Stack>
@@ -163,7 +163,7 @@ export default function Home() {
               variant="h6"
               sx={{ color: "text.secondary", mt: 2, maxWidth: 680 }}
             >
-              We help outpatient clinics schedule doctors and nurses without
+              We help Healthcare facilities schedule doctors and nurses without
               spreadsheets, last-minute chaos, or burnout.
             </Typography>
 
@@ -310,7 +310,7 @@ export default function Home() {
             <Testimonial
               quote="Call-outs used to derail the entire day. Now they’re manageable."
               name="Clinic Operations Lead"
-              role="Outpatient services"
+              role="Healthcare services"
             />
             <Testimonial
               quote="We finally see overtime before it becomes a payroll problem."

@@ -87,7 +87,7 @@ export default function MessageList() {
       try {
         await api.put(`/messages/${msg._id}/read`, {});
         setInboxMessages((prev) =>
-          prev.map((m) => (m._id === msg._id ? { ...m, read: true } : m))
+          prev.map((m) => (m._id === msg._id ? { ...m, read: true } : m)),
         );
       } catch (err) {
         console.error("Failed to mark message as read", err);
@@ -114,7 +114,7 @@ export default function MessageList() {
       .sort(
         (a, b) =>
           new Date(b.createdAt || b.sentAt || b.updatedAt) -
-          new Date(a.createdAt || a.sentAt || a.updatedAt)
+          new Date(a.createdAt || a.sentAt || a.updatedAt),
       );
   }, [inboxMessages, searchTerm]);
 
@@ -132,7 +132,7 @@ export default function MessageList() {
       .sort(
         (a, b) =>
           new Date(b.createdAt || b.sentAt || b.updatedAt) -
-          new Date(a.createdAt || a.sentAt || a.updatedAt)
+          new Date(a.createdAt || a.sentAt || a.updatedAt),
       );
   }, [sentMessages, searchTerm]);
 
@@ -316,7 +316,7 @@ export default function MessageList() {
                         (mainTab === "inbox"
                           ? selectedMessage.senderId
                           : selectedMessage.receiverId
-                        )?.role
+                        )?.role,
                       ),
                       width: 56,
                       height: 56,

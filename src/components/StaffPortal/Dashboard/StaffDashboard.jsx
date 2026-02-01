@@ -6,7 +6,8 @@ import {
   Button,
   Grid,
   CircularProgress,
-  Modal,
+  Dialog,
+  DialogContent,
   Paper,
 } from "@mui/material";
 
@@ -53,36 +54,38 @@ export default function StaffDashboard() {
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    async function loadDashboardData() {
-      try {
-        if (!user || !user.tenantId) throw new Error("No tenant ID");
+  // Extracted loader so we can refresh after modal actions
+  async function loadDashboardData() {
+    setLoading(true);
+    try {
+      if (!user || !user.tenantId) throw new Error("No tenant ID");
 
-        // 🔥 USE THE NEW ROUTES WITH ID
-        const endpoint = isAdmin
-          ? `/summary/admin/${user._id}`
-          : `/summary/staff/${user._id}`;
+      // 🔥 USE THE NEW ROUTES WITH ID
+      const endpoint = isAdmin
+        ? `/summary/admin/${user._id}`
+        : `/summary/staff/${user._id}`;
 
-        // Summary
-        const summaryRes = await api.get(`${endpoint}`);
+      // Summary
+      const summaryRes = await api.get(`${endpoint}`);
+      setSummary(summaryRes.data);
 
-        setSummary(summaryRes.data);
+      // Tenant
+      const tenantRes = await api.get(`/tenants/${user.tenantId}`);
+      setTenant(tenantRes.data);
 
-        // Tenant
-        const tenantRes = await api.get(`/tenants/${user.tenantId}`);
-        setTenant(tenantRes.data);
-
-        // Staff List (required for schedule form)
-        const staffRes = await api.get(`/auth/users`);
-        setStaffList(staffRes.data);
-      } catch (err) {
-        console.error("Failed to load dashboard", err);
-      } finally {
-        setLoading(false);
-      }
+      // Staff List (required for schedule form)
+      const staffRes = await api.get(`/auth/users`);
+      setStaffList(staffRes.data);
+    } catch (err) {
+      console.error("Failed to load dashboard", err);
+    } finally {
+      setLoading(false);
     }
+  }
 
+  useEffect(() => {
     loadDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isAdmin]);
 
   if (loading)
@@ -185,7 +188,7 @@ export default function StaffDashboard() {
   // Add some padding characters to avoid tight fit
   const minWidthCh = Math.max(
     28,
-    Math.min(60, Math.ceil(longestLabelLength * 0.9))
+    Math.min(60, Math.ceil(longestLabelLength * 0.9)),
   );
 
   console.log("Tenant data on dashboard:", tenant);
@@ -261,6 +264,57 @@ export default function StaffDashboard() {
         </Box>
       </Box>
 
+      {/* Action buttons */}
+      <Box
+        sx={{
+          mb: 4,
+          display: "flex",
+          gap: 2,
+          flexWrap: "wrap",
+          justifyContent: "right",
+          marginRight: 4,
+        }}
+      >
+        {isAdmin ? (
+          <>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => setOpenCoverageModal(true)}
+            >
+              Add Coverage
+            </Button>
+
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={() => setOpenScheduleModal(true)}
+            >
+              Create Schedule
+            </Button>
+
+            <Button
+              variant="contained"
+              color="warning"
+              onClick={() => setOpenAutoModal(true)}
+            >
+              Auto-Generate Schedule
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => {
+              // open schedule modal prefilled for current user
+              setOpenScheduleModal(true);
+            }}
+          >
+            Pick up shift
+          </Button>
+        )}
+      </Box>
+
       {/* Cards */}
       <Grid container spacing={4} alignItems="center" justifyContent="center">
         {(isAdmin ? adminCards : staffCards).map((card) => (
@@ -273,6 +327,7 @@ export default function StaffDashboard() {
               icon={card.icon}
               layout={card.layout}
               bgColor={card.bgColor}
+              minWidth={250}
               badge={card.badge}
             />
           </Grid>
@@ -282,6 +337,62 @@ export default function StaffDashboard() {
       {/* Charts */}
       {/* 🔥 CHARTS STILL USE SCHEDULES + COVERAGE DIRECTLY — NOTHING TO CHANGE */}
       <ScheduleAndCoverageCharts userId={user._id} isAdmin={isAdmin} />
+
+      {/* Modals for actions */}
+      <Dialog
+        open={openCoverageModal}
+        onClose={() => setOpenCoverageModal(false)}
+        fullWidth
+        maxWidth="sm"
+        scroll="paper"
+      >
+        <DialogContent dividers>
+          <CoverageCreateForm
+            tenantId={user?.tenantId}
+            onSuccess={() => {
+              setOpenCoverageModal(false);
+              loadDashboardData();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={openScheduleModal}
+        onClose={() => setOpenScheduleModal(false)}
+        fullWidth
+        maxWidth="sm"
+        scroll="paper"
+      >
+        <DialogContent dividers>
+          <ScheduleForm
+            staffList={staffList}
+            initialStaffId={isAdmin ? "" : user?._id}
+            disableStaffSelect={!isAdmin}
+            onSuccess={() => {
+              setOpenScheduleModal(false);
+              loadDashboardData();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={openAutoModal}
+        onClose={() => setOpenAutoModal(false)}
+        fullWidth
+        maxWidth="md"
+        scroll="paper"
+      >
+        <DialogContent dividers>
+          <AutoGenerateScheduleForm
+            onSuccess={() => {
+              setOpenAutoModal(false);
+              loadDashboardData();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </Container>
   );
 }

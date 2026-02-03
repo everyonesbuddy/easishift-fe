@@ -14,6 +14,7 @@ import {
   Stack,
 } from "@mui/material";
 import api from "../../../config/api";
+import { toast } from "react-toastify";
 
 const roles = ["doctor", "nurse", "receptionist", "billing", "staff", "other"];
 
@@ -37,7 +38,7 @@ export default function AutoGenerateScheduleForm({ onSuccess }) {
         // Filter out past coverages
         const now = new Date();
         const upcoming = (Array.isArray(res.data) ? res.data : []).filter(
-          (cov) => new Date(cov.endTime) >= now
+          (cov) => new Date(cov.endTime) >= now,
         );
 
         setCoverages(upcoming);
@@ -55,7 +56,7 @@ export default function AutoGenerateScheduleForm({ onSuccess }) {
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
@@ -73,7 +74,14 @@ export default function AutoGenerateScheduleForm({ onSuccess }) {
         coverageIds: selectedIds,
       });
 
-      alert(`Generated ${res.data.generatedCount} shifts.`);
+      toast.success(`Generated ${res.data.generatedCount} shifts.`, {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
       onSuccess?.();
       setSelectedIds([]);
     } catch (err) {
@@ -86,18 +94,32 @@ export default function AutoGenerateScheduleForm({ onSuccess }) {
 
   return (
     <Paper
-      sx={{ p: 3, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.02)" }}
+      sx={{
+        p: { xs: 1.5, md: 3 },
+        borderRadius: 2,
+        backgroundColor: "rgba(255,255,255,0.02)",
+      }}
       elevation={0}
     >
-      <Typography variant="h6" sx={{ mb: 2 }}>
+      <Typography
+        variant="h6"
+        sx={{ mb: 1.5, fontSize: { xs: "1rem", md: "1.25rem" } }}
+      >
         Auto-Generate Schedule
       </Typography>
 
-      <Typography variant="body2" sx={{ mb: 2, color: "gray" }}>
+      <Typography
+        variant="body2"
+        sx={{
+          mb: 1.5,
+          color: "gray",
+          fontSize: { xs: "0.8rem", md: "0.95rem" },
+        }}
+      >
         Select the role and the coverages you want to auto-schedule.
       </Typography>
 
-      <Stack spacing={2}>
+      <Stack spacing={1.25}>
         {/* Role selection */}
         <FormControl fullWidth>
           <InputLabel>Role (optional)</InputLabel>
@@ -115,13 +137,19 @@ export default function AutoGenerateScheduleForm({ onSuccess }) {
         </FormControl>
 
         {fetching ? (
-          <Typography>Loading coverages...</Typography>
+          <Typography sx={{ color: "gray" }}>Loading coverages...</Typography>
         ) : coverages.length === 0 ? (
-          <Typography sx={{ mb: 2, color: "gray" }}>
+          <Typography sx={{ mb: 1.5, color: "gray" }}>
             No unfilled coverages available.
           </Typography>
         ) : (
-          <Box sx={{ maxHeight: 320, overflowY: "auto", pr: 0.5 }}>
+          <Box
+            sx={{
+              maxHeight: { xs: "60vh", md: 320 },
+              overflowY: "auto",
+              pr: 0.5,
+            }}
+          >
             {coverages
               .slice()
               .sort((a, b) => {
@@ -140,7 +168,7 @@ export default function AutoGenerateScheduleForm({ onSuccess }) {
                   {
                     hour: "2-digit",
                     minute: "2-digit",
-                  }
+                  },
                 );
                 const endStr = new Date(cov.endTime).toLocaleTimeString([], {
                   hour: "2-digit",
@@ -156,9 +184,10 @@ export default function AutoGenerateScheduleForm({ onSuccess }) {
                     onClick={() => !isZero && toggleSelect(cov._id)}
                     elevation={selected ? 6 : 0}
                     sx={{
-                      p: 1,
+                      p: { xs: 0.75, md: 1 },
                       my: 0.5,
                       display: "flex",
+                      flexDirection: { xs: "column", sm: "row" },
                       alignItems: "center",
                       justifyContent: "space-between",
                       cursor: isZero ? "default" : "pointer",
@@ -166,18 +195,19 @@ export default function AutoGenerateScheduleForm({ onSuccess }) {
                       backgroundColor: selected
                         ? "rgba(25,118,210,0.06)"
                         : isZero
-                        ? "rgba(255,255,255,0.01)"
-                        : "transparent",
+                          ? "rgba(255,255,255,0.01)"
+                          : "transparent",
                       border: "1px solid rgba(255,255,255,0.03)",
-                      opacity: isZero ? 0.55 : 1,
-                      pointerEvents: isZero ? "auto" : "auto",
+                      opacity: isZero ? 0.65 : 1,
                     }}
                   >
-                    <Stack
-                      direction="row"
-                      spacing={1}
-                      alignItems="center"
-                      sx={{ flex: 1 }}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        width: "100%",
+                      }}
                     >
                       <Checkbox
                         size="small"
@@ -187,31 +217,43 @@ export default function AutoGenerateScheduleForm({ onSuccess }) {
                         disabled={isZero}
                       />
 
-                      <Box sx={{ minWidth: 120 }}>
-                        <Typography sx={{ fontWeight: 600, fontSize: 13 }}>
-                          {dateStr}
-                        </Typography>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexDirection: "column",
+                          minWidth: 0,
+                          mr: 1,
+                        }}
+                      >
                         <Typography
-                          variant="caption"
-                          sx={{ color: "gray", display: "block" }}
+                          sx={{
+                            fontWeight: 600,
+                            fontSize: { xs: 12, md: 13 },
+                            lineHeight: 1,
+                          }}
+                          noWrap
                         >
+                          {dateStr} ·{" "}
                           {cov.role.charAt(0).toUpperCase() + cov.role.slice(1)}
                         </Typography>
-                      </Box>
-
-                      <Box sx={{ flex: 1 }}>
-                        <Typography sx={{ fontSize: 13 }}>
+                        <Typography
+                          sx={{ fontSize: { xs: 12, md: 13 }, color: "gray" }}
+                          noWrap
+                        >
                           {startStr} — {endStr}
+                          {cov.location ? ` · ${cov.location}` : ""}
                         </Typography>
-                        {cov.location && (
-                          <Typography variant="caption" sx={{ color: "gray" }}>
-                            {cov.location}
-                          </Typography>
-                        )}
                       </Box>
-                    </Stack>
+                    </Box>
 
-                    <Stack direction="row" spacing={1} alignItems="center">
+                    <Box
+                      sx={{
+                        display: "flex",
+                        gap: 2,
+                        alignItems: "center",
+                        mt: { xs: 1, sm: 0 },
+                      }}
+                    >
                       <Box sx={{ textAlign: "right" }}>
                         <Typography
                           variant="caption"
@@ -219,12 +261,14 @@ export default function AutoGenerateScheduleForm({ onSuccess }) {
                         >
                           Required
                         </Typography>
-                        <Typography sx={{ fontWeight: 700 }}>
+                        <Typography
+                          sx={{ fontWeight: 700, fontSize: { xs: 13, md: 14 } }}
+                        >
                           {cov.requiredCount}
                         </Typography>
                       </Box>
 
-                      <Box sx={{ textAlign: "right", ml: 1 }}>
+                      <Box sx={{ textAlign: "right" }}>
                         <Typography
                           variant="caption"
                           sx={{ color: "gray", display: "block" }}
@@ -234,17 +278,18 @@ export default function AutoGenerateScheduleForm({ onSuccess }) {
                         <Typography
                           sx={{
                             fontWeight: 700,
+                            fontSize: { xs: 13, md: 14 },
                             color: isZero
                               ? "text.secondary"
                               : cov.remaining === 0
-                              ? "error.main"
-                              : "success.main",
+                                ? "error.main"
+                                : "success.main",
                           }}
                         >
                           {cov.remaining}
                         </Typography>
                       </Box>
-                    </Stack>
+                    </Box>
                   </Paper>
                 );
               })}

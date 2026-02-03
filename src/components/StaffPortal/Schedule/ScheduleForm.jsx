@@ -12,6 +12,7 @@ import {
   Stack,
 } from "@mui/material";
 import api from "../../../config/api";
+import { toast } from "react-toastify";
 
 // Convert UTC → local string for <input type="datetime-local">
 function toLocalInputValue(dateString) {
@@ -115,7 +116,7 @@ export default function ScheduleForm({
 
       try {
         const res = await api.get(
-          `/coverage/unfilled?role=${selectedStaff.role}`
+          `/coverage/unfilled?role=${selectedStaff.role}`,
         );
 
         // Filter out past shifts (based on startTime)
@@ -151,16 +152,24 @@ export default function ScheduleForm({
     try {
       if (isEditing) {
         await api.put(`/schedules/${schedule._id}`, payload);
-        setMessage("✅ Schedule updated!");
+        toast.success("Schedule updated", {
+          position: "top-right",
+          autoClose: 2500,
+        });
       } else {
         await api.post("/schedules", payload);
-        setMessage("✅ Schedule created!");
+        toast.success("Schedule created", {
+          position: "top-right",
+          autoClose: 2500,
+        });
       }
 
       if (onSuccess) onSuccess();
     } catch (err) {
       console.error(err);
-      setMessage("❌ Error saving schedule");
+      const msg = err?.response?.data?.message || "Error saving schedule";
+      setMessage("❌ " + msg);
+      toast.error(msg, { position: "top-right", autoClose: 4000 });
     }
   };
 
@@ -219,7 +228,7 @@ export default function ScheduleForm({
               value={formData.coverageId}
               onChange={(e) => {
                 const cov = coverageOptions.find(
-                  (c) => c._id === e.target.value
+                  (c) => c._id === e.target.value,
                 );
                 if (!cov) return;
 

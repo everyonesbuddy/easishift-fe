@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { TextField, Button, Typography, MenuItem, Box } from "@mui/material";
 import api from "../../../config/api";
+import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 
 export default function MessageComposer({ onSuccess }) {
@@ -41,9 +42,14 @@ export default function MessageComposer({ onSuccess }) {
         body: form.body,
       });
 
+      toast.success("Message sent", { position: "top-right", autoClose: 2000 });
       onSuccess(); // close
     } catch (err) {
       console.error("Failed to send message", err);
+      toast.error("Failed to send message", {
+        position: "top-right",
+        autoClose: 4000,
+      });
     }
   };
 

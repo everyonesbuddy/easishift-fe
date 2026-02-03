@@ -7,7 +7,8 @@ import {
   Box,
   Button,
   Paper,
-  Modal,
+  Dialog,
+  DialogContent,
   Table,
   TableBody,
   TableCell,
@@ -577,26 +578,22 @@ export default function CoveragePlanningPage() {
         </Box>
       )}
 
-      <Modal open={openAdd} onClose={() => setOpenAdd(false)}>
-        <Paper
-          sx={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: 520,
-            p: 4,
-            borderRadius: 3,
-          }}
-        >
+      <Dialog
+        open={openAdd}
+        onClose={() => setOpenAdd(false)}
+        fullWidth
+        maxWidth="sm"
+        scroll="paper"
+      >
+        <DialogContent dividers>
           <CoverageCreateForm
             onSuccess={() => {
               setOpenAdd(false);
               fetchCoverages();
             }}
           />
-        </Paper>
-      </Modal>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={confirmOpen}

@@ -15,6 +15,7 @@ import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useAuth } from "../../../context/AuthContext";
 import api from "../../../config/api";
+import { toast } from "react-toastify";
 
 export default function ManageSubscription() {
   const theme = useTheme();
@@ -92,8 +93,9 @@ export default function ManageSubscription() {
         atPeriodEnd: !!opts.atPeriodEnd,
       });
       await refreshTenant();
-      alert(
+      toast.success(
         "Subscription cancellation requested. Changes may take a moment to appear.",
+        { position: "top-right", autoClose: 3000 },
       );
     } catch (err) {
       console.error("Failed to cancel subscription", err);

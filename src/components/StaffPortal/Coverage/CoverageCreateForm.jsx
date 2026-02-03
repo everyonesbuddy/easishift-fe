@@ -10,6 +10,7 @@ import {
   Stack,
 } from "@mui/material";
 import api from "../../../config/api";
+import { toast } from "react-toastify";
 
 const roles = ["doctor", "nurse", "receptionist", "billing", "staff", "other"];
 
@@ -59,6 +60,10 @@ export default function CoverageCreateForm({ tenantId, onSuccess }) {
       });
 
       setSuccess("Coverage added successfully!");
+      toast.success("Coverage added", {
+        position: "top-right",
+        autoClose: 2500,
+      });
       setRole("");
       setDate("");
       setStartTime("08:00");
@@ -68,7 +73,9 @@ export default function CoverageCreateForm({ tenantId, onSuccess }) {
 
       if (onSuccess) onSuccess();
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to add coverage.");
+      const msg = err.response?.data?.message || "Failed to add coverage.";
+      setError(msg);
+      toast.error(msg, { position: "top-right", autoClose: 4000 });
     } finally {
       setLoading(false);
     }

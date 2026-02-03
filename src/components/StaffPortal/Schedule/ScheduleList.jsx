@@ -9,7 +9,8 @@ import {
   TableRow,
   Button,
   Box,
-  Modal,
+  Dialog,
+  DialogContent,
   Paper,
   TablePagination,
   ToggleButton,
@@ -658,18 +659,14 @@ export default function ScheduleList() {
         </Box>
       )}
 
-      <Modal open={open} onClose={() => closeModal()}>
-        <Paper
-          sx={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: 500,
-            p: 4,
-            borderRadius: 3,
-          }}
-        >
+      <Dialog
+        open={open}
+        onClose={() => closeModal()}
+        fullWidth
+        maxWidth="sm"
+        scroll="paper"
+      >
+        <DialogContent dividers>
           <ScheduleForm
             onSuccess={() => closeModal(true)}
             schedule={editingSchedule}
@@ -679,30 +676,26 @@ export default function ScheduleList() {
             initialStaffId={!isAdmin && !editingSchedule ? user._id : ""}
             disableStaffSelect={!isAdmin && !editingSchedule}
           />
-        </Paper>
-      </Modal>
+        </DialogContent>
+      </Dialog>
 
       {/* Bulk Scheduling Modal */}
-      <Modal open={openAutoModal} onClose={() => setOpenAutoModal(false)}>
-        <Paper
-          sx={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: 500,
-            p: 4,
-            borderRadius: 3,
-          }}
-        >
+      <Dialog
+        open={openAutoModal}
+        onClose={() => setOpenAutoModal(false)}
+        fullWidth
+        maxWidth="md"
+        scroll="paper"
+      >
+        <DialogContent dividers>
           <AutoGenerateScheduleForm
             onSuccess={() => {
               setOpenAutoModal(false);
               window.location.reload();
             }}
           />
-        </Paper>
-      </Modal>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={confirmOpen}

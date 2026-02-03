@@ -18,6 +18,7 @@ import {
 } from "@mui/material";
 import { FiSave, FiInfo } from "react-icons/fi";
 import api from "../../../config/api";
+import { toast } from "react-toastify";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -67,9 +68,10 @@ export default function PreferencesPage() {
       await api.post("/preferences/me", prefs);
       setError("");
       // small confirmation
-      setTimeout(() => {
-        alert("Preferences saved");
-      }, 50);
+      toast.success("Preferences saved", {
+        position: "top-right",
+        autoClose: 2000,
+      });
     } catch (err) {
       console.error(err);
       setError("Failed to save preferences");

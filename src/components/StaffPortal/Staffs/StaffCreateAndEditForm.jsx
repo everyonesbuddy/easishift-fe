@@ -9,6 +9,7 @@ import {
   Stack,
 } from "@mui/material";
 import api from "../../../config/api";
+import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 
 export default function StaffCreateAndEditForm({ staff, onSuccess }) {
@@ -45,13 +46,23 @@ export default function StaffCreateAndEditForm({ staff, onSuccess }) {
         };
 
         await api.put(`/auth/${staff._id}`, payload);
+        toast.success("Staff updated", {
+          position: "top-right",
+          autoClose: 2500,
+        });
       } else {
         await api.post("/auth/signup/staff", form);
+        toast.success("Staff created", {
+          position: "top-right",
+          autoClose: 2500,
+        });
       }
 
       onSuccess();
     } catch (err) {
       console.error(err);
+      const msg = err?.response?.data?.message || "Failed to save staff";
+      toast.error(msg, { position: "top-right", autoClose: 4000 });
     }
   };
 

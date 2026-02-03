@@ -6,6 +6,8 @@ import {
   Button,
   Paper,
   Modal,
+  Dialog,
+  DialogContent,
   Table,
   TableHead,
   TableBody,
@@ -396,24 +398,20 @@ export default function StaffList() {
         </Paper>
       )}
 
-      <Modal open={open} onClose={() => handleModalClose()}>
-        <Paper
-          sx={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%,-50%)",
-            width: 500,
-            p: 4,
-            borderRadius: 3,
-          }}
-        >
+      <Dialog
+        open={open}
+        onClose={() => handleModalClose()}
+        fullWidth
+        maxWidth="sm"
+        scroll="paper"
+      >
+        <DialogContent dividers>
           <StaffCreateAndEditForm
             staff={editingStaff}
             onSuccess={() => handleModalClose(true)}
           />
-        </Paper>
-      </Modal>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={confirmOpen}

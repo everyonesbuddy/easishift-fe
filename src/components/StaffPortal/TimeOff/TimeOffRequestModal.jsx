@@ -2,6 +2,8 @@ import { useState } from "react";
 import {
   Modal,
   Paper,
+  Dialog,
+  DialogContent,
   Box,
   Typography,
   TextField,
@@ -9,6 +11,8 @@ import {
   Alert,
 } from "@mui/material";
 import axios from "axios";
+import api from "../../../config/api";
+import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 
 export default function TimeOffRequestModal({ open, onClose, onSuccess }) {
@@ -25,37 +29,44 @@ export default function TimeOffRequestModal({ open, onClose, onSuccess }) {
       return setError("Start and end time are required");
     try {
       setSubmitting(true);
-      await axios.post(
-        "/timeoff",
-        { startTime, endTime, reason },
-        { withCredentials: true }
-      );
+      // await axios.post(
+      //   "/timeoff",
+      //   { startTime, endTime, reason },
+      //   { withCredentials: true },
+      // );
+      await api.post("/timeoff", {
+        startTime: startTime,
+        endTime: endTime,
+        reason: reason,
+      });
       setStartTime("");
       setEndTime("");
       setReason("");
+      toast.success("Time off request submitted", {
+        position: "top-right",
+        autoClose: 2500,
+      });
       onSuccess?.();
       onClose?.();
     } catch (err) {
       console.error(err);
-      setError(err?.response?.data?.message || "Failed to submit request");
+      const msg = err?.response?.data?.message || "Failed to submit request";
+      setError(msg);
+      toast.error(msg, { position: "top-right", autoClose: 4000 });
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Modal open={open} onClose={onClose}>
-      <Paper
-        sx={{
-          position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          width: 520,
-          p: 4,
-          borderRadius: 2,
-        }}
-      >
+    <Dialog
+      open={open}
+      onClose={() => onClose()}
+      fullWidth
+      maxWidth="sm"
+      scroll="paper"
+    >
+      <DialogContent dividers>
         <Typography variant="h6" sx={{ mb: 2 }}>
           Request Time Off
         </Typography>
@@ -107,7 +118,7 @@ export default function TimeOffRequestModal({ open, onClose, onSuccess }) {
             </Button>
           </Box>
         </Box>
-      </Paper>
-    </Modal>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -17,6 +17,7 @@ import TimeOffRequestList from "./components/StaffPortal/TimeOff/TimeOffRequestL
 import TimeOffDecision from "./components/StaffPortal/TimeOff/TimeOffDecision";
 import PreferencesPage from "./components/StaffPortal/NoAdminPreferences/PreferencesPage";
 import CoveragePlanningPage from "./components/StaffPortal/Coverage/CoveragePlanningPage";
+import { ToastContainer } from "react-toastify";
 import { Box } from "@mui/material";
 import { useAuth } from "./context/AuthContext";
 import { useState } from "react";
@@ -134,6 +135,7 @@ export default function App() {
             }
           />
         </Routes>
+        <ToastContainer />
       </Box>
     </BrowserRouter>
   );

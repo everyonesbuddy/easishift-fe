@@ -31,7 +31,7 @@ export default function StatCard({
       sx={{
         background: "white",
         borderRadius: 2,
-        p: 2,
+        p: { xs: 1.25, sm: 2 },
         border: "1px solid rgba(0,0,0,0.04)",
         position: "relative",
         minHeight: 120,
@@ -47,7 +47,7 @@ export default function StatCard({
     >
       {/* Badge positioned absolutely so it doesn't affect sizing */}
       {badge ? (
-        <Box sx={{ position: "absolute", top: 12, right: 12 }}>
+        <Box sx={{ position: "absolute", top: 12, right: 32 }}>
           <Badge badgeContent={badge} color="warning" />
         </Box>
       ) : null}
@@ -56,23 +56,36 @@ export default function StatCard({
         <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
           <Box
             sx={{
-              width: 48,
-              height: 48,
+              width: { xs: 40, sm: 48 },
+              height: { xs: 40, sm: 48 },
               borderRadius: 1.5,
               backgroundColor: bgColor,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              svg: { width: { xs: 18, sm: 20 }, height: { xs: 18, sm: 20 } },
             }}
           >
             {icon}
           </Box>
 
           <Box mt={1} textAlign="center">
-            <Typography variant="h4" sx={{ fontWeight: 700 }}>
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: 700,
+                fontSize: { xs: "1.25rem", sm: "1.5rem" },
+              }}
+            >
               {value}
             </Typography>
-            <Typography variant="body2" sx={{ color: "#666" }}>
+            <Typography
+              variant="body2"
+              sx={{
+                color: "#666",
+                fontSize: { xs: "0.75rem", sm: "0.875rem" },
+              }}
+            >
               {subtitle || title}
             </Typography>
           </Box>
@@ -81,13 +94,14 @@ export default function StatCard({
         <Box display="flex" alignItems="center" gap={2}>
           <Box
             sx={{
-              width: 48,
-              height: 48,
+              width: { xs: 40, sm: 48 },
+              height: { xs: 40, sm: 48 },
               borderRadius: 1.5,
               backgroundColor: bgColor,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              svg: { width: { xs: 18, sm: 20 }, height: { xs: 18, sm: 20 } },
             }}
           >
             {icon}

@@ -139,11 +139,24 @@ export default function MessageList() {
   const activeFiltered = mainTab === "inbox" ? inboxFiltered : sentFiltered;
 
   return (
-    <Container sx={{ mt: 4 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center">
+    <Container sx={{ mt: 4, px: { xs: 2, sm: 3 } }}>
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        sx={{ flexDirection: { xs: "column", md: "row" }, gap: 1 }}
+      >
         <Box>
-          <Typography variant="h5">Messages</Typography>
-          <Typography color="text.secondary">
+          <Typography
+            variant="h5"
+            sx={{ fontSize: { xs: "1.1rem", md: "1.5rem" } }}
+          >
+            Messages
+          </Typography>
+          <Typography
+            color="text.secondary"
+            sx={{ fontSize: { xs: "0.78rem", md: "0.875rem" } }}
+          >
             Internal team communication
           </Typography>
         </Box>
@@ -152,7 +165,7 @@ export default function MessageList() {
           startIcon={<FiPlus />}
           variant="contained"
           onClick={() => setOpenComposerModal(true)}
-          sx={{ textTransform: "none" }}
+          sx={{ textTransform: "none", width: { xs: "100%", md: "auto" } }}
         >
           New Message
         </Button>
@@ -196,7 +209,7 @@ export default function MessageList() {
 
       <Box
         display="grid"
-        gridTemplateColumns={{ xs: "1fr", lg: "320px 1fr" }}
+        gridTemplateColumns={{ xs: "1fr", md: "320px 1fr" }}
         gap={3}
         mt={3}
       >
@@ -230,7 +243,7 @@ export default function MessageList() {
             />
           </Box>
 
-          <Box maxHeight={600} overflow="auto">
+          <Box sx={{ maxHeight: { xs: "40vh", md: 600 }, overflow: "auto" }}>
             {activeFiltered.length === 0 ? (
               <Box textAlign="center" p={6} color="text.secondary">
                 <FiMail size={48} />
@@ -253,8 +266,8 @@ export default function MessageList() {
                       <Avatar
                         sx={{
                           bgcolor: getRoleColor(person?.role),
-                          width: 48,
-                          height: 48,
+                          width: { xs: 40, md: 48 },
+                          height: { xs: 40, md: 48 },
                           mr: 2,
                         }}
                       >
@@ -266,18 +279,29 @@ export default function MessageList() {
                       </Avatar>
                       <ListItemText
                         primary={
-                          <Typography noWrap fontWeight={600}>
+                          <Typography
+                            noWrap
+                            fontWeight={600}
+                            sx={{ fontSize: { xs: 13, md: "inherit" } }}
+                          >
                             {person?.name || "Unknown"}
                           </Typography>
                         }
                         secondary={
                           <>
-                            <Typography noWrap variant="body2">
+                            <Typography
+                              noWrap
+                              variant="body2"
+                              sx={{ fontSize: { xs: 13, md: "0.875rem" } }}
+                            >
                               {m.subject}
                             </Typography>
                             <Typography
                               variant="caption"
                               color="text.secondary"
+                              sx={{
+                                display: { xs: "none", sm: "inline-block" },
+                              }}
                             >
                               {dateLabel}
                             </Typography>
@@ -318,8 +342,8 @@ export default function MessageList() {
                           : selectedMessage.receiverId
                         )?.role,
                       ),
-                      width: 56,
-                      height: 56,
+                      width: { xs: 40, md: 56 },
+                      height: { xs: 40, md: 56 },
                     }}
                   >
                     {(
@@ -334,16 +358,26 @@ export default function MessageList() {
                       .join("")}
                   </Avatar>
                   <Box>
-                    <Typography variant="h6">
+                    <Typography
+                      variant="h6"
+                      sx={{ fontSize: { xs: "1rem", md: "1.25rem" } }}
+                    >
                       {selectedMessage.subject}
                     </Typography>
-                    <Typography color="text.secondary">
-                      {mainTab === "inbox" ? "From" : "To"}:
+                    <Typography
+                      color="text.secondary"
+                      sx={{ fontSize: { xs: "0.85rem", md: "0.95rem" } }}
+                    >
+                      {mainTab === "inbox" ? "From" : "To"}:{" "}
                       {(mainTab === "inbox"
                         ? selectedMessage.senderId?.name
                         : selectedMessage.receiverId?.name) || "Unknown"}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: { xs: "none", sm: "block" } }}
+                    >
                       {formatMessageDate(selectedMessage)}
                     </Typography>
                   </Box>
@@ -351,7 +385,12 @@ export default function MessageList() {
               </Box>
 
               <Box p={3} flex={1} overflow="auto">
-                <Typography style={{ whiteSpace: "pre-wrap" }}>
+                <Typography
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    fontSize: { xs: 14, md: "inherit" },
+                  }}
+                >
                   {selectedMessage.body}
                 </Typography>
               </Box>
@@ -360,9 +399,8 @@ export default function MessageList() {
                 <Button
                   startIcon={<FiSend />}
                   variant="contained"
-                  onClick={() => {
-                    setOpenComposerModal(true);
-                  }}
+                  onClick={() => setOpenComposerModal(true)}
+                  sx={{ width: { xs: "100%", md: "auto" } }}
                 >
                   Reply
                 </Button>

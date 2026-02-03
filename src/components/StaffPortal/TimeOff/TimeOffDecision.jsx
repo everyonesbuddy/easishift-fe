@@ -32,7 +32,7 @@ function statusColor(status) {
   }
 }
 
-function AvatarGradient({ name, color = "#6B7280" }) {
+function AvatarGradient({ name, color = "#6B7280", sx = {} }) {
   const initials = name
     ? name
         .split(" ")
@@ -43,10 +43,11 @@ function AvatarGradient({ name, color = "#6B7280" }) {
   return (
     <Avatar
       sx={{
-        width: 56,
-        height: 56,
+        width: { xs: 48, sm: 56 },
+        height: { xs: 48, sm: 56 },
         bgcolor: "transparent",
         backgroundImage: bg,
+        ...sx,
       }}
     >
       {initials}
@@ -112,11 +113,7 @@ export default function TimeOffDecision() {
     setError("");
     try {
       setActionLoadingId(id);
-      await axios.patch(
-        `/timeoff/${id}/review`,
-        { status, reviewNotes: notes },
-        { withCredentials: true }
-      );
+      await api.patch(`/timeoff/${id}/review`, { status, reviewNotes: notes });
       await fetchRequests();
       handleClose();
     } catch (err) {
@@ -132,12 +129,16 @@ export default function TimeOffDecision() {
   const deniedCount = list.filter((r) => r.status === "denied").length;
 
   return (
-    <Container sx={{ mt: 3 }}>
+    <Container sx={{ mt: 2, px: { xs: 2, md: 3 } }}>
       <Box
         display="flex"
         justifyContent="space-between"
         alignItems="center"
         mb={2}
+        sx={{
+          flexDirection: { xs: "column", sm: "row" },
+          gap: { xs: 1, sm: 0 },
+        }}
       >
         <div>
           <Typography variant="h6">Time Off Approvals</Typography>
@@ -146,7 +147,7 @@ export default function TimeOffDecision() {
           </Typography>
         </div>
 
-        <Box>
+        <Box sx={{ mt: { xs: 1, sm: 0 } }}>
           <Button
             variant="outlined"
             sx={{ mr: 1 }}
@@ -161,16 +162,16 @@ export default function TimeOffDecision() {
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "repeat(4,1fr)" },
+          gridTemplateColumns: { xs: "repeat(2,1fr)", md: "repeat(4,1fr)" },
           gap: 2,
           mb: 2,
         }}
       >
-        <Paper sx={{ p: 2 }} elevation={1}>
+        <Paper sx={{ p: { xs: 1.5, md: 2 } }} elevation={1}>
           <Typography variant="h5">{requests.length}</Typography>
           <Typography color="text.secondary">Total Requests</Typography>
         </Paper>
-        <Paper sx={{ p: 2 }} elevation={1}>
+        <Paper sx={{ p: { xs: 1.5, md: 2 } }} elevation={1}>
           <Box
             display="flex"
             justifyContent="space-between"
@@ -188,11 +189,11 @@ export default function TimeOffDecision() {
             )}
           </Box>
         </Paper>
-        <Paper sx={{ p: 2 }} elevation={1}>
+        <Paper sx={{ p: { xs: 1.5, md: 2 } }} elevation={1}>
           <Typography variant="h5">{approvedCount}</Typography>
           <Typography color="text.secondary">Approved</Typography>
         </Paper>
-        <Paper sx={{ p: 2 }} elevation={1}>
+        <Paper sx={{ p: { xs: 1.5, md: 2 } }} elevation={1}>
           <Typography variant="h5">{deniedCount}</Typography>
           <Typography color="text.secondary">Denied</Typography>
         </Paper>
@@ -285,12 +286,17 @@ export default function TimeOffDecision() {
                 </Box>
 
                 {r.status === "pending" ? (
-                  <Stack direction="column" spacing={1}>
+                  <Stack
+                    direction="column"
+                    spacing={1}
+                    sx={{ mt: { xs: 1, sm: 0 } }}
+                  >
                     <Button
                       variant="contained"
                       color="success"
                       startIcon={<FiCheck />}
                       onClick={() => handleOpen(r)}
+                      sx={{ width: { xs: "100%", sm: "auto" } }}
                     >
                       Review
                     </Button>
@@ -356,13 +362,21 @@ export default function TimeOffDecision() {
             </Box>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
+        <DialogActions
+          sx={{ flexDirection: { xs: "column", sm: "row" }, gap: 1, p: 2 }}
+        >
+          <Button
+            onClick={handleClose}
+            sx={{ width: { xs: "100%", sm: "auto" } }}
+          >
+            Cancel
+          </Button>
           <Button
             color="error"
             variant="outlined"
             onClick={() => handleDecision(selected._id, "denied")}
             disabled={actionLoadingId === selected?._id}
+            sx={{ width: { xs: "100%", sm: "auto" } }}
           >
             Deny
           </Button>
@@ -371,6 +385,7 @@ export default function TimeOffDecision() {
             variant="contained"
             onClick={() => handleDecision(selected._id, "approved")}
             disabled={actionLoadingId === selected?._id}
+            sx={{ width: { xs: "100%", sm: "auto" } }}
           >
             Approve
           </Button>

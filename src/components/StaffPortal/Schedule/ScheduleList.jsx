@@ -32,6 +32,9 @@ import ScheduleForm from "./ScheduleForm";
 import AutoGenerateScheduleForm from "./AutoGenerateScheduleForm";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import { useAuth } from "../../../context/AuthContext";
+import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import Stack from "@mui/material/Stack";
 
 // Local role helpers (small mapping to match Figma colors)
 const ROLE_COLORS = {
@@ -58,6 +61,8 @@ const getRoleDisplayName = (r) => {
 
 export default function ScheduleList() {
   const { user, isAdmin } = useAuth();
+  const theme = useTheme();
+  const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
   const [schedules, setSchedules] = useState([]);
   const [staff, setStaff] = useState([]);
@@ -195,11 +200,30 @@ export default function ScheduleList() {
   };
 
   return (
-    <Container sx={{ mt: 4 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center">
-        <Typography variant="h5">Staff Scheduling</Typography>
+    <Container sx={{ mt: 4, px: { xs: 2, sm: 3 } }}>
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        sx={{ flexDirection: { xs: "column", md: "row" }, gap: 2 }}
+      >
+        <Typography
+          variant="h5"
+          sx={{ fontSize: { xs: "1.1rem", md: "1.25rem" } }}
+        >
+          Staff Scheduling
+        </Typography>
 
-        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1,
+            alignItems: "center",
+            width: { xs: "100%", md: "auto" },
+            justifyContent: { xs: "stretch", md: "flex-end" },
+            flexDirection: { xs: "column", md: "row" },
+          }}
+        >
           {/* View toggle moved next to actions */}
           <ToggleButtonGroup
             value={view}
@@ -208,9 +232,11 @@ export default function ScheduleList() {
             sx={{
               backgroundColor: "#f3f4f6",
               borderRadius: 2,
+              width: { xs: "100%", md: "auto" },
               "& .MuiToggleButton-root": {
                 textTransform: "none",
                 color: "#374151",
+                px: 2,
               },
               "& .MuiToggleButton-root.Mui-selected": {
                 backgroundColor: "#2563eb",
@@ -219,10 +245,16 @@ export default function ScheduleList() {
             }}
             size="small"
           >
-            <ToggleButton value="table">
+            <ToggleButton
+              value="table"
+              sx={{ width: { xs: "50%", md: "auto" } }}
+            >
               <FiList style={{ marginRight: 6 }} /> List
             </ToggleButton>
-            <ToggleButton value="calendar">
+            <ToggleButton
+              value="calendar"
+              sx={{ width: { xs: "50%", md: "auto" } }}
+            >
               <FiCalendar style={{ marginRight: 6 }} /> Calendar
             </ToggleButton>
           </ToggleButtonGroup>
@@ -234,7 +266,11 @@ export default function ScheduleList() {
               variant="outlined"
               startIcon={<FiPlus />}
               onClick={() => setOpenAutoModal(true)}
-              sx={{ textTransform: "none", borderRadius: 2 }}
+              sx={{
+                textTransform: "none",
+                borderRadius: 2,
+                width: { xs: "100%", sm: "auto" },
+              }}
             >
               Bulk Scheduling
             </Button>
@@ -256,7 +292,11 @@ export default function ScheduleList() {
                 setOpen(true);
               }
             }}
-            sx={{ textTransform: "none", borderRadius: 2 }}
+            sx={{
+              textTransform: "none",
+              borderRadius: 2,
+              width: { xs: "100%", sm: "auto" },
+            }}
           >
             Individual Schedule
           </Button>
@@ -267,16 +307,34 @@ export default function ScheduleList() {
       <Paper sx={{ mt: 3, p: 2 }}>
         <Box
           display="flex"
-          flexDirection={{ xs: "column", lg: "row" }}
-          alignItems="center"
+          flexDirection={{ xs: "column", md: "row" }}
+          alignItems={{ xs: "stretch", md: "center" }}
           justifyContent="space-between"
           gap={2}
         >
-          <Box display="flex" alignItems="center" gap={2}>
-            <Typography color="text.secondary">Filter:</Typography>
-            {/* Role buttons */}
+          <Box
+            display="flex"
+            alignItems="center"
+            gap={2}
+            sx={{ width: { xs: "100%", md: "auto" } }}
+          >
+            <Typography
+              color="text.secondary"
+              sx={{ fontSize: { xs: "0.78rem", md: "0.875rem" } }}
+            >
+              Filter:
+            </Typography>
+            {/* Role buttons: horizontally scrollable on small screens */}
             {isAdmin && (
-              <Box display="flex" gap={1}>
+              <Box
+                display="flex"
+                gap={1}
+                sx={{
+                  px: { xs: 0.5, md: 0 },
+                  overflowX: { xs: "auto", md: "visible" },
+                  "& > *": { whiteSpace: "nowrap", flexShrink: 0 },
+                }}
+              >
                 {["all", "doctor", "nurse", "receptionist", "billing"].map(
                   (r) => (
                     <Button
@@ -288,23 +346,37 @@ export default function ScheduleList() {
                             ? "contained"
                             : "outlined"
                           : roleFilter === r
-                          ? "contained"
-                          : "outlined"
+                            ? "contained"
+                            : "outlined"
                       }
                       onClick={() => setRoleFilter(r)}
-                      sx={{ textTransform: "none", borderRadius: 2 }}
+                      sx={{
+                        textTransform: "none",
+                        borderRadius: 2,
+                        px: 1.5,
+                        py: { xs: 0.5, md: 0.5 },
+                      }}
                     >
                       {r === "all"
                         ? "All"
                         : r.charAt(0).toUpperCase() + r.slice(1)}
                     </Button>
-                  )
+                  ),
                 )}
               </Box>
             )}
           </Box>
 
-          <Box display="flex" gap={2} alignItems="center">
+          <Box
+            display="flex"
+            gap={2}
+            alignItems="center"
+            sx={{
+              width: { xs: "100%", md: "auto" },
+              justifyContent: { xs: "space-between", md: "flex-end" },
+              mt: { xs: 1, md: 0 },
+            }}
+          >
             <FormControl size="small" sx={{ minWidth: 160 }}>
               <InputLabel>Status</InputLabel>
               <Select
@@ -324,132 +396,200 @@ export default function ScheduleList() {
 
       {/* TABLE VIEW */}
       {view === "table" ? (
-        <>
-          <Table sx={{ mt: 2, background: "white" }} size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ color: "black", fontWeight: 700 }}>
-                  Staff
-                </TableCell>
-                <TableCell sx={{ color: "black" }}>Role</TableCell>
-                <TableCell sx={{ color: "black" }}>Start</TableCell>
-                <TableCell sx={{ color: "black" }}>End</TableCell>
-                <TableCell sx={{ color: "black" }}>Status</TableCell>
-                <TableCell sx={{ color: "black" }}>Notes</TableCell>
-                {isAdmin && (
-                  <TableCell sx={{ color: "black" }}>Actions</TableCell>
-                )}
-              </TableRow>
-            </TableHead>
-
-            <TableBody>
-              {filteredSchedules
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((s) => (
-                  <TableRow
-                    key={s._id}
-                    sx={{ "&:hover": { background: "#f3f4f6" } }}
+        isCompact ? (
+          <Box sx={{ mt: 2, display: "grid", gap: 2 }}>
+            {filteredSchedules
+              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+              .map((s) => (
+                <Paper key={s._id} sx={{ p: 2 }}>
+                  <Box
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="space-between"
                   >
-                    <TableCell sx={{ color: "black" }}>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <Box
-                          sx={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: "50%",
-                            backgroundColor: ROLE_COLORS[s.role] || "#6b7280",
-                          }}
-                        />
-                        <Box>{s.staffId?.name || "Unknown"}</Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={{ color: "black" }}>
-                      <Box
-                        component="span"
-                        sx={{
-                          px: 1,
-                          py: 0.4,
-                          borderRadius: 1,
-                          backgroundColor:
-                            (ROLE_COLORS[s.role] || "#6b7280") + "22",
-                          color: ROLE_COLORS[s.role] || "#000",
-                          fontWeight: 600,
-                          fontSize: 13,
-                        }}
+                    <Box>
+                      <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                        {s.staffId?.name || "Unknown"}
+                      </Typography>
+                      <Typography
+                        sx={{ fontSize: 12, color: "text.secondary" }}
                       >
-                        {getRoleDisplayName(s.role)}
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={{ color: "black" }}>
-                      {formatLocal(s.startTime)}
-                    </TableCell>
-                    <TableCell sx={{ color: "black" }}>
-                      {formatLocal(s.endTime)}
-                    </TableCell>
-                    <TableCell>
-                      <Box
-                        component="span"
-                        sx={{
-                          display: "inline-block",
-                          px: 1,
-                          py: 0.4,
-                          borderRadius: 1,
-                          border: `1px solid ${
-                            statusColors[s.status] || "#9e9e9e"
-                          }`,
-                          color: statusColors[s.status] || "#000",
-                          fontWeight: 600,
-                          fontSize: 12,
-                          background: "#fff",
-                        }}
+                        {getRoleDisplayName(s.role)} •{" "}
+                        {formatLocal(s.startTime)} - {formatLocal(s.endTime)}
+                      </Typography>
+                      <Typography
+                        sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
+                        noWrap
                       >
-                        {s.status}
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={{ color: "black" }}>
-                      {s.notes || "—"}
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color="info"
-                          onClick={() => openEdit(s)}
-                          sx={{ mr: 1, borderRadius: 2, textTransform: "none" }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color="error"
-                          onClick={() => askDelete(s._id)}
-                          sx={{ borderRadius: 2, textTransform: "none" }}
-                        >
-                          Delete
-                        </Button>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-            </TableBody>
-          </Table>
+                        {s.notes || "—"}
+                      </Typography>
+                    </Box>
+                    <Stack spacing={1}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => openEdit(s)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="error"
+                        onClick={() => askDelete(s._id)}
+                      >
+                        Delete
+                      </Button>
+                    </Stack>
+                  </Box>
+                </Paper>
+              ))}
 
-          <TablePagination
-            component="div"
-            count={filteredSchedules.length}
-            page={page}
-            onPageChange={(e, newPage) => setPage(newPage)}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={(e) => {
-              setRowsPerPage(parseInt(e.target.value, 10));
-              setPage(0);
-            }}
-            rowsPerPageOptions={[5, 10, 25]}
-            sx={{ mt: 1 }}
-          />
-        </>
+            <Box display="flex" justifyContent="center">
+              <TablePagination
+                component="div"
+                count={filteredSchedules.length}
+                page={page}
+                onPageChange={(e, newPage) => setPage(newPage)}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={(e) => {
+                  setRowsPerPage(parseInt(e.target.value, 10));
+                  setPage(0);
+                }}
+                rowsPerPageOptions={[5, 10, 25]}
+              />
+            </Box>
+          </Box>
+        ) : (
+          <>
+            <Table sx={{ mt: 2, background: "white" }} size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ color: "black", fontWeight: 700 }}>
+                    Staff
+                  </TableCell>
+                  <TableCell sx={{ color: "black" }}>Role</TableCell>
+                  <TableCell sx={{ color: "black" }}>Start</TableCell>
+                  <TableCell sx={{ color: "black" }}>End</TableCell>
+                  <TableCell sx={{ color: "black" }}>Status</TableCell>
+                  <TableCell sx={{ color: "black" }}>Notes</TableCell>
+                  {isAdmin && (
+                    <TableCell sx={{ color: "black" }}>Actions</TableCell>
+                  )}
+                </TableRow>
+              </TableHead>
+
+              <TableBody>
+                {filteredSchedules
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((s) => (
+                    <TableRow
+                      key={s._id}
+                      sx={{ "&:hover": { background: "#f3f4f6" } }}
+                    >
+                      <TableCell sx={{ color: "black" }}>
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <Box
+                            sx={{
+                              width: 10,
+                              height: 10,
+                              borderRadius: "50%",
+                              backgroundColor: ROLE_COLORS[s.role] || "#6b7280",
+                            }}
+                          />
+                          <Box>{s.staffId?.name || "Unknown"}</Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ color: "black" }}>
+                        <Box
+                          component="span"
+                          sx={{
+                            px: 1,
+                            py: 0.4,
+                            borderRadius: 1,
+                            backgroundColor:
+                              (ROLE_COLORS[s.role] || "#6b7280") + "22",
+                            color: ROLE_COLORS[s.role] || "#000",
+                            fontWeight: 600,
+                            fontSize: 13,
+                          }}
+                        >
+                          {getRoleDisplayName(s.role)}
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ color: "black" }}>
+                        {formatLocal(s.startTime)}
+                      </TableCell>
+                      <TableCell sx={{ color: "black" }}>
+                        {formatLocal(s.endTime)}
+                      </TableCell>
+                      <TableCell>
+                        <Box
+                          component="span"
+                          sx={{
+                            display: "inline-block",
+                            px: 1,
+                            py: 0.4,
+                            borderRadius: 1,
+                            border: `1px solid ${statusColors[s.status] || "#9e9e9e"}`,
+                            color: statusColors[s.status] || "#000",
+                            fontWeight: 600,
+                            fontSize: 12,
+                            background: "#fff",
+                          }}
+                        >
+                          {s.status}
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ color: "black" }}>
+                        {s.notes || "—"}
+                      </TableCell>
+                      {isAdmin && (
+                        <TableCell>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="info"
+                            onClick={() => openEdit(s)}
+                            sx={{
+                              mr: 1,
+                              borderRadius: 2,
+                              textTransform: "none",
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            onClick={() => askDelete(s._id)}
+                            sx={{ borderRadius: 2, textTransform: "none" }}
+                          >
+                            Delete
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+
+            <TablePagination
+              component="div"
+              count={filteredSchedules.length}
+              page={page}
+              onPageChange={(e, newPage) => setPage(newPage)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
+              rowsPerPageOptions={[5, 10, 25]}
+              sx={{ mt: 1 }}
+            />
+          </>
+        )
       ) : (
         <Box
           mt={3}

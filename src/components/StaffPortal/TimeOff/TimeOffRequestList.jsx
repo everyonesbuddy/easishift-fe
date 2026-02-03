@@ -53,7 +53,7 @@ export default function TimeOffRequestList() {
 
   const isAdmin = useMemo(
     () => role === "admin" || role === "superadmin",
-    [role]
+    [role],
   );
 
   const handleReview = async (id, newStatus) => {
@@ -62,7 +62,7 @@ export default function TimeOffRequestList() {
       await axios.patch(
         `/timeoff/${id}/review`,
         { status: newStatus },
-        { withCredentials: true }
+        { withCredentials: true },
       );
       await fetchRequests();
     } catch (err) {
@@ -97,7 +97,7 @@ export default function TimeOffRequestList() {
       // inclusive days
       const diff =
         Math.round(
-          (e.setHours(0, 0, 0, 0) - s.setHours(0, 0, 0, 0)) / MS_PER_DAY
+          (e.setHours(0, 0, 0, 0) - s.setHours(0, 0, 0, 0)) / MS_PER_DAY,
         ) + 1;
       return diff > 0 ? diff : 1;
     } catch (err) {
@@ -109,23 +109,39 @@ export default function TimeOffRequestList() {
   today.setHours(0, 0, 0, 0);
 
   return (
-    <Container sx={{ mt: 3 }}>
+    <Container sx={{ mt: 2, px: { xs: 2, md: 3 } }}>
       <Box
         display="flex"
         justifyContent="space-between"
         alignItems="center"
         mb={2}
+        sx={{
+          flexDirection: { xs: "column", sm: "row" },
+          gap: { xs: 1, sm: 0 },
+        }}
       >
         <Typography variant="h6">Time Off Requests</Typography>
-        <Box>
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1,
+            mt: { xs: 1, sm: 0 },
+            width: { xs: "100%", sm: "auto" },
+            justifyContent: { xs: "stretch", sm: "flex-end" },
+          }}
+        >
           <Button
             variant="outlined"
-            sx={{ mr: 1 }}
+            sx={{ mr: { sm: 1 }, width: { xs: "50%", sm: "auto" } }}
             onClick={() => fetchRequests()}
           >
             Refresh
           </Button>
-          <Button variant="contained" onClick={() => setOpenModal(true)}>
+          <Button
+            variant="contained"
+            onClick={() => setOpenModal(true)}
+            sx={{ width: { xs: "50%", sm: "auto" } }}
+          >
             Request Time Off
           </Button>
         </Box>
@@ -142,42 +158,45 @@ export default function TimeOffRequestList() {
             <Box
               sx={{
                 display: "grid",
-                gridTemplateColumns: "repeat(4,1fr)",
+                gridTemplateColumns: {
+                  xs: "repeat(2,1fr)",
+                  md: "repeat(4,1fr)",
+                },
                 gap: 2,
                 mb: 2,
               }}
             >
-              <Paper sx={{ p: 2 }}>
+              <Paper sx={{ p: { xs: 1.5, md: 2 } }}>
                 <Typography variant="h5">{myRequests.length}</Typography>
                 <Typography color="text.secondary">Total Requests</Typography>
               </Paper>
 
-              <Paper sx={{ p: 2 }}>
+              <Paper sx={{ p: { xs: 1.5, md: 2 } }}>
                 <Box
                   display="flex"
                   justifyContent="space-between"
                   alignItems="center"
                 >
-                  <div>
+                  <Box>
                     <Typography variant="h5">
                       {pendingRequests.length}
                     </Typography>
                     <Typography color="text.secondary">
                       Awaiting Review
                     </Typography>
-                  </div>
+                  </Box>
                   {pendingRequests.length > 0 && (
                     <Chip label="Pending" color="warning" />
                   )}
                 </Box>
               </Paper>
 
-              <Paper sx={{ p: 2 }}>
+              <Paper sx={{ p: { xs: 1.5, md: 2 } }}>
                 <Typography variant="h5">{approvedRequests.length}</Typography>
                 <Typography color="text.secondary">Approved</Typography>
               </Paper>
 
-              <Paper sx={{ p: 2 }}>
+              <Paper sx={{ p: { xs: 1.5, md: 2 } }}>
                 <Typography variant="h5">{deniedRequests.length}</Typography>
                 <Typography color="text.secondary">Denied</Typography>
               </Paper>
@@ -193,7 +212,10 @@ export default function TimeOffRequestList() {
                   <Typography color="text.secondary">
                     No time off requests
                   </Typography>
-                  <Button sx={{ mt: 2 }} onClick={() => setOpenModal(true)}>
+                  <Button
+                    sx={{ mt: 2, width: { xs: "100%", sm: "auto" } }}
+                    onClick={() => setOpenModal(true)}
+                  >
                     Submit your first request
                   </Button>
                 </Paper>
@@ -201,7 +223,7 @@ export default function TimeOffRequestList() {
                 myRequests.map((r) => {
                   const days = calculateDays(
                     r.startTime || r.startDate || r.start,
-                    r.endTime || r.endDate || r.end
+                    r.endTime || r.endDate || r.end,
                   );
                   const isPast =
                     new Date(r.endTime || r.endDate || r.end) < today;
@@ -219,16 +241,17 @@ export default function TimeOffRequestList() {
                     <Paper
                       key={r._id}
                       sx={{
-                        p: 3,
+                        p: { xs: 2, md: 3 },
                         display: "flex",
                         gap: 2,
                         alignItems: "flex-start",
+                        flexDirection: { xs: "column", sm: "row" },
                       }}
                     >
                       <Box
                         sx={{
-                          width: 56,
-                          height: 56,
+                          width: { xs: 48, sm: 56 },
+                          height: { xs: 48, sm: 56 },
                           borderRadius: 1,
                           backgroundColor: "#eff6ff",
                           display: "flex",
@@ -240,14 +263,20 @@ export default function TimeOffRequestList() {
                       </Box>
 
                       <Box flex={1}>
-                        <Box display="flex" alignItems="center" gap={2} mb={1}>
-                          <Typography variant="subtitle1">
+                        <Box
+                          display="flex"
+                          alignItems="center"
+                          gap={2}
+                          mb={1}
+                          sx={{ flexWrap: "wrap" }}
+                        >
+                          <Typography variant="subtitle1" sx={{ minWidth: 0 }}>
                             {new Date(
-                              r.startTime || r.startDate || r.start
+                              r.startTime || r.startDate || r.start,
                             ).toLocaleDateString()}{" "}
                             -{" "}
                             {new Date(
-                              r.endTime || r.endDate || r.end
+                              r.endTime || r.endDate || r.end,
                             ).toLocaleDateString()}
                           </Typography>
                           <Chip label={r.status || "pending"} />
@@ -259,6 +288,7 @@ export default function TimeOffRequestList() {
                           gap={3}
                           color="text.secondary"
                           mb={1}
+                          sx={{ flexWrap: "wrap" }}
                         >
                           <Box display="flex" alignItems="center" gap={1}>
                             <FiClock />{" "}
@@ -270,7 +300,7 @@ export default function TimeOffRequestList() {
                             <FiCalendar />{" "}
                             <Typography variant="body2">
                               {new Date(
-                                r.startTime || r.startDate || r.start
+                                r.startTime || r.startDate || r.start,
                               ).toLocaleDateString()}
                             </Typography>
                           </Box>
@@ -300,17 +330,17 @@ export default function TimeOffRequestList() {
                         <Typography variant="caption" color="text.secondary">
                           Submitted{" "}
                           {new Date(
-                            r.requestedAt || r.createdAt || r.created
+                            r.requestedAt || r.createdAt || r.created,
                           ).toLocaleString()}
                           {r.reviewedAt
                             ? ` • Reviewed ${new Date(
-                                r.reviewedAt
+                                r.reviewedAt,
                               ).toLocaleString()}`
                             : ""}
                         </Typography>
                       </Box>
 
-                      <Box>
+                      <Box sx={{ mt: { xs: 1, sm: 0 } }}>
                         {isAdmin && r.status === "pending" && (
                           <Box display="flex" flexDirection="column" gap={1}>
                             <Tooltip title="Approve">
@@ -321,6 +351,7 @@ export default function TimeOffRequestList() {
                                   onClick={() =>
                                     handleReview(r._id, "approved")
                                   }
+                                  sx={{ width: { xs: 44, sm: "auto" } }}
                                 >
                                   <FiCheck />
                                 </IconButton>
@@ -332,6 +363,7 @@ export default function TimeOffRequestList() {
                                   color="error"
                                   disabled={actionLoadingId === r._id}
                                   onClick={() => handleReview(r._id, "denied")}
+                                  sx={{ width: { xs: 44, sm: "auto" } }}
                                 >
                                   <FiX />
                                 </IconButton>

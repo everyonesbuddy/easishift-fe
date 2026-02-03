@@ -24,10 +24,17 @@ import logo from "../../assets/logos/easishift-logo-plus-text2.svg";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 
-function Sidebar() {
+import { IconButton } from "@mui/material";
+import { MdClose } from "react-icons/md";
+import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
+
+function Sidebar({ mobileOpen, onMobileClose }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const theme = useTheme();
+  const isMdUp = useMediaQuery(theme.breakpoints.up("sm"));
 
   const role = user?.role || "staff";
 
@@ -89,10 +96,14 @@ function Sidebar() {
 
   return (
     <Drawer
-      variant="permanent"
+      variant={isMdUp ? "permanent" : "temporary"}
+      open={isMdUp ? true : Boolean(mobileOpen)}
+      onClose={() => onMobileClose && onMobileClose()}
+      ModalProps={{ keepMounted: true }}
       sx={{
         width: 260,
         flexShrink: 0,
+        zIndex: (theme) => theme.zIndex.appBar - 1,
         "& .MuiDrawer-paper": {
           width: 260,
           boxSizing: "border-box",
@@ -103,26 +114,37 @@ function Sidebar() {
       }}
     >
       {/* Logo / Header */}
-      <Box sx={{ p: 3, borderBottom: "1px solid #1f2937" }}>
+      <Box
+        sx={{
+          p: 2,
+          borderBottom: "1px solid #1f2937",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 1,
+        }}
+      >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <Box
             component="img"
             src={logo}
             alt="Easishift logo"
             sx={{
-              width: 200,
+              width: 180,
               height: "auto",
               display: "block",
               objectFit: "contain",
             }}
           />
         </Box>
-        <Typography
-          variant="caption"
-          sx={{ color: "#9ca3af", mt: 0.5, display: "block" }} // gray-400
-        >
-          Outpatient Scheduling
-        </Typography>
+        {!isMdUp && (
+          <IconButton
+            onClick={() => onMobileClose && onMobileClose()}
+            sx={{ color: "white" }}
+          >
+            <MdClose />
+          </IconButton>
+        )}
       </Box>
 
       {/* Navigation */}

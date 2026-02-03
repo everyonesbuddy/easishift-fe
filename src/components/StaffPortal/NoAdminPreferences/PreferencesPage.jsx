@@ -81,10 +81,15 @@ export default function PreferencesPage() {
   const hasPref = (arr, idx) => Array.isArray(arr) && arr.includes(idx);
 
   return (
-    <Box sx={{ p: 4, maxWidth: 900, margin: "0 auto" }}>
+    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 900, margin: "0 auto" }}>
       <Box mb={3}>
         <Stack direction="row" spacing={2} alignItems="center">
-          <Typography variant="h4">My Preferences</Typography>
+          <Typography
+            variant="h4"
+            sx={{ fontSize: { xs: "1.25rem", md: "1.5rem" } }}
+          >
+            My Preferences
+          </Typography>
           <IconButton sx={{ ml: 1, bgcolor: "#EFF6FF" }} aria-label="info">
             <FiInfo style={{ color: "#0369A1" }} />
           </IconButton>
@@ -102,7 +107,7 @@ export default function PreferencesPage() {
 
       <Paper
         sx={{
-          p: 3,
+          p: { xs: 2, md: 3 },
           borderRadius: 3,
           mb: 3,
           bgcolor: "#EFF6FF",
@@ -119,7 +124,7 @@ export default function PreferencesPage() {
         </Typography>
       </Paper>
 
-      <Stack spacing={3}>
+      <Stack sx={{ gap: { xs: 2, md: 3 } }}>
         <Paper sx={{ p: 3, borderRadius: 3 }}>
           <Typography variant="h6" mb={1}>
             Preferred Days
@@ -127,7 +132,9 @@ export default function PreferencesPage() {
           <Typography variant="body2" color="text.secondary" mb={2}>
             Select the days you prefer to work
           </Typography>
-          <ToggleButtonGroup sx={{ display: "flex", gap: 1 }}>
+          <ToggleButtonGroup
+            sx={{ display: "flex", gap: 1, overflowX: "auto", px: 0.5 }}
+          >
             {DAYS.map((d, i) => {
               const isPreferred = hasPref(prefs.preferredDaysOfWeek, i);
               const isUnavailable = hasPref(prefs.unavailableDaysOfWeek, i);
@@ -140,15 +147,16 @@ export default function PreferencesPage() {
                     !isUnavailable && toggleArrayItem("preferredDaysOfWeek", i)
                   }
                   sx={{
-                    flex: 1,
+                    flex: "0 0 auto",
+                    minWidth: 44,
                     borderRadius: 1,
                     bgcolor: isPreferred ? "#ECFDF5" : undefined,
                     color: isPreferred ? "#065F46" : undefined,
                     border: isPreferred
                       ? "2px solid #10B981"
                       : isUnavailable
-                      ? "1px solid #F3F4F6"
-                      : undefined,
+                        ? "1px solid #F3F4F6"
+                        : undefined,
                     opacity: isUnavailable ? 0.6 : 1,
                     cursor: isUnavailable ? "not-allowed" : "pointer",
                   }}
@@ -161,14 +169,16 @@ export default function PreferencesPage() {
           </ToggleButtonGroup>
         </Paper>
 
-        <Paper sx={{ p: 3, borderRadius: 3 }}>
+        <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
           <Typography variant="h6" mb={1}>
             Unavailable Days
           </Typography>
           <Typography variant="body2" color="text.secondary" mb={2}>
             Select days when you cannot work
           </Typography>
-          <ToggleButtonGroup sx={{ display: "flex", gap: 1 }}>
+          <ToggleButtonGroup
+            sx={{ display: "flex", gap: 1, overflowX: "auto", px: 0.5 }}
+          >
             {DAYS.map((d, i) => {
               const isPreferred = hasPref(prefs.preferredDaysOfWeek, i);
               const isUnavailable = hasPref(prefs.unavailableDaysOfWeek, i);
@@ -181,15 +191,16 @@ export default function PreferencesPage() {
                     !isPreferred && toggleArrayItem("unavailableDaysOfWeek", i)
                   }
                   sx={{
-                    flex: 1,
+                    flex: "0 0 auto",
+                    minWidth: 44,
                     borderRadius: 1,
                     bgcolor: isUnavailable ? "#FEF2F2" : undefined,
                     color: isUnavailable ? "#991B1B" : undefined,
                     border: isUnavailable
                       ? "2px solid #EF4444"
                       : isPreferred
-                      ? "1px solid #F3F4F6"
-                      : undefined,
+                        ? "1px solid #F3F4F6"
+                        : undefined,
                     opacity: isPreferred ? 0.6 : 1,
                     cursor: isPreferred ? "not-allowed" : "pointer",
                   }}
@@ -202,7 +213,7 @@ export default function PreferencesPage() {
           </ToggleButtonGroup>
         </Paper>
 
-        <Paper sx={{ p: 3, borderRadius: 3 }}>
+        <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
           <Typography variant="h6" mb={1}>
             Preferred Shift Times
           </Typography>
@@ -221,6 +232,7 @@ export default function PreferencesPage() {
                 handleChange("preferredShiftStart", e.target.value)
               }
               InputLabelProps={{ shrink: true }}
+              fullWidth
             />
             <TextField
               label="Preferred End Time"
@@ -230,11 +242,12 @@ export default function PreferencesPage() {
                 handleChange("preferredShiftEnd", e.target.value)
               }
               InputLabelProps={{ shrink: true }}
+              fullWidth
             />
           </Box>
         </Paper>
 
-        <Paper sx={{ p: 3, borderRadius: 3 }}>
+        <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
           <Typography variant="h6" mb={1}>
             Weekly Hours
           </Typography>
@@ -252,6 +265,7 @@ export default function PreferencesPage() {
               onChange={(e) =>
                 handleChange("minHoursPerWeek", parseInt(e.target.value) || 0)
               }
+              fullWidth
             />
             <TextField
               label="Maximum Hours per Week"
@@ -260,11 +274,12 @@ export default function PreferencesPage() {
               onChange={(e) =>
                 handleChange("maxHoursPerWeek", parseInt(e.target.value) || 0)
               }
+              fullWidth
             />
           </Box>
         </Paper>
 
-        <Paper sx={{ p: 3, borderRadius: 3 }}>
+        <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
           <Typography variant="h6" mb={1}>
             Work Style Preferences
           </Typography>
@@ -334,6 +349,7 @@ export default function PreferencesPage() {
               "&:hover": { background: "#1D4ED8" },
               display: "flex",
               alignItems: "center",
+              width: { xs: "100%", md: "auto" },
             }}
           >
             {saving ? "Saving..." : "Save Preferences"}

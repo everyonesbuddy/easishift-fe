@@ -19,6 +19,7 @@ import PreferencesPage from "./components/StaffPortal/NoAdminPreferences/Prefere
 import CoveragePlanningPage from "./components/StaffPortal/Coverage/CoveragePlanningPage";
 import { Box } from "@mui/material";
 import { useAuth } from "./context/AuthContext";
+import { useState } from "react";
 
 export default function App() {
   const { user, tenant, isAdmin } = useAuth();
@@ -44,16 +45,23 @@ export default function App() {
     );
   }
 
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   return (
     <BrowserRouter>
-      {user && <Sidebar />}
+      {user && (
+        <Sidebar
+          mobileOpen={mobileOpen}
+          onMobileClose={() => setMobileOpen(false)}
+        />
+      )}
       <Box
         sx={{
           marginLeft: user ? { xs: 0, sm: "260px" } : 0,
           position: "relative",
         }}
       >
-        <Navbar />
+        <Navbar onMobileOpen={() => setMobileOpen(true)} />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />

@@ -1,4 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
+import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import {
   Container,
   Typography,
@@ -55,6 +57,8 @@ const statusColors = {
 
 export default function CoveragePlanningPage() {
   const { user, isAdmin } = useAuth();
+  const theme = useTheme();
+  const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
   const [coverages, setCoverages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -153,7 +157,7 @@ export default function CoveragePlanningPage() {
   // Filtered + sorted coverages (most recent -> least recent)
   const displayedCoverages = useMemo(() => {
     const filtered = coverages.filter(
-      (c) => selectedRole === "all" || c.role === selectedRole
+      (c) => selectedRole === "all" || c.role === selectedRole,
     );
     return filtered.sort((a, b) => {
       const da = new Date(a.date).getTime();
@@ -166,37 +170,60 @@ export default function CoveragePlanningPage() {
 
   const paginated = displayedCoverages.slice(
     page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
+    page * rowsPerPage + rowsPerPage,
   );
 
   return (
-    <Container sx={{ mt: 4 }}>
+    <Container sx={{ mt: 4, px: { xs: 2, sm: 3 } }}>
       <Box
         display="flex"
         justifyContent="space-between"
         alignItems="center"
         mb={3}
+        sx={{ flexDirection: { xs: "column", md: "row" }, gap: 2 }}
       >
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+          <Typography
+            variant="h5"
+            sx={{ fontWeight: 700, fontSize: { xs: "1.1rem", md: "1.25rem" } }}
+          >
             Coverage Planning
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ fontSize: { xs: "0.78rem", md: "0.875rem" } }}
+          >
             Define staffing requirements
           </Typography>
         </Box>
 
-        <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+        <Box
+          sx={{
+            display: "flex",
+            gap: 2,
+            alignItems: "center",
+            width: { xs: "100%", md: "auto" },
+            justifyContent: { xs: "space-between", md: "flex-end" },
+            flexDirection: { xs: "column", md: "row" },
+          }}
+        >
           <Stack
             direction="row"
             spacing={0}
-            sx={{ bgcolor: "#F3F4F6", borderRadius: 2, p: 0.5 }}
+            sx={{
+              bgcolor: "#F3F4F6",
+              borderRadius: 2,
+              p: 0.5,
+              width: { xs: "100%", md: "auto" },
+            }}
           >
             <ToggleButtonGroup
               value={view}
               exclusive
               onChange={(e, next) => next && setView(next)}
               sx={{
+                width: { xs: "100%", md: "auto" },
                 "& .MuiToggleButton-root": {
                   textTransform: "none",
                   color: "#374151",
@@ -209,11 +236,17 @@ export default function CoveragePlanningPage() {
               }}
               size="small"
             >
-              <ToggleButton value="table">
+              <ToggleButton
+                value="table"
+                sx={{ width: { xs: "50%", md: "auto" } }}
+              >
                 <FiList style={{ marginRight: 8 }} />
                 List
               </ToggleButton>
-              <ToggleButton value="calendar">
+              <ToggleButton
+                value="calendar"
+                sx={{ width: { xs: "50%", md: "auto" } }}
+              >
                 <FiCalendar style={{ marginRight: 8 }} />
                 Calendar
               </ToggleButton>
@@ -231,6 +264,7 @@ export default function CoveragePlanningPage() {
                 borderRadius: 2,
                 px: 3,
                 bgcolor: "#2563EB",
+                width: { xs: "100%", md: "auto" },
                 "&:hover": { bgcolor: "#1D4ED8" },
               }}
             >
@@ -255,9 +289,30 @@ export default function CoveragePlanningPage() {
           justifyContent="space-between"
           gap={2}
         >
-          <Box display="flex" alignItems="center" gap={2}>
-            <Typography color="text.secondary">Filter by role:</Typography>
-            <Box sx={{ display: "flex", gap: 1 }}>
+          <Box
+            display="flex"
+            alignItems="center"
+            gap={2}
+            sx={{ width: { xs: "100%", lg: "auto" } }}
+          >
+            <Typography
+              color="text.secondary"
+              sx={{
+                fontSize: { xs: "0.78rem", lg: "0.875rem" },
+                minWidth: { xs: "auto", lg: "auto" },
+              }}
+            >
+              Filter by role:
+            </Typography>
+            <Box
+              sx={{
+                display: "flex",
+                gap: 1,
+                px: { xs: 0.5, md: 0 },
+                overflowX: { xs: "auto", md: "visible" },
+                "& > *": { whiteSpace: "nowrap", flexShrink: 0 },
+              }}
+            >
               <Button
                 size="small"
                 onClick={() => setSelectedRole("all")}
@@ -273,7 +328,7 @@ export default function CoveragePlanningPage() {
 
               {Object.keys(ROLE_LABELS)
                 .filter((r) =>
-                  ["doctor", "nurse", "receptionist", "billing"].includes(r)
+                  ["doctor", "nurse", "receptionist", "billing"].includes(r),
                 )
                 .map((role) => (
                   <Button
@@ -286,6 +341,8 @@ export default function CoveragePlanningPage() {
                       bgcolor:
                         selectedRole === role ? ROLE_COLORS[role] : "#F3F4F6",
                       color: selectedRole === role ? "#fff" : "#374151",
+                      px: 1.5,
+                      py: { xs: 0.5, md: 0.5 },
                     }}
                   >
                     {ROLE_LABELS[role]}
@@ -299,111 +356,179 @@ export default function CoveragePlanningPage() {
       </Paper>
 
       {view === "table" ? (
-        <>
-          <Paper sx={{ mt: 3, p: 2 }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ background: "#F8FAFC" }}>
-                  <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
-                    Date
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
-                    Role
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
-                    Shift Time
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
-                    Required Staff
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
-                    Notes
-                  </TableCell>
-                  {isAdmin && (
-                    <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
-                      Actions
-                    </TableCell>
-                  )}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {paginated.map((c) => (
-                  <TableRow
-                    key={c._id}
-                    sx={{ "&:hover": { background: "#f3f4f6" } }}
-                  >
-                    <TableCell>
-                      {toLocal(c.startTime || c.date)?.toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>{ROLE_LABELS[c.role] || c.role}</TableCell>
-                    <TableCell>{`${toLocal(c.startTime)?.toLocaleTimeString(
-                      [],
-                      { hour: "numeric", minute: "2-digit" }
-                    )} - ${toLocal(c.endTime)?.toLocaleTimeString([], {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}`}</TableCell>
-                    <TableCell>{c.requiredCount}</TableCell>
-                    <TableCell>{c.note || "—"}</TableCell>
+        isCompact ? (
+          <Box sx={{ mt: 2, display: "grid", gap: 2 }}>
+            {paginated.map((c) => (
+              <Paper key={c._id} sx={{ p: 2 }}>
+                <Box
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems="center"
+                >
+                  <Box>
+                    <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                      {ROLE_LABELS[c.role] || c.role}
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                      {toLocal(c.startTime || c.date)?.toLocaleDateString()} •{" "}
+                      {toLocal(c.startTime)?.toLocaleTimeString([], {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}{" "}
+                      -{" "}
+                      {toLocal(c.endTime)?.toLocaleTimeString([], {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </Typography>
+                    <Typography
+                      sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
+                      noWrap
+                    >
+                      {c.note || "—"}
+                    </Typography>
+                  </Box>
+                  <Stack spacing={1}>
+                    <Typography
+                      sx={{
+                        fontSize: 12,
+                        color: "text.secondary",
+                        textAlign: "right",
+                      }}
+                    >
+                      {c.requiredCount} needed
+                    </Typography>
                     {isAdmin && (
-                      <TableCell>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color="error"
-                          onClick={() => askDelete(c._id)}
-                          sx={{ textTransform: "none", borderRadius: 2 }}
-                        >
-                          Delete
-                        </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="error"
+                        onClick={() => askDelete(c._id)}
+                        sx={{ textTransform: "none", borderRadius: 2 }}
+                      >
+                        Delete
+                      </Button>
+                    )}
+                  </Stack>
+                </Box>
+              </Paper>
+            ))}
+
+            <Box display="flex" justifyContent="center">
+              <TablePagination
+                component="div"
+                count={displayedCoverages.length}
+                page={page}
+                onPageChange={(e, newPage) => setPage(newPage)}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={(e) => {
+                  setRowsPerPage(parseInt(e.target.value, 10));
+                  setPage(0);
+                }}
+                rowsPerPageOptions={[5, 10, 25]}
+              />
+            </Box>
+          </Box>
+        ) : (
+          <>
+            <Paper sx={{ mt: 3, p: 2 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ background: "#F8FAFC" }}>
+                    <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
+                      Date
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
+                      Role
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
+                      Shift Time
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
+                      Required Staff
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
+                      Notes
+                    </TableCell>
+                    {isAdmin && (
+                      <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
+                        Actions
                       </TableCell>
                     )}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {paginated.map((c) => (
+                    <TableRow
+                      key={c._id}
+                      sx={{ "&:hover": { background: "#f3f4f6" } }}
+                    >
+                      <TableCell>
+                        {toLocal(c.startTime || c.date)?.toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>{ROLE_LABELS[c.role] || c.role}</TableCell>
+                      <TableCell>{`${toLocal(c.startTime)?.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} - ${toLocal(c.endTime)?.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}</TableCell>
+                      <TableCell>{c.requiredCount}</TableCell>
+                      <TableCell>{c.note || "—"}</TableCell>
+                      {isAdmin && (
+                        <TableCell>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            onClick={() => askDelete(c._id)}
+                            sx={{ textTransform: "none", borderRadius: 2 }}
+                          >
+                            Delete
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
 
-            {/* Custom pagination to match Figma */}
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                mt: 2,
-              }}
-            >
-              <Typography variant="body2" color="text.secondary">
-                Showing {page * rowsPerPage + 1} to{" "}
-                {Math.min((page + 1) * rowsPerPage, coverages.length)} of{" "}
-                {coverages.length}
-              </Typography>
-              <Box>
-                <Button
-                  size="small"
-                  sx={{ mr: 1 }}
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                >
-                  Previous
-                </Button>
-                <Button
-                  size="small"
-                  onClick={() =>
-                    setPage((p) =>
-                      Math.min(
-                        Math.floor((coverages.length - 1) / rowsPerPage),
-                        p + 1
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  mt: 2,
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  Showing {page * rowsPerPage + 1} to{" "}
+                  {Math.min((page + 1) * rowsPerPage, coverages.length)} of{" "}
+                  {coverages.length}
+                </Typography>
+                <Box>
+                  <Button
+                    size="small"
+                    sx={{ mr: 1 }}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    size="small"
+                    onClick={() =>
+                      setPage((p) =>
+                        Math.min(
+                          Math.floor((coverages.length - 1) / rowsPerPage),
+                          p + 1,
+                        ),
                       )
-                    )
-                  }
-                  disabled={(page + 1) * rowsPerPage >= coverages.length}
-                >
-                  Next
-                </Button>
+                    }
+                    disabled={(page + 1) * rowsPerPage >= coverages.length}
+                  >
+                    Next
+                  </Button>
+                </Box>
               </Box>
-            </Box>
-          </Paper>
-        </>
+            </Paper>
+          </>
+        )
       ) : (
         <Box mt={3} sx={{ background: "white", borderRadius: 2, p: 2 }}>
           <GlobalStyles

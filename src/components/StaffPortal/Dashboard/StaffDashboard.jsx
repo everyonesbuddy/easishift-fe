@@ -10,6 +10,8 @@ import {
   DialogContent,
   Paper,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 
 import { useAuth } from "../../../context/AuthContext";
 import api from "../../../config/api";
@@ -53,6 +55,8 @@ export default function StaffDashboard() {
   const [staffList, setStaffList] = useState([]);
 
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
 
   // Extracted loader so we can refresh after modal actions
   async function loadDashboardData() {
@@ -271,8 +275,10 @@ export default function StaffDashboard() {
           display: "flex",
           gap: 2,
           flexWrap: "wrap",
-          justifyContent: "right",
-          marginRight: 4,
+          justifyContent: { xs: "center", md: "flex-end" },
+          flexDirection: { xs: "column", sm: "row" },
+          alignItems: { xs: "stretch", sm: "center" },
+          mr: { xs: 0, md: 4 },
         }}
       >
         {isAdmin ? (
@@ -281,6 +287,7 @@ export default function StaffDashboard() {
               variant="contained"
               color="primary"
               onClick={() => setOpenCoverageModal(true)}
+              sx={{ width: { xs: "100%", sm: "auto" } }}
             >
               Add Coverage
             </Button>
@@ -289,6 +296,7 @@ export default function StaffDashboard() {
               variant="outlined"
               color="primary"
               onClick={() => setOpenScheduleModal(true)}
+              sx={{ width: { xs: "100%", sm: "auto" } }}
             >
               Create Schedule
             </Button>
@@ -297,6 +305,7 @@ export default function StaffDashboard() {
               variant="contained"
               color="warning"
               onClick={() => setOpenAutoModal(true)}
+              sx={{ width: { xs: "100%", sm: "auto" } }}
             >
               Auto-Generate Schedule
             </Button>
@@ -309,6 +318,7 @@ export default function StaffDashboard() {
               // open schedule modal prefilled for current user
               setOpenScheduleModal(true);
             }}
+            sx={{ width: { xs: "100%", sm: "auto" } }}
           >
             Pick up shift
           </Button>

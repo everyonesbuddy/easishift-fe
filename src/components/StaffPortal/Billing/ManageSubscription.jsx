@@ -10,13 +10,15 @@ import {
   Stack,
   Divider,
   Chip,
-  useTheme,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import { useAuth } from "../../../context/AuthContext";
 import api from "../../../config/api";
 
 export default function ManageSubscription() {
   const theme = useTheme();
+  const isCompact = useMediaQuery(theme.breakpoints.down("md"));
   const { tenant, refreshTenant } = useAuth();
   const [loadingPlan, setLoadingPlan] = useState(null);
   const [error, setError] = useState(null);
@@ -76,7 +78,6 @@ export default function ManageSubscription() {
 
   const handleCancelSubscription = async (opts = { atPeriodEnd: true }) => {
     setError(null);
-    // simple confirmation
     const ok = window.confirm(
       opts.atPeriodEnd
         ? "Cancel subscription at period end? Your users will keep access until the billing period ends."
@@ -86,15 +87,11 @@ export default function ManageSubscription() {
 
     try {
       setLoadingPlan("cancel");
-      const res = await api.post("/stripe/cancel-subscription", {
+      await api.post("/stripe/cancel-subscription", {
         tenantId: tenant._id,
         atPeriodEnd: !!opts.atPeriodEnd,
       });
-
-      // Refresh tenant state (webhook may still update later)
       await refreshTenant();
-
-      // show success message briefly
       alert(
         "Subscription cancellation requested. Changes may take a moment to appear.",
       );
@@ -111,7 +108,7 @@ export default function ManageSubscription() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 6, mb: 6 }}>
+    <Container maxWidth="lg" sx={{ mt: 6, mb: 6, px: { xs: 2, sm: 3 } }}>
       <Box sx={{ textAlign: "center", mb: 4 }}>
         <Typography variant="h4" sx={{ fontWeight: 900 }}>
           Manage subscription
@@ -124,7 +121,14 @@ export default function ManageSubscription() {
       <Box sx={{ display: "flex", justifyContent: "center" }}>
         <Box sx={{ width: "100%", maxWidth: 1100 }}>
           <Paper
-            sx={{ p: 3, mb: 3, display: "flex", gap: 3, alignItems: "center" }}
+            sx={{
+              p: { xs: 2, md: 3 },
+              mb: 3,
+              display: "flex",
+              gap: 3,
+              alignItems: "center",
+              flexDirection: { xs: "column", md: "row" },
+            }}
           >
             <Box sx={{ flex: 1 }}>
               <Typography sx={{ fontWeight: 800 }}>
@@ -132,30 +136,58 @@ export default function ManageSubscription() {
               </Typography>
               <Typography
                 variant="body2"
-                sx={{ color: "text.secondary", mb: 0.5 }}
+                sx={{
+                  color: "text.secondary",
+                  mb: 0.5,
+                  fontSize: { xs: "0.85rem", md: "0.95rem" },
+                }}
               >
                 Status:{" "}
                 <strong>{tenant.subscriptionStatus || "inactive"}</strong>
               </Typography>
               <Typography
                 variant="body2"
-                sx={{ color: "text.secondary", mb: 0.5 }}
+                sx={{
+                  color: "text.secondary",
+                  mb: 0.5,
+                  fontSize: { xs: "0.85rem", md: "0.95rem" },
+                }}
               >
                 Plan: <strong>{tenant.planKey || "None"}</strong> • Seats:{" "}
                 <strong>{tenant.seatLimit ?? "1"}</strong>
               </Typography>
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "text.secondary",
+                  fontSize: { xs: "0.85rem", md: "0.95rem" },
+                }}
+              >
                 Billing: <strong>{tenant.billingEmail || "Not set"}</strong>
               </Typography>
             </Box>
 
-            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-              <Button variant="outlined" onClick={refreshTenant}>
+            <Box
+              sx={{
+                display: "flex",
+                gap: 2,
+                alignItems: "center",
+                width: "100%",
+                justifyContent: { xs: "stretch", md: "flex-end" },
+                flexDirection: { xs: "column", md: "row" },
+              }}
+            >
+              <Button
+                variant="outlined"
+                onClick={refreshTenant}
+                sx={{ width: { xs: "100%", md: "auto" } }}
+              >
                 Refresh
               </Button>
               <Button
                 variant="contained"
                 onClick={() => handleCancelSubscription()}
+                sx={{ width: { xs: "100%", md: "auto" } }}
               >
                 {loadingPlan === "cancel"
                   ? "Processing..."
@@ -178,7 +210,7 @@ export default function ManageSubscription() {
               <Grid item xs={12} md={4} key={p.key}>
                 <Paper
                   sx={{
-                    p: 3,
+                    p: { xs: 2, md: 3 },
                     height: "100%",
                     display: "flex",
                     flexDirection: "column",
@@ -196,6 +228,7 @@ export default function ManageSubscription() {
                     <Chip
                       label={p.name}
                       color={p.highlight ? "primary" : "default"}
+                      size={isCompact ? "small" : "medium"}
                       sx={{ mb: 1 }}
                     />
                     <Typography variant="h5" sx={{ fontWeight: 900, mt: 1 }}>
@@ -203,7 +236,11 @@ export default function ManageSubscription() {
                     </Typography>
                     <Typography
                       variant="body2"
-                      sx={{ color: "text.secondary", mt: 1 }}
+                      sx={{
+                        color: "text.secondary",
+                        mt: 1,
+                        fontSize: { xs: "0.85rem", md: "0.95rem" },
+                      }}
                     >
                       {p.seats} seats • Billed yearly
                     </Typography>

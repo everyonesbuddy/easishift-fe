@@ -26,6 +26,9 @@ import { AiOutlineCalendar } from "react-icons/ai";
 import { useAuth } from "../../../context/AuthContext";
 import StaffCreateAndEditForm from "./StaffCreateAndEditForm";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
+import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { IconButton, Stack } from "@mui/material";
 
 // small role color helper — matches the mock idea; tweak as needed
 const ROLE_COLORS = {
@@ -39,6 +42,8 @@ const ROLE_COLORS = {
 
 export default function StaffList() {
   const { role } = useAuth();
+  const theme = useTheme();
+  const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
   const [staff, setStaff] = useState([]);
   const [schedules, setSchedules] = useState([]);
@@ -191,121 +196,205 @@ export default function StaffList() {
         </Box>
       </Paper>
 
-      {/* table */}
-      <Paper sx={{ mt: 3, overflow: "hidden" }}>
-        <Table>
-          <TableHead sx={{ background: "#f3f4f6" }}>
-            <TableRow>
-              <TableCell>Staff Member</TableCell>
-              <TableCell>Role</TableCell>
-              <TableCell>Contact</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
+      {/* table on desktop, cards on tablet/mobile */}
+      {isCompact ? (
+        <Box sx={{ mt: 3, display: "grid", gap: 2 }}>
+          {filteredUsers.length === 0 && (
+            <Box textAlign="center" py={4} color="text.secondary">
+              No staff members found
+            </Box>
+          )}
 
-          <TableBody>
-            {filteredUsers
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((u) => {
-                const initials = (u.name || "")
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase();
+          {filteredUsers
+            .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+            .map((u) => {
+              const initials = (u.name || "")
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase();
 
-                return (
-                  <TableRow key={u._id || u.id} hover>
-                    <TableCell>
-                      <Box display="flex" alignItems="center" gap={2}>
-                        <Avatar
-                          sx={{ bgcolor: ROLE_COLORS[u.role] || "#6b7280" }}
-                        >
-                          {initials}
-                        </Avatar>
-                        <Box>
-                          <Typography>{u.name}</Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
+              return (
+                <Paper key={u._id || u.id} sx={{ p: 2 }}>
+                  <Box display="flex" alignItems="center" gap={2}>
+                    <Avatar sx={{ bgcolor: ROLE_COLORS[u.role] || "#6b7280" }}>
+                      {initials}
+                    </Avatar>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontSize: 15, fontWeight: 600 }} noWrap>
+                        {u.name}
+                      </Typography>
+                      <Typography
+                        sx={{ fontSize: 12, color: "text.secondary" }}
+                        noWrap
+                      >
+                        {u.role}
+                      </Typography>
+                      <Typography
+                        sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
+                        noWrap
+                      >
+                        {u.email || "No email"}
+                      </Typography>
+                    </Box>
 
-                    <TableCell>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <Box
-                          sx={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: "50%",
-                            backgroundColor: ROLE_COLORS[u.role] || "#6b7280",
-                          }}
-                        />
-                        <Typography>{u.role}</Typography>
-                      </Box>
-                    </TableCell>
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => handleOpenEdit(u)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="error"
+                        disabled={u.role === "admin"}
+                        onClick={() => handleAskDelete(u._id || u.id)}
+                      >
+                        Delete
+                      </Button>
+                    </Stack>
+                  </Box>
+                </Paper>
+              );
+            })}
 
-                    <TableCell>
-                      {u.email ? (
-                        <Box
-                          display="flex"
-                          alignItems="center"
-                          gap={1}
-                          color="text.secondary"
-                        >
-                          <FiMail />
-                          <Typography variant="body2">{u.email}</Typography>
-                        </Box>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">
-                          No email
-                        </Typography>
-                      )}
-                    </TableCell>
-
-                    <TableCell>
-                      <Box display="flex" gap={1}>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => handleOpenEdit(u)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color="error"
-                          disabled={u.role === "admin"}
-                          onClick={() => handleAskDelete(u._id || u.id)}
-                        >
-                          Delete
-                        </Button>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-          </TableBody>
-        </Table>
-
-        {filteredUsers.length === 0 && (
-          <Box textAlign="center" py={4} color="text.secondary">
-            No staff members found
+          <Box display="flex" justifyContent="center">
+            <TablePagination
+              component="div"
+              count={filteredUsers.length}
+              page={page}
+              onPageChange={(e, newPage) => setPage(newPage)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
+              rowsPerPageOptions={[5, 10, 25]}
+            />
           </Box>
-        )}
+        </Box>
+      ) : (
+        <Paper sx={{ mt: 3, overflow: "hidden" }}>
+          <Table>
+            <TableHead sx={{ background: "#f3f4f6" }}>
+              <TableRow>
+                <TableCell>Staff Member</TableCell>
+                <TableCell>Role</TableCell>
+                <TableCell>Contact</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
 
-        <TablePagination
-          component="div"
-          count={filteredUsers.length}
-          page={page}
-          onPageChange={(e, newPage) => setPage(newPage)}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={(e) => {
-            setRowsPerPage(parseInt(e.target.value, 10));
-            setPage(0);
-          }}
-          rowsPerPageOptions={[5, 10, 25]}
-        />
-      </Paper>
+            <TableBody>
+              {filteredUsers
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((u) => {
+                  const initials = (u.name || "")
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase();
+
+                  return (
+                    <TableRow key={u._1d || u.id} hover>
+                      <TableCell>
+                        <Box display="flex" alignItems="center" gap={2}>
+                          <Avatar
+                            sx={{ bgcolor: ROLE_COLORS[u.role] || "#6b7280" }}
+                          >
+                            {initials}
+                          </Avatar>
+                          <Box>
+                            <Typography sx={{ fontSize: 15 }}>
+                              {u.name}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </TableCell>
+
+                      <TableCell>
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <Box
+                            sx={{
+                              width: 10,
+                              height: 10,
+                              borderRadius: "50%",
+                              backgroundColor: ROLE_COLORS[u.role] || "#6b7280",
+                            }}
+                          />
+                          <Typography>{u.role}</Typography>
+                        </Box>
+                      </TableCell>
+
+                      <TableCell>
+                        {u.email ? (
+                          <Box
+                            display="flex"
+                            alignItems="center"
+                            gap={1}
+                            color="text.secondary"
+                          >
+                            <FiMail />
+                            <Typography variant="body2">{u.email}</Typography>
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No email
+                          </Typography>
+                        )}
+                      </TableCell>
+
+                      <TableCell>
+                        <Box display="flex" gap={1}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleOpenEdit(u)}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            disabled={u.role === "admin"}
+                            onClick={() => handleAskDelete(u._id || u.id)}
+                          >
+                            Delete
+                          </Button>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+            </TableBody>
+          </Table>
+
+          {filteredUsers.length === 0 && (
+            <Box textAlign="center" py={4} color="text.secondary">
+              No staff members found
+            </Box>
+          )}
+
+          <TablePagination
+            component="div"
+            count={filteredUsers.length}
+            page={page}
+            onPageChange={(e, newPage) => setPage(newPage)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(e) => {
+              setRowsPerPage(parseInt(e.target.value, 10));
+              setPage(0);
+            }}
+            rowsPerPageOptions={[5, 10, 25]}
+          />
+        </Paper>
+      )}
 
       <Modal open={open} onClose={() => handleModalClose()}>
         <Paper

@@ -28,7 +28,7 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
 import api from "../../../config/api";
-import { FiCalendar, FiList, FiPlus } from "react-icons/fi";
+import { FiCalendar, FiList, FiPlus, FiEdit, FiDelete } from "react-icons/fi";
 import ScheduleForm from "./ScheduleForm";
 import AutoGenerateScheduleForm from "./AutoGenerateScheduleForm";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
@@ -264,16 +264,20 @@ export default function ScheduleList() {
           {isAdmin && (
             <Button
               size="small"
-              variant="outlined"
+              variant="contained"
               startIcon={<FiPlus />}
               onClick={() => setOpenAutoModal(true)}
               sx={{
                 textTransform: "none",
                 borderRadius: 2,
-                width: { xs: "100%", sm: "auto" },
+                px: 3,
+                bgcolor: "#1D4ED8",
+                color: "#fff",
+                width: { xs: "100%", md: "auto" },
+                "&:hover": { bgcolor: "#1146b1" },
               }}
             >
-              Bulk Scheduling
+              Auto-Generate Schedule
             </Button>
           )}
 
@@ -281,7 +285,6 @@ export default function ScheduleList() {
           <Button
             size="small"
             variant="contained"
-            color="primary"
             startIcon={<FiPlus />}
             onClick={() => {
               if (isAdmin) {
@@ -296,7 +299,11 @@ export default function ScheduleList() {
             sx={{
               textTransform: "none",
               borderRadius: 2,
-              width: { xs: "100%", sm: "auto" },
+              px: 3,
+              bgcolor: "#111827",
+              color: "#fff",
+              width: { xs: "100%", md: "auto" },
+              "&:hover": { bgcolor: "#0f172a" },
             }}
           >
             Individual Schedule
@@ -549,8 +556,9 @@ export default function ScheduleList() {
                         <TableCell>
                           <Button
                             size="small"
-                            variant="outlined"
+                            variant="contained"
                             color="info"
+                            startIcon={<FiEdit />}
                             onClick={() => openEdit(s)}
                             sx={{
                               mr: 1,
@@ -562,7 +570,8 @@ export default function ScheduleList() {
                           </Button>
                           <Button
                             size="small"
-                            variant="outlined"
+                            variant="contained"
+                            startIcon={<FiDelete />}
                             color="error"
                             onClick={() => askDelete(s._id)}
                             sx={{ borderRadius: 2, textTransform: "none" }}

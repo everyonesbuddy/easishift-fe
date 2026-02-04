@@ -347,11 +347,13 @@ export default function PreferencesPage() {
             onClick={handleSave}
             disabled={saving}
             sx={{
-              background: "#2563EB",
-              "&:hover": { background: "#1D4ED8" },
-              display: "flex",
-              alignItems: "center",
+              textTransform: "none",
+              borderRadius: 2,
+              px: 3,
+              bgcolor: "#2563EB",
+              color: "#fff",
               width: { xs: "100%", md: "auto" },
+              "&:hover": { bgcolor: "#1D4ED8" },
             }}
           >
             {saving ? "Saving..." : "Save Preferences"}

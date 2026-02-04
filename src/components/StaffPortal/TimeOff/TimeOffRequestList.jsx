@@ -131,8 +131,16 @@ export default function TimeOffRequestList() {
           }}
         >
           <Button
-            variant="outlined"
-            sx={{ mr: { sm: 1 }, width: { xs: "50%", sm: "auto" } }}
+            variant="contained"
+            sx={{
+              textTransform: "none",
+              borderRadius: 2,
+              px: 3,
+              bgcolor: "#111827",
+              color: "#fff",
+              width: { xs: "100%", md: "auto" },
+              "&:hover": { bgcolor: "#0f172a" },
+            }}
             onClick={() => fetchRequests()}
           >
             Refresh
@@ -140,7 +148,15 @@ export default function TimeOffRequestList() {
           <Button
             variant="contained"
             onClick={() => setOpenModal(true)}
-            sx={{ width: { xs: "50%", sm: "auto" } }}
+            sx={{
+              textTransform: "none",
+              borderRadius: 2,
+              px: 3,
+              bgcolor: "#2563EB",
+              color: "#fff",
+              width: { xs: "100%", md: "auto" },
+              "&:hover": { bgcolor: "#1D4ED8" },
+            }}
           >
             Request Time Off
           </Button>

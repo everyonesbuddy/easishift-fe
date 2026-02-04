@@ -22,6 +22,7 @@ import {
   FiMessageSquare,
   FiUserCheck,
   FiCalendar,
+  FiPlus,
 } from "react-icons/fi";
 import {
   FiCheckCircle,
@@ -100,10 +101,6 @@ export default function StaffDashboard() {
     );
 
   if (!summary) return <p>Error loading dashboard.</p>;
-
-  /* ------------------------------------------------------------------ */
-  /*                UPDATED CARD DATA USING NEW SUMMARY FIELDS          */
-  /* ------------------------------------------------------------------ */
 
   // Admin cards
   const adminCards = [
@@ -284,43 +281,97 @@ export default function StaffDashboard() {
         {isAdmin ? (
           <>
             <Button
+              size="small"
               variant="contained"
-              color="primary"
+              startIcon={<FiUsers />}
+              onClick={() => setOpenStaffModal(true)}
+              sx={{
+                textTransform: "none",
+                borderRadius: 2,
+                px: 3,
+                bgcolor: "#ffffff",
+                color: "#111827",
+                width: { xs: "100%", md: "auto" },
+                "&:hover": { bgcolor: "#f3f4f6" },
+              }}
+            >
+              Add Staff
+            </Button>
+
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<FiPlus />}
               onClick={() => setOpenCoverageModal(true)}
-              sx={{ width: { xs: "100%", sm: "auto" } }}
+              sx={{
+                textTransform: "none",
+                borderRadius: 2,
+                px: 3,
+                bgcolor: "#2563EB",
+                color: "#fff",
+                width: { xs: "100%", md: "auto" },
+                "&:hover": { bgcolor: "#1D4ED8" },
+              }}
             >
               Add Coverage
             </Button>
 
             <Button
-              variant="outlined"
-              color="primary"
+              size="small"
+              variant="contained"
+              startIcon={<FiCalendar />}
               onClick={() => setOpenScheduleModal(true)}
-              sx={{ width: { xs: "100%", sm: "auto" } }}
+              sx={{
+                textTransform: "none",
+                borderRadius: 2,
+                px: 3,
+                bgcolor: "#111827",
+                color: "#fff",
+                width: { xs: "100%", md: "auto" },
+                "&:hover": { bgcolor: "#0f172a" },
+              }}
             >
               Create Schedule
             </Button>
 
             <Button
+              size="small"
               variant="contained"
-              color="warning"
+              startIcon={<FiUserCheck />}
               onClick={() => setOpenAutoModal(true)}
-              sx={{ width: { xs: "100%", sm: "auto" } }}
+              sx={{
+                textTransform: "none",
+                borderRadius: 2,
+                px: 3,
+                bgcolor: "#1D4ED8",
+                color: "#fff",
+                width: { xs: "100%", md: "auto" },
+                "&:hover": { bgcolor: "#1146b1" },
+              }}
             >
               Auto-Generate Schedule
             </Button>
           </>
         ) : (
           <Button
+            size="small"
             variant="contained"
-            color="primary"
+            startIcon={<FiPlus />}
             onClick={() => {
               // open schedule modal prefilled for current user
               setOpenScheduleModal(true);
             }}
-            sx={{ width: { xs: "100%", sm: "auto" } }}
+            sx={{
+              textTransform: "none",
+              borderRadius: 2,
+              px: 3,
+              bgcolor: "#2563EB",
+              color: "#fff",
+              width: { xs: "100%", md: "auto" },
+              "&:hover": { bgcolor: "#1D4ED8" },
+            }}
           >
-            Pick up shift
+            Pick Up Shift
           </Button>
         )}
       </Box>
@@ -349,6 +400,23 @@ export default function StaffDashboard() {
       <ScheduleAndCoverageCharts userId={user._id} isAdmin={isAdmin} />
 
       {/* Modals for actions */}
+      <Dialog
+        open={openStaffModal}
+        onClose={() => setOpenStaffModal(false)}
+        fullWidth
+        maxWidth="sm"
+        scroll="paper"
+      >
+        <DialogContent dividers>
+          <StaffCreateAndEditForm
+            staff={null}
+            onSuccess={() => {
+              setOpenStaffModal(false);
+              loadDashboardData();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={openCoverageModal}
         onClose={() => setOpenCoverageModal(false)}

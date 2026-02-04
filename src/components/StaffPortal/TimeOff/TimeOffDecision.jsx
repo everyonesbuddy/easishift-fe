@@ -149,8 +149,16 @@ export default function TimeOffDecision() {
 
         <Box sx={{ mt: { xs: 1, sm: 0 } }}>
           <Button
-            variant="outlined"
-            sx={{ mr: 1 }}
+            variant="contained"
+            sx={{
+              textTransform: "none",
+              borderRadius: 2,
+              px: 3,
+              bgcolor: "#111827",
+              color: "#fff",
+              width: { xs: "100%", md: "auto" },
+              "&:hover": { bgcolor: "#0f172a" },
+            }}
             onClick={() => fetchRequests()}
           >
             Refresh
@@ -373,7 +381,7 @@ export default function TimeOffDecision() {
           </Button>
           <Button
             color="error"
-            variant="outlined"
+            variant="contained"
             onClick={() => handleDecision(selected._id, "denied")}
             disabled={actionLoadingId === selected?._id}
             sx={{ width: { xs: "100%", sm: "auto" } }}

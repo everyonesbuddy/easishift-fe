@@ -180,16 +180,32 @@ export default function ManageSubscription() {
               }}
             >
               <Button
-                variant="outlined"
+                variant="contained"
                 onClick={refreshTenant}
-                sx={{ width: { xs: "100%", md: "auto" } }}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: 2,
+                  px: 3,
+                  bgcolor: "#111827",
+                  color: "#fff",
+                  width: { xs: "100%", md: "auto" },
+                  "&:hover": { bgcolor: "#0f172a" },
+                }}
               >
                 Refresh
               </Button>
               <Button
                 variant="contained"
                 onClick={() => handleCancelSubscription()}
-                sx={{ width: { xs: "100%", md: "auto" } }}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: 2,
+                  px: 3,
+                  bgcolor: "#2563EB",
+                  color: "#fff",
+                  width: { xs: "100%", md: "auto" },
+                  "&:hover": { bgcolor: "#1D4ED8" },
+                }}
               >
                 {loadingPlan === "cancel"
                   ? "Processing..."

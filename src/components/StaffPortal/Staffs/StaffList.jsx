@@ -23,7 +23,15 @@ import {
   Avatar,
 } from "@mui/material";
 import api from "../../../config/api";
-import { FiUserPlus, FiMail, FiPhone, FiSearch } from "react-icons/fi";
+import {
+  FiUserPlus,
+  FiMail,
+  FiPhone,
+  FiSearch,
+  FiUsers,
+  FiEdit,
+  FiDelete,
+} from "react-icons/fi";
 import { AiOutlineCalendar } from "react-icons/ai";
 import { useAuth } from "../../../context/AuthContext";
 import StaffCreateAndEditForm from "./StaffCreateAndEditForm";
@@ -141,13 +149,22 @@ export default function StaffList() {
 
         {role === "admin" && (
           <Button
-            startIcon={<FiUserPlus />}
+            size="small"
             variant="contained"
+            startIcon={<FiUsers />}
             onClick={() => {
               setEditingStaff(null);
               setOpen(true);
             }}
-            sx={{ textTransform: "none", borderRadius: 2 }}
+            sx={{
+              textTransform: "none",
+              borderRadius: 2,
+              px: 3,
+              bgcolor: "#2563EB",
+              color: "#fff",
+              width: { xs: "100%", md: "auto" },
+              "&:hover": { bgcolor: "#1D4ED8" },
+            }}
           >
             Add Staff Member
           </Button>
@@ -244,17 +261,28 @@ export default function StaffList() {
                     <Stack direction="row" spacing={1}>
                       <Button
                         size="small"
-                        variant="outlined"
+                        variant="contained"
+                        color="info"
                         onClick={() => handleOpenEdit(u)}
+                        sx={{
+                          mr: 1,
+                          borderRadius: 2,
+                          textTransform: "none",
+                        }}
                       >
                         Edit
                       </Button>
                       <Button
                         size="small"
-                        variant="outlined"
+                        variant="contained"
                         color="error"
                         disabled={u.role === "admin"}
                         onClick={() => handleAskDelete(u._id || u.id)}
+                        sx={{
+                          mr: 1,
+                          borderRadius: 2,
+                          textTransform: "none",
+                        }}
                       >
                         Delete
                       </Button>
@@ -355,15 +383,18 @@ export default function StaffList() {
                         <Box display="flex" gap={1}>
                           <Button
                             size="small"
-                            variant="outlined"
+                            variant="contained"
+                            color="info"
+                            startIcon={<FiEdit />}
                             onClick={() => handleOpenEdit(u)}
                           >
                             Edit
                           </Button>
                           <Button
                             size="small"
-                            variant="outlined"
+                            variant="contained"
                             color="error"
+                            startIcon={<FiDelete />}
                             disabled={u.role === "admin"}
                             onClick={() => handleAskDelete(u._id || u.id)}
                           >

@@ -165,7 +165,15 @@ export default function MessageList() {
           startIcon={<FiPlus />}
           variant="contained"
           onClick={() => setOpenComposerModal(true)}
-          sx={{ textTransform: "none", width: { xs: "100%", md: "auto" } }}
+          sx={{
+            textTransform: "none",
+            borderRadius: 2,
+            px: 3,
+            bgcolor: "#2563EB",
+            color: "#fff",
+            width: { xs: "100%", md: "auto" },
+            "&:hover": { bgcolor: "#1D4ED8" },
+          }}
         >
           New Message
         </Button>
@@ -400,7 +408,15 @@ export default function MessageList() {
                   startIcon={<FiSend />}
                   variant="contained"
                   onClick={() => setOpenComposerModal(true)}
-                  sx={{ width: { xs: "100%", md: "auto" } }}
+                  sx={{
+                    textTransform: "none",
+                    borderRadius: 2,
+                    px: 3,
+                    bgcolor: "#2563EB",
+                    color: "#fff",
+                    width: { xs: "100%", md: "auto" },
+                    "&:hover": { bgcolor: "#1D4ED8" },
+                  }}
                 >
                   Reply
                 </Button>

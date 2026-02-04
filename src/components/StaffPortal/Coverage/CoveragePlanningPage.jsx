@@ -27,7 +27,7 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
 import api from "../../../config/api";
-import { FiCalendar, FiList, FiPlus } from "react-icons/fi";
+import { FiCalendar, FiList, FiPlus, FiDelete } from "react-icons/fi";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import { useAuth } from "../../../context/AuthContext";
 import CoverageCreateForm from "./CoverageCreateForm";
@@ -402,7 +402,8 @@ export default function CoveragePlanningPage() {
                     {isAdmin && (
                       <Button
                         size="small"
-                        variant="outlined"
+                        variant="contained"
+                        startIcon={<FiDelete />}
                         color="error"
                         onClick={() => askDelete(c._id)}
                         sx={{ textTransform: "none", borderRadius: 2 }}
@@ -475,7 +476,8 @@ export default function CoveragePlanningPage() {
                         <TableCell>
                           <Button
                             size="small"
-                            variant="outlined"
+                            variant="contained"
+                            startIcon={<FiDelete />}
                             color="error"
                             onClick={() => askDelete(c._id)}
                             sx={{ textTransform: "none", borderRadius: 2 }}

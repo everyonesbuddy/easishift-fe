@@ -9,7 +9,6 @@ import {
   TextField,
   Button,
   Alert,
-  InputAdornment,
   IconButton,
 } from "@mui/material";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
@@ -90,27 +89,6 @@ export default function TimeOffRequestModal({ open, onClose, onSuccess }) {
             onChange={(e) => setStartTime(e.target.value)}
             InputLabelProps={{ shrink: true }}
             fullWidth
-            inputRef={startInputRef}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    edge="end"
-                    onClick={() => {
-                      const input = startInputRef.current;
-                      if (!input) return;
-                      if (typeof input.showPicker === "function") {
-                        input.showPicker();
-                      } else {
-                        input.focus();
-                      }
-                    }}
-                  >
-                    <CalendarMonthIcon />
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
           />
 
           <TextField
@@ -120,27 +98,6 @@ export default function TimeOffRequestModal({ open, onClose, onSuccess }) {
             onChange={(e) => setEndTime(e.target.value)}
             InputLabelProps={{ shrink: true }}
             fullWidth
-            inputRef={endInputRef}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    edge="end"
-                    onClick={() => {
-                      const input = endInputRef.current;
-                      if (!input) return;
-                      if (typeof input.showPicker === "function") {
-                        input.showPicker();
-                      } else {
-                        input.focus();
-                      }
-                    }}
-                  >
-                    <CalendarMonthIcon />
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
           />
 
           <TextField

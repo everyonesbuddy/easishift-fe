@@ -8,7 +8,6 @@ import {
   Alert,
   Paper,
   Stack,
-  InputAdornment,
   IconButton,
 } from "@mui/material";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
@@ -117,30 +116,9 @@ export default function CoverageCreateForm({ tenantId, onSuccess }) {
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton
-                  edge="end"
-                  onClick={() => {
-                    const input = dateInputRef.current;
-                    if (!input) return;
-                    if (typeof input.showPicker === "function") {
-                      input.showPicker();
-                    } else {
-                      input.focus();
-                    }
-                  }}
-                >
-                  <CalendarMonthIcon />
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
           // The label should remain shrunk for date inputs
           InputLabelProps={{ shrink: true }}
           required
-          inputRef={dateInputRef}
         />
 
         <TextField

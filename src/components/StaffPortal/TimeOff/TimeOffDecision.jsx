@@ -293,7 +293,7 @@ export default function TimeOffDecision() {
                   </Typography>
                 </Box>
 
-                {/* {r.status === "pending" ? (
+                {r.status === "pending" ? (
                   <Stack
                     direction="column"
                     spacing={1}
@@ -316,7 +316,7 @@ export default function TimeOffDecision() {
                   >
                     {r.status}
                   </Typography>
-                )} */}
+                )}
               </Box>
             ))}
           </Box>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Box,
   Button,
@@ -8,7 +8,10 @@ import {
   Alert,
   Paper,
   Stack,
+  InputAdornment,
+  IconButton,
 } from "@mui/material";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 
@@ -27,6 +30,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess }) {
   const [endTime, setEndTime] = useState("17:00");
   const [requiredCount, setRequiredCount] = useState(1);
   const [note, setNote] = useState("");
+  const dateInputRef = useRef(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -37,6 +41,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess }) {
 
     if (!role || !date || !startTime || !endTime) {
       setError("Please complete all fields.");
+      toast.error("Please complete all fields.");
       return;
     }
 
@@ -60,10 +65,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess }) {
       });
 
       setSuccess("Coverage added successfully!");
-      toast.success("Coverage added", {
-        position: "top-right",
-        autoClose: 2500,
-      });
+      toast.success("Coverage added");
       setRole("");
       setDate("");
       setStartTime("08:00");
@@ -75,7 +77,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess }) {
     } catch (err) {
       const msg = err.response?.data?.message || "Failed to add coverage.";
       setError(msg);
-      toast.error(msg, { position: "top-right", autoClose: 4000 });
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -115,8 +117,30 @@ export default function CoverageCreateForm({ tenantId, onSuccess }) {
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  edge="end"
+                  onClick={() => {
+                    const input = dateInputRef.current;
+                    if (!input) return;
+                    if (typeof input.showPicker === "function") {
+                      input.showPicker();
+                    } else {
+                      input.focus();
+                    }
+                  }}
+                >
+                  <CalendarMonthIcon />
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+          // The label should remain shrunk for date inputs
           InputLabelProps={{ shrink: true }}
           required
+          inputRef={dateInputRef}
         />
 
         <TextField

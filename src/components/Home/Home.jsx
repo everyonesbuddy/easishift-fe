@@ -143,9 +143,9 @@ export default function Home() {
           {/* LEFT */}
           <Box>
             <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
-              <Chip icon={<FiZap />} label="Outpatient scheduling" />
-              <Chip icon={<FiShield />} label="Designed for change" />
-              <Chip icon={<FiCalendar />} label="No enterprise overhead" />
+              <Chip icon={<FiZap />} label="Workforce scheduling" />
+              <Chip icon={<FiShield />} label="Flexible by design" />
+              <Chip icon={<FiCalendar />} label="Simple to use" />
             </Stack>
 
             <Typography
@@ -156,15 +156,14 @@ export default function Home() {
                 lineHeight: 1.02,
               }}
             >
-              Stop losing time, money, and staff to broken scheduling
+              Scheduling Made Easy
             </Typography>
 
             <Typography
               variant="h6"
               sx={{ color: "text.secondary", mt: 2, maxWidth: 680 }}
             >
-              We help outpatient clinics schedule doctors and nurses without
-              spreadsheets, last-minute chaos, or burnout.
+              Modern Scheduling for clinics-minus the chaos
             </Typography>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} mt={3}>
@@ -336,7 +335,7 @@ export default function Home() {
             >
               <Box>
                 <Typography variant="h4" sx={{ fontWeight: 950 }}>
-                  See if it fits your clinic
+                  Start Scheduling The Smart Way
                 </Typography>
                 <Typography sx={{ color: "text.secondary", mt: 1 }}>
                   Walk through your staffing patterns in a short demo.
@@ -354,7 +353,7 @@ export default function Home() {
                   rel="noopener noreferrer"
                   sx={{ fontWeight: 900 }}
                 >
-                  Book a demo
+                  Request a demo
                 </Button>
                 <Button
                   variant="outlined"

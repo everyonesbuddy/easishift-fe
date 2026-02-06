@@ -359,10 +359,10 @@ export default function Home() {
                 <Button
                   variant="outlined"
                   size="large"
-                  onClick={() => navigate("/login")}
+                  onClick={() => navigate("/signup-tenant")}
                   sx={{ fontWeight: 900 }}
                 >
-                  Log in
+                  Sign Up
                 </Button>
               </Stack>
             </Box>

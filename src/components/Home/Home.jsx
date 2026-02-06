@@ -163,7 +163,7 @@ export default function Home() {
               variant="h6"
               sx={{ color: "text.secondary", mt: 2, maxWidth: 680 }}
             >
-              Modern Scheduling for clinics-minus the chaos
+              Modern scheduling for clinics-minus the chaos
             </Typography>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} mt={3}>

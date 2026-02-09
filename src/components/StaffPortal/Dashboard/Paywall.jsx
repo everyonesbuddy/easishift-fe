@@ -74,7 +74,7 @@ export default function Paywall({ tenant }) {
   };
 
   return (
-    <Container maxWidth="md" sx={{ mt: 6, mb: 6 }}>
+    <Container maxWidth="md" sx={{ mt: 6, mb: 6, pb: 8 }}>
       <Box sx={{ textAlign: "center", mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 900 }}>
           Activate your clinic
@@ -152,8 +152,8 @@ export default function Paywall({ tenant }) {
                   {loadingPlan === p.key
                     ? "Redirecting..."
                     : p.highlight
-                    ? "Choose plan"
-                    : "Upgrade"}
+                      ? "Choose plan"
+                      : "Upgrade"}
                 </Button>
               </Box>
             </Paper>

@@ -147,7 +147,7 @@ export default function TimeOffDecision() {
           </Typography>
         </div>
 
-        <Box sx={{ mt: { xs: 1, sm: 0 } }}>
+        {/* <Box sx={{ mt: { xs: 1, sm: 0 } }}>
           <Button
             variant="contained"
             sx={{
@@ -163,7 +163,7 @@ export default function TimeOffDecision() {
           >
             Refresh
           </Button>
-        </Box>
+        </Box> */}
       </Box>
 
       {/* Stats */}

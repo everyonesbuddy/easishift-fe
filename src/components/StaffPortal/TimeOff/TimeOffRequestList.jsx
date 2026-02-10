@@ -130,7 +130,7 @@ export default function TimeOffRequestList() {
             justifyContent: { xs: "stretch", sm: "flex-end" },
           }}
         >
-          <Button
+          {/* <Button
             variant="contained"
             sx={{
               textTransform: "none",
@@ -144,7 +144,7 @@ export default function TimeOffRequestList() {
             onClick={() => fetchRequests()}
           >
             Refresh
-          </Button>
+          </Button> */}
           <Button
             variant="contained"
             onClick={() => setOpenModal(true)}

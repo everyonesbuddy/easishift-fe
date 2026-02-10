@@ -179,7 +179,7 @@ export default function ManageSubscription() {
                 flexDirection: { xs: "column", md: "row" },
               }}
             >
-              <Button
+              {/* <Button
                 variant="contained"
                 onClick={refreshTenant}
                 sx={{
@@ -193,7 +193,7 @@ export default function ManageSubscription() {
                 }}
               >
                 Refresh
-              </Button>
+              </Button> */}
               <Button
                 variant="contained"
                 onClick={() => handleCancelSubscription()}
@@ -223,6 +223,7 @@ export default function ManageSubscription() {
             spacing={3}
             alignItems="stretch"
             justifyContent="center"
+            paddingBottom={5}
           >
             {plans.map((p) => (
               <Grid item xs={12} md={4} key={p.key}>

@@ -10,7 +10,7 @@ import {
   Stack,
   IconButton,
 } from "@mui/material";
-import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import CloseIcon from "@mui/icons-material/Close";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 
@@ -22,7 +22,7 @@ function toUTC(dateStr, timeStr) {
   return new Date(local.toISOString()); // guaranteed UTC
 }
 
-export default function CoverageCreateForm({ tenantId, onSuccess }) {
+export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   const [role, setRole] = useState("");
   const [date, setDate] = useState(""); // YYYY-MM-DD
   const [startTime, setStartTime] = useState("08:00");
@@ -86,9 +86,23 @@ export default function CoverageCreateForm({ tenantId, onSuccess }) {
     <Paper
       component="form"
       onSubmit={handleSubmit}
-      sx={{ p: 3, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.02)" }}
+      sx={{
+        p: 3,
+        borderRadius: 2,
+        backgroundColor: "rgba(255,255,255,0.02)",
+        position: "relative",
+      }}
       elevation={0}
     >
+      {onClose && (
+        <IconButton
+          aria-label="Close"
+          onClick={onClose}
+          sx={{ position: "absolute", top: 8, right: 8 }}
+        >
+          <CloseIcon />
+        </IconButton>
+      )}
       <Typography variant="h6" sx={{ mb: 2 }}>
         Add Coverage
       </Typography>

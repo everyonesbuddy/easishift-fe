@@ -7,12 +7,14 @@ import {
   Box,
   Paper,
   Stack,
+  IconButton,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 
-export default function StaffCreateAndEditForm({ staff, onSuccess }) {
+export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
   const { user, role: loggedInRole } = useAuth();
 
   const [form, setForm] = useState({
@@ -73,9 +75,23 @@ export default function StaffCreateAndEditForm({ staff, onSuccess }) {
         e.preventDefault();
         handleSubmit();
       }}
-      sx={{ p: 3, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.02)" }}
+      sx={{
+        p: 3,
+        borderRadius: 2,
+        backgroundColor: "rgba(255,255,255,0.02)",
+        position: "relative",
+      }}
       elevation={0}
     >
+      {onClose && (
+        <IconButton
+          aria-label="Close"
+          onClick={onClose}
+          sx={{ position: "absolute", top: 8, right: 8 }}
+        >
+          <CloseIcon />
+        </IconButton>
+      )}
       <Typography variant="h6" sx={{ mb: 2 }}>
         {staff ? "Edit Staff Member" : "Add Staff Member"}
       </Typography>

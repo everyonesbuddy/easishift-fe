@@ -50,6 +50,11 @@ export default function MessageList() {
   const [selectedMessage, setSelectedMessage] = useState(null);
 
   const [openComposerModal, setOpenComposerModal] = useState(false);
+  const [composerDefaults, setComposerDefaults] = useState({
+    recipientId: "",
+    subject: "",
+    lockRecipient: false,
+  });
 
   const fetchInbox = async () => {
     try {
@@ -81,6 +86,30 @@ export default function MessageList() {
   };
 
   const handleMainTabChange = (e, val) => setMainTab(val);
+
+  const formatReplySubject = (subject) => {
+    if (!subject) return "";
+    return /^re:/i.test(subject) ? subject : `Re: ${subject}`;
+  };
+
+  const handleNewMessage = () => {
+    setComposerDefaults({ recipientId: "", subject: "", lockRecipient: false });
+    setOpenComposerModal(true);
+  };
+
+  const handleReply = () => {
+    if (!selectedMessage) return;
+    const otherPersonId =
+      mainTab === "inbox"
+        ? selectedMessage.senderId?._id
+        : selectedMessage.receiverId?._id;
+    setComposerDefaults({
+      recipientId: otherPersonId || "",
+      subject: formatReplySubject(selectedMessage.subject || ""),
+      lockRecipient: true,
+    });
+    setOpenComposerModal(true);
+  };
 
   const handleViewMessage = async (msg) => {
     if (!msg.read && mainTab === "inbox") {
@@ -164,7 +193,7 @@ export default function MessageList() {
         <Button
           startIcon={<FiPlus />}
           variant="contained"
-          onClick={() => setOpenComposerModal(true)}
+          onClick={handleNewMessage}
           sx={{
             textTransform: "none",
             borderRadius: 2,
@@ -407,7 +436,7 @@ export default function MessageList() {
                 <Button
                   startIcon={<FiSend />}
                   variant="contained"
-                  onClick={() => setOpenComposerModal(true)}
+                  onClick={handleReply}
                   sx={{
                     textTransform: "none",
                     borderRadius: 2,
@@ -457,6 +486,10 @@ export default function MessageList() {
           }}
         >
           <MessageComposer
+            onClose={() => setOpenComposerModal(false)}
+            initialRecipientId={composerDefaults.recipientId}
+            initialSubject={composerDefaults.subject}
+            lockRecipient={composerDefaults.lockRecipient}
             onSuccess={() => {
               setOpenComposerModal(false);
               fetchInbox();

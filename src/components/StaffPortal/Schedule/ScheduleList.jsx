@@ -306,7 +306,7 @@ export default function ScheduleList() {
               "&:hover": { bgcolor: "#0f172a" },
             }}
           >
-            Individual Schedule
+            {isAdmin ? "Individual Schedule" : "Pick Up Shift"}
           </Button>
         </Box>
       </Box>
@@ -678,6 +678,7 @@ export default function ScheduleList() {
         <DialogContent dividers>
           <ScheduleForm
             onSuccess={() => closeModal(true)}
+            onClose={() => closeModal()}
             schedule={editingSchedule}
             staffList={staff}
             // If user is not admin and the modal was opened via the Individual Schedule button,
@@ -698,6 +699,7 @@ export default function ScheduleList() {
       >
         <DialogContent dividers>
           <AutoGenerateScheduleForm
+            onClose={() => setOpenAutoModal(false)}
             onSuccess={() => {
               setOpenAutoModal(false);
               window.location.reload();

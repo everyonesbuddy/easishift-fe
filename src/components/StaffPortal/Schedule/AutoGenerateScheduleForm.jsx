@@ -12,13 +12,15 @@ import {
   MenuItem,
   Paper,
   Stack,
+  IconButton,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 
 const roles = ["doctor", "nurse", "receptionist", "billing", "staff", "other"];
 
-export default function AutoGenerateScheduleForm({ onSuccess }) {
+export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
   const [coverages, setCoverages] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -98,9 +100,19 @@ export default function AutoGenerateScheduleForm({ onSuccess }) {
         p: { xs: 1.5, md: 3 },
         borderRadius: 2,
         backgroundColor: "rgba(255,255,255,0.02)",
+        position: "relative",
       }}
       elevation={0}
     >
+      {onClose && (
+        <IconButton
+          aria-label="Close"
+          onClick={onClose}
+          sx={{ position: "absolute", top: 8, right: 8 }}
+        >
+          <CloseIcon />
+        </IconButton>
+      )}
       <Typography
         variant="h6"
         sx={{ mb: 1.5, fontSize: { xs: "1rem", md: "1.25rem" } }}

@@ -62,7 +62,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
     {
       id: "timeoff",
       icon: MdSchedule,
-      label: "Time Off Approvals",
+      label: "Time Off Requests",
       to: "/timeoff-decisions",
     },
     { id: "messages", icon: MdMessage, label: "Messages", to: "/messages" },

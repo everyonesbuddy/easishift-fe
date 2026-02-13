@@ -1,15 +1,29 @@
 import { useState, useEffect } from "react";
-import { TextField, Button, Typography, MenuItem, Box } from "@mui/material";
+import {
+  TextField,
+  Button,
+  Typography,
+  MenuItem,
+  Box,
+  IconButton,
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 
-export default function MessageComposer({ onSuccess }) {
+export default function MessageComposer({
+  onSuccess,
+  onClose,
+  initialRecipientId = "",
+  lockRecipient = false,
+  initialSubject = "",
+}) {
   const { user } = useAuth();
 
   const [form, setForm] = useState({
-    receiverId: "",
-    subject: "",
+    receiverId: initialRecipientId,
+    subject: initialSubject,
     body: "",
   });
 
@@ -30,6 +44,14 @@ export default function MessageComposer({ onSuccess }) {
 
     loadStaff();
   }, []);
+
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      receiverId: initialRecipientId,
+      subject: initialSubject,
+    }));
+  }, [initialRecipientId, initialSubject]);
 
   const handleSubmit = async () => {
     try {
@@ -54,7 +76,16 @@ export default function MessageComposer({ onSuccess }) {
   };
 
   return (
-    <>
+    <Box sx={{ position: "relative" }}>
+      {onClose && (
+        <IconButton
+          aria-label="Close"
+          onClick={onClose}
+          sx={{ position: "absolute", top: -8, right: -8 }}
+        >
+          <CloseIcon />
+        </IconButton>
+      )}
       <Typography variant="h6" sx={{ mb: 2 }}>
         Send Message
       </Typography>
@@ -65,6 +96,7 @@ export default function MessageComposer({ onSuccess }) {
         label="Recipient"
         sx={{ mb: 2 }}
         value={form.receiverId}
+        disabled={lockRecipient}
         onChange={(e) => setForm({ ...form, receiverId: e.target.value })}
       >
         {staffList.map((s) => (
@@ -100,6 +132,6 @@ export default function MessageComposer({ onSuccess }) {
           Cancel
         </Button>
       </Box>
-    </>
+    </Box>
   );
 }

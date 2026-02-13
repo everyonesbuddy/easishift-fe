@@ -10,7 +10,10 @@ import {
   InputLabel,
   Paper,
   Stack,
+  IconButton,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import { useAuth } from "../../../context/AuthContext";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 
@@ -55,12 +58,15 @@ function formatShiftLabel(coverage) {
 
 export default function ScheduleForm({
   onSuccess,
+  onClose,
   schedule,
   staffList,
   initialStaffId = "",
   disableStaffSelect = false,
 }) {
   const isEditing = Boolean(schedule);
+
+  const { isAdmin } = useAuth();
 
   const [formData, setFormData] = useState({
     staffId: "",
@@ -177,9 +183,23 @@ export default function ScheduleForm({
     <Paper
       component="form"
       onSubmit={submit}
-      sx={{ p: 3, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.02)" }}
+      sx={{
+        p: 3,
+        borderRadius: 2,
+        backgroundColor: "rgba(255,255,255,0.02)",
+        position: "relative",
+      }}
       elevation={0}
     >
+      {onClose && (
+        <IconButton
+          aria-label="Close"
+          onClick={onClose}
+          sx={{ position: "absolute", top: 8, right: 8 }}
+        >
+          <CloseIcon />
+        </IconButton>
+      )}
       <Stack spacing={2}>
         <Typography variant="h6">
           {isEditing ? "Edit Schedule" : "Create New Schedule"}
@@ -277,14 +297,16 @@ export default function ScheduleForm({
           disabled
         />
 
-        <TextField
-          label="Notes"
-          name="notes"
-          value={formData.notes}
-          onChange={handleChange}
-          multiline
-          rows={3}
-        />
+        {isAdmin && (
+          <TextField
+            label="Notes"
+            name="notes"
+            value={formData.notes}
+            onChange={handleChange}
+            multiline
+            rows={3}
+          />
+        )}
 
         {isEditing && (
           <FormControl fullWidth>

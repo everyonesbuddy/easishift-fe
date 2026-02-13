@@ -410,6 +410,7 @@ export default function StaffDashboard() {
         <DialogContent dividers>
           <StaffCreateAndEditForm
             staff={null}
+            onClose={() => setOpenStaffModal(false)}
             onSuccess={() => {
               setOpenStaffModal(false);
               loadDashboardData();
@@ -427,6 +428,7 @@ export default function StaffDashboard() {
         <DialogContent dividers>
           <CoverageCreateForm
             tenantId={user?.tenantId}
+            onClose={() => setOpenCoverageModal(false)}
             onSuccess={() => {
               setOpenCoverageModal(false);
               loadDashboardData();
@@ -447,6 +449,7 @@ export default function StaffDashboard() {
             staffList={staffList}
             initialStaffId={isAdmin ? "" : user?._id}
             disableStaffSelect={!isAdmin}
+            onClose={() => setOpenScheduleModal(false)}
             onSuccess={() => {
               setOpenScheduleModal(false);
               loadDashboardData();
@@ -464,6 +467,7 @@ export default function StaffDashboard() {
       >
         <DialogContent dividers>
           <AutoGenerateScheduleForm
+            onClose={() => setOpenAutoModal(false)}
             onSuccess={() => {
               setOpenAutoModal(false);
               loadDashboardData();

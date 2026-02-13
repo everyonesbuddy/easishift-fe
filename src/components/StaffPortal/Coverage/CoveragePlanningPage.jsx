@@ -589,6 +589,7 @@ export default function CoveragePlanningPage() {
       >
         <DialogContent dividers>
           <CoverageCreateForm
+            onClose={() => setOpenAdd(false)}
             onSuccess={() => {
               setOpenAdd(false);
               fetchCoverages();

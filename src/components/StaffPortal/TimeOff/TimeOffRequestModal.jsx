@@ -12,6 +12,7 @@ import {
   IconButton,
 } from "@mui/material";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import CloseIcon from "@mui/icons-material/Close";
 import axios from "axios";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
@@ -70,7 +71,14 @@ export default function TimeOffRequestModal({ open, onClose, onSuccess }) {
       maxWidth="sm"
       scroll="paper"
     >
-      <DialogContent dividers>
+      <DialogContent dividers sx={{ position: "relative" }}>
+        <IconButton
+          aria-label="Close"
+          onClick={onClose}
+          sx={{ position: "absolute", top: 8, right: 8 }}
+        >
+          <CloseIcon />
+        </IconButton>
         <Typography variant="h6" sx={{ mb: 2 }}>
           Request Time Off
         </Typography>

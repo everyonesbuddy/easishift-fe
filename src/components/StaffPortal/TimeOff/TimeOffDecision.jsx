@@ -15,7 +15,9 @@ import {
   DialogContent,
   DialogActions,
   Stack,
+  IconButton,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import api from "../../../config/api";
 import { FiCheck, FiX, FiCalendar, FiClock } from "react-icons/fi";
 
@@ -325,7 +327,16 @@ export default function TimeOffDecision() {
 
       {/* Review Dialog */}
       <Dialog open={!!selected} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Review Time Off Request</DialogTitle>
+        <DialogTitle sx={{ position: "relative", pr: 6 }}>
+          Review Time Off Request
+          <IconButton
+            aria-label="Close"
+            onClick={handleClose}
+            sx={{ position: "absolute", top: 8, right: 8 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
         <DialogContent>
           {selected && (
             <Box>

@@ -439,6 +439,7 @@ export default function StaffList() {
         <DialogContent dividers>
           <StaffCreateAndEditForm
             staff={editingStaff}
+            onClose={() => handleModalClose()}
             onSuccess={() => handleModalClose(true)}
           />
         </DialogContent>

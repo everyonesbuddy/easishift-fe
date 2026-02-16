@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import PrivateRoute from "./components/Shared/PrivateRoute";
 import Login from "./components/Auth/Login";
+import ResetPassword from "./components/Auth/ResetPassword";
 import StaffDashboard from "./components/StaffPortal/Dashboard/StaffDashboard";
 import SignupTenant from "./components/Auth/SignupTenant";
 import Home from "./components/Home/Home";
@@ -66,6 +67,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/signup-tenant" element={<SignupTenant />} />
           <Route path="/billing" element={<ManageSubscription />} />
           <Route path="/billing/success" element={<BillingSuccess />} />

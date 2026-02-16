@@ -11,7 +11,10 @@ import {
   Divider,
   Stack,
   useTheme,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import api from "../../../config/api";
 
 // Modern paywall page used during initial activation
@@ -19,39 +22,83 @@ export default function Paywall({ tenant }) {
   const theme = useTheme();
   const [loadingPlan, setLoadingPlan] = useState(null);
   const [error, setError] = useState(null);
+  const [billingPeriod, setBillingPeriod] = useState("yearly");
 
   if (!tenant) return null;
 
-  const plans = [
+  const yearlyPlans = [
     {
-      key: "starter",
+      key: "starterYearly",
       name: "Starter",
       priceLabel: "$3,000/yr",
+      price: 3000,
       seats: 10,
       highlight: false,
     },
     {
-      key: "growth",
+      key: "growthYearly",
       name: "Growth",
       priceLabel: "$5,000/yr",
+      price: 5000,
       seats: 20,
       highlight: true,
     },
     {
-      key: "premium",
+      key: "premiumYearly",
       name: "Premium",
       priceLabel: "$7,000/yr",
+      price: 7000,
       seats: 30,
       highlight: false,
     },
-    // {
-    //   key: "test",
-    //   name: "Test",
-    //   priceLabel: "$2/yr",
-    //   seats: 12,
-    //   highlight: false,
-    // },
   ];
+
+  const monthlyPlans = [
+    {
+      key: "starterMonthly",
+      name: "Starter",
+      priceLabel: "$300/mo",
+      price: 300,
+      seats: 10,
+      highlight: false,
+    },
+    {
+      key: "growthMonthly",
+      name: "Growth",
+      priceLabel: "$500/mo",
+      price: 500,
+      seats: 20,
+      highlight: true,
+    },
+    {
+      key: "premiumMonthly",
+      name: "Premium",
+      priceLabel: "$700/mo",
+      price: 700,
+      seats: 30,
+      highlight: false,
+    },
+  ];
+
+  const plans = billingPeriod === "yearly" ? yearlyPlans : monthlyPlans;
+  const featureList = [
+    "Priority support",
+    "Advanced reporting",
+    "Automated scheduling tools",
+  ];
+
+  const getYearlySavingsPercent = () => {
+    const sampleMonthly = monthlyPlans[0]?.price;
+    const sampleYearly = yearlyPlans[0]?.price;
+    if (!sampleMonthly || !sampleYearly) return null;
+    const monthlyTotal = sampleMonthly * 12;
+    const savingsPercent = Math.round(
+      ((monthlyTotal - sampleYearly) / monthlyTotal) * 100,
+    );
+    return Number.isFinite(savingsPercent) ? savingsPercent : null;
+  };
+
+  const yearlySavingsPercent = getYearlySavingsPercent();
 
   const handleChoosePlan = async (planKey) => {
     setError(null);
@@ -84,13 +131,76 @@ export default function Paywall({ tenant }) {
         </Typography>
       </Box>
 
-      <Grid container spacing={3} justifyContent="center">
+      <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>
+        <ToggleButtonGroup
+          value={billingPeriod}
+          exclusive
+          onChange={(e, newPeriod) => {
+            if (newPeriod !== null) setBillingPeriod(newPeriod);
+          }}
+          sx={{
+            p: 0.5,
+            borderRadius: 999,
+            backgroundColor: "rgba(15, 23, 42, 0.06)",
+            boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.08)",
+            gap: 0.5,
+            "& .MuiToggleButtonGroup-grouped": {
+              border: 0,
+              borderRadius: 999,
+              px: 3,
+              py: 0.8,
+              textTransform: "none",
+              fontWeight: 700,
+              color: "text.secondary",
+            },
+            "& .MuiToggleButtonGroup-grouped.Mui-selected": {
+              backgroundColor: "#fff",
+              color: "text.primary",
+              boxShadow: "0 10px 24px rgba(15, 23, 42, 0.12)",
+            },
+            "& .MuiToggleButtonGroup-grouped.Mui-selected:hover": {
+              backgroundColor: "#fff",
+            },
+          }}
+        >
+          <ToggleButton value="yearly">Yearly</ToggleButton>
+          <ToggleButton value="monthly">Monthly</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+
+      <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>
+        <Chip
+          label={
+            billingPeriod === "yearly" && yearlySavingsPercent
+              ? `Yearly saves ${yearlySavingsPercent}% compared to monthly`
+              : "Monthly offers flexibility with no long-term commitment"
+          }
+          color={billingPeriod === "yearly" ? "primary" : "default"}
+          variant={billingPeriod === "yearly" ? "filled" : "outlined"}
+          sx={{ fontWeight: 700 }}
+        />
+      </Box>
+
+      <Grid
+        container
+        spacing={3}
+        rowSpacing={{ xs: 3, md: 3 }}
+        columnSpacing={{ xs: 2, md: 3 }}
+        justifyContent="center"
+      >
         {plans.map((p) => (
-          <Grid item xs={12} sm={10} md={4} key={p.key}>
+          <Grid
+            item
+            xs={12}
+            sm={10}
+            md={4}
+            key={p.key}
+            sx={{ mb: { xs: 2, md: 0 } }}
+          >
             <Paper
               sx={{
                 p: 3,
-                height: "100%",
+                height: { xs: "auto", md: "100%" },
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "space-between",
@@ -109,22 +219,68 @@ export default function Paywall({ tenant }) {
                   color={p.highlight ? "primary" : "default"}
                   sx={{ mb: 1 }}
                 />
-                <Typography variant="h4" sx={{ fontWeight: 900, mt: 1 }}>
+                <Typography
+                  variant="h4"
+                  sx={{
+                    fontWeight: 900,
+                    mt: 1,
+                    fontSize: { xs: "1.5rem", md: "1.7rem" },
+                    lineHeight: 1.15,
+                  }}
+                >
                   {p.priceLabel}
                 </Typography>
                 <Typography
                   variant="body2"
-                  sx={{ color: "text.secondary", mt: 1 }}
+                  sx={{
+                    color: "text.secondary",
+                    mt: 0.5,
+                    fontSize: { xs: "0.78rem", md: "0.86rem" },
+                    lineHeight: 1.35,
+                  }}
                 >
-                  {p.seats} seats • Billed yearly
+                  {billingPeriod === "yearly"
+                    ? `Equivalent to $${Math.round(
+                        p.price / 12,
+                      )}/mo billed yearly`
+                    : "Billed monthly, cancel anytime"}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: "text.secondary",
+                    mt: 1,
+                    fontSize: { xs: "0.8rem", md: "0.9rem" },
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {p.seats} seats • Billed{" "}
+                  {billingPeriod === "yearly" ? "yearly" : "monthly"}
                 </Typography>
 
                 <Divider sx={{ my: 2 }} />
 
-                <Stack spacing={0.75} sx={{ color: "text.secondary" }}>
-                  <Typography>Easy setup</Typography>
-                  <Typography>Priority email support</Typography>
-                  <Typography>Seat management</Typography>
+                <Stack
+                  spacing={0.9}
+                  sx={{ color: "text.secondary", alignItems: "flex-start" }}
+                >
+                  {featureList.map((feature) => (
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      key={feature}
+                      sx={{ justifyContent: "flex-start" }}
+                    >
+                      <CheckCircleRoundedIcon
+                        fontSize="small"
+                        sx={{ color: theme.palette.primary.main }}
+                      />
+                      <Typography variant="body2" sx={{ lineHeight: 1.3 }}>
+                        {feature}
+                      </Typography>
+                    </Stack>
+                  ))}
                 </Stack>
               </Box>
 

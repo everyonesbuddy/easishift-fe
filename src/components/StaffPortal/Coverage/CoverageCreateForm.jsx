@@ -9,8 +9,12 @@ import {
   Paper,
   Stack,
   IconButton,
+  Chip,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import { LocalizationProvider, DateCalendar } from "@mui/x-date-pickers";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import dayjs from "dayjs";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 
@@ -24,12 +28,11 @@ function toUTC(dateStr, timeStr) {
 
 export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   const [role, setRole] = useState("");
-  const [date, setDate] = useState(""); // YYYY-MM-DD
+  const [selectedDates, setSelectedDates] = useState([]); // Array of dayjs objects
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("17:00");
   const [requiredCount, setRequiredCount] = useState(1);
   const [note, setNote] = useState("");
-  const dateInputRef = useRef(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -38,9 +41,9 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!role || !date || !startTime || !endTime) {
-      setError("Please complete all fields.");
-      toast.error("Please complete all fields.");
+    if (!role || selectedDates.length === 0 || !startTime || !endTime) {
+      setError("Please select a role, at least one date, and times.");
+      toast.error("Please select a role, at least one date, and times.");
       return;
     }
 
@@ -49,24 +52,29 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
     setSuccess("");
 
     try {
-      // Convert local times → UTC ISO strings
-      const startUTC = toUTC(date, startTime);
-      const endUTC = toUTC(date, endTime);
+      // Create coverage for each selected date
+      const coveragePromises = selectedDates.map((dayjsDate) => {
+        const dateStr = dayjsDate.format("YYYY-MM-DD");
+        const startUTC = toUTC(dateStr, startTime);
+        const endUTC = toUTC(dateStr, endTime);
 
-      await api.post("/coverage", {
-        tenantId,
-        role,
-        date, // raw, backend normalizes
-        startTime: startUTC,
-        endTime: endUTC,
-        requiredCount,
-        note,
+        return api.post("/coverage", {
+          tenantId,
+          role,
+          date: dateStr,
+          startTime: startUTC,
+          endTime: endUTC,
+          requiredCount,
+          note,
+        });
       });
 
-      setSuccess("Coverage added successfully!");
-      toast.success("Coverage added");
+      await Promise.all(coveragePromises);
+
+      setSuccess(`Coverage added for ${selectedDates.length} date(s)!`);
+      toast.success(`Coverage added for ${selectedDates.length} date(s)`);
       setRole("");
-      setDate("");
+      setSelectedDates([]);
       setStartTime("08:00");
       setEndTime("17:00");
       setRequiredCount(1);
@@ -80,6 +88,31 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDateChange = (date) => {
+    if (!date) return;
+
+    const dateStr = date.format("YYYY-MM-DD");
+    const isSelected = selectedDates.some(
+      (d) => d.format("YYYY-MM-DD") === dateStr,
+    );
+
+    if (isSelected) {
+      // Remove date if already selected
+      setSelectedDates(
+        selectedDates.filter((d) => d.format("YYYY-MM-DD") !== dateStr),
+      );
+    } else {
+      // Add date if not selected
+      setSelectedDates([...selectedDates, date].sort((a, b) => a.diff(b)));
+    }
+  };
+
+  const handleRemoveDate = (dateToRemove) => {
+    setSelectedDates(
+      selectedDates.filter((d) => d.format("YYYY-MM-DD") !== dateToRemove),
+    );
   };
 
   return (
@@ -125,15 +158,71 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
           ))}
         </TextField>
 
-        <TextField
-          label="Date"
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          // The label should remain shrunk for date inputs
-          InputLabelProps={{ shrink: true }}
-          required
-        />
+        <Typography variant="body2" sx={{ fontWeight: 600, mt: 1 }}>
+          Select Coverage Dates:
+        </Typography>
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <Paper
+            sx={{
+              p: 1,
+              bgcolor: "rgba(37, 99, 235, 0.05)",
+              borderRadius: 1,
+              display: "flex",
+              justifyContent: "center",
+              overflow: "auto",
+            }}
+            elevation={0}
+          >
+            <DateCalendar
+              value={null}
+              onChange={handleDateChange}
+              slotProps={{
+                toolbar: { hidden: true },
+              }}
+              sx={{
+                maxWidth: 320,
+                "& .MuiPickersDay-root": {
+                  fontSize: "0.8rem",
+                  "&.Mui-selected": {
+                    backgroundColor: "#2563EB",
+                    color: "white",
+                  },
+                  "&:hover": {
+                    backgroundColor: "rgba(37, 99, 235, 0.2)",
+                  },
+                },
+                "& .MuiPickersCalendarHeader-root": {
+                  paddingY: 1,
+                },
+                "& .MuiPickersMonth-root": {
+                  gap: "4px",
+                },
+              }}
+            />
+          </Paper>
+        </LocalizationProvider>
+
+        {selectedDates.length > 0 && (
+          <Box
+            sx={{ p: 2, bgcolor: "rgba(37, 99, 235, 0.1)", borderRadius: 1 }}
+          >
+            <Typography variant="body2" sx={{ mb: 1.5, fontWeight: 600 }}>
+              Selected Dates ({selectedDates.length}):
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+              {selectedDates.map((d) => (
+                <Chip
+                  key={d.format("YYYY-MM-DD")}
+                  label={d.format("MMM DD, YYYY")}
+                  onDelete={() => handleRemoveDate(d.format("YYYY-MM-DD"))}
+                  color="primary"
+                  variant="filled"
+                  sx={{ fontWeight: 600 }}
+                />
+              ))}
+            </Box>
+          </Box>
+        )}
 
         <TextField
           label="Start Time"

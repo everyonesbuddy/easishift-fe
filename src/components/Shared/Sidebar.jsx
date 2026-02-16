@@ -9,6 +9,9 @@ import {
   ListItemText,
   Typography,
   Avatar,
+  IconButton,
+  Menu,
+  MenuItem,
 } from "@mui/material";
 import {
   MdDashboard,
@@ -19,15 +22,16 @@ import {
   MdSettings,
   MdAssignment,
   MdAccountCircle,
+  MdMoreVert,
+  MdClose,
 } from "react-icons/md";
 import logo from "../../assets/logos/easishift-logo-plus-text2.svg";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
-
-import { IconButton } from "@mui/material";
-import { MdClose } from "react-icons/md";
+import { useState } from "react";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import ChangePasswordModal from "../Auth/ChangePasswordModal";
 
 function Sidebar({ mobileOpen, onMobileClose }) {
   const { user } = useAuth();
@@ -35,6 +39,9 @@ function Sidebar({ mobileOpen, onMobileClose }) {
   const location = useLocation();
   const theme = useTheme();
   const isMdUp = useMediaQuery(theme.breakpoints.up("sm"));
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const menuOpen = Boolean(anchorEl);
 
   const role = user?.role || "staff";
 
@@ -194,6 +201,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
             gap: 1.5,
             px: 2,
             py: 1.5,
+            position: "relative",
           }}
         >
           <Avatar sx={{ bgcolor: "#2563eb", width: 40, height: 40 }}>
@@ -224,8 +232,44 @@ function Sidebar({ mobileOpen, onMobileClose }) {
               {user?.email || ""}
             </Typography>
           </Box>
+          <IconButton
+            size="small"
+            onClick={(e) => setAnchorEl(e.currentTarget)}
+            sx={{ color: "#9ca3af", "&:hover": { color: "white" } }}
+          >
+            <MdMoreVert size={18} />
+          </IconButton>
         </Box>
+
+        <Menu
+          anchorEl={anchorEl}
+          open={menuOpen}
+          onClose={() => setAnchorEl(null)}
+          PaperProps={{
+            sx: {
+              bgcolor: "#1f2937",
+              color: "white",
+            },
+          }}
+        >
+          <MenuItem
+            onClick={() => {
+              setChangePasswordOpen(true);
+              setAnchorEl(null);
+            }}
+            sx={{
+              "&:hover": { bgcolor: "#111827" },
+            }}
+          >
+            Change Password
+          </MenuItem>
+        </Menu>
       </Box>
+
+      <ChangePasswordModal
+        open={changePasswordOpen}
+        onClose={() => setChangePasswordOpen(false)}
+      />
     </Drawer>
   );
 }

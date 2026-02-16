@@ -11,6 +11,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../config/api";
+import ForgotPasswordModal from "./ForgotPasswordModal";
 
 export default function Login() {
   const { login } = useAuth();
@@ -18,6 +19,7 @@ export default function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -47,7 +49,7 @@ export default function Login() {
     } catch (err) {
       console.error("Login error:", err);
       setError(
-        err.response?.data?.message || "Invalid credentials, please try again."
+        err.response?.data?.message || "Invalid credentials, please try again.",
       );
     } finally {
       setLoading(false);
@@ -139,8 +141,30 @@ export default function Login() {
           >
             Don’t have an account? Contact your hospital admin.
           </Typography>
+
+          <Box
+            sx={{
+              display: "flex",
+              gap: 1,
+              justifyContent: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <Button
+              type="button"
+              sx={{ textTransform: "none", color: "#42a5f5", fontWeight: 600 }}
+              onClick={() => setForgotPasswordOpen(true)}
+            >
+              Forgot password?
+            </Button>
+          </Box>
         </Box>
       </Paper>
+
+      <ForgotPasswordModal
+        open={forgotPasswordOpen}
+        onClose={() => setForgotPasswordOpen(false)}
+      />
     </Container>
   );
 }

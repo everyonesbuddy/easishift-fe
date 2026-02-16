@@ -11,6 +11,11 @@ import {
 import { useNavigate } from "react-router-dom";
 import api from "../../config/api";
 
+const validateEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
 export default function SignupTenant() {
   const [hospitalName, setHospitalName] = useState("");
   const [adminName, setAdminName] = useState("");
@@ -19,11 +24,18 @@ export default function SignupTenant() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [error, setError] = useState("");
+  const [emailError, setEmailError] = useState("");
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setEmailError("");
+
+    if (!validateEmail(adminEmail)) {
+      setEmailError("Please enter a valid email address");
+      return;
+    }
 
     try {
       const res = await api.post("/auth/signup/tenant", {
@@ -40,7 +52,7 @@ export default function SignupTenant() {
     } catch (err) {
       console.error("Signup error:", err);
       setError(
-        err.response?.data?.message || "Failed to create tenant. Try again."
+        err.response?.data?.message || "Failed to create tenant. Try again.",
       );
     }
   };
@@ -125,7 +137,12 @@ export default function SignupTenant() {
             type="email"
             fullWidth
             value={adminEmail}
-            onChange={(e) => setAdminEmail(e.target.value)}
+            onChange={(e) => {
+              setAdminEmail(e.target.value);
+              setEmailError("");
+            }}
+            error={!!emailError}
+            helperText={emailError}
             variant="outlined"
             sx={whiteTextField}
           />

@@ -14,6 +14,11 @@ import api from "../../../config/api";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 
+const validateEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
 export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
   const { user, role: loggedInRole } = useAuth();
 
@@ -23,6 +28,7 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
     password: "",
     role: "doctor",
   });
+  const [emailError, setEmailError] = useState("");
 
   const isEditingSelf = staff && staff._id === user._id;
   const disableRoleChange = isEditingSelf && loggedInRole === "admin";
@@ -39,6 +45,13 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
   }, [staff]);
 
   const handleSubmit = async () => {
+    setEmailError("");
+
+    if (!validateEmail(form.email)) {
+      setEmailError("Please enter a valid email address");
+      return;
+    }
+
     try {
       if (staff) {
         // Prevent self-role modification
@@ -107,8 +120,14 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
         <TextField
           fullWidth
           label="Email"
+          type="email"
           value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
+          onChange={(e) => {
+            setForm({ ...form, email: e.target.value });
+            setEmailError("");
+          }}
+          error={!!emailError}
+          helperText={emailError}
         />
 
         {!staff && (

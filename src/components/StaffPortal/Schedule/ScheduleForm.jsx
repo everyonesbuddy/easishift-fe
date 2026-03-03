@@ -155,6 +155,16 @@ export default function ScheduleForm({
       timezone: formData.timezone,
     };
 
+    if (!isAdmin && isEditing) {
+      payload.status = formData.status;
+      delete payload.staffId;
+      delete payload.role;
+      delete payload.startTime;
+      delete payload.endTime;
+      delete payload.notes;
+      delete payload.timezone;
+    }
+
     try {
       if (isEditing) {
         await api.put(`/schedules/${schedule._id}`, payload);
@@ -317,8 +327,8 @@ export default function ScheduleForm({
               onChange={handleChange}
             >
               <MenuItem value="scheduled">Scheduled</MenuItem>
-              <MenuItem value="completed">Completed</MenuItem>
-              <MenuItem value="cancelled">Cancelled</MenuItem>
+              {isAdmin && <MenuItem value="completed">Completed</MenuItem>}
+              <MenuItem value="call_out">Call Out</MenuItem>
             </Select>
           </FormControl>
         )}

@@ -128,9 +128,6 @@ export default function MessageComposer({
         <Button variant="contained" fullWidth onClick={handleSubmit}>
           Send
         </Button>
-        <Button variant="outlined" fullWidth onClick={() => onSuccess(false)}>
-          Cancel
-        </Button>
       </Box>
     </Box>
   );

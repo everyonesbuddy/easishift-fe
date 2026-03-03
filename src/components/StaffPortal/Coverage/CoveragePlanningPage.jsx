@@ -17,6 +17,10 @@ import {
   TablePagination,
   ToggleButton,
   ToggleButtonGroup,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
   GlobalStyles,
   Stack,
   Alert,
@@ -27,28 +31,43 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
 import api from "../../../config/api";
-import { FiCalendar, FiList, FiPlus, FiDelete } from "react-icons/fi";
+import { FiCalendar, FiList, FiPlus, FiDelete, FiEdit2 } from "react-icons/fi";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import { useAuth } from "../../../context/AuthContext";
 import CoverageCreateForm from "./CoverageCreateForm";
+import CoverageEditCountForm from "./CoverageEditCountForm";
 
 const ROLE_LABELS = {
   doctor: "Doctor",
   nurse: "Nurse",
+  rn: "RN",
+  lpn: "LPN",
+  cna: "CNA",
+  med_aide: "Med Aide",
+  caregiver: "Caregiver",
+  activity_aide: "Activity Aide",
+  dietary_aide: "Dietary Aide",
+  housekeeper: "Housekeeper",
   receptionist: "Receptionist",
   billing: "Billing",
   staff: "Staff",
   other: "Other",
 };
 
-const ROLE_COLORS = {
-  doctor: "#0ea5a4",
-  nurse: "#f97316",
-  receptionist: "#2563eb",
-  billing: "#f59e0b",
-  staff: "#6b7280",
-  other: "#6b7280",
-};
+const FILTER_ROLES = [
+  "doctor",
+  "nurse",
+  "rn",
+  "lpn",
+  "cna",
+  "med_aide",
+  "caregiver",
+  "activity_aide",
+  "dietary_aide",
+  "housekeeper",
+  "receptionist",
+  "billing",
+];
 
 const statusColors = {
   open: "#f59e0b",
@@ -97,6 +116,11 @@ export default function CoveragePlanningPage() {
     if (!isAdmin) return;
     setDeleteId(id);
     setConfirmOpen(true);
+  };
+
+  const openEdit = (coverage) => {
+    if (!isAdmin || !coverage) return;
+    setEditingCoverage(coverage);
   };
 
   const confirmDelete = async () => {
@@ -287,7 +311,6 @@ export default function CoveragePlanningPage() {
           display="flex"
           flexDirection={{ xs: "column", lg: "row" }}
           alignItems="center"
-          justifyContent="space-between"
           gap={2}
         >
           <Box
@@ -305,51 +328,26 @@ export default function CoveragePlanningPage() {
             >
               Filter by role:
             </Typography>
-            <Box
-              sx={{
-                display: "flex",
-                gap: 1,
-                px: { xs: 0.5, md: 0 },
-                overflowX: { xs: "auto", md: "visible" },
-                "& > *": { whiteSpace: "nowrap", flexShrink: 0 },
-              }}
+            <FormControl
+              size="small"
+              sx={{ minWidth: { xs: "100%", sm: 220 } }}
             >
-              <Button
-                size="small"
-                onClick={() => setSelectedRole("all")}
-                sx={{
-                  textTransform: "none",
-                  borderRadius: 2,
-                  bgcolor: selectedRole === "all" ? "#2563EB" : "#F3F4F6",
-                  color: selectedRole === "all" ? "#fff" : "#374151",
-                }}
+              <InputLabel>Role</InputLabel>
+              <Select
+                value={selectedRole}
+                label="Role"
+                onChange={(e) => setSelectedRole(e.target.value)}
               >
-                All Roles
-              </Button>
-
-              {Object.keys(ROLE_LABELS)
-                .filter((r) =>
-                  ["doctor", "nurse", "receptionist", "billing"].includes(r),
-                )
-                .map((role) => (
-                  <Button
-                    key={role}
-                    size="small"
-                    onClick={() => setSelectedRole(role)}
-                    sx={{
-                      textTransform: "none",
-                      borderRadius: 2,
-                      bgcolor:
-                        selectedRole === role ? ROLE_COLORS[role] : "#F3F4F6",
-                      color: selectedRole === role ? "#fff" : "#374151",
-                      px: 1.5,
-                      py: { xs: 0.5, md: 0.5 },
-                    }}
-                  >
-                    {ROLE_LABELS[role]}
-                  </Button>
-                ))}
-            </Box>
+                <MenuItem value="all">All Roles</MenuItem>
+                {Object.keys(ROLE_LABELS)
+                  .filter((r) => FILTER_ROLES.includes(r))
+                  .map((role) => (
+                    <MenuItem key={role} value={role}>
+                      {ROLE_LABELS[role]}
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
           </Box>
 
           <Box>{/* placeholder for future controls */}</Box>
@@ -400,16 +398,27 @@ export default function CoveragePlanningPage() {
                       {c.requiredCount} needed
                     </Typography>
                     {isAdmin && (
-                      <Button
-                        size="small"
-                        variant="contained"
-                        startIcon={<FiDelete />}
-                        color="error"
-                        onClick={() => askDelete(c._id)}
-                        sx={{ textTransform: "none", borderRadius: 2 }}
-                      >
-                        Delete
-                      </Button>
+                      <Stack direction="row" spacing={1}>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<FiEdit2 />}
+                          onClick={() => openEdit(c)}
+                          sx={{ textTransform: "none", borderRadius: 2 }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<FiDelete />}
+                          color="error"
+                          onClick={() => askDelete(c._id)}
+                          sx={{ textTransform: "none", borderRadius: 2 }}
+                        >
+                          Delete
+                        </Button>
+                      </Stack>
                     )}
                   </Stack>
                 </Box>
@@ -474,16 +483,27 @@ export default function CoveragePlanningPage() {
                       <TableCell>{c.note || "—"}</TableCell>
                       {isAdmin && (
                         <TableCell>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            startIcon={<FiDelete />}
-                            color="error"
-                            onClick={() => askDelete(c._id)}
-                            sx={{ textTransform: "none", borderRadius: 2 }}
-                          >
-                            Delete
-                          </Button>
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              startIcon={<FiEdit2 />}
+                              onClick={() => openEdit(c)}
+                              sx={{ textTransform: "none", borderRadius: 2 }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              startIcon={<FiDelete />}
+                              color="error"
+                              onClick={() => askDelete(c._id)}
+                              sx={{ textTransform: "none", borderRadius: 2 }}
+                            >
+                              Delete
+                            </Button>
+                          </Stack>
                         </TableCell>
                       )}
                     </TableRow>
@@ -572,7 +592,9 @@ export default function CoveragePlanningPage() {
               end: toLocal(e.end),
             }))}
             eventClick={(info) => {
-              // no edit for now - could open modal to edit coverage
+              if (!isAdmin) return;
+              const matched = coverages.find((c) => c._id === info.event.id);
+              if (matched) openEdit(matched);
             }}
             height="72vh"
             nowIndicator={true}
@@ -584,14 +606,43 @@ export default function CoveragePlanningPage() {
         open={openAdd}
         onClose={() => setOpenAdd(false)}
         fullWidth
-        maxWidth="sm"
+        maxWidth="md"
         scroll="paper"
+        PaperProps={{
+          sx: {
+            borderRadius: { xs: 3, md: 4 },
+          },
+        }}
       >
         <DialogContent dividers>
           <CoverageCreateForm
             onClose={() => setOpenAdd(false)}
             onSuccess={() => {
               setOpenAdd(false);
+              fetchCoverages();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(editingCoverage)}
+        onClose={() => setEditingCoverage(null)}
+        fullWidth
+        maxWidth="md"
+        scroll="paper"
+        PaperProps={{
+          sx: {
+            borderRadius: { xs: 3, md: 4 },
+          },
+        }}
+      >
+        <DialogContent dividers>
+          <CoverageEditCountForm
+            coverage={editingCoverage}
+            onClose={() => setEditingCoverage(null)}
+            onSuccess={() => {
+              setEditingCoverage(null);
               fetchCoverages();
             }}
           />

@@ -331,7 +331,7 @@ export default function StaffDashboard() {
                 "&:hover": { bgcolor: "#0f172a" },
               }}
             >
-              Create Schedule
+              Manual Schedule
             </Button>
 
             <Button
@@ -349,7 +349,7 @@ export default function StaffDashboard() {
                 "&:hover": { bgcolor: "#1146b1" },
               }}
             >
-              Auto-Generate Schedule
+              AI Generated Schedule
             </Button>
           </>
         ) : (
@@ -404,8 +404,13 @@ export default function StaffDashboard() {
         open={openStaffModal}
         onClose={() => setOpenStaffModal(false)}
         fullWidth
-        maxWidth="sm"
+        maxWidth="md"
         scroll="paper"
+        PaperProps={{
+          sx: {
+            borderRadius: { xs: 3, md: 4 },
+          },
+        }}
       >
         <DialogContent dividers>
           <StaffCreateAndEditForm
@@ -422,8 +427,13 @@ export default function StaffDashboard() {
         open={openCoverageModal}
         onClose={() => setOpenCoverageModal(false)}
         fullWidth
-        maxWidth="sm"
+        maxWidth="md"
         scroll="paper"
+        PaperProps={{
+          sx: {
+            borderRadius: { xs: 3, md: 4 },
+          },
+        }}
       >
         <DialogContent dividers>
           <CoverageCreateForm
@@ -441,8 +451,13 @@ export default function StaffDashboard() {
         open={openScheduleModal}
         onClose={() => setOpenScheduleModal(false)}
         fullWidth
-        maxWidth="sm"
+        maxWidth="md"
         scroll="paper"
+        PaperProps={{
+          sx: {
+            borderRadius: { xs: 3, md: 4 },
+          },
+        }}
       >
         <DialogContent dividers>
           <ScheduleForm
@@ -464,6 +479,11 @@ export default function StaffDashboard() {
         fullWidth
         maxWidth="md"
         scroll="paper"
+        PaperProps={{
+          sx: {
+            borderRadius: { xs: 3, md: 4 },
+          },
+        }}
       >
         <DialogContent dividers>
           <AutoGenerateScheduleForm

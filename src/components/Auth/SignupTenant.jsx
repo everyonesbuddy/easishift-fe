@@ -7,6 +7,7 @@ import {
   Typography,
   Alert,
   Paper,
+  MenuItem,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import api from "../../config/api";
@@ -21,11 +22,27 @@ export default function SignupTenant() {
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
-  const [phone, setPhone] = useState("");
+  const [tenantPhoneCountryCode, setTenantPhoneCountryCode] = useState("");
+  const [tenantPhone, setTenantPhone] = useState("");
+  const [userPhoneCountryCode, setUserPhoneCountryCode] = useState("");
+  const [userPhone, setUserPhone] = useState("");
   const [address, setAddress] = useState("");
   const [error, setError] = useState("");
   const [emailError, setEmailError] = useState("");
   const navigate = useNavigate();
+
+  const phoneCountryCodes = [
+    { code: "+1", label: "US/CA (+1)" },
+    { code: "+44", label: "UK (+44)" },
+    { code: "+234", label: "Nigeria (+234)" },
+    { code: "+353", label: "Ireland (+353)" },
+    { code: "+61", label: "Australia (+61)" },
+    { code: "+64", label: "New Zealand (+64)" },
+    { code: "+27", label: "South Africa (+27)" },
+    { code: "+91", label: "India (+91)" },
+    { code: "+49", label: "Germany (+49)" },
+    { code: "+33", label: "France (+33)" },
+  ];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -42,7 +59,10 @@ export default function SignupTenant() {
         name: hospitalName,
         email: adminEmail,
         password: adminPassword,
-        phone,
+        tenantPhoneCountryCode,
+        tenantPhone,
+        userPhoneCountryCode,
+        userPhone,
         address,
         adminName,
       });
@@ -101,14 +121,32 @@ export default function SignupTenant() {
             sx={whiteTextField}
           />
 
-          <TextField
-            label="Hospital Phone"
-            fullWidth
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            variant="outlined"
-            sx={whiteTextField}
-          />
+          <Box display="flex" gap={2}>
+            <TextField
+              select
+              label="Country Code"
+              value={tenantPhoneCountryCode}
+              onChange={(e) => setTenantPhoneCountryCode(e.target.value)}
+              variant="outlined"
+              sx={{ ...whiteTextField, minWidth: 160 }}
+            >
+              <MenuItem value="">Select</MenuItem>
+              {phoneCountryCodes.map((item) => (
+                <MenuItem key={item.code} value={item.code}>
+                  {item.label}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              label="Facility Phone"
+              fullWidth
+              value={tenantPhone}
+              onChange={(e) => setTenantPhone(e.target.value)}
+              variant="outlined"
+              sx={whiteTextField}
+            />
+          </Box>
 
           <TextField
             label="Hospital Address"
@@ -131,6 +169,33 @@ export default function SignupTenant() {
             variant="outlined"
             sx={whiteTextField}
           />
+
+          <Box display="flex" gap={2}>
+            <TextField
+              select
+              label="Country Code"
+              value={userPhoneCountryCode}
+              onChange={(e) => setUserPhoneCountryCode(e.target.value)}
+              variant="outlined"
+              sx={{ ...whiteTextField, minWidth: 160 }}
+            >
+              <MenuItem value="">Select</MenuItem>
+              {phoneCountryCodes.map((item) => (
+                <MenuItem key={item.code} value={item.code}>
+                  {item.label}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              label="Admin Phone"
+              fullWidth
+              value={userPhone}
+              onChange={(e) => setUserPhone(e.target.value)}
+              variant="outlined"
+              sx={whiteTextField}
+            />
+          </Box>
 
           <TextField
             label="Admin Email"

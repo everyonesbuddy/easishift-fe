@@ -143,27 +143,28 @@ export default function Home() {
           {/* LEFT */}
           <Box>
             <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
-              <Chip icon={<FiZap />} label="Workforce scheduling" />
+              <Chip icon={<FiZap />} label="AI Workforce scheduling" />
               <Chip icon={<FiShield />} label="Flexible by design" />
               <Chip icon={<FiCalendar />} label="Simple to use" />
             </Stack>
 
             <Typography
-              variant="h2"
+              variant="h3"
               sx={{
                 fontWeight: 950,
                 letterSpacing: "-0.035em",
                 lineHeight: 1.02,
               }}
             >
-              Scheduling Made Easy
+              AI Workforce Scheduling Made For Senior Care Facilities
             </Typography>
 
             <Typography
               variant="h6"
               sx={{ color: "text.secondary", mt: 2, maxWidth: 680 }}
             >
-              Modern scheduling for clinics-minus the chaos
+              Modern scheduling for assisted living and nursing homes, minus the
+              chaos
             </Typography>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} mt={3}>
@@ -258,7 +259,7 @@ export default function Home() {
         <Section>
           <SectionTitle
             eyebrow="Why it works"
-            title="Scheduling built for real clinic conditions"
+            title="AI Scheduling built for real senior care facility conditions"
             subtitle="Designed around constant change, not ideal scenarios."
           />
 
@@ -308,7 +309,7 @@ export default function Home() {
           >
             <Testimonial
               quote="Call-outs used to derail the entire day. Now they’re manageable."
-              name="Clinic Operations Lead"
+              name="Nursing Home Operations Lead"
               role="Outpatient services"
             />
             <Testimonial

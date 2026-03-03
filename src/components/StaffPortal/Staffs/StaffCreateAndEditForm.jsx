@@ -19,16 +19,32 @@ const validateEmail = (email) => {
   return emailRegex.test(email);
 };
 
+const PHONE_COUNTRY_CODES = [
+  { code: "+1", label: "US/CA (+1)" },
+  { code: "+44", label: "UK (+44)" },
+  { code: "+234", label: "Nigeria (+234)" },
+  { code: "+353", label: "Ireland (+353)" },
+  { code: "+61", label: "Australia (+61)" },
+  { code: "+64", label: "New Zealand (+64)" },
+  { code: "+27", label: "South Africa (+27)" },
+  { code: "+91", label: "India (+91)" },
+  { code: "+49", label: "Germany (+49)" },
+  { code: "+33", label: "France (+33)" },
+];
+
 export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
   const { user, role: loggedInRole } = useAuth();
 
   const [form, setForm] = useState({
     name: "",
     email: "",
+    phoneCountryCode: "",
+    phone: "",
     password: "",
     role: "doctor",
   });
   const [emailError, setEmailError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
   const isEditingSelf = staff && staff._id === user._id;
   const disableRoleChange = isEditingSelf && loggedInRole === "admin";
@@ -38,6 +54,9 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
       setForm({
         name: staff.name,
         email: staff.email,
+        phoneCountryCode:
+          staff.userPhoneCountryCode || staff.phoneCountryCode || "",
+        phone: staff.userPhone || staff.phone || "",
         password: "",
         role: staff.role,
       });
@@ -46,9 +65,21 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
 
   const handleSubmit = async () => {
     setEmailError("");
+    setPhoneError("");
+
+    const normalizedPhone = (form.phone || "").trim();
+    const normalizedPhoneCountryCode = (form.phoneCountryCode || "").trim();
 
     if (!validateEmail(form.email)) {
       setEmailError("Please enter a valid email address");
+      return;
+    }
+
+    if (
+      (normalizedPhone && !normalizedPhoneCountryCode) ||
+      (!normalizedPhone && normalizedPhoneCountryCode)
+    ) {
+      setPhoneError("Please provide both country code and phone number");
       return;
     }
 
@@ -56,9 +87,19 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
       if (staff) {
         // Prevent self-role modification
         const payload = {
-          ...form,
+          name: form.name,
+          email: form.email,
           role: disableRoleChange ? staff.role : form.role,
         };
+
+        if (normalizedPhone && normalizedPhoneCountryCode) {
+          payload.userPhoneCountryCode = normalizedPhoneCountryCode;
+          payload.userPhone = normalizedPhone;
+          payload.phoneCountryCode = normalizedPhoneCountryCode;
+          payload.phone = normalizedPhone;
+        }
+
+        if (form.password) payload.password = form.password;
 
         await api.put(`/auth/${staff._id}`, payload);
         toast.success("Staff updated", {
@@ -66,7 +107,20 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
           autoClose: 2500,
         });
       } else {
-        await api.post("/auth/signup/staff", form);
+        await api.post("/auth/signup/staff", {
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          role: form.role,
+          ...(normalizedPhone && normalizedPhoneCountryCode
+            ? {
+                userPhoneCountryCode: normalizedPhoneCountryCode,
+                userPhone: normalizedPhone,
+                phoneCountryCode: normalizedPhoneCountryCode,
+                phone: normalizedPhone,
+              }
+            : {}),
+        });
         toast.success("Staff created", {
           position: "top-right",
           autoClose: 2500,
@@ -130,6 +184,39 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
           helperText={emailError}
         />
 
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+          <TextField
+            select
+            fullWidth
+            label="Country Code"
+            value={form.phoneCountryCode}
+            onChange={(e) => {
+              setForm({ ...form, phoneCountryCode: e.target.value });
+              setPhoneError("");
+            }}
+          >
+            <MenuItem value="">Select code</MenuItem>
+            {PHONE_COUNTRY_CODES.map((item) => (
+              <MenuItem key={item.code} value={item.code}>
+                {item.label}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            fullWidth
+            label="Phone Number"
+            value={form.phone}
+            onChange={(e) => {
+              setForm({ ...form, phone: e.target.value });
+              setPhoneError("");
+            }}
+            error={!!phoneError}
+            helperText={phoneError}
+            inputProps={{ inputMode: "tel" }}
+          />
+        </Stack>
+
         {!staff && (
           <TextField
             fullWidth
@@ -150,6 +237,14 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
         >
           <MenuItem value="doctor">Doctor</MenuItem>
           <MenuItem value="nurse">Nurse</MenuItem>
+          <MenuItem value="rn">RN</MenuItem>
+          <MenuItem value="lpn">LPN</MenuItem>
+          <MenuItem value="cna">CNA</MenuItem>
+          <MenuItem value="med_aide">Med Aide</MenuItem>
+          <MenuItem value="caregiver">Caregiver</MenuItem>
+          <MenuItem value="activity_aide">Activity Aide</MenuItem>
+          <MenuItem value="dietary_aide">Dietary Aide</MenuItem>
+          <MenuItem value="housekeeper">Housekeeper</MenuItem>
           <MenuItem value="receptionist">Receptionist</MenuItem>
           <MenuItem value="billing">Billing</MenuItem>
           <MenuItem value="staff">General Staff</MenuItem>
@@ -158,10 +253,6 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
         <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
           <Button variant="contained" fullWidth onClick={handleSubmit}>
             {staff ? "Save Changes" : "Create Staff"}
-          </Button>
-
-          <Button variant="outlined" fullWidth onClick={() => onSuccess(false)}>
-            Cancel
           </Button>
         </Box>
       </Stack>

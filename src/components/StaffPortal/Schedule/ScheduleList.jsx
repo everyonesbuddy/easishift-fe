@@ -42,8 +42,18 @@ const ROLE_COLORS = {
   admin: "#7c3aed",
   doctor: "#0ea5a4",
   nurse: "#f97316",
+  rn: "#14b8a6",
+  lpn: "#fb923c",
+  cna: "#fdba74",
+  med_aide: "#a855f7",
+  caregiver: "#10b981",
+  activity_aide: "#22c55e",
+  dietary_aide: "#f59e0b",
+  housekeeper: "#64748b",
   receptionist: "#2563eb",
   billing: "#f59e0b",
+  staff: "#6b7280",
+  other: "#6b7280",
   general: "#6b7280",
 };
 
@@ -52,8 +62,18 @@ const getRoleDisplayName = (r) => {
     admin: "Admin",
     doctor: "Doctor",
     nurse: "Nurse",
+    rn: "RN",
+    lpn: "LPN",
+    cna: "CNA",
+    med_aide: "Med Aide",
+    caregiver: "Caregiver",
+    activity_aide: "Activity Aide",
+    dietary_aide: "Dietary Aide",
+    housekeeper: "Housekeeper",
     receptionist: "Receptionist",
     billing: "Billing",
+    staff: "Staff",
+    other: "Other",
     general: "General",
   };
   if (!r) return "Unknown";
@@ -137,7 +157,6 @@ export default function ScheduleList() {
   // Modals
   // ---------------------------
   const openEdit = (sched) => {
-    if (!isAdmin) return;
     setEditingSchedule(sched);
     setOpen(true);
   };
@@ -197,7 +216,7 @@ export default function ScheduleList() {
   const statusColors = {
     scheduled: "#fbc02d",
     completed: "#66bb6a",
-    cancelled: "#ef5350",
+    call_out: "#ef5350",
   };
 
   return (
@@ -277,7 +296,7 @@ export default function ScheduleList() {
                 "&:hover": { bgcolor: "#1146b1" },
               }}
             >
-              Auto-Generate Schedule
+              AI Generated Schedule
             </Button>
           )}
 
@@ -306,7 +325,7 @@ export default function ScheduleList() {
               "&:hover": { bgcolor: "#0f172a" },
             }}
           >
-            {isAdmin ? "Individual Schedule" : "Pick Up Shift"}
+            {isAdmin ? "Manual Schedule" : "Pick Up Shift"}
           </Button>
         </Box>
       </Box>
@@ -317,75 +336,63 @@ export default function ScheduleList() {
           display="flex"
           flexDirection={{ xs: "column", md: "row" }}
           alignItems={{ xs: "stretch", md: "center" }}
-          justifyContent="space-between"
-          gap={2}
+          gap={1.5}
         >
-          <Box
-            display="flex"
-            alignItems="center"
-            gap={2}
-            sx={{ width: { xs: "100%", md: "auto" } }}
+          <Typography
+            color="text.secondary"
+            sx={{
+              fontSize: { xs: "0.78rem", md: "0.875rem" },
+              minWidth: { md: 44 },
+            }}
           >
-            <Typography
-              color="text.secondary"
-              sx={{ fontSize: { xs: "0.78rem", md: "0.875rem" } }}
-            >
-              Filter:
-            </Typography>
-            {/* Role buttons: horizontally scrollable on small screens */}
-            {isAdmin && (
-              <Box
-                display="flex"
-                gap={1}
-                sx={{
-                  px: { xs: 0.5, md: 0 },
-                  overflowX: { xs: "auto", md: "visible" },
-                  "& > *": { whiteSpace: "nowrap", flexShrink: 0 },
-                }}
-              >
-                {["all", "doctor", "nurse", "receptionist", "billing"].map(
-                  (r) => (
-                    <Button
-                      key={r}
-                      size="small"
-                      variant={
-                        r === "all"
-                          ? roleFilter === "all"
-                            ? "contained"
-                            : "outlined"
-                          : roleFilter === r
-                            ? "contained"
-                            : "outlined"
-                      }
-                      onClick={() => setRoleFilter(r)}
-                      sx={{
-                        textTransform: "none",
-                        borderRadius: 2,
-                        px: 1.5,
-                        py: { xs: 0.5, md: 0.5 },
-                      }}
-                    >
-                      {r === "all"
-                        ? "All"
-                        : r.charAt(0).toUpperCase() + r.slice(1)}
-                    </Button>
-                  ),
-                )}
-              </Box>
-            )}
-          </Box>
+            Filter:
+          </Typography>
 
           <Box
             display="flex"
-            gap={2}
-            alignItems="center"
-            sx={{
-              width: { xs: "100%", md: "auto" },
-              justifyContent: { xs: "space-between", md: "flex-end" },
-              mt: { xs: 1, md: 0 },
-            }}
+            flexDirection={{ xs: "column", sm: "row" }}
+            gap={1.5}
+            alignItems={{ xs: "stretch", sm: "center" }}
+            sx={{ width: { xs: "100%", md: "auto" } }}
           >
-            <FormControl size="small" sx={{ minWidth: 160 }}>
+            {isAdmin && (
+              <FormControl
+                size="small"
+                sx={{ minWidth: { xs: "100%", sm: 220 } }}
+              >
+                <InputLabel>Role</InputLabel>
+                <Select
+                  value={roleFilter}
+                  label="Role"
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                >
+                  {[
+                    "all",
+                    "doctor",
+                    "nurse",
+                    "rn",
+                    "lpn",
+                    "cna",
+                    "med_aide",
+                    "caregiver",
+                    "activity_aide",
+                    "dietary_aide",
+                    "housekeeper",
+                    "receptionist",
+                    "billing",
+                  ].map((r) => (
+                    <MenuItem key={r} value={r}>
+                      {r === "all" ? "All Roles" : getRoleDisplayName(r)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+
+            <FormControl
+              size="small"
+              sx={{ minWidth: { xs: "100%", sm: 180 } }}
+            >
               <InputLabel>Status</InputLabel>
               <Select
                 value={statusFilter}
@@ -395,7 +402,7 @@ export default function ScheduleList() {
                 <MenuItem value="">All</MenuItem>
                 <MenuItem value="scheduled">Scheduled</MenuItem>
                 <MenuItem value="completed">Completed</MenuItem>
-                <MenuItem value="cancelled">Cancelled</MenuItem>
+                <MenuItem value="call_out">Call Out</MenuItem>
               </Select>
             </FormControl>
           </Box>
@@ -440,14 +447,16 @@ export default function ScheduleList() {
                       >
                         Edit
                       </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color="error"
-                        onClick={() => askDelete(s._id)}
-                      >
-                        Delete
-                      </Button>
+                      {isAdmin && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          onClick={() => askDelete(s._id)}
+                        >
+                          Delete
+                        </Button>
+                      )}
                     </Stack>
                   </Box>
                 </Paper>
@@ -481,9 +490,7 @@ export default function ScheduleList() {
                   <TableCell sx={{ color: "black" }}>End</TableCell>
                   <TableCell sx={{ color: "black" }}>Status</TableCell>
                   <TableCell sx={{ color: "black" }}>Notes</TableCell>
-                  {isAdmin && (
-                    <TableCell sx={{ color: "black" }}>Actions</TableCell>
-                  )}
+                  <TableCell sx={{ color: "black" }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
 
@@ -546,28 +553,28 @@ export default function ScheduleList() {
                             background: "#fff",
                           }}
                         >
-                          {s.status}
+                          {s.status.replace("_", " ").toUpperCase()}
                         </Box>
                       </TableCell>
                       <TableCell sx={{ color: "black" }}>
                         {s.notes || "—"}
                       </TableCell>
-                      {isAdmin && (
-                        <TableCell>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            color="info"
-                            startIcon={<FiEdit />}
-                            onClick={() => openEdit(s)}
-                            sx={{
-                              mr: 1,
-                              borderRadius: 2,
-                              textTransform: "none",
-                            }}
-                          >
-                            Edit
-                          </Button>
+                      <TableCell>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="info"
+                          startIcon={<FiEdit />}
+                          onClick={() => openEdit(s)}
+                          sx={{
+                            mr: 1,
+                            borderRadius: 2,
+                            textTransform: "none",
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        {isAdmin && (
                           <Button
                             size="small"
                             variant="contained"
@@ -578,8 +585,8 @@ export default function ScheduleList() {
                           >
                             Delete
                           </Button>
-                        </TableCell>
-                      )}
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
               </TableBody>
@@ -672,8 +679,13 @@ export default function ScheduleList() {
         open={open}
         onClose={() => closeModal()}
         fullWidth
-        maxWidth="sm"
+        maxWidth="md"
         scroll="paper"
+        PaperProps={{
+          sx: {
+            borderRadius: { xs: 3, md: 4 },
+          },
+        }}
       >
         <DialogContent dividers>
           <ScheduleForm
@@ -696,6 +708,11 @@ export default function ScheduleList() {
         fullWidth
         maxWidth="md"
         scroll="paper"
+        PaperProps={{
+          sx: {
+            borderRadius: { xs: 3, md: 4 },
+          },
+        }}
       >
         <DialogContent dividers>
           <AutoGenerateScheduleForm

@@ -10,11 +10,8 @@ import {
   ToggleButtonGroup,
   Switch,
   FormControlLabel,
-  Divider,
-  MenuItem,
   Stack,
   Alert,
-  IconButton,
 } from "@mui/material";
 import { FiSave, FiInfo } from "react-icons/fi";
 import api from "../../../config/api";
@@ -83,19 +80,14 @@ export default function PreferencesPage() {
   const hasPref = (arr, idx) => Array.isArray(arr) && arr.includes(idx);
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 900, margin: "0 auto" }}>
-      <Box mb={3}>
-        <Stack direction="row" spacing={2} alignItems="center">
-          <Typography
-            variant="h4"
-            sx={{ fontSize: { xs: "1.25rem", md: "1.5rem" } }}
-          >
-            My Preferences
-          </Typography>
-          <IconButton sx={{ ml: 1, bgcolor: "#EFF6FF" }} aria-label="info">
-            <FiInfo style={{ color: "#0369A1" }} />
-          </IconButton>
-        </Stack>
+    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 980, margin: "0 auto" }}>
+      <Box mb={3.5}>
+        <Typography
+          variant="h4"
+          sx={{ fontSize: { xs: "1.35rem", md: "1.7rem" }, fontWeight: 700 }}
+        >
+          My Preferences
+        </Typography>
         <Typography variant="body2" color="text.secondary">
           Set your availability and work style preferences
         </Typography>
@@ -109,33 +101,60 @@ export default function PreferencesPage() {
 
       <Paper
         sx={{
-          p: { xs: 2, md: 3 },
+          p: { xs: 2, md: 2.5 },
           borderRadius: 3,
           mb: 3,
-          bgcolor: "#EFF6FF",
-          border: "1px solid #BFDBFE",
+          bgcolor: "info.lighter",
+          border: "1px solid",
+          borderColor: "info.light",
         }}
       >
-        <Typography variant="body2" sx={{ color: "#083344" }}>
-          These preferences help administrators create schedules that work
-          better for you.
-        </Typography>
-        <Typography variant="body2" sx={{ color: "#083344", mt: 1 }}>
-          They are soft constraints and cannot guarantee specific assignments,
-          but they will be considered when building schedules.
-        </Typography>
+        <Stack direction="row" spacing={1.5} alignItems="flex-start">
+          <Box
+            sx={{
+              mt: 0.25,
+              color: "info.main",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <FiInfo size={18} />
+          </Box>
+          <Box>
+            <Typography variant="body2" sx={{ color: "info.dark" }}>
+              These preferences help administrators and AI systems create
+              schedules that work better for you.
+            </Typography>
+            <Typography variant="body2" sx={{ color: "info.dark", mt: 0.75 }}>
+              They are soft constraints and cannot guarantee specific
+              assignments, but they will be considered when building schedules.
+            </Typography>
+          </Box>
+        </Stack>
       </Paper>
 
       <Stack sx={{ gap: { xs: 2, md: 3 } }}>
-        <Paper sx={{ p: 3, borderRadius: 3 }}>
-          <Typography variant="h6" mb={1}>
+        <Paper
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "divider",
+            boxShadow: 1,
+          }}
+        >
+          <Typography variant="h6" mb={0.5} sx={{ fontWeight: 700 }}>
             Preferred Days
           </Typography>
-          <Typography variant="body2" color="text.secondary" mb={2}>
+          <Typography variant="body2" color="text.secondary" mb={2.25}>
             Select the days you prefer to work
           </Typography>
           <ToggleButtonGroup
-            sx={{ display: "flex", gap: 1, overflowX: "auto", px: 0.5 }}
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7, minmax(42px, 1fr))",
+              gap: 1,
+            }}
           >
             {DAYS.map((d, i) => {
               const isPreferred = hasPref(prefs.preferredDaysOfWeek, i);
@@ -149,18 +168,28 @@ export default function PreferencesPage() {
                     !isUnavailable && toggleArrayItem("preferredDaysOfWeek", i)
                   }
                   sx={{
-                    flex: "0 0 auto",
-                    minWidth: 44,
-                    borderRadius: 1,
-                    bgcolor: isPreferred ? "#ECFDF5" : undefined,
-                    color: isPreferred ? "#065F46" : undefined,
+                    borderRadius: 2,
+                    minHeight: 44,
+                    fontWeight: 600,
+                    bgcolor: isPreferred
+                      ? "success.lighter"
+                      : "background.paper",
+                    color: isPreferred ? "success.dark" : "text.primary",
                     border: isPreferred
-                      ? "2px solid #10B981"
+                      ? "2px solid"
                       : isUnavailable
-                        ? "1px solid #F3F4F6"
-                        : undefined,
+                        ? "1px solid"
+                        : "1px solid",
+                    borderColor: isPreferred
+                      ? "success.main"
+                      : isUnavailable
+                        ? "grey.200"
+                        : "divider",
                     opacity: isUnavailable ? 0.6 : 1,
                     cursor: isUnavailable ? "not-allowed" : "pointer",
+                    "&:hover": {
+                      borderColor: isUnavailable ? "grey.200" : "success.light",
+                    },
                   }}
                   disabled={isUnavailable}
                 >
@@ -171,15 +200,27 @@ export default function PreferencesPage() {
           </ToggleButtonGroup>
         </Paper>
 
-        <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-          <Typography variant="h6" mb={1}>
+        <Paper
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "divider",
+            boxShadow: 1,
+          }}
+        >
+          <Typography variant="h6" mb={0.5} sx={{ fontWeight: 700 }}>
             Unavailable Days
           </Typography>
-          <Typography variant="body2" color="text.secondary" mb={2}>
+          <Typography variant="body2" color="text.secondary" mb={2.25}>
             Select days when you cannot work
           </Typography>
           <ToggleButtonGroup
-            sx={{ display: "flex", gap: 1, overflowX: "auto", px: 0.5 }}
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7, minmax(42px, 1fr))",
+              gap: 1,
+            }}
           >
             {DAYS.map((d, i) => {
               const isPreferred = hasPref(prefs.preferredDaysOfWeek, i);
@@ -193,18 +234,28 @@ export default function PreferencesPage() {
                     !isPreferred && toggleArrayItem("unavailableDaysOfWeek", i)
                   }
                   sx={{
-                    flex: "0 0 auto",
-                    minWidth: 44,
-                    borderRadius: 1,
-                    bgcolor: isUnavailable ? "#FEF2F2" : undefined,
-                    color: isUnavailable ? "#991B1B" : undefined,
+                    borderRadius: 2,
+                    minHeight: 44,
+                    fontWeight: 600,
+                    bgcolor: isUnavailable
+                      ? "error.lighter"
+                      : "background.paper",
+                    color: isUnavailable ? "error.dark" : "text.primary",
                     border: isUnavailable
-                      ? "2px solid #EF4444"
+                      ? "2px solid"
                       : isPreferred
-                        ? "1px solid #F3F4F6"
-                        : undefined,
+                        ? "1px solid"
+                        : "1px solid",
+                    borderColor: isUnavailable
+                      ? "error.main"
+                      : isPreferred
+                        ? "grey.200"
+                        : "divider",
                     opacity: isPreferred ? 0.6 : 1,
                     cursor: isPreferred ? "not-allowed" : "pointer",
+                    "&:hover": {
+                      borderColor: isPreferred ? "grey.200" : "error.light",
+                    },
                   }}
                   disabled={isPreferred}
                 >
@@ -215,8 +266,16 @@ export default function PreferencesPage() {
           </ToggleButtonGroup>
         </Paper>
 
-        <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-          <Typography variant="h6" mb={1}>
+        <Paper
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "divider",
+            boxShadow: 1,
+          }}
+        >
+          <Typography variant="h6" mb={1.75} sx={{ fontWeight: 700 }}>
             Preferred Shift Times
           </Typography>
           <Box
@@ -249,8 +308,16 @@ export default function PreferencesPage() {
           </Box>
         </Paper>
 
-        <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-          <Typography variant="h6" mb={1}>
+        <Paper
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "divider",
+            boxShadow: 1,
+          }}
+        >
+          <Typography variant="h6" mb={1.75} sx={{ fontWeight: 700 }}>
             Weekly Hours
           </Typography>
           <Box
@@ -281,53 +348,91 @@ export default function PreferencesPage() {
           </Box>
         </Paper>
 
-        <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 3 }}>
-          <Typography variant="h6" mb={1}>
+        <Paper
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "divider",
+            boxShadow: 1,
+          }}
+        >
+          <Typography variant="h6" mb={1.75} sx={{ fontWeight: 700 }}>
             Work Style Preferences
           </Typography>
           <Stack spacing={2}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={prefs.dislikesNights || false}
-                  onChange={(e) =>
-                    handleChange("dislikesNights", e.target.checked)
-                  }
-                />
-              }
-              label={
-                <Box>
-                  <Typography>Night Shift Preference</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    I prefer working night shifts
-                  </Typography>
-                </Box>
-              }
-            />
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                bgcolor: "grey.50",
+                border: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <FormControlLabel
+                sx={{ m: 0, width: "100%" }}
+                control={
+                  <Switch
+                    checked={prefs.dislikesNights || false}
+                    onChange={(e) =>
+                      handleChange("dislikesNights", e.target.checked)
+                    }
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography>Night Shift Preference</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      I prefer working night shifts
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Box>
 
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={prefs.prefersBlockScheduling || false}
-                  onChange={(e) =>
-                    handleChange("prefersBlockScheduling", e.target.checked)
-                  }
-                />
-              }
-              label={
-                <Box>
-                  <Typography>Block Scheduling</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    I prefer working consecutive days in a row
-                  </Typography>
-                </Box>
-              }
-            />
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                bgcolor: "grey.50",
+                border: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <FormControlLabel
+                sx={{ m: 0, width: "100%" }}
+                control={
+                  <Switch
+                    checked={prefs.prefersBlockScheduling || false}
+                    onChange={(e) =>
+                      handleChange("prefersBlockScheduling", e.target.checked)
+                    }
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography>Block Scheduling</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      I prefer working consecutive days in a row
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Box>
           </Stack>
         </Paper>
 
-        <Paper sx={{ p: 3, borderRadius: 3 }}>
-          <Typography variant="h6" mb={1}>
+        <Paper
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "divider",
+            boxShadow: 1,
+          }}
+        >
+          <Typography variant="h6" mb={1.5} sx={{ fontWeight: 700 }}>
             Additional Notes
           </Typography>
           <TextField
@@ -348,12 +453,11 @@ export default function PreferencesPage() {
             disabled={saving}
             sx={{
               textTransform: "none",
-              borderRadius: 2,
-              px: 3,
-              bgcolor: "#2563EB",
-              color: "#fff",
+              borderRadius: 2.5,
+              px: 4,
+              py: 1.1,
+              fontWeight: 600,
               width: { xs: "100%", md: "auto" },
-              "&:hover": { bgcolor: "#1D4ED8" },
             }}
           >
             {saving ? "Saving..." : "Save Preferences"}

@@ -16,9 +16,8 @@ export const AuthProvider = ({ children }) => {
     try {
       const existingToken = localStorage.getItem("token");
       if (existingToken)
-        api.defaults.headers.common[
-          "Authorization"
-        ] = `Bearer ${existingToken}`;
+        api.defaults.headers.common["Authorization"] =
+          `Bearer ${existingToken}`;
     } catch (err) {
       // ignore storage errors
     }
@@ -120,6 +119,14 @@ export const AuthProvider = ({ children }) => {
     "admin",
     "doctor",
     "nurse",
+    "rn",
+    "lpn",
+    "cna",
+    "med_aide",
+    "caregiver",
+    "activity_aide",
+    "dietary_aide",
+    "housekeeper",
     "receptionist",
     "billing",
   ].includes(role);

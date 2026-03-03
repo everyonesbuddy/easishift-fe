@@ -208,6 +208,14 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
   const allRoles = [
     "doctor",
     "nurse",
+    "rn",
+    "lpn",
+    "cna",
+    "med_aide",
+    "caregiver",
+    "activity_aide",
+    "dietary_aide",
+    "housekeeper",
     "receptionist",
     "billing",
     "staff",
@@ -251,7 +259,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
           s.staffRole === selectedRole &&
           s.dayKey === c.dayKey &&
           s.start.getTime() === c.startTime.getTime() &&
-          s.status !== "cancelled"
+          s.status !== "call_out",
       ).length;
 
       // concise label: Mon, 6AM - 8PM
@@ -278,12 +286,12 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
     return weekDays.map((day) => {
       const dayKey = getLocalDayKey(day);
       const shifts = schedulesNormalized.filter(
-        (s) => s.dayKey === dayKey && s.status !== "cancelled"
+        (s) => s.dayKey === dayKey && s.status !== "call_out",
       );
       const hours = shifts.reduce(
         (sum, s) =>
           sum + (s.end.getTime() - s.start.getTime()) / 1000 / 60 / 60,
-        0
+        0,
       );
       // label day + numeric date to make it less ambiguous
       const dayLabel = `${formatDayLabel(day)} ${day.getDate()}`;
@@ -296,7 +304,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
     return weekDays.map((day) => {
       const dayKey = getLocalDayKey(day);
       const shifts = schedulesNormalized
-        .filter((s) => s.dayKey === dayKey && s.status !== "cancelled")
+        .filter((s) => s.dayKey === dayKey && s.status !== "call_out")
         .sort((a, b) => a.start - b.start);
 
       if (shifts.length === 0) return { day: formatDayLabel(day), shifts: [] };
@@ -327,7 +335,23 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
   // small helpers
   function getRoleDisplayName(role) {
     if (!role) return "Staff";
-    return role.charAt(0).toUpperCase() + role.slice(1);
+    const labels = {
+      doctor: "Doctor",
+      nurse: "Nurse",
+      rn: "RN",
+      lpn: "LPN",
+      cna: "CNA",
+      med_aide: "Med Aide",
+      caregiver: "Caregiver",
+      activity_aide: "Activity Aide",
+      dietary_aide: "Dietary Aide",
+      housekeeper: "Housekeeper",
+      receptionist: "Receptionist",
+      billing: "Billing",
+      staff: "Staff",
+      other: "Other",
+    };
+    return labels[role] || role;
   }
 
   function getRoleColor(role) {
@@ -336,6 +360,22 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
         return "#1e88e5"; // blue
       case "nurse":
         return "#66bb6a"; // green
+      case "rn":
+        return "#26a69a"; // teal
+      case "lpn":
+        return "#ffb74d"; // amber
+      case "cna":
+        return "#ffa726"; // orange
+      case "med_aide":
+        return "#ab47bc"; // purple
+      case "caregiver":
+        return "#43a047"; // green
+      case "activity_aide":
+        return "#26c6da"; // cyan
+      case "dietary_aide":
+        return "#fdd835"; // yellow
+      case "housekeeper":
+        return "#78909c"; // blue gray
       case "receptionist":
         return "#ffb74d"; // orange
       case "billing":
@@ -355,7 +395,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
         return (
           s.dayKey === c.dayKey &&
           s.start.getTime() === new Date(c.startTime).getTime() &&
-          s.status !== "cancelled" &&
+          s.status !== "call_out" &&
           scheduleRole === c.role
         );
       }).length;
@@ -381,7 +421,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
     .sort((a, b) =>
       a.dayKey === b.dayKey
         ? a.startTime - b.startTime
-        : a.dayKey.localeCompare(b.dayKey)
+        : a.dayKey.localeCompare(b.dayKey),
     )
     .slice(0, 8)
     .map((c, idx) => {
@@ -390,7 +430,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
         return (
           s.dayKey === c.dayKey &&
           s.start.getTime() === new Date(c.startTime).getTime() &&
-          s.status !== "cancelled" &&
+          s.status !== "call_out" &&
           scheduleRole === c.role
         );
       }).length;
@@ -407,15 +447,15 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
 
   // For staff: find today's shift (schedulesNormalized already filtered by staff when fetched for non-admin)
   const todayShift = schedulesNormalized.find(
-    (s) => s.dayKey === todayKey && s.status !== "cancelled"
+    (s) => s.dayKey === todayKey && s.status !== "call_out",
   );
 
   const upcomingShifts = schedulesNormalized
-    .filter((s) => s.dayKey > todayKey && s.status !== "cancelled")
+    .filter((s) => s.dayKey > todayKey && s.status !== "call_out")
     .sort((a, b) =>
       a.dayKey === b.dayKey
         ? a.start - b.start
-        : a.dayKey.localeCompare(b.dayKey)
+        : a.dayKey.localeCompare(b.dayKey),
     )
     .slice(0, 8)
     .map((s) => ({
@@ -452,7 +492,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
     const now = new Date();
     const diff = Math.round(
       (d - new Date(now.getFullYear(), now.getMonth(), now.getDate())) /
-        (1000 * 60 * 60 * 24)
+        (1000 * 60 * 60 * 24),
     );
     if (diff === 0) return "Today";
     if (diff === 1) return "Tomorrow";
@@ -496,14 +536,14 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                         backgroundColor: cov.isUnderstaffed
                           ? "#ffebee"
                           : cov.isOverstaffed
-                          ? "#fff8e1"
-                          : "#e8f5e9",
+                            ? "#fff8e1"
+                            : "#e8f5e9",
                         borderLeft: `4px solid ${
                           cov.isUnderstaffed
                             ? "#f44336"
                             : cov.isOverstaffed
-                            ? "#fbc02d"
-                            : "#66bb6a"
+                              ? "#fbc02d"
+                              : "#66bb6a"
                         }`,
                       }}
                     >
@@ -556,8 +596,8 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                                 cov.requiredStaff - cov.assignedCount
                               } more`
                             : cov.isOverstaffed
-                            ? `${cov.assignedCount - cov.requiredStaff} extra`
-                            : "Fully staffed"}
+                              ? `${cov.assignedCount - cov.requiredStaff} extra`
+                              : "Fully staffed"}
                         </Typography>
                       </Box>
                     </Box>

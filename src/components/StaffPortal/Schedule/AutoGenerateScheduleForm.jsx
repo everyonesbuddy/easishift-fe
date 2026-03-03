@@ -18,7 +18,39 @@ import CloseIcon from "@mui/icons-material/Close";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 
-const roles = ["doctor", "nurse", "receptionist", "billing", "staff", "other"];
+const roles = [
+  "doctor",
+  "nurse",
+  "rn",
+  "lpn",
+  "cna",
+  "med_aide",
+  "caregiver",
+  "activity_aide",
+  "dietary_aide",
+  "housekeeper",
+  "receptionist",
+  "billing",
+  "staff",
+  "other",
+];
+
+const roleLabels = {
+  doctor: "Doctor",
+  nurse: "Nurse",
+  rn: "RN",
+  lpn: "LPN",
+  cna: "CNA",
+  med_aide: "Med Aide",
+  caregiver: "Caregiver",
+  activity_aide: "Activity Aide",
+  dietary_aide: "Dietary Aide",
+  housekeeper: "Housekeeper",
+  receptionist: "Receptionist",
+  billing: "Billing",
+  staff: "Staff",
+  other: "Other",
+};
 
 export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
   const [coverages, setCoverages] = useState([]);
@@ -27,6 +59,15 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
   const [errorMsg, setErrorMsg] = useState("");
   const [selectedRole, setSelectedRole] = useState(""); // optional role filter
   const [fetching, setFetching] = useState(false);
+
+  const toastOptions = {
+    position: "top-right",
+    autoClose: 3500,
+    hideProgressBar: false,
+    closeOnClick: true,
+    pauseOnHover: true,
+    draggable: true,
+  };
 
   // Fetch unfilled coverages when component mounts or role changes
   useEffect(() => {
@@ -65,6 +106,10 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
   const handleSubmit = async () => {
     if (!selectedIds.length) {
       setErrorMsg("Select at least one coverage.");
+      toast.info("Select at least one coverage and try AI-generate again.", {
+        ...toastOptions,
+        autoClose: 3000,
+      });
       return;
     }
 
@@ -76,19 +121,166 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
         coverageIds: selectedIds,
       });
 
-      toast.success(`Generated ${res.data.generatedCount} shifts.`, {
-        position: "top-right",
-        autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
+      const data = res.data || {};
+      const generatedCount = data.generatedCount ?? 0;
+      const coverageResults = Array.isArray(data.coverageResults)
+        ? data.coverageResults
+        : [];
+
+      const selectedCoverageMap = new Map(
+        coverages
+          .filter((cov) => selectedIds.includes(cov._id))
+          .map((cov) => [cov._id, cov]),
+      );
+
+      const toNumberOrNull = (value) => {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : null;
+      };
+
+      const findSourceCoverage = (item) => {
+        const resultId = item?.coverageId || item?._id || item?.id;
+        if (resultId && selectedCoverageMap.has(resultId)) {
+          return selectedCoverageMap.get(resultId);
+        }
+
+        const resultStart = new Date(item?.startTime || "").getTime();
+        const resultEnd = new Date(item?.endTime || "").getTime();
+        if (!Number.isFinite(resultStart) || !Number.isFinite(resultEnd)) {
+          return null;
+        }
+
+        return (
+          coverages.find((cov) => {
+            const sameRole = (cov?.role || "") === (item?.role || "");
+            const covStart = new Date(cov?.startTime || "").getTime();
+            const covEnd = new Date(cov?.endTime || "").getTime();
+            return sameRole && covStart === resultStart && covEnd === resultEnd;
+          }) || null
+        );
+      };
+
+      const statusLabelMap = {
+        filled: "Scheduled",
+        partially_filled: "Partially Scheduled",
+        already_filled: "Already Full",
+        skipped: "Skipped",
+      };
+
+      const formatDatePart = (value) => {
+        if (!value) return "Unknown date";
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return "Unknown date";
+        return parsed.toLocaleDateString();
+      };
+
+      const formatTimePart = (value) => {
+        if (!value) return "--:--";
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return "--:--";
+        return parsed.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      };
+
+      const coverageLines = coverageResults.slice(0, 3).map((item) => {
+        const sourceCoverage = findSourceCoverage(item);
+        const role = roleLabels[item?.role] || item?.role || "Role";
+        const dateValue =
+          item?.startTime ||
+          sourceCoverage?.startTime ||
+          item?.date ||
+          sourceCoverage?.date;
+        const dateText = formatDatePart(dateValue);
+        const startText = formatTimePart(item?.startTime);
+        const endText = formatTimePart(item?.endTime);
+        const status = statusLabelMap[item?.status] || "Processed";
+        const reason = item?.message;
+
+        const requiredFromResult = toNumberOrNull(item?.requiredCount);
+        const requiredFromSource = toNumberOrNull(
+          sourceCoverage?.requiredCount,
+        );
+        const required = requiredFromResult ?? requiredFromSource;
+
+        const startFilledFromResult = toNumberOrNull(
+          item?.alreadyAssignedCount,
+        );
+        const startFilledFromSource = toNumberOrNull(
+          sourceCoverage?.assignedCount,
+        );
+        const startFilled = startFilledFromResult ?? startFilledFromSource;
+
+        const startRemainingFromSource = toNumberOrNull(
+          sourceCoverage?.remaining,
+        );
+        const startRemaining =
+          startRemainingFromSource ??
+          (required != null && startFilled != null
+            ? Math.max(0, required - startFilled)
+            : null);
+
+        const assignedNow = toNumberOrNull(item?.assignedCount) ?? 0;
+
+        const endFilled =
+          startFilled != null ? startFilled + assignedNow : null;
+
+        const endRemainingFromResult = toNumberOrNull(item?.unfilledCount);
+        const endRemaining =
+          endRemainingFromResult ??
+          (required != null && endFilled != null
+            ? Math.max(0, required - endFilled)
+            : null);
+
+        const startState =
+          required != null && startFilled != null && startRemaining != null
+            ? `Started: required ${required}, filled ${startFilled}, remaining ${startRemaining}`
+            : "Started: state unavailable";
+
+        const endState =
+          required != null && endFilled != null && endRemaining != null
+            ? `Ended: required ${required}, filled ${endFilled}, remaining ${endRemaining}`
+            : "Ended: state unavailable";
+
+        return `• ${role} — ${status}\n  ${dateText} | ${startText}-${endText}\n  ${startState}\n  ${endState}${reason ? `\n  ${reason}` : ""}`;
       });
+
+      if (coverageResults.length > 3) {
+        coverageLines.push(`• +${coverageResults.length - 3} more item(s)`);
+      }
+
+      const consolidatedMessage = coverageLines.length
+        ? coverageLines.join("\n\n")
+        : "Auto-scheduling completed.";
+
+      const toastMethod = generatedCount > 0 ? toast.success : toast.info;
+      toastMethod(consolidatedMessage, {
+        ...toastOptions,
+        autoClose: 8500,
+        style: {
+          whiteSpace: "pre-line",
+          width: "min(92vw, 760px)",
+          maxWidth: "760px",
+          lineHeight: 1.5,
+        },
+      });
+
       onSuccess?.();
       setSelectedIds([]);
     } catch (err) {
       console.error(err);
-      setErrorMsg(err.response?.data?.message || "Failed to auto-generate.");
+      const backend = err.response?.data;
+      const message = backend?.message || "Failed to auto-generate.";
+      const hint = backend?.hint;
+      const errorCode = backend?.errorCode;
+
+      const fullMessage = [errorCode ? `[${errorCode}]` : null, message, hint]
+        .filter(Boolean)
+        .join(" ");
+
+      setErrorMsg(fullMessage);
+      toast.error(fullMessage, { ...toastOptions, autoClose: 5500 });
     } finally {
       setLoading(false);
     }
@@ -117,7 +309,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
         variant="h6"
         sx={{ mb: 1.5, fontSize: { xs: "1rem", md: "1.25rem" } }}
       >
-        Auto-Generate Schedule
+        AI Generated Schedule
       </Typography>
 
       <Typography
@@ -128,8 +320,16 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
           fontSize: { xs: "0.8rem", md: "0.95rem" },
         }}
       >
-        Select the role and the coverages you want to auto-schedule.
+        Use AI to automatically assign staff to selected coverage windows.
       </Typography>
+
+      {/* <Typography
+        variant="caption"
+        sx={{ color: "text.secondary", display: "block", mb: 0.5 }}
+      >
+        AI scheduling assigns staff based on your selected unfilled coverages
+        and availability.
+      </Typography> */}
 
       <Stack spacing={1.25}>
         {/* Role selection */}
@@ -142,7 +342,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
             <MenuItem value="">All Roles</MenuItem>
             {roles.map((r) => (
               <MenuItem key={r} value={r}>
-                {r.charAt(0).toUpperCase() + r.slice(1)}
+                {roleLabels[r] || r}
               </MenuItem>
             ))}
           </Select>
@@ -245,8 +445,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                           }}
                           noWrap
                         >
-                          {dateStr} ·{" "}
-                          {cov.role.charAt(0).toUpperCase() + cov.role.slice(1)}
+                          {dateStr} · {roleLabels[cov.role] || cov.role}
                         </Typography>
                         <Typography
                           sx={{ fontSize: { xs: 12, md: 13 }, color: "gray" }}
@@ -317,7 +516,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
           onClick={handleSubmit}
           disabled={loading || fetching}
         >
-          {loading ? <CircularProgress size={22} /> : "Generate"}
+          {loading ? <CircularProgress size={22} /> : "Generate with AI"}
         </Button>
       </Stack>
     </Paper>

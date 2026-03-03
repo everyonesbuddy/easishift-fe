@@ -45,9 +45,39 @@ const ROLE_COLORS = {
   admin: "#7c3aed",
   doctor: "#0ea5a4",
   nurse: "#f97316",
+  rn: "#14b8a6",
+  lpn: "#fb923c",
+  cna: "#fdba74",
+  med_aide: "#a855f7",
+  caregiver: "#10b981",
+  activity_aide: "#22c55e",
+  dietary_aide: "#f59e0b",
+  housekeeper: "#64748b",
   receptionist: "#2563eb",
   billing: "#f59e0b",
+  staff: "#6b7280",
   general: "#6b7280",
+};
+
+const getRoleDisplayName = (role) => {
+  const labels = {
+    admin: "Admin",
+    doctor: "Doctor",
+    nurse: "Nurse",
+    rn: "RN",
+    lpn: "LPN",
+    cna: "CNA",
+    med_aide: "Med Aide",
+    caregiver: "Caregiver",
+    activity_aide: "Activity Aide",
+    dietary_aide: "Dietary Aide",
+    housekeeper: "Housekeeper",
+    receptionist: "Receptionist",
+    billing: "Billing",
+    staff: "Staff",
+    general: "General",
+  };
+  return labels[role] || role;
 };
 
 export default function StaffList() {
@@ -120,8 +150,17 @@ export default function StaffList() {
     "admin",
     "doctor",
     "nurse",
+    "rn",
+    "lpn",
+    "cna",
+    "med_aide",
+    "caregiver",
+    "activity_aide",
+    "dietary_aide",
+    "housekeeper",
     "receptionist",
     "billing",
+    "staff",
     "general",
   ];
 
@@ -204,9 +243,7 @@ export default function StaffList() {
               >
                 {roles.map((r) => (
                   <MenuItem key={r} value={r}>
-                    {r === "all"
-                      ? "All Roles"
-                      : r.charAt(0).toUpperCase() + r.slice(1)}
+                    {r === "all" ? "All Roles" : getRoleDisplayName(r)}
                   </MenuItem>
                 ))}
               </Select>
@@ -248,7 +285,7 @@ export default function StaffList() {
                         sx={{ fontSize: 12, color: "text.secondary" }}
                         noWrap
                       >
-                        {u.role}
+                        {getRoleDisplayName(u.role)}
                       </Typography>
                       <Typography
                         sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
@@ -314,7 +351,8 @@ export default function StaffList() {
               <TableRow>
                 <TableCell>Staff Member</TableCell>
                 <TableCell>Role</TableCell>
-                <TableCell>Contact</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>Phone</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -357,7 +395,7 @@ export default function StaffList() {
                               backgroundColor: ROLE_COLORS[u.role] || "#6b7280",
                             }}
                           />
-                          <Typography>{u.role}</Typography>
+                          <Typography>{getRoleDisplayName(u.role)}</Typography>
                         </Box>
                       </TableCell>
 
@@ -375,6 +413,27 @@ export default function StaffList() {
                         ) : (
                           <Typography variant="body2" color="text.secondary">
                             No email
+                          </Typography>
+                        )}
+                      </TableCell>
+
+                      <TableCell>
+                        {u.userPhone !== undefined && u.userPhone !== null ? (
+                          <Box
+                            display="flex"
+                            alignItems="center"
+                            gap={1}
+                            color="text.secondary"
+                          >
+                            <FiPhone />
+                            <Typography variant="body2">
+                              {(u.userPhoneCountryCode || "") +
+                                (u.userPhone || "")}
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No phone
                           </Typography>
                         )}
                       </TableCell>
@@ -433,8 +492,13 @@ export default function StaffList() {
         open={open}
         onClose={() => handleModalClose()}
         fullWidth
-        maxWidth="sm"
+        maxWidth="md"
         scroll="paper"
+        PaperProps={{
+          sx: {
+            borderRadius: { xs: 3, md: 4 },
+          },
+        }}
       >
         <DialogContent dividers>
           <StaffCreateAndEditForm

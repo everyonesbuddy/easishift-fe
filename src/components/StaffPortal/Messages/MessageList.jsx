@@ -30,8 +30,18 @@ const ROLE_COLORS = {
   admin: "#7c3aed",
   doctor: "#0ea5a4",
   nurse: "#f97316",
+  rn: "#14b8a6",
+  lpn: "#fb923c",
+  cna: "#fdba74",
+  med_aide: "#a855f7",
+  caregiver: "#10b981",
+  activity_aide: "#22c55e",
+  dietary_aide: "#f59e0b",
+  housekeeper: "#64748b",
   receptionist: "#2563eb",
   billing: "#f59e0b",
+  staff: "#6b7280",
+  other: "#6b7280",
   general: "#6b7280",
 };
 
@@ -482,7 +492,7 @@ export default function MessageList() {
             width: 640,
             maxWidth: "95%",
             p: 4,
-            borderRadius: 2,
+            borderRadius: 4,
           }}
         >
           <MessageComposer

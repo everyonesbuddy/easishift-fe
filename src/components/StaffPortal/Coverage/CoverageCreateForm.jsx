@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import {
   Box,
   Button,
@@ -9,16 +9,53 @@ import {
   Paper,
   Stack,
   IconButton,
-  Chip,
+  Divider,
+  InputAdornment,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { LocalizationProvider, DateCalendar } from "@mui/x-date-pickers";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import dayjs from "dayjs";
+import {
+  MdAdd,
+  MdDelete,
+  MdAccessTime,
+  MdGroups2,
+  MdEvent,
+} from "react-icons/md";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 
-const roles = ["doctor", "nurse", "receptionist", "billing", "staff", "other"];
+const roles = [
+  "doctor",
+  "nurse",
+  "rn",
+  "lpn",
+  "cna",
+  "med_aide",
+  "caregiver",
+  "activity_aide",
+  "dietary_aide",
+  "housekeeper",
+  "receptionist",
+  "billing",
+  "staff",
+  "other",
+];
+
+const roleLabels = {
+  doctor: "Doctor",
+  nurse: "Nurse",
+  rn: "RN",
+  lpn: "LPN",
+  cna: "CNA",
+  med_aide: "Med Aide",
+  caregiver: "Caregiver",
+  activity_aide: "Activity Aide",
+  dietary_aide: "Dietary Aide",
+  housekeeper: "Housekeeper",
+  receptionist: "Receptionist",
+  billing: "Billing",
+  staff: "Staff",
+  other: "Other",
+};
 
 // Convert local date "2025-12-02" and time "08:00" → UTC ISO string
 function toUTC(dateStr, timeStr) {
@@ -27,57 +64,105 @@ function toUTC(dateStr, timeStr) {
 }
 
 export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
-  const [role, setRole] = useState("");
-  const [selectedDates, setSelectedDates] = useState([]); // Array of dayjs objects
-  const [startTime, setStartTime] = useState("08:00");
-  const [endTime, setEndTime] = useState("17:00");
-  const [requiredCount, setRequiredCount] = useState(1);
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [requirements, setRequirements] = useState([
+    {
+      role: "",
+      requiredCount: 1,
+      startTime: "09:00",
+      endTime: "17:00",
+    },
+  ]);
   const [note, setNote] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const [loadingMode, setLoadingMode] = useState("create");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e, autoGenerate = false) => {
+    if (e) e.preventDefault();
 
-    if (!role || selectedDates.length === 0 || !startTime || !endTime) {
-      setError("Please select a role, at least one date, and times.");
-      toast.error("Please select a role, at least one date, and times.");
+    if (!date || requirements.length === 0) {
+      setError("Please select a date and at least one coverage requirement.");
+      toast.error(
+        "Please select a date and at least one coverage requirement.",
+      );
       return;
     }
 
+    for (let index = 0; index < requirements.length; index += 1) {
+      const req = requirements[index];
+      if (!req.role || !req.startTime || !req.endTime) {
+        const msg = `Requirement ${index + 1} must include role, start time, and end time.`;
+        setError(msg);
+        toast.error(msg);
+        return;
+      }
+
+      const startUTC = toUTC(date, req.startTime);
+      const endUTC = toUTC(date, req.endTime);
+
+      if (startUTC >= endUTC) {
+        const msg = `Requirement ${index + 1} must have end time after start time.`;
+        setError(msg);
+        toast.error(msg);
+        return;
+      }
+    }
+
+    setLoadingMode(autoGenerate ? "ai" : "create");
     setLoading(true);
     setError("");
     setSuccess("");
 
     try {
-      // Create coverage for each selected date
-      const coveragePromises = selectedDates.map((dayjsDate) => {
-        const dateStr = dayjsDate.format("YYYY-MM-DD");
-        const startUTC = toUTC(dateStr, startTime);
-        const endUTC = toUTC(dateStr, endTime);
+      const shifts = requirements.map((req) => ({
+        role: req.role,
+        requiredCount: Number(req.requiredCount) || 0,
+        startTime: toUTC(date, req.startTime),
+        endTime: toUTC(date, req.endTime),
+        note,
+      }));
 
-        return api.post("/coverage", {
-          tenantId,
-          role,
-          date: dateStr,
-          startTime: startUTC,
-          endTime: endUTC,
-          requiredCount,
-          note,
-        });
+      const createRes = await api.post("/coverage", {
+        tenantId,
+        dates: [date],
+        shifts,
       });
 
-      await Promise.all(coveragePromises);
+      let generatedCount = 0;
+      if (autoGenerate) {
+        const created = Array.isArray(createRes.data)
+          ? createRes.data
+          : Array.isArray(createRes.data?.created)
+            ? createRes.data.created
+            : [];
 
-      setSuccess(`Coverage added for ${selectedDates.length} date(s)!`);
-      toast.success(`Coverage added for ${selectedDates.length} date(s)`);
-      setRole("");
-      setSelectedDates([]);
-      setStartTime("08:00");
-      setEndTime("17:00");
-      setRequiredCount(1);
+        const coverageIds = created.map((item) => item?._id).filter(Boolean);
+
+        if (coverageIds.length > 0) {
+          const autoRes = await api.post("/schedules/auto-generate", {
+            coverageIds,
+          });
+          generatedCount = autoRes.data?.generatedCount ?? 0;
+        }
+      }
+
+      const successMsg = autoGenerate
+        ? `Coverage created + AI auto-schedule complete (${generatedCount} shifts generated).`
+        : "Coverage requirements added successfully!";
+
+      setSuccess(successMsg);
+      toast.success(successMsg);
+      setRequirements([
+        {
+          role: "",
+          requiredCount: 1,
+          startTime: "09:00",
+          endTime: "17:00",
+        },
+      ]);
       setNote("");
 
       if (onSuccess) onSuccess();
@@ -87,31 +172,31 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
       toast.error(msg);
     } finally {
       setLoading(false);
+      setLoadingMode("create");
     }
   };
 
-  const handleDateChange = (date) => {
-    if (!date) return;
-
-    const dateStr = date.format("YYYY-MM-DD");
-    const isSelected = selectedDates.some(
-      (d) => d.format("YYYY-MM-DD") === dateStr,
+  const handleRequirementChange = (index, key, value) => {
+    setRequirements((prev) =>
+      prev.map((req, i) => (i === index ? { ...req, [key]: value } : req)),
     );
-
-    if (isSelected) {
-      // Remove date if already selected
-      setSelectedDates(
-        selectedDates.filter((d) => d.format("YYYY-MM-DD") !== dateStr),
-      );
-    } else {
-      // Add date if not selected
-      setSelectedDates([...selectedDates, date].sort((a, b) => a.diff(b)));
-    }
   };
 
-  const handleRemoveDate = (dateToRemove) => {
-    setSelectedDates(
-      selectedDates.filter((d) => d.format("YYYY-MM-DD") !== dateToRemove),
+  const handleAddRequirement = () => {
+    setRequirements((prev) => [
+      ...prev,
+      {
+        role: "",
+        requiredCount: 1,
+        startTime: "09:00",
+        endTime: "17:00",
+      },
+    ]);
+  };
+
+  const handleRemoveRequirement = (index) => {
+    setRequirements((prev) =>
+      prev.length === 1 ? prev : prev.filter((_, i) => i !== index),
     );
   };
 
@@ -120,9 +205,11 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
       component="form"
       onSubmit={handleSubmit}
       sx={{
-        p: 3,
-        borderRadius: 2,
-        backgroundColor: "rgba(255,255,255,0.02)",
+        p: { xs: 2, sm: 3 },
+        borderRadius: 4,
+        border: "1px solid",
+        borderColor: "divider",
+        backgroundColor: "background.paper",
         position: "relative",
       }}
       elevation={0}
@@ -131,137 +218,238 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
         <IconButton
           aria-label="Close"
           onClick={onClose}
-          sx={{ position: "absolute", top: 8, right: 8 }}
+          sx={{ position: "absolute", top: 10, right: 10 }}
         >
           <CloseIcon />
         </IconButton>
       )}
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        Add Coverage
-      </Typography>
+      <Box sx={{ mb: 2.5, pr: onClose ? 5 : 0 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+          Add Coverage Requirements
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          Define role, count, and shift window for each requirement.
+        </Typography>
+      </Box>
 
       <Stack spacing={2}>
         {error && <Alert severity="error">{error}</Alert>}
         {success && <Alert severity="success">{success}</Alert>}
 
         <TextField
-          select
-          label="Role"
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
+          label="Date"
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          helperText="Select the day for these coverage requirements"
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <MdEvent size={18} />
+              </InputAdornment>
+            ),
+          }}
           required
+        />
+
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1,
+            mt: 1,
+          }}
         >
-          {roles.map((r) => (
-            <MenuItem key={r} value={r}>
-              {r.charAt(0).toUpperCase() + r.slice(1)}
-            </MenuItem>
-          ))}
-        </TextField>
-
-        <Typography variant="body2" sx={{ fontWeight: 600, mt: 1 }}>
-          Select Coverage Dates:
-        </Typography>
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <Paper
-            sx={{
-              p: 1,
-              bgcolor: "rgba(37, 99, 235, 0.05)",
-              borderRadius: 1,
-              display: "flex",
-              justifyContent: "center",
-              overflow: "auto",
-            }}
-            elevation={0}
-          >
-            <DateCalendar
-              value={null}
-              onChange={handleDateChange}
-              slotProps={{
-                toolbar: { hidden: true },
-              }}
-              sx={{
-                maxWidth: 320,
-                "& .MuiPickersDay-root": {
-                  fontSize: "0.8rem",
-                  "&.Mui-selected": {
-                    backgroundColor: "#2563EB",
-                    color: "white",
-                  },
-                  "&:hover": {
-                    backgroundColor: "rgba(37, 99, 235, 0.2)",
-                  },
-                },
-                "& .MuiPickersCalendarHeader-root": {
-                  paddingY: 1,
-                },
-                "& .MuiPickersMonth-root": {
-                  gap: "4px",
-                },
-              }}
-            />
-          </Paper>
-        </LocalizationProvider>
-
-        {selectedDates.length > 0 && (
-          <Box
-            sx={{ p: 2, bgcolor: "rgba(37, 99, 235, 0.1)", borderRadius: 1 }}
-          >
-            <Typography variant="body2" sx={{ mb: 1.5, fontWeight: 600 }}>
-              Selected Dates ({selectedDates.length}):
+          <Box>
+            <Typography variant="body1" sx={{ fontWeight: 700 }}>
+              Coverage Requirements
             </Typography>
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-              {selectedDates.map((d) => (
-                <Chip
-                  key={d.format("YYYY-MM-DD")}
-                  label={d.format("MMM DD, YYYY")}
-                  onDelete={() => handleRemoveDate(d.format("YYYY-MM-DD"))}
-                  color="primary"
-                  variant="filled"
-                  sx={{ fontWeight: 600 }}
-                />
-              ))}
-            </Box>
+            <Typography variant="caption" color="text.secondary">
+              {requirements.length}{" "}
+              {requirements.length === 1 ? "entry" : "entries"}
+            </Typography>
           </Box>
-        )}
+
+          <Button
+            variant="outlined"
+            onClick={handleAddRequirement}
+            startIcon={<MdAdd size={18} />}
+            sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+          >
+            Add Requirement
+          </Button>
+        </Box>
+
+        <Stack spacing={2}>
+          {requirements.map((req, index) => (
+            <Paper
+              key={`req-${index}`}
+              variant="outlined"
+              sx={{
+                p: 2,
+                borderRadius: 2.5,
+                borderColor: "divider",
+                backgroundColor: "background.default",
+              }}
+            >
+              <Stack spacing={1.5}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    mb: 0.5,
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                    Requirement {index + 1}
+                  </Typography>
+
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => handleRemoveRequirement(index)}
+                    disabled={requirements.length === 1}
+                    aria-label={`Remove requirement ${index + 1}`}
+                  >
+                    <MdDelete size={18} />
+                  </IconButton>
+                </Box>
+
+                <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="Role"
+                    value={req.role}
+                    onChange={(e) =>
+                      handleRequirementChange(index, "role", e.target.value)
+                    }
+                    required
+                  >
+                    {roles.map((r) => (
+                      <MenuItem key={r} value={r}>
+                        {roleLabels[r] || r}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+
+                  <TextField
+                    label="Count"
+                    type="number"
+                    value={req.requiredCount}
+                    onChange={(e) =>
+                      handleRequirementChange(
+                        index,
+                        "requiredCount",
+                        Number(e.target.value),
+                      )
+                    }
+                    inputProps={{ min: 0 }}
+                    required
+                    sx={{ minWidth: { md: 130 } }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <MdGroups2 size={18} />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Stack>
+
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                  <TextField
+                    fullWidth
+                    label="Start"
+                    type="time"
+                    value={req.startTime}
+                    onChange={(e) =>
+                      handleRequirementChange(
+                        index,
+                        "startTime",
+                        e.target.value,
+                      )
+                    }
+                    InputLabelProps={{ shrink: true }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <MdAccessTime size={18} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    required
+                  />
+
+                  <TextField
+                    fullWidth
+                    label="End"
+                    type="time"
+                    value={req.endTime}
+                    onChange={(e) =>
+                      handleRequirementChange(index, "endTime", e.target.value)
+                    }
+                    InputLabelProps={{ shrink: true }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <MdAccessTime size={18} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    required
+                  />
+                </Stack>
+              </Stack>
+            </Paper>
+          ))}
+        </Stack>
+
+        <Divider />
 
         <TextField
-          label="Start Time"
-          type="time"
-          value={startTime}
-          onChange={(e) => setStartTime(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-          required
-        />
-
-        <TextField
-          label="End Time"
-          type="time"
-          value={endTime}
-          onChange={(e) => setEndTime(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-          required
-        />
-
-        <TextField
-          label="Required Count"
-          type="number"
-          value={requiredCount}
-          onChange={(e) => setRequiredCount(Number(e.target.value))}
-          inputProps={{ min: 0 }}
-          required
-        />
-
-        <TextField
-          label="Note (optional)"
+          label="Notes (Optional)"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           multiline
           rows={3}
+          placeholder="Add any additional notes about these coverage requirements..."
         />
 
-        <Button type="submit" variant="contained" disabled={loading}>
-          {loading ? "Adding..." : "Add Coverage"}
-        </Button>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={loading}
+            fullWidth
+            sx={{ textTransform: "none", fontWeight: 600 }}
+          >
+            {loading && loadingMode === "create"
+              ? "Saving..."
+              : "Save Requirements"}
+          </Button>
+
+          <Button
+            type="button"
+            variant="contained"
+            disabled={loading}
+            onClick={(e) => handleSubmit(e, true)}
+            fullWidth
+            sx={{
+              textTransform: "none",
+              fontWeight: 600,
+              backgroundColor: "#111827",
+              "&:hover": { backgroundColor: "#1f2937" },
+            }}
+          >
+            {loading && loadingMode === "ai"
+              ? "Creating + AI Scheduling..."
+              : "Save + AI Generate Schedule"}
+          </Button>
+        </Stack>
       </Stack>
     </Paper>
   );

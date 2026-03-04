@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   TextField,
   Button,
   Typography,
   MenuItem,
+  ListSubheader,
   Box,
   IconButton,
 } from "@mui/material";
@@ -22,7 +23,7 @@ export default function MessageComposer({
   const { user } = useAuth();
 
   const [form, setForm] = useState({
-    receiverId: initialRecipientId,
+    recipientSelection: initialRecipientId ? `user:${initialRecipientId}` : "",
     subject: initialSubject,
     body: "",
   });
@@ -48,17 +49,60 @@ export default function MessageComposer({
   useEffect(() => {
     setForm((prev) => ({
       ...prev,
-      receiverId: initialRecipientId,
+      recipientSelection: initialRecipientId
+        ? `user:${initialRecipientId}`
+        : "",
       subject: initialSubject,
     }));
   }, [initialRecipientId, initialSubject]);
 
+  const roleOptions = useMemo(() => {
+    const uniqueRoles = [
+      ...new Set(staffList.map((staff) => staff.role).filter(Boolean)),
+    ];
+    return uniqueRoles.sort((a, b) => a.localeCompare(b));
+  }, [staffList]);
+
+  const resolveReceiverIds = () => {
+    const selection = form.recipientSelection;
+
+    if (!selection) return [];
+
+    if (selection === "all_staff") {
+      return staffList.map((staff) => staff._id);
+    }
+
+    if (selection.startsWith("role:")) {
+      const role = selection.replace("role:", "");
+      return staffList
+        .filter((staff) => staff.role === role)
+        .map((staff) => staff._id);
+    }
+
+    if (selection.startsWith("user:")) {
+      const userId = selection.replace("user:", "");
+      return userId ? [userId] : [];
+    }
+
+    return [];
+  };
+
   const handleSubmit = async () => {
     try {
+      const receiverIds = resolveReceiverIds();
+
+      if (!receiverIds.length) {
+        toast.error("Please select at least one recipient", {
+          position: "top-right",
+          autoClose: 3000,
+        });
+        return;
+      }
+
       await api.post("/messages", {
         senderId: user._id,
         senderModel: "User",
-        receiverId: form.receiverId,
+        receiverIds,
         receiverModel: "User",
         subject: form.subject,
         body: form.body,
@@ -93,14 +137,27 @@ export default function MessageComposer({
       <TextField
         select
         fullWidth
-        label="Recipient"
+        label="Recipients"
         sx={{ mb: 2 }}
-        value={form.receiverId}
+        value={form.recipientSelection}
         disabled={lockRecipient}
-        onChange={(e) => setForm({ ...form, receiverId: e.target.value })}
+        onChange={(e) =>
+          setForm({ ...form, recipientSelection: e.target.value })
+        }
       >
+        <ListSubheader>Quick Select</ListSubheader>
+        <MenuItem value="all_staff">All Staff (except you)</MenuItem>
+
+        {roleOptions.length > 0 && <ListSubheader>By Role</ListSubheader>}
+        {roleOptions.map((role) => (
+          <MenuItem key={role} value={`role:${role}`}>
+            Role: {role}
+          </MenuItem>
+        ))}
+
+        <ListSubheader>Individual Staff</ListSubheader>
         {staffList.map((s) => (
-          <MenuItem key={s._id} value={s._id}>
+          <MenuItem key={s._id} value={`user:${s._id}`}>
             {s.name}
           </MenuItem>
         ))}

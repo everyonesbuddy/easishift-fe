@@ -5,6 +5,7 @@ import {
   Typography,
   Box,
   CircularProgress,
+  TextField,
   FormControl,
   InputLabel,
   Select,
@@ -17,21 +18,6 @@ import {
   FiCheckCircle,
   FiAlertTriangle,
 } from "react-icons/fi";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-} from "recharts";
-
-const CARD_BG = "rgba(255,255,255,0.06)";
-const CARD_HEIGHT = 320;
-const BAR_COLORS = { required: "#ef5350", scheduled: "#66bb6a" };
-const BAR_COLOR = "#66bb6a";
 
 // -------------------
 // Utilities
@@ -103,6 +89,37 @@ function formatTime(d) {
     .replace(/\s?/g, "");
 }
 
+const CARD_MAX_HEIGHT = { xs: "52vh", sm: "56vh", md: "60vh" };
+
+const CARD_SCROLL_SX = {
+  scrollbarWidth: "thin",
+  scrollbarColor: "#b0bec5 #eef2f5",
+  "&::-webkit-scrollbar": {
+    width: 10,
+    height: 10,
+  },
+  "&::-webkit-scrollbar-track": {
+    backgroundColor: "#eef2f5",
+    borderRadius: 999,
+  },
+  "&::-webkit-scrollbar-thumb": {
+    backgroundColor: "#b0bec5",
+    borderRadius: 999,
+    border: "2px solid #eef2f5",
+  },
+  "&::-webkit-scrollbar-thumb:hover": {
+    backgroundColor: "#90a4ae",
+  },
+};
+
+const CARD_SX = {
+  background: "white",
+  borderRadius: 2,
+  maxHeight: CARD_MAX_HEIGHT,
+  overflowY: "auto",
+  ...CARD_SCROLL_SX,
+};
+
 // -------------------
 // Main Component
 // -------------------
@@ -114,6 +131,10 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
   // UI state
   const [selectedRole, setSelectedRole] = useState("");
   const [nonAdminView, setNonAdminView] = useState("hours"); // 'hours' or 'table'
+  const [selectedCoverageRole, setSelectedCoverageRole] = useState("all");
+  const [selectedOvertimeRole, setSelectedOvertimeRole] = useState("all");
+  const [coverageStartDate, setCoverageStartDate] = useState("");
+  const [coverageEndDate, setCoverageEndDate] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -201,6 +222,12 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
     });
     return `${firstLabel} – ${lastLabel}`;
   }, [weekDays]);
+
+  useEffect(() => {
+    if (!weekDays.length) return;
+    if (!coverageStartDate) setCoverageStartDate(getLocalDayKey(weekDays[0]));
+    if (!coverageEndDate) setCoverageEndDate(getLocalDayKey(weekDays[6]));
+  }, [weekDays, coverageStartDate, coverageEndDate]);
 
   // -------------------
   // Roles & role selector (only roles that actually have coverage)
@@ -318,6 +345,159 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
     });
   }, [schedulesNormalized, weekDays, isAdmin]);
 
+  const weeklyOvertimeData = useMemo(() => {
+    if (!isAdmin) return [];
+
+    const weekDayKeys = new Set(weekDays.map((d) => getLocalDayKey(d)));
+    const totals = new Map();
+
+    schedulesNormalized
+      .filter((s) => weekDayKeys.has(s.dayKey) && s.status !== "call_out")
+      .forEach((s) => {
+        const staffRef = s.staffId;
+        const staffId =
+          typeof staffRef === "string"
+            ? staffRef
+            : staffRef?._id || `${s.staffRole || "staff"}-${s.dayKey}`;
+
+        const staffName =
+          (typeof staffRef === "object" &&
+            (staffRef?.name ||
+              [staffRef?.firstName, staffRef?.lastName]
+                .filter(Boolean)
+                .join(" "))) ||
+          "Unknown Staff";
+
+        const shiftHours =
+          (s.end.getTime() - s.start.getTime()) / (1000 * 60 * 60);
+
+        if (!totals.has(staffId)) {
+          totals.set(staffId, {
+            staffId,
+            staffName,
+            role: s.staffRole || s.role || "staff",
+            hours: 0,
+          });
+        }
+
+        const row = totals.get(staffId);
+        row.hours += shiftHours;
+      });
+
+    return Array.from(totals.values())
+      .map((row) => {
+        const roundedHours = Math.round(row.hours * 10) / 10;
+        const roleLabel = getRoleDisplayName(row.role);
+        return {
+          ...row,
+          hours: roundedHours,
+          roleLabel,
+          staffLabel: `${row.staffName} (${roleLabel})`,
+          isNearOvertime: roundedHours >= 36 && roundedHours < 40,
+          isOvertime: roundedHours >= 40,
+        };
+      })
+      .sort((a, b) => b.hours - a.hours);
+  }, [isAdmin, schedulesNormalized, weekDays]);
+
+  const filteredWeeklyOvertimeData = useMemo(() => {
+    if (!isAdmin) return [];
+    return weeklyOvertimeData.filter(
+      (row) =>
+        selectedOvertimeRole === "all" || row.role === selectedOvertimeRole,
+    );
+  }, [isAdmin, weeklyOvertimeData, selectedOvertimeRole]);
+
+  const overtimeSummary = useMemo(() => {
+    if (!isAdmin || filteredWeeklyOvertimeData.length === 0) {
+      return { nearCount: 0, overtimeCount: 0 };
+    }
+
+    const nearCount = filteredWeeklyOvertimeData.filter(
+      (w) => w.isNearOvertime,
+    ).length;
+    const overtimeCount = filteredWeeklyOvertimeData.filter(
+      (w) => w.isOvertime,
+    ).length;
+
+    return { nearCount, overtimeCount };
+  }, [isAdmin, filteredWeeklyOvertimeData]);
+
+  const consolidatedCoverageWithStaffing = useMemo(() => {
+    if (!isAdmin) return [];
+
+    const startKey =
+      coverageStartDate && coverageEndDate
+        ? coverageStartDate <= coverageEndDate
+          ? coverageStartDate
+          : coverageEndDate
+        : coverageStartDate || coverageEndDate;
+
+    const endKey =
+      coverageStartDate && coverageEndDate
+        ? coverageStartDate <= coverageEndDate
+          ? coverageEndDate
+          : coverageStartDate
+        : coverageEndDate || coverageStartDate;
+
+    return coverageNormalized
+      .filter((c) => {
+        const inRole =
+          selectedCoverageRole === "all" || c.role === selectedCoverageRole;
+        const inStartRange = startKey ? c.dayKey >= startKey : true;
+        const inEndRange = endKey ? c.dayKey <= endKey : true;
+        return inRole && inStartRange && inEndRange;
+      })
+      .sort((a, b) =>
+        a.dayKey === b.dayKey
+          ? a.startTime - b.startTime
+          : a.dayKey.localeCompare(b.dayKey),
+      )
+      .map((c, idx) => {
+        const assignedCount = schedulesNormalized.filter((s) => {
+          const scheduleRole = s.staffRole || s.role;
+          return (
+            s.dayKey === c.dayKey &&
+            s.start.getTime() === new Date(c.startTime).getTime() &&
+            s.status !== "call_out" &&
+            scheduleRole === c.role
+          );
+        }).length;
+
+        return {
+          id: c._id || `${c.dayKey}-${c.role}-${idx}`,
+          role: c.role,
+          dayKey: c.dayKey,
+          shiftStart: c.startTime,
+          shiftEnd: c.endTime,
+          assignedCount,
+          requiredStaff: c.requiredCount,
+          isUnderstaffed: assignedCount < c.requiredCount,
+          isOverstaffed: assignedCount > c.requiredCount,
+        };
+      });
+  }, [
+    isAdmin,
+    coverageStartDate,
+    coverageEndDate,
+    selectedCoverageRole,
+    coverageNormalized,
+    schedulesNormalized,
+  ]);
+
+  const consolidatedCoverageSummary = useMemo(() => {
+    return consolidatedCoverageWithStaffing.reduce(
+      (acc, c) => {
+        if (c.isUnderstaffed) acc.understaffed += 1;
+        else if (c.isOverstaffed) acc.overstaffed += 1;
+        else acc.fullyStaffed += 1;
+        acc.total += 1;
+        return acc;
+      },
+      { understaffed: 0, fullyStaffed: 0, overstaffed: 0, total: 0 },
+    );
+  }, [consolidatedCoverageWithStaffing]);
+
   if (loading)
     return (
       <Box display="flex" justifyContent="center" mt={4}>
@@ -357,95 +537,34 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
   function getRoleColor(role) {
     switch (role) {
       case "doctor":
-        return "#1e88e5"; // blue
+        return "#1e88e5";
       case "nurse":
-        return "#66bb6a"; // green
+        return "#66bb6a";
       case "rn":
-        return "#26a69a"; // teal
+        return "#26a69a";
       case "lpn":
-        return "#ffb74d"; // amber
+        return "#ffb74d";
       case "cna":
-        return "#ffa726"; // orange
+        return "#ffa726";
       case "med_aide":
-        return "#ab47bc"; // purple
+        return "#ab47bc";
       case "caregiver":
-        return "#43a047"; // green
+        return "#43a047";
       case "activity_aide":
-        return "#26c6da"; // cyan
+        return "#26c6da";
       case "dietary_aide":
-        return "#fdd835"; // yellow
+        return "#fdd835";
       case "housekeeper":
-        return "#78909c"; // blue gray
+        return "#78909c";
       case "receptionist":
-        return "#ffb74d"; // orange
+        return "#ffb74d";
       case "billing":
-        return "#ab47bc"; // purple
+        return "#ab47bc";
       default:
-        return "#90a4ae"; // gray
+        return "#90a4ae";
     }
   }
 
-  // Today's coverage with assigned counts
-  const coverageWithStaffing = coverageNormalized
-    .filter((c) => c.dayKey === todayKey)
-    .sort((a, b) => a.startTime - b.startTime)
-    .map((c, idx) => {
-      const assignedCount = schedulesNormalized.filter((s) => {
-        const scheduleRole = s.staffRole || s.role;
-        return (
-          s.dayKey === c.dayKey &&
-          s.start.getTime() === new Date(c.startTime).getTime() &&
-          s.status !== "call_out" &&
-          scheduleRole === c.role
-        );
-      }).length;
-
-      const isUnderstaffed = assignedCount < c.requiredCount;
-      const isOverstaffed = assignedCount > c.requiredCount;
-
-      return {
-        id: c._id || `${c.dayKey}-${idx}`,
-        role: c.role,
-        shiftStart: c.startTime,
-        shiftEnd: c.endTime,
-        assignedCount,
-        requiredStaff: c.requiredCount,
-        isUnderstaffed,
-        isOverstaffed,
-      };
-    });
-
-  // Upcoming coverage (excluding today) - next 7 days
-  const upcomingCoverage = coverageNormalized
-    .filter((c) => c.dayKey > todayKey)
-    .sort((a, b) =>
-      a.dayKey === b.dayKey
-        ? a.startTime - b.startTime
-        : a.dayKey.localeCompare(b.dayKey),
-    )
-    .slice(0, 8)
-    .map((c, idx) => {
-      const assignedCount = schedulesNormalized.filter((s) => {
-        const scheduleRole = s.staffRole || s.role;
-        return (
-          s.dayKey === c.dayKey &&
-          s.start.getTime() === new Date(c.startTime).getTime() &&
-          s.status !== "call_out" &&
-          scheduleRole === c.role
-        );
-      }).length;
-      return {
-        id: c._id || `${c.dayKey}-up-${idx}`,
-        role: c.role,
-        dayKey: c.dayKey,
-        shiftStart: c.startTime,
-        shiftEnd: c.endTime,
-        assignedCount,
-        requiredStaff: c.requiredCount,
-      };
-    });
-
-  // For staff: find today's shift (schedulesNormalized already filtered by staff when fetched for non-admin)
   const todayShift = schedulesNormalized.find(
     (s) => s.dayKey === todayKey && s.status !== "call_out",
   );
@@ -502,29 +621,91 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
 
   return (
     <Box mt={4} px={{ xs: 2, md: 4 }}>
-      <Box
-        display="grid"
-        gridTemplateColumns={{ xs: "1fr", lg: "1fr 1fr" }}
-        gap={3}
-      >
-        {/* Today's Coverage Status (Admin) or Today's Shift (Staff) */}
-        {isAdmin ? (
-          <Paper sx={{ background: "white", borderRadius: 2 }} elevation={1}>
+      {isAdmin ? (
+        <Box
+          display="grid"
+          gridTemplateColumns={{ xs: "1fr", lg: "1fr 1fr" }}
+          gap={3}
+        >
+          <Paper sx={CARD_SX} elevation={1}>
             <Box p={2} borderBottom="1px solid rgba(0,0,0,0.08)">
-              <Typography variant="h6">Today's Coverage Status</Typography>
+              <Typography variant="h6">Coverage Overview</Typography>
               <Typography variant="body2" sx={{ color: "#666" }}>
-                Coverage vs Assigned Staff
+                Filter by date range and role, then review each coverage slot
               </Typography>
             </Box>
+
             <Box p={2}>
-              {coverageWithStaffing.length === 0 ? (
+              <Stack
+                direction={{ xs: "column", md: "row" }}
+                spacing={1.5}
+                sx={{ mb: 2 }}
+              >
+                <TextField
+                  size="small"
+                  label="Start Date"
+                  type="date"
+                  value={coverageStartDate}
+                  onChange={(e) => setCoverageStartDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                />
+                <TextField
+                  size="small"
+                  label="End Date"
+                  type="date"
+                  value={coverageEndDate}
+                  onChange={(e) => setCoverageEndDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                />
+                <FormControl size="small" fullWidth>
+                  <InputLabel id="coverage-role-filter-label">Role</InputLabel>
+                  <Select
+                    labelId="coverage-role-filter-label"
+                    value={selectedCoverageRole}
+                    label="Role"
+                    onChange={(e) => setSelectedCoverageRole(e.target.value)}
+                  >
+                    <MenuItem value="all">All Roles</MenuItem>
+                    {rolesWithCoverage.map((role) => (
+                      <MenuItem key={role} value={role}>
+                        {getRoleDisplayName(role)}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Stack>
+
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1.5}
+                sx={{ mb: 2, color: "#666" }}
+              >
+                <Typography variant="body2">
+                  Slots: {consolidatedCoverageSummary.total}
+                </Typography>
+                <Typography variant="body2">
+                  Understaffed: {consolidatedCoverageSummary.understaffed}
+                </Typography>
+                <Typography variant="body2">
+                  Fully staffed: {consolidatedCoverageSummary.fullyStaffed}
+                </Typography>
+                <Typography variant="body2">
+                  Overstaffed: {consolidatedCoverageSummary.overstaffed}
+                </Typography>
+              </Stack>
+
+              {consolidatedCoverageWithStaffing.length === 0 ? (
                 <Box textAlign="center" py={6} sx={{ color: "#9e9e9e" }}>
-                  <FiCalendar size={48} className="opacity-50" />
-                  <Typography>No coverage requirements for today</Typography>
+                  <FiCalendar size={48} />
+                  <Typography>
+                    No coverage requirements in this range
+                  </Typography>
                 </Box>
               ) : (
                 <Box display="flex" flexDirection="column" gap={2}>
-                  {coverageWithStaffing.map((cov) => (
+                  {consolidatedCoverageWithStaffing.map((cov) => (
                     <Box
                       key={cov.id}
                       sx={{
@@ -553,6 +734,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                           alignItems="center"
                           gap={1}
                           mb={0.5}
+                          flexWrap="wrap"
                         >
                           <Box
                             sx={{
@@ -564,6 +746,10 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                           />
                           <Typography variant="subtitle1">
                             {getRoleDisplayName(cov.role)}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: "#666" }}>
+                            {formatDate(cov.dayKey)}
+                            {/* {getRelativeDateString(cov.dayKey)} */}
                           </Typography>
                         </Box>
                         <Typography variant="body2" sx={{ color: "#666" }}>
@@ -592,9 +778,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                         </Box>
                         <Typography variant="caption" sx={{ color: "#666" }}>
                           {cov.isUnderstaffed
-                            ? `Need ${
-                                cov.requiredStaff - cov.assignedCount
-                              } more`
+                            ? `Need ${cov.requiredStaff - cov.assignedCount} more`
                             : cov.isOverstaffed
                               ? `${cov.assignedCount - cov.requiredStaff} extra`
                               : "Fully staffed"}
@@ -606,11 +790,137 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
               )}
             </Box>
           </Paper>
-        ) : (
-          <Paper
-            sx={{ background: "white", borderRadius: 2, p: 3 }}
-            elevation={1}
-          >
+
+          <Paper sx={CARD_SX} elevation={1}>
+            <Box p={2} borderBottom="1px solid rgba(0,0,0,0.08)">
+              <Typography variant="h6">Weekly Overtime Tracker</Typography>
+              <Typography variant="body2" sx={{ color: "#666" }}>
+                Hours scheduled this week ({weekRangeLabel})
+              </Typography>
+            </Box>
+
+            <Box p={2}>
+              <Box mb={2}>
+                <FormControl size="small" sx={{ minWidth: 180 }}>
+                  <InputLabel id="overtime-role-filter-label">
+                    Overtime Role
+                  </InputLabel>
+                  <Select
+                    labelId="overtime-role-filter-label"
+                    value={selectedOvertimeRole}
+                    label="Overtime Role"
+                    onChange={(e) => setSelectedOvertimeRole(e.target.value)}
+                  >
+                    <MenuItem value="all">All Roles</MenuItem>
+                    {rolesWithCoverage.map((role) => (
+                      <MenuItem key={role} value={role}>
+                        {getRoleDisplayName(role)}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+
+              {filteredWeeklyOvertimeData.length === 0 ? (
+                <Box textAlign="center" py={6} sx={{ color: "#9e9e9e" }}>
+                  <FiCalendar size={48} />
+                  <Typography>No matching staff for this filter</Typography>
+                </Box>
+              ) : (
+                <>
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={1.5}
+                    sx={{ mb: 2, color: "#666" }}
+                  >
+                    <Typography variant="body2">
+                      Staff tracked: {filteredWeeklyOvertimeData.length}
+                    </Typography>
+                    <Typography variant="body2">
+                      Near overtime (36–39.9h): {overtimeSummary.nearCount}
+                    </Typography>
+                    <Typography variant="body2">
+                      Overtime (40h+): {overtimeSummary.overtimeCount}
+                    </Typography>
+                  </Stack>
+
+                  <Box
+                    display="grid"
+                    gridTemplateColumns={{ xs: "1fr", sm: "1fr 1fr" }}
+                    gap={1.5}
+                  >
+                    {filteredWeeklyOvertimeData.map((row) => {
+                      const cardBg = row.isOvertime
+                        ? "#ffebee"
+                        : row.isNearOvertime
+                          ? "#fff8e1"
+                          : "#e8f5e9";
+                      const accent = row.isOvertime
+                        ? "#f44336"
+                        : row.isNearOvertime
+                          ? "#f9a825"
+                          : "#66bb6a";
+                      const statusLabel = row.isOvertime
+                        ? "Overtime"
+                        : row.isNearOvertime
+                          ? "Near 40h"
+                          : "Within target";
+
+                      return (
+                        <Box
+                          key={row.staffId}
+                          sx={{
+                            p: 1.5,
+                            borderRadius: 1,
+                            backgroundColor: cardBg,
+                            borderLeft: `4px solid ${accent}`,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 0.75,
+                          }}
+                        >
+                          <Typography
+                            variant="subtitle2"
+                            sx={{ lineHeight: 1.3 }}
+                          >
+                            {row.staffName}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: "#666" }}>
+                            {row.roleLabel}
+                          </Typography>
+
+                          <Box
+                            display="flex"
+                            justifyContent="space-between"
+                            alignItems="center"
+                            mt={0.5}
+                          >
+                            <Typography sx={{ fontWeight: 700 }}>
+                              {row.hours}h
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              sx={{ color: accent }}
+                            >
+                              {statusLabel}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </>
+              )}
+            </Box>
+          </Paper>
+        </Box>
+      ) : (
+        <Box
+          display="grid"
+          gridTemplateColumns={{ xs: "1fr", lg: "1fr 1fr" }}
+          gap={3}
+        >
+          <Paper sx={{ ...CARD_SX, p: 3 }} elevation={1}>
             <Typography variant="h6" mb={2}>
               Today's Shift
             </Typography>
@@ -688,64 +998,8 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
               </Box>
             )}
           </Paper>
-        )}
 
-        {/* Upcoming Coverage (Admin) or Upcoming Shifts (Staff) */}
-        {isAdmin ? (
-          <Paper sx={{ background: "white", borderRadius: 2 }} elevation={1}>
-            <Box p={2} borderBottom="1px solid rgba(0,0,0,0.08)">
-              <Typography variant="h6">Upcoming Coverage</Typography>
-              <Typography variant="body2" sx={{ color: "#666" }}>
-                Next coverage windows
-              </Typography>
-            </Box>
-            <Box p={2}>
-              {upcomingCoverage.length === 0 ? (
-                <Box textAlign="center" py={6} sx={{ color: "#9e9e9e" }}>
-                  <FiCalendar size={48} />
-                  <Typography>No upcoming coverage</Typography>
-                </Box>
-              ) : (
-                <Box display="flex" flexDirection="column" gap={2}>
-                  {upcomingCoverage.map((cov) => (
-                    <Box
-                      key={cov.id}
-                      sx={{ p: 2, borderRadius: 1, backgroundColor: "#fafafa" }}
-                    >
-                      <Box
-                        display="flex"
-                        justifyContent="space-between"
-                        alignItems="center"
-                      >
-                        <Box>
-                          <Typography variant="subtitle1">
-                            {getRoleDisplayName(cov.role)}
-                          </Typography>
-                          <Typography variant="body2" sx={{ color: "#666" }}>
-                            {formatDate(cov.dayKey)} •{" "}
-                            {formatTime(cov.shiftStart)} -{" "}
-                            {formatTime(cov.shiftEnd)}
-                          </Typography>
-                        </Box>
-                        <Box textAlign="right">
-                          <Typography sx={{ fontWeight: 700 }}>
-                            {cov.assignedCount} / {cov.requiredStaff}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: "#666" }}>
-                            {cov.assignedCount >= cov.requiredStaff
-                              ? "OK"
-                              : `Need ${cov.requiredStaff - cov.assignedCount}`}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </Box>
-                  ))}
-                </Box>
-              )}
-            </Box>
-          </Paper>
-        ) : (
-          <Paper sx={{ background: "white", borderRadius: 2 }} elevation={1}>
+          <Paper sx={CARD_SX} elevation={1}>
             <Box p={2} borderBottom="1px solid rgba(0,0,0,0.08)">
               <Box
                 display="flex"
@@ -817,8 +1071,8 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
               )}
             </Box>
           </Paper>
-        )}
-      </Box>
+        </Box>
+      )}
     </Box>
   );
 }

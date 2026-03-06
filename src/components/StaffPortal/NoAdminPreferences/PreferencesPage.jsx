@@ -432,6 +432,153 @@ export default function PreferencesPage() {
             boxShadow: 1,
           }}
         >
+          <Typography variant="h6" mb={1.75} sx={{ fontWeight: 700 }}>
+            Notification Preferences
+          </Typography>
+          <Stack spacing={2}>
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                bgcolor: "grey.50",
+                border: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <FormControlLabel
+                sx={{ m: 0, width: "100%" }}
+                control={
+                  <Switch
+                    checked={prefs.scheduleEmailNotificationsEnabled ?? true}
+                    onChange={(e) =>
+                      handleChange(
+                        "scheduleEmailNotificationsEnabled",
+                        e.target.checked,
+                      )
+                    }
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography>Schedule Email Notifications</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Receive email alerts for schedule updates
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Box>
+
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                bgcolor: "grey.50",
+                border: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <FormControlLabel
+                sx={{ m: 0, width: "100%" }}
+                control={
+                  <Switch
+                    checked={prefs.scheduleSmsNotificationsEnabled ?? true}
+                    onChange={(e) =>
+                      handleChange(
+                        "scheduleSmsNotificationsEnabled",
+                        e.target.checked,
+                      )
+                    }
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography>Schedule SMS Notifications</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Receive text alerts for schedule updates
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Box>
+
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                bgcolor: "grey.50",
+                border: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <FormControlLabel
+                sx={{ m: 0, width: "100%" }}
+                control={
+                  <Switch
+                    checked={prefs.timeOffEmailNotificationsEnabled ?? true}
+                    onChange={(e) =>
+                      handleChange(
+                        "timeOffEmailNotificationsEnabled",
+                        e.target.checked,
+                      )
+                    }
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography>Time-Off Email Notifications</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Receive email alerts for time-off decisions
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Box>
+
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                bgcolor: "grey.50",
+                border: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <FormControlLabel
+                sx={{ m: 0, width: "100%" }}
+                control={
+                  <Switch
+                    checked={prefs.timeOffSmsNotificationsEnabled ?? true}
+                    onChange={(e) =>
+                      handleChange(
+                        "timeOffSmsNotificationsEnabled",
+                        e.target.checked,
+                      )
+                    }
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography>Time-Off SMS Notifications</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Receive text alerts for time-off decisions
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Box>
+          </Stack>
+        </Paper>
+
+        <Paper
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "divider",
+            boxShadow: 1,
+          }}
+        >
           <Typography variant="h6" mb={1.5} sx={{ fontWeight: 700 }}>
             Additional Notes
           </Typography>

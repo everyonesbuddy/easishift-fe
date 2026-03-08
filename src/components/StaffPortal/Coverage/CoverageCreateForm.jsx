@@ -8,20 +8,20 @@ import {
   Alert,
   Paper,
   Stack,
+  Chip,
   IconButton,
   Divider,
   InputAdornment,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import {
-  MdAdd,
-  MdDelete,
-  MdAccessTime,
-  MdGroups2,
-  MdEvent,
-} from "react-icons/md";
+import { MdAdd, MdDelete, MdAccessTime, MdGroups2 } from "react-icons/md";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
+import dayjs from "dayjs";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { DateCalendar } from "@mui/x-date-pickers/DateCalendar";
+import { PickersDay } from "@mui/x-date-pickers/PickersDay";
 
 const roles = [
   "doctor",
@@ -63,8 +63,27 @@ function toUTC(dateStr, timeStr) {
   return new Date(local.toISOString()); // guaranteed UTC
 }
 
+function MultiSelectDay(props) {
+  const { day, selectedDates = [], ...other } = props;
+  const dayKey = day.format("YYYY-MM-DD");
+  const isSelected = selectedDates.includes(dayKey);
+
+  return (
+    <PickersDay
+      {...other}
+      day={day}
+      selected={isSelected}
+      sx={{
+        ...(isSelected ? { fontWeight: 700 } : {}),
+      }}
+    />
+  );
+}
+
 export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const today = new Date().toISOString().slice(0, 10);
+  const [calendarDate, setCalendarDate] = useState(dayjs(`${today}T00:00:00`));
+  const [dates, setDates] = useState([today]);
   const [requirements, setRequirements] = useState([
     {
       role: "",
@@ -80,16 +99,36 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const handleCalendarDateToggle = (pickedDate) => {
+    if (!pickedDate) return;
+
+    const pickedDay = pickedDate.format("YYYY-MM-DD");
+    setCalendarDate(pickedDate);
+    setDates((prev) => {
+      const next = prev.includes(pickedDay)
+        ? prev.filter((d) => d !== pickedDay)
+        : [...prev, pickedDay];
+
+      next.sort((a, b) => a.localeCompare(b));
+      setError("");
+      return next;
+    });
+  };
+
+  const handleRemoveDate = (dateToRemove) => {
+    setDates((prev) => prev.filter((d) => d !== dateToRemove));
+  };
+
   const handleSubmit = async (e, autoGenerate = false) => {
     if (e) e.preventDefault();
 
-    if (!date || requirements.length === 0) {
-      setError("Please select a date and at least one coverage requirement.");
-      toast.error(
-        "Please select a date and at least one coverage requirement.",
-      );
+    if (!dates.length || requirements.length === 0) {
+      setError("Please add at least one date and one coverage requirement.");
+      toast.error("Please add at least one date and one coverage requirement.");
       return;
     }
+
+    const referenceDate = dates[0];
 
     for (let index = 0; index < requirements.length; index += 1) {
       const req = requirements[index];
@@ -100,8 +139,8 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
         return;
       }
 
-      const startUTC = toUTC(date, req.startTime);
-      const endUTC = toUTC(date, req.endTime);
+      const startUTC = toUTC(referenceDate, req.startTime);
+      const endUTC = toUTC(referenceDate, req.endTime);
 
       if (startUTC >= endUTC) {
         const msg = `Requirement ${index + 1} must have end time after start time.`;
@@ -117,29 +156,35 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
     setSuccess("");
 
     try {
-      const shifts = requirements.map((req) => ({
-        role: req.role,
-        requiredCount: Number(req.requiredCount) || 0,
-        startTime: toUTC(date, req.startTime),
-        endTime: toUTC(date, req.endTime),
-        note,
-      }));
+      const allCreated = [];
 
-      const createRes = await api.post("/coverage", {
-        tenantId,
-        dates: [date],
-        shifts,
-      });
+      for (const selectedDate of dates) {
+        const shifts = requirements.map((req) => ({
+          role: req.role,
+          requiredCount: Number(req.requiredCount) || 0,
+          startTime: toUTC(selectedDate, req.startTime),
+          endTime: toUTC(selectedDate, req.endTime),
+          note,
+        }));
 
-      let generatedCount = 0;
-      if (autoGenerate) {
-        const created = Array.isArray(createRes.data)
+        const createRes = await api.post("/coverage", {
+          tenantId,
+          dates: [selectedDate],
+          shifts,
+        });
+
+        const createdForDate = Array.isArray(createRes.data)
           ? createRes.data
           : Array.isArray(createRes.data?.created)
             ? createRes.data.created
             : [];
 
-        const coverageIds = created.map((item) => item?._id).filter(Boolean);
+        allCreated.push(...createdForDate);
+      }
+
+      let generatedCount = 0;
+      if (autoGenerate) {
+        const coverageIds = allCreated.map((item) => item?._id).filter(Boolean);
 
         if (coverageIds.length > 0) {
           const autoRes = await api.post("/schedules/auto-generate", {
@@ -163,6 +208,8 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
           endTime: "17:00",
         },
       ]);
+      setCalendarDate(dayjs(`${today}T00:00:00`));
+      setDates([today]);
       setNote("");
 
       if (onSuccess) onSuccess();
@@ -205,7 +252,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
       component="form"
       onSubmit={handleSubmit}
       sx={{
-        p: { xs: 2, sm: 3 },
+        p: { xs: 1.5, sm: 3 },
         borderRadius: 4,
         border: "1px solid",
         borderColor: "divider",
@@ -223,7 +270,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
           <CloseIcon />
         </IconButton>
       )}
-      <Box sx={{ mb: 2.5, pr: onClose ? 5 : 0 }}>
+      <Box sx={{ mb: { xs: 2, sm: 2.5 }, pr: onClose ? 5 : 0 }}>
         <Typography variant="h6" sx={{ fontWeight: 700 }}>
           Add Coverage Requirements
         </Typography>
@@ -232,34 +279,122 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
         </Typography>
       </Box>
 
-      <Stack spacing={2}>
+      <Stack spacing={{ xs: 1.5, sm: 2 }}>
         {error && <Alert severity="error">{error}</Alert>}
         {success && <Alert severity="success">{success}</Alert>}
 
-        <TextField
-          label="Date"
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-          helperText="Select the day for these coverage requirements"
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <MdEvent size={18} />
-              </InputAdornment>
-            ),
+        <Box
+          sx={{
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 2.5,
+            p: { xs: 1, sm: 1.5 },
+            backgroundColor: "background.default",
           }}
-          required
-        />
+        >
+          <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>
+            Coverage Dates
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Click dates on the calendar to select or unselect multiple days.
+          </Typography>
+
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <DateCalendar
+              value={calendarDate}
+              onChange={handleCalendarDateToggle}
+              sx={{
+                mt: 1,
+                width: "100%",
+                maxWidth: { xs: 320, sm: 360 },
+                mx: "auto",
+                "& .MuiPickersCalendarHeader-root": {
+                  pl: { xs: 0.5, sm: 1 },
+                  pr: { xs: 0.5, sm: 1 },
+                },
+                "& .MuiDayCalendar-header": {
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, 1fr)",
+                },
+                "& .MuiDayCalendar-weekDayLabel": {
+                  justifySelf: "center",
+                  mx: 0,
+                },
+                "& .MuiDayCalendar-weekContainer": {
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, 1fr)",
+                },
+                "& .MuiPickersDay-root": {
+                  width: { xs: 34, sm: 36 },
+                  height: { xs: 34, sm: 36 },
+                  fontSize: { xs: "0.82rem", sm: "0.875rem" },
+                  justifySelf: "center",
+                  mx: 0,
+                },
+              }}
+              slots={{ day: MultiSelectDay }}
+              slotProps={{
+                day: {
+                  selectedDates: dates,
+                },
+              }}
+            />
+          </LocalizationProvider>
+        </Box>
+
+        <Box>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            spacing={1}
+          >
+            <Typography variant="caption" color="text.secondary">
+              Selected dates: {dates.length}
+            </Typography>
+            {dates.length > 0 && (
+              <Button
+                type="button"
+                size="small"
+                onClick={() => setDates([])}
+                sx={{ textTransform: "none", minWidth: "unset", px: 1 }}
+              >
+                Clear all
+              </Button>
+            )}
+          </Stack>
+          <Box
+            sx={{
+              mt: 1,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 1,
+              maxHeight: { xs: 96, sm: "none" },
+              overflowY: { xs: "auto", sm: "visible" },
+              pr: { xs: 0.5, sm: 0 },
+            }}
+          >
+            {dates.map((d) => (
+              <Chip
+                key={d}
+                label={new Date(`${d}T00:00:00`).toLocaleDateString()}
+                onDelete={() => handleRemoveDate(d)}
+                color="primary"
+                variant="outlined"
+                size="small"
+              />
+            ))}
+          </Box>
+        </Box>
 
         <Box
           sx={{
             display: "flex",
-            alignItems: "center",
+            alignItems: { xs: "stretch", sm: "center" },
             justifyContent: "space-between",
             gap: 1,
             mt: 1,
+            flexDirection: { xs: "column", sm: "row" },
           }}
         >
           <Box>
@@ -276,7 +411,11 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
             variant="outlined"
             onClick={handleAddRequirement}
             startIcon={<MdAdd size={18} />}
-            sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+            sx={{
+              textTransform: "none",
+              whiteSpace: "nowrap",
+              width: { xs: "100%", sm: "auto" },
+            }}
           >
             Add Requirement
           </Button>
@@ -288,7 +427,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
               key={`req-${index}`}
               variant="outlined"
               sx={{
-                p: 2,
+                p: { xs: 1.5, sm: 2 },
                 borderRadius: 2.5,
                 borderColor: "divider",
                 backgroundColor: "background.default",

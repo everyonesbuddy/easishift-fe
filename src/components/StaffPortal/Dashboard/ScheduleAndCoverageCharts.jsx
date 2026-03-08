@@ -116,6 +116,14 @@ const CARD_SX = {
   background: "white",
   borderRadius: 2,
   maxHeight: CARD_MAX_HEIGHT,
+  display: "flex",
+  flexDirection: "column",
+  overflow: "hidden",
+};
+
+const CARD_INNER_SCROLL_SX = {
+  flex: 1,
+  minHeight: 0,
   overflowY: "auto",
   ...CARD_SCROLL_SX,
 };
@@ -635,12 +643,17 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
               </Typography>
             </Box>
 
-            <Box p={2}>
-              <Stack
-                direction={{ xs: "column", md: "row" }}
-                spacing={1.5}
-                sx={{ mb: 2 }}
-              >
+            <Box
+              p={2}
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                flex: 1,
+                minHeight: 0,
+              }}
+            >
+              <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
                 <TextField
                   size="small"
                   label="Start Date"
@@ -680,7 +693,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
               <Stack
                 direction={{ xs: "column", sm: "row" }}
                 spacing={1.5}
-                sx={{ mb: 2, color: "#666" }}
+                sx={{ color: "#666" }}
               >
                 <Typography variant="body2">
                   Slots: {consolidatedCoverageSummary.total}
@@ -704,7 +717,12 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                   </Typography>
                 </Box>
               ) : (
-                <Box display="flex" flexDirection="column" gap={2}>
+                <Box
+                  sx={{ ...CARD_INNER_SCROLL_SX, pr: 0.5 }}
+                  display="flex"
+                  flexDirection="column"
+                  gap={2}
+                >
                   {consolidatedCoverageWithStaffing.map((cov) => (
                     <Box
                       key={cov.id}
@@ -799,8 +817,17 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
               </Typography>
             </Box>
 
-            <Box p={2}>
-              <Box mb={2}>
+            <Box
+              p={2}
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                flex: 1,
+                minHeight: 0,
+              }}
+            >
+              <Box>
                 <FormControl size="small" sx={{ minWidth: 180 }}>
                   <InputLabel id="overtime-role-filter-label">
                     Overtime Role
@@ -831,7 +858,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                   <Stack
                     direction={{ xs: "column", sm: "row" }}
                     spacing={1.5}
-                    sx={{ mb: 2, color: "#666" }}
+                    sx={{ color: "#666" }}
                   >
                     <Typography variant="body2">
                       Staff tracked: {filteredWeeklyOvertimeData.length}
@@ -845,6 +872,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                   </Stack>
 
                   <Box
+                    sx={{ ...CARD_INNER_SCROLL_SX, pr: 0.5 }}
                     display="grid"
                     gridTemplateColumns={{ xs: "1fr", sm: "1fr 1fr" }}
                     gap={1.5}

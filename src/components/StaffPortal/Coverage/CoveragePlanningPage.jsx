@@ -94,6 +94,53 @@ export default function CoveragePlanningPage() {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [error, setError] = useState("");
 
+  const getCoverageDayKey = (coverageDate) => {
+    if (!coverageDate) return "";
+
+    if (typeof coverageDate === "string") {
+      const match = coverageDate.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (match?.[1]) return match[1];
+    }
+
+    const d = new Date(coverageDate);
+    if (Number.isNaN(d.getTime())) return "";
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const parseCoverageDateAsLocal = (coverageDate) => {
+    const dayKey = getCoverageDayKey(coverageDate);
+    if (!dayKey) return null;
+    return new Date(`${dayKey}T00:00:00`);
+  };
+
+  const buildEventDateTime = (coverageDate, shiftTime) => {
+    if (!coverageDate || !shiftTime) return shiftTime;
+
+    const datePart = parseCoverageDateAsLocal(coverageDate);
+    const timePart = new Date(shiftTime);
+
+    if (
+      !datePart ||
+      Number.isNaN(timePart.getTime())
+    ) {
+      return shiftTime;
+    }
+
+    const merged = new Date(datePart);
+    merged.setHours(
+      timePart.getHours(),
+      timePart.getMinutes(),
+      timePart.getSeconds(),
+      timePart.getMilliseconds(),
+    );
+
+    return merged.toISOString();
+  };
+
   useEffect(() => {
     fetchCoverages();
   }, []);
@@ -142,8 +189,8 @@ export default function CoveragePlanningPage() {
       .map((c) => ({
         id: c._id,
         title: `${ROLE_LABELS[c.role] || c.role} (${c.requiredCount || 1})`,
-        start: c.startTime,
-        end: c.endTime,
+        start: buildEventDateTime(c.date, c.startTime),
+        end: buildEventDateTime(c.date, c.endTime),
         backgroundColor:
           statusColors[
             c.remaining > 0
@@ -161,10 +208,10 @@ export default function CoveragePlanningPage() {
               : "filled"
           ] || "#6b7280",
         textColor: "#fff",
-        // use startTime as the canonical date for display (keeps date aligned with local shift start)
+        // use coverage date as canonical display day
         extendedProps: {
           note: c.note,
-          date: c.startTime || c.date,
+          date: c.date || c.startTime,
           remaining: c.remaining,
         },
       }));
@@ -185,9 +232,9 @@ export default function CoveragePlanningPage() {
       (c) => selectedRole === "all" || c.role === selectedRole,
     );
     return filtered.sort((a, b) => {
-      const da = new Date(a.date).getTime();
-      const db = new Date(b.date).getTime();
-      if (db !== da) return db - da; // most recent first
+      const da = getCoverageDayKey(a.date);
+      const db = getCoverageDayKey(b.date);
+      if (db !== da) return db.localeCompare(da); // most recent first
       // fallback: compare startTime
       return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
     });
@@ -369,7 +416,7 @@ export default function CoveragePlanningPage() {
                       {ROLE_LABELS[c.role] || c.role}
                     </Typography>
                     <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                      {toLocal(c.startTime || c.date)?.toLocaleDateString()} •{" "}
+                      {parseCoverageDateAsLocal(c.date || c.startTime)?.toLocaleDateString()} •{" "}
                       {toLocal(c.startTime)?.toLocaleTimeString([], {
                         hour: "numeric",
                         minute: "2-digit",
@@ -475,7 +522,9 @@ export default function CoveragePlanningPage() {
                       sx={{ "&:hover": { background: "#f3f4f6" } }}
                     >
                       <TableCell>
-                        {toLocal(c.startTime || c.date)?.toLocaleDateString()}
+                        {parseCoverageDateAsLocal(
+                          c.date || c.startTime,
+                        )?.toLocaleDateString()}
                       </TableCell>
                       <TableCell>{ROLE_LABELS[c.role] || c.role}</TableCell>
                       <TableCell>{`${toLocal(c.startTime)?.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} - ${toLocal(c.endTime)?.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}</TableCell>

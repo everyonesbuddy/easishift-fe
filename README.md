@@ -1,224 +1,230 @@
-🏥 Hospital App — Front-End README
-Table of Contents
+# Easishift Front-End (Staff Scheduling)
 
-Project Overview
+This repository contains the front-end for **Easishift**, a multi-tenant workforce scheduling platform for senior care facilities.
 
-Folder Structure
+It is now focused on:
 
-Routing & Pages
+- Staff scheduling and calendar planning
+- Coverage planning by role and shift demand
+- Time-off request and approval workflows
+- Internal team messaging
+- Subscription/paywall + seat-based tenant access
 
-Components
+---
 
-Staff/Admin Portal
+## Tech Stack
 
-Patient Portal
+- **React 19 + Vite**
+- **Material UI (MUI)** for UI primitives/layout
+- **React Router** for app routing
+- **Axios** for API integration
+- **FullCalendar** for schedule/coverage calendar views
+- **React Toastify** for notifications
 
-Context & State Management
+---
 
-Styling & Layout
+## Product Direction (Current)
 
-API Integration
+Easishift is a **staff/admin portal** (no patient portal in current FE scope).
 
-User Flows
+### Core capabilities
 
-Staff/Admin Flow
+1. **Authentication + tenant onboarding**
+   - Staff login
+   - Tenant (facility) signup
+   - Forgot/reset password flow
 
-Patient Flow
-
-Getting Started
-
-1. Project Overview
-
-This front-end is built with React and Material-UI (MUI) for styling. It supports:
-
-Multi-tenant architecture: Each hospital is a separate tenant.
-
-Staff/Admin portal: Manage patients, appointments, messages, and forms.
-
-Patient portal: View assigned appointments, messages, and complete forms.
-
-Authentication & authorization: Role-based access for staff/admin/patient.
-
-Global state: Managed using AuthContext for authentication and tenant info.
-
-2. Folder Structure
-   src/
-   ├── App.js
-   ├── index.js
-   ├── index.css
-   ├── context/
-   │ └── AuthContext.jsx # Global state for auth & user info
-   ├── components/
-   │ ├── Home/
-   │ │ └── Home.jsx # Landing page
-   │ ├── Auth/
-   │ │ ├── Login.jsx # Staff login
-   │ │ ├── SignupTenant.jsx # New hospital signup
-   │ │ └── PatientLogin.jsx # Patient portal login
-   │ ├── StaffPortal/
-   │ │ ├── Dashboard/
-   │ │ │ └── DashboardHome.jsx # Staff/Admin central hub
-   │ │ ├── Patients/
-   │ │ │ ├── PatientForm.jsx
-   │ │ │ ├── PatientList.jsx
-   │ │ │ └── PatientDetails.jsx
-   │ │ ├── Appointments/
-   │ │ │ ├── AppointmentForm.jsx
-   │ │ │ └── AppointmentList.jsx
-   │ │ └── Messages/
-   │ │ ├── MessageList.jsx
-   │ │ └── MessageComposer.jsx
-   │ ├── PatientPortal/
-   │ │ ├── PatientDashboard.jsx
-   │ │ ├── PatientForms.jsx
-   │ │ ├── FollowUpForm.jsx
-   │ │ └── MessageList.jsx
-   │ └── Shared/
-   │ ├── ProtectedRoute.jsx # Route guard
-   │ └── Loader.jsx # Loading indicator
-   ├── utils/ # Helper functions (e.g., date formatting)
-   └── App.css
-
-3. Routing & Pages
-
-Landing / Home → /
-
-Staff Login → /login
-
-Hospital Signup → /signup-tenant
-
-Dashboard (Staff/Admin) → /dashboard
-
-Patients Management → /patients
-
-Appointments Management → /appointments
-
-Messages / Follow-ups → /messages
-
-Patient Login → /patient-login
-
-Patient Portal → /patient-portal
-
-/patient-portal/forms
-
-/patient-portal/follow-ups
-
-/patient-portal/messages
-
-4. Components
-   Staff/Admin Portal
-   Component Purpose
-   DashboardHome.jsx Central hub with summary cards for Patients, Appointments, Messages
-   PatientForm.jsx Add a new patient
-   PatientList.jsx List all patients
-   PatientDetails.jsx View patient details
-   AppointmentForm.jsx Schedule an appointment
-   AppointmentList.jsx View all appointments
-   MessageList.jsx View messages sent by staff
-   MessageComposer.jsx Compose new message to patient
-   Patient Portal
-   Component Purpose
-   PatientDashboard.jsx Overview of appointments, messages, forms
-   PatientForms.jsx Fill pre-visit forms assigned by staff
-   FollowUpForm.jsx Add additional info requested by staff
-   MessageList.jsx View messages sent by hospital staff
-   Shared
-   Component Purpose
-   ProtectedRoute.jsx Guards routes, ensuring proper auth + role
-   Loader.jsx Shows loading spinner for async data
-5. Context & State Management
-
-AuthContext.jsx stores:
-
-Logged-in user info (id, role, tenantId)
-
-Functions: login(), logout()
-
-Purpose:
-
-Enables role-based rendering and access control
-
-Makes JWT/token available for API calls
-
-6. Styling & Layout
-
-Material-UI (MUI) is used for forms, buttons, cards, grids.
-
-Containers wrap pages to provide responsive padding.
-
-Local centering via Box and flex — global body no longer forces centering.
-
-Base styles in index.css and App.css.
-
-Each page/component handles its own layout using MUI Grid/Box.
-
-7. API Integration
-
-Login/Signup: POST to /api/v1/auth/...
-
-Tenant creation: POST /api/v1/tenants
-
-Patients: CRUD via /api/v1/patients
-
-Appointments: CRUD via /api/v1/appointments
-
-Forms & Follow-ups: /api/v1/forms
-
-Messages: /api/v1/messages
-
-Note: API calls include JWT from AuthContext for authentication.
-
-8. User Flows
-   Staff/Admin Flow
-
-Visit landing page → /
-
-Staff login /login → AuthContext stores user
-
-Redirect to /dashboard → view summary
-
-Navigate to:
-
-Patients → add/list/view patients
-
-Appointments → schedule/list appointments
-
-Messages → send notifications to patients
-
-Patient Flow
-
-Receives portal credentials from staff
-
-Login at /patient-login → AuthContext stores patient info
-
-Access /patient-portal → dashboard shows:
-
-Appointments (read-only)
-
-Messages from staff
-
-Forms/follow-ups → submit additional info
-
-Data submission saved under patient + tenant ID → secure multi-tenant data isolation
-
-9. Getting Started
-
-Install dependencies
-
+2. **Dashboard + operational visibility**
+   - Role-aware summary cards (admin vs staff)
+   - Quick actions (add staff, create coverage, create schedule, message)
+   - Schedule and coverage charts
+
+3. **Coverage planning**
+   - Define required role count by shift
+   - View in list or calendar mode
+   - Admin create/edit/delete
+
+4. **Staff scheduling**
+   - Create and manage individual schedules
+   - AI-generated/bulk scheduling (admin)
+   - Role/status filtering + list/calendar views
+
+5. **Team management**
+   - Staff directory with search/filter
+   - Admin create/edit/delete staff members
+
+6. **Time-off workflows**
+   - Staff submit and track requests
+   - Admin review/approve/deny with notes
+
+7. **Internal messaging**
+   - Inbox + sent views
+   - Read-state updates, reply support, compose flow
+
+8. **Preferences (non-admin staff)**
+   - Availability and day preferences
+   - Shift time preferences and related constraints
+
+9. **Subscription and billing**
+   - Tenant plan selection and upgrades
+   - Stripe checkout session flow
+   - Admin paywall if subscription is inactive/limited
+
+---
+
+## Routing (Current)
+
+### Public routes
+
+- `/` → Landing page
+- `/login` → Staff login
+- `/signup-tenant` → Tenant/facility signup
+- `/reset-password` → Password reset
+- `/billing` → Manage subscription
+- `/billing/success` → Stripe success callback
+- `/billing/cancel` → Stripe cancel callback
+
+### Protected routes (requires authenticated user)
+
+- `/dashboard` → Staff dashboard
+- `/coverage-planning` → Coverage planning
+- `/schedule` → Staff scheduling
+- `/staffs` → Staff management
+- `/timeoff-decisions` → Admin time-off approvals
+- `/timeoff-requests` → Staff time-off requests
+- `/messages` → Internal messages
+- `/preferences` → Staff preferences
+
+### Billing-only mode
+
+If an admin tenant is inactive or seat-limited, app routing is restricted to paywall/billing flow until subscription is resolved.
+
+---
+
+## Role Behavior (High Level)
+
+- **Admin users**
+  - Access staff management, coverage planning, approvals, billing
+  - Can create/edit/delete coverage, schedules, staff records
+- **Staff users**
+  - Access own schedule, messages, time-off requests, preferences
+  - Limited access to admin-only management actions
+
+Role/tenant state is managed centrally in `AuthContext`.
+
+---
+
+## Project Structure
+
+```text
+src/
+├── App.jsx
+├── main.jsx
+├── index.css
+├── App.css
+├── config/
+│   └── api.js
+├── context/
+│   └── AuthContext.jsx
+└── components/
+    ├── Auth/
+    │   ├── Login.jsx
+    │   ├── SignupTenant.jsx
+    │   ├── ForgotPasswordModal.jsx
+    │   ├── ResetPassword.jsx
+    │   └── ChangePasswordModal.jsx
+    ├── Home/
+    │   └── Home.jsx
+    ├── Shared/
+    │   ├── Navbar.jsx
+    │   ├── Sidebar.jsx
+    │   ├── PrivateRoute.jsx
+    │   └── ConfirmDialog.jsx
+    └── StaffPortal/
+        ├── Dashboard/
+        ├── Coverage/
+        ├── Schedule/
+        ├── Staffs/
+        ├── TimeOff/
+        ├── Messages/
+        ├── NoAdminPreferences/
+        └── Billing/
+```
+
+---
+
+## API Integration Notes
+
+- Axios client is defined in `src/config/api.js` with base path `.../api/v1`.
+- Runtime backend selection currently uses hostname detection:
+  - localhost → local backend
+  - non-localhost → production backend
+- Auth token is persisted in `localStorage` and attached as `Authorization: Bearer <token>`.
+- Tenant data is loaded and refreshed via `AuthContext`.
+
+---
+
+## Local Development
+
+### Prerequisites
+
+- Node.js 18+ (recommended)
+- npm
+
+### Install
+
+```bash
 npm install
+```
 
-Run development server
+### Run development server
 
+```bash
 npm run dev
+```
 
-Environment Variables
+### Build production bundle
 
-Backend URL (REACT_APP_API_URL) if needed
+```bash
+npm run build
+```
 
-JWT storage handled in cookies/localStorage (via AuthContext)
+### Preview production build
 
-Folder conventions
+```bash
+npm run preview
+```
 
-Place new components inside StaffPortal or PatientPortal
+### Lint
 
-Shared components (buttons, loaders, protected routes) go in /Shared
+```bash
+npm run lint
+```
+
+---
+
+## Main User Flows
+
+### Admin flow
+
+1. Sign up tenant or log in
+2. Land on dashboard and review staffing health
+3. Configure coverage requirements
+4. Build schedules (manual or AI-generated)
+5. Review time-off requests
+6. Manage staff and subscription
+
+### Staff flow
+
+1. Log in
+2. Check dashboard and upcoming schedule
+3. Set work preferences
+4. Request time off
+5. Use internal messaging for coordination
+
+---
+
+## Notes
+
+- This README reflects the **current scheduling product direction** and intentionally removes old patient-portal documentation.
+- If architecture or routes change, update this file alongside feature work to keep onboarding accurate.

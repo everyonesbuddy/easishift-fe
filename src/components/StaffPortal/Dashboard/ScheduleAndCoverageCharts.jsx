@@ -92,11 +92,12 @@ function formatTime(d) {
 const CARD_MAX_HEIGHT = { xs: "52vh", sm: "56vh", md: "60vh" };
 
 const CARD_SCROLL_SX = {
+  WebkitOverflowScrolling: "touch",
   scrollbarWidth: "thin",
   scrollbarColor: "#b0bec5 #eef2f5",
   "&::-webkit-scrollbar": {
-    width: 10,
-    height: 10,
+    width: 12,
+    height: 12,
   },
   "&::-webkit-scrollbar-track": {
     backgroundColor: "#eef2f5",
@@ -651,8 +652,20 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                 gap: 2,
                 flex: 1,
                 minHeight: 0,
+                ...CARD_INNER_SCROLL_SX,
               }}
             >
+              <Typography
+                variant="caption"
+                sx={{
+                  display: { xs: "block", sm: "none" },
+                  color: "#78909c",
+                  fontWeight: 600,
+                }}
+              >
+                Swipe up to view more
+              </Typography>
+
               <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
                 <TextField
                   size="small"
@@ -717,12 +730,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                   </Typography>
                 </Box>
               ) : (
-                <Box
-                  sx={{ ...CARD_INNER_SCROLL_SX, pr: 0.5 }}
-                  display="flex"
-                  flexDirection="column"
-                  gap={2}
-                >
+                <Box display="flex" flexDirection="column" gap={2}>
                   {consolidatedCoverageWithStaffing.map((cov) => (
                     <Box
                       key={cov.id}
@@ -825,8 +833,20 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                 gap: 2,
                 flex: 1,
                 minHeight: 0,
+                ...CARD_INNER_SCROLL_SX,
               }}
             >
+              <Typography
+                variant="caption"
+                sx={{
+                  display: { xs: "block", sm: "none" },
+                  color: "#78909c",
+                  fontWeight: 600,
+                }}
+              >
+                Swipe up to view more
+              </Typography>
+
               <Box>
                 <FormControl size="small" sx={{ minWidth: 180 }}>
                   <InputLabel id="overtime-role-filter-label">
@@ -872,7 +892,6 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                   </Stack>
 
                   <Box
-                    sx={{ ...CARD_INNER_SCROLL_SX, pr: 0.5 }}
                     display="grid"
                     gridTemplateColumns={{ xs: "1fr", sm: "1fr 1fr" }}
                     gap={1.5}

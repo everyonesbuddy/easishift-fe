@@ -262,7 +262,7 @@ export default function Home() {
           <SectionTitle
             eyebrow="Why it works"
             // title="AI Scheduling built for real senior care facility conditions"
-            title="AI Scheduling built for real healthcare facility conditions"
+            title="Scheduling built for real healthcare facility conditions"
             subtitle="Designed around constant change, not ideal scenarios."
           />
 

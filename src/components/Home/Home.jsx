@@ -156,15 +156,17 @@ export default function Home() {
                 lineHeight: 1.02,
               }}
             >
-              AI Workforce Scheduling Made For Senior Care Facilities
+              {/* AI Workforce Scheduling Made For Senior Care Facilities */}
+              AI Workforce Scheduling Made For Health Care Facilities
             </Typography>
 
             <Typography
               variant="h6"
               sx={{ color: "text.secondary", mt: 2, maxWidth: 680 }}
             >
-              Modern scheduling for assisted living and nursing homes, minus the
-              chaos
+              {/* Modern scheduling for assisted living and nursing homes, minus the
+              chaos */}
+              Modern scheduling for healthcare, minus the chaos
             </Typography>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} mt={3}>
@@ -259,7 +261,8 @@ export default function Home() {
         <Section>
           <SectionTitle
             eyebrow="Why it works"
-            title="AI Scheduling built for real senior care facility conditions"
+            // title="AI Scheduling built for real senior care facility conditions"
+            title="AI Scheduling built for real healthcare facility conditions"
             subtitle="Designed around constant change, not ideal scenarios."
           />
 

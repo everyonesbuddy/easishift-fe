@@ -5,7 +5,6 @@ import {
   Box,
   Button,
   Paper,
-  Modal,
   Dialog,
   DialogContent,
   Table,
@@ -32,13 +31,13 @@ import {
   FiEdit,
   FiDelete,
 } from "react-icons/fi";
-import { AiOutlineCalendar } from "react-icons/ai";
 import { useAuth } from "../../../context/AuthContext";
 import StaffCreateAndEditForm from "./StaffCreateAndEditForm";
+import BulkStaffModal from "./BulkStaffModal";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import { IconButton, Stack } from "@mui/material";
+import { Stack } from "@mui/material";
 
 // small role color helper — matches the mock idea; tweak as needed
 const ROLE_COLORS = {
@@ -86,9 +85,9 @@ export default function StaffList() {
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
   const [staff, setStaff] = useState([]);
-  const [schedules, setSchedules] = useState([]);
 
   const [open, setOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
 
   const [page, setPage] = useState(0);
@@ -187,26 +186,41 @@ export default function StaffList() {
         </Box>
 
         {role === "admin" && (
-          <Button
-            size="small"
-            variant="contained"
-            startIcon={<FiUsers />}
-            onClick={() => {
-              setEditingStaff(null);
-              setOpen(true);
-            }}
-            sx={{
-              textTransform: "none",
-              borderRadius: 2,
-              px: 3,
-              bgcolor: "#2563EB",
-              color: "#fff",
-              width: { xs: "100%", md: "auto" },
-              "&:hover": { bgcolor: "#1D4ED8" },
-            }}
-          >
-            Add Staff Member
-          </Button>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => setBulkOpen(true)}
+              sx={{
+                textTransform: "none",
+                borderRadius: 2,
+                px: 3,
+                width: { xs: "100%", md: "auto" },
+              }}
+            >
+              Bulk Add Staff
+            </Button>
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<FiUsers />}
+              onClick={() => {
+                setEditingStaff(null);
+                setOpen(true);
+              }}
+              sx={{
+                textTransform: "none",
+                borderRadius: 2,
+                px: 3,
+                bgcolor: "#2563EB",
+                color: "#fff",
+                width: { xs: "100%", md: "auto" },
+                "&:hover": { bgcolor: "#1D4ED8" },
+              }}
+            >
+              Add Staff Member
+            </Button>
+          </Stack>
         )}
       </Box>
 
@@ -515,6 +529,12 @@ export default function StaffList() {
         message="This action cannot be undone."
         onCancel={() => setConfirmOpen(false)}
         onConfirm={handleConfirmDelete}
+      />
+
+      <BulkStaffModal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        onSuccess={fetchStaff}
       />
     </Container>
   );

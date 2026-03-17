@@ -40,7 +40,6 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
     email: "",
     phoneCountryCode: "",
     phone: "",
-    password: "",
     role: "doctor",
   });
   const [emailError, setEmailError] = useState("");
@@ -57,7 +56,6 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
         phoneCountryCode:
           staff.userPhoneCountryCode || staff.phoneCountryCode || "",
         phone: staff.userPhone || staff.phone || "",
-        password: "",
         role: staff.role,
       });
     }
@@ -99,8 +97,6 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
           payload.phone = normalizedPhone;
         }
 
-        if (form.password) payload.password = form.password;
-
         await api.put(`/auth/${staff._id}`, payload);
         toast.success("Staff updated", {
           position: "top-right",
@@ -110,7 +106,6 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
         await api.post("/auth/signup/staff", {
           name: form.name,
           email: form.email,
-          password: form.password,
           role: form.role,
           ...(normalizedPhone && normalizedPhoneCountryCode
             ? {
@@ -216,16 +211,6 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
             inputProps={{ inputMode: "tel" }}
           />
         </Stack>
-
-        {!staff && (
-          <TextField
-            fullWidth
-            label="Password"
-            type="password"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-          />
-        )}
 
         <TextField
           select

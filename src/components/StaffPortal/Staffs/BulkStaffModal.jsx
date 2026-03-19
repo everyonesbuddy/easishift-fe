@@ -94,10 +94,13 @@ export default function BulkStaffModal({ open, onClose, onSuccess }) {
 
       setCsvInput(text);
       setSelectedFileName(file.name);
-      toast.success(`Loaded ${file.name}. Review and click Import Staff to continue.`, {
-        position: "top-right",
-        autoClose: 2500,
-      });
+      toast.success(
+        `Loaded ${file.name}. Review and click Import Staff to continue.`,
+        {
+          position: "top-right",
+          autoClose: 2500,
+        },
+      );
     } catch (err) {
       setSelectedFileName("");
       toast.error(err?.message || "Failed to read CSV file", {
@@ -116,7 +119,9 @@ export default function BulkStaffModal({ open, onClose, onSuccess }) {
     try {
       const trimmed = (csvInput || "").trim();
       if (!trimmed) {
-        throw new Error("Paste CSV content or upload a CSV file before importing");
+        throw new Error(
+          "Paste CSV content or upload a CSV file before importing",
+        );
       }
 
       const payload = { csv: trimmed };
@@ -142,8 +147,8 @@ export default function BulkStaffModal({ open, onClose, onSuccess }) {
       toast.success(
         `Import complete: ${nextSummary.created} created, ${nextSummary.skipped} skipped, ${nextSummary.failed} failed.`,
         {
-        position: "top-right",
-        autoClose: 2500,
+          position: "top-right",
+          autoClose: 2500,
         },
       );
     } catch (err) {

@@ -28,10 +28,18 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
 import api from "../../../config/api";
-import { FiCalendar, FiList, FiPlus, FiEdit, FiDelete } from "react-icons/fi";
+import {
+  FiCalendar,
+  FiList,
+  FiPlus,
+  FiEdit,
+  FiDelete,
+  FiRepeat,
+} from "react-icons/fi";
 import ScheduleForm from "./ScheduleForm";
 import AutoGenerateScheduleForm from "./AutoGenerateScheduleForm";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
+import ShiftSwapRequestModal from "./ShiftSwapRequestModal";
 import { useAuth } from "../../../context/AuthContext";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
@@ -96,6 +104,8 @@ export default function ScheduleList() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+  const [swapModalOpen, setSwapModalOpen] = useState(false);
+  const [swapSchedule, setSwapSchedule] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
@@ -192,6 +202,16 @@ export default function ScheduleList() {
       setConfirmOpen(false);
       setDeleteId(null);
     }
+  };
+
+  const openSwapRequestModal = (sched) => {
+    setSwapSchedule(sched);
+    setSwapModalOpen(true);
+  };
+
+  const closeSwapRequestModal = () => {
+    setSwapModalOpen(false);
+    setSwapSchedule(null);
   };
 
   // ---------------------------
@@ -447,6 +467,17 @@ export default function ScheduleList() {
                       >
                         Edit
                       </Button>
+                      {!isAdmin && s.status === "scheduled" && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<FiRepeat />}
+                          onClick={() => openSwapRequestModal(s)}
+                          sx={{ textTransform: "none" }}
+                        >
+                          Swap Shift
+                        </Button>
+                      )}
                       {isAdmin && (
                         <Button
                           size="small"
@@ -574,6 +605,23 @@ export default function ScheduleList() {
                         >
                           Edit
                         </Button>
+                        {!isAdmin && s.status === "scheduled" && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<FiRepeat />}
+                            onClick={() => openSwapRequestModal(s)}
+                            sx={{
+                              mr: 1,
+                              borderRadius: 2,
+                              textTransform: "none",
+                              bgcolor: "#7c3aed",
+                              "&:hover": { bgcolor: "#6d28d9" },
+                            }}
+                          >
+                            Swap Shift
+                          </Button>
+                        )}
                         {isAdmin && (
                           <Button
                             size="small"
@@ -731,6 +779,14 @@ export default function ScheduleList() {
         message="This action cannot be undone."
         onCancel={() => setConfirmOpen(false)}
         onConfirm={confirmDelete}
+      />
+
+      <ShiftSwapRequestModal
+        open={swapModalOpen}
+        onClose={closeSwapRequestModal}
+        onSuccess={fetchSchedules}
+        schedule={swapSchedule}
+        staffList={staff}
       />
     </Container>
   );

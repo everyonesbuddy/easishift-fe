@@ -21,6 +21,7 @@ import {
   MdMessage,
   MdSettings,
   MdAssignment,
+  MdSwapHoriz,
   MdAccountCircle,
   MdMoreVert,
   MdClose,
@@ -94,6 +95,12 @@ function Sidebar({ mobileOpen, onMobileClose }) {
       icon: MdSchedule,
       label: "Time Off",
       to: "/timeoff-requests",
+    },
+    {
+      id: "swap-requests",
+      icon: MdSwapHoriz,
+      label: "Shift Swaps",
+      to: "/swap-requests",
     },
     { id: "messages", icon: MdMessage, label: "Messages", to: "/messages" },
   ];

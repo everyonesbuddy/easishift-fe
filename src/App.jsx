@@ -12,6 +12,7 @@ import ManageSubscription from "./components/StaffPortal/Billing/ManageSubscript
 import BillingSuccess from "./components/StaffPortal/Billing/BillingSuccess";
 import BillingCancel from "./components/StaffPortal/Billing/BillingCancel";
 import ScheduleList from "./components/StaffPortal/Schedule/ScheduleList";
+import ShiftSwapRequestsPage from "./components/StaffPortal/Schedule/ShiftSwapRequestsPage";
 import StaffList from "./components/StaffPortal/Staffs/StaffList";
 import MessageList from "./components/StaffPortal/Messages/MessageList";
 import TimeOffRequestList from "./components/StaffPortal/TimeOff/TimeOffRequestList";
@@ -93,6 +94,14 @@ export default function App() {
             element={
               <PrivateRoute>
                 <ScheduleList />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/swap-requests"
+            element={
+              <PrivateRoute>
+                <ShiftSwapRequestsPage />
               </PrivateRoute>
             }
           />

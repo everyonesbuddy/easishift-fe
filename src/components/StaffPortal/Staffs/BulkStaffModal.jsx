@@ -20,6 +20,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import { toast } from "react-toastify";
 import api from "../../../config/api";
+import { useAuth } from "../../../context/AuthContext";
 
 const SAMPLE_CSV =
   "name,email,role,userPhone,userPhoneCountryCode\nA,a@x.com,nurse,5551112222,+1\nB,b@x.com,doctor,5553334444,+1";
@@ -35,7 +36,14 @@ const statusLabel = (status) => {
   return labels[status] || status || "-";
 };
 
-export default function BulkStaffModal({ open, onClose, onSuccess }) {
+export default function BulkStaffModal({
+  open,
+  onClose,
+  onSuccess,
+  staffList = [],
+}) {
+  const { tenant } = useAuth();
+
   const [csvInput, setCsvInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState(null);
@@ -122,6 +130,38 @@ export default function BulkStaffModal({ open, onClose, onSuccess }) {
         throw new Error(
           "Paste CSV content or upload a CSV file before importing",
         );
+      }
+
+      const seatLimit = Number(tenant?.seatLimit);
+      const hasSeatLimit = Number.isFinite(seatLimit) && seatLimit > 0;
+
+      if (hasSeatLimit) {
+        const existingStaffCount = Array.isArray(staffList)
+          ? staffList.length
+          : 0;
+        const lines = trimmed
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean);
+        const incomingStaffCount = Math.max(lines.length - 1, 0);
+
+        if (incomingStaffCount <= 0) {
+          throw new Error("CSV must include at least one data row");
+        }
+
+        const availableSeats = Math.max(seatLimit - existingStaffCount, 0);
+
+        if (existingStaffCount >= seatLimit) {
+          throw new Error(
+            `Staff seat limit reached (${existingStaffCount}/${seatLimit}). Upgrade your plan to add more staff.`,
+          );
+        }
+
+        if (incomingStaffCount > availableSeats) {
+          throw new Error(
+            `Import exceeds seat limit. You can add up to ${availableSeats} more staff but CSV contains ${incomingStaffCount} row(s).`,
+          );
+        }
       }
 
       const payload = { csv: trimmed };

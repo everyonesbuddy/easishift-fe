@@ -32,8 +32,13 @@ const PHONE_COUNTRY_CODES = [
   { code: "+33", label: "France (+33)" },
 ];
 
-export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
-  const { user, role: loggedInRole } = useAuth();
+export default function StaffCreateAndEditForm({
+  staff,
+  onSuccess,
+  onClose,
+  staffList = [],
+}) {
+  const { user, role: loggedInRole, tenant } = useAuth();
 
   const [form, setForm] = useState({
     name: "",
@@ -103,6 +108,20 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
           autoClose: 2500,
         });
       } else {
+        const seatLimit = Number(tenant?.seatLimit);
+        const hasSeatLimit = Number.isFinite(seatLimit) && seatLimit > 0;
+        const existingStaffCount = Array.isArray(staffList)
+          ? staffList.length
+          : 0;
+
+        if (hasSeatLimit && existingStaffCount >= seatLimit) {
+          toast.error(
+            `Staff seat limit reached (${existingStaffCount}/${seatLimit}). Upgrade your plan to add more staff.`,
+            { position: "top-right", autoClose: 4000 },
+          );
+          return;
+        }
+
         await api.post("/auth/signup/staff", {
           name: form.name,
           email: form.email,

@@ -415,6 +415,7 @@ export default function StaffDashboard() {
         <DialogContent dividers>
           <StaffCreateAndEditForm
             staff={null}
+            staffList={staffList}
             onClose={() => setOpenStaffModal(false)}
             onSuccess={() => {
               setOpenStaffModal(false);

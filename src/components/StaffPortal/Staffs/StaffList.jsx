@@ -517,6 +517,7 @@ export default function StaffList() {
         <DialogContent dividers>
           <StaffCreateAndEditForm
             staff={editingStaff}
+            staffList={staff}
             onClose={() => handleModalClose()}
             onSuccess={() => handleModalClose(true)}
           />
@@ -533,6 +534,7 @@ export default function StaffList() {
 
       <BulkStaffModal
         open={bulkOpen}
+        staffList={staff}
         onClose={() => setBulkOpen(false)}
         onSuccess={fetchStaff}
       />

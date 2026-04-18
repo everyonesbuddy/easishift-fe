@@ -156,7 +156,7 @@ export default function Home() {
                 lineHeight: 1.02,
               }}
             >
-              Workforce Scheduling Made For Health Care Facilities
+              Workforce Scheduling Made For Senior Living Facilities
             </Typography>
 
             <Typography
@@ -259,7 +259,7 @@ export default function Home() {
         <Section>
           <SectionTitle
             eyebrow="Why it works"
-            title="Workforce Scheduling built for real health care facility conditions"
+            title="Workforce Scheduling built for real senior living facility conditions"
             subtitle="Designed around constant change, not ideal scenarios."
           />
 

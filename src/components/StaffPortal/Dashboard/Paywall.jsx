@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   Box,
-  Grid,
   Paper,
   Typography,
   Button,
@@ -14,6 +13,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from "@mui/material";
+import ArrowOutwardRoundedIcon from "@mui/icons-material/ArrowOutwardRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import api from "../../../config/api";
 
@@ -121,7 +121,7 @@ export default function Paywall({ tenant }) {
   };
 
   return (
-    <Container maxWidth="md" sx={{ mt: 6, mb: 6, pb: 8 }}>
+    <Container maxWidth="lg" sx={{ mt: 6, mb: 6, pb: 8, px: { xs: 2, sm: 3 } }}>
       <Box sx={{ textAlign: "center", mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 900 }}>
           Activate your clinic
@@ -181,50 +181,94 @@ export default function Paywall({ tenant }) {
         />
       </Box>
 
-      <Grid
-        container
-        spacing={3}
-        rowSpacing={{ xs: 3, md: 3 }}
-        columnSpacing={{ xs: 2, md: 3 }}
-        justifyContent="center"
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            lg: "repeat(2, minmax(0, 280px))",
+            xl: "repeat(3, minmax(0, 270px))",
+          },
+          justifyContent: "center",
+          rowGap: { xs: 3.25, sm: 3.75, md: 4, lg: 4.25 },
+          columnGap: { xs: 0, lg: 3.25, xl: 3.5 },
+          px: { xs: 1.25, sm: 1.75, md: 2, lg: 0.75, xl: 0 },
+          pb: { xs: 1.5, md: 2 },
+        }}
       >
         {plans.map((p) => (
-          <Grid
-            item
-            xs={12}
-            sm={10}
-            md={4}
+          <Box
             key={p.key}
-            sx={{ mb: { xs: 2, md: 0 } }}
+            sx={{
+              width: "100%",
+              maxWidth: { xs: 340, sm: 360, md: 380, lg: "none" },
+              mx: "auto",
+            }}
           >
             <Paper
               sx={{
-                p: 3,
-                height: { xs: "auto", md: "100%" },
+                p: { xs: 1.75, sm: 2.25, md: 3 },
+                height: "100%",
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "space-between",
-                textAlign: "center",
+                textAlign: "left",
+                borderRadius: 4,
                 border: p.highlight
                   ? `2px solid ${theme.palette.primary.main}`
-                  : undefined,
+                  : "1px solid rgba(15, 23, 42, 0.08)",
                 boxShadow: p.highlight
                   ? "0 14px 40px rgba(16,24,40,0.14)"
                   : "0 6px 18px rgba(15,23,42,0.06)",
               }}
             >
               <Box>
-                <Chip
-                  label={p.name}
-                  color={p.highlight ? "primary" : "default"}
-                  sx={{ mb: 1 }}
-                />
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="flex-start"
+                  spacing={1}
+                  sx={{ mb: 1.5 }}
+                >
+                  <Box>
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        fontWeight: 900,
+                        lineHeight: 1.15,
+                        fontSize: { xs: "1.05rem", md: "1.1rem" },
+                      }}
+                    >
+                      {p.name}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: "text.secondary",
+                        mt: 0.35,
+                        fontSize: { xs: "0.76rem", md: "0.78rem" },
+                      }}
+                    >
+                      Per facility /{" "}
+                      {billingPeriod === "yearly" ? "year" : "month"}
+                    </Typography>
+                  </Box>
+
+                  {p.highlight && (
+                    <Chip
+                      label="Most popular"
+                      color="primary"
+                      size="small"
+                      sx={{ fontWeight: 800, height: 26 }}
+                    />
+                  )}
+                </Stack>
                 <Typography
                   variant="h4"
                   sx={{
                     fontWeight: 900,
-                    mt: 1,
-                    fontSize: { xs: "1.5rem", md: "1.7rem" },
+                    mt: 0.75,
+                    fontSize: { xs: "1.28rem", md: "1.4rem" },
                     lineHeight: 1.15,
                   }}
                 >
@@ -234,9 +278,9 @@ export default function Paywall({ tenant }) {
                   variant="body2"
                   sx={{
                     color: "text.secondary",
-                    mt: 0.5,
-                    fontSize: { xs: "0.78rem", md: "0.86rem" },
-                    lineHeight: 1.35,
+                    mt: 0.75,
+                    fontSize: { xs: "0.76rem", md: "0.8rem" },
+                    lineHeight: 1.3,
                   }}
                 >
                   {billingPeriod === "yearly"
@@ -248,20 +292,20 @@ export default function Paywall({ tenant }) {
                 <Typography
                   variant="body2"
                   sx={{
-                    color: "text.secondary",
-                    mt: 1,
-                    fontSize: { xs: "0.8rem", md: "0.9rem" },
+                    color: "text.primary",
+                    mt: 2,
+                    fontSize: { xs: "0.9rem", md: "0.92rem" },
                     lineHeight: 1.3,
+                    fontWeight: 700,
                   }}
                 >
-                  {p.seats} seats • Billed{" "}
-                  {billingPeriod === "yearly" ? "yearly" : "monthly"}
+                  {p.seats} seats
                 </Typography>
 
-                <Divider sx={{ my: 2 }} />
+                <Divider sx={{ my: 1.5 }} />
 
                 <Stack
-                  spacing={0.9}
+                  spacing={0.8}
                   sx={{ color: "text.secondary", alignItems: "flex-start" }}
                 >
                   {featureList.map((feature) => (
@@ -276,7 +320,14 @@ export default function Paywall({ tenant }) {
                         fontSize="small"
                         sx={{ color: theme.palette.primary.main }}
                       />
-                      <Typography variant="body2" sx={{ lineHeight: 1.3 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          lineHeight: 1.3,
+                          color: "text.primary",
+                          fontSize: { xs: "0.82rem", md: "0.84rem" },
+                        }}
+                      >
                         {feature}
                       </Typography>
                     </Stack>
@@ -301,21 +352,49 @@ export default function Paywall({ tenant }) {
                   startIcon={
                     loadingPlan === p.key ? (
                       <CircularProgress size={18} />
-                    ) : null
+                    ) : (
+                      <ArrowOutwardRoundedIcon fontSize="small" />
+                    )
                   }
                   fullWidth
+                  sx={{
+                    mt: 2.25,
+                    py: 1,
+                    textTransform: "none",
+                    fontWeight: 800,
+                    fontSize: { xs: "0.9rem", md: "0.92rem" },
+                  }}
                 >
-                  {loadingPlan === p.key
-                    ? "Redirecting..."
-                    : p.highlight
-                      ? "Choose plan"
-                      : "Upgrade"}
+                  {loadingPlan === p.key ? "Redirecting..." : "Get started"}
                 </Button>
               </Box>
             </Paper>
-          </Grid>
+          </Box>
         ))}
-      </Grid>
+      </Box>
+
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          mt: { xs: 4, md: 5 },
+          px: { xs: 1, sm: 2 },
+        }}
+      >
+        <Typography
+          variant="caption"
+          sx={{
+            display: "block",
+            maxWidth: 420,
+            width: "100%",
+            textAlign: "center",
+            color: "text.secondary",
+            lineHeight: 1.5,
+          }}
+        >
+          One price per facility. Each facility is billed independently.
+        </Typography>
+      </Box>
     </Container>
   );
 }

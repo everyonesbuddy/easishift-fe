@@ -255,6 +255,48 @@ export default function Home() {
           </Box>
         </Box>
 
+        {/* ROI STRIP */}
+        <Card
+          variant="outlined"
+          sx={{
+            borderRadius: 4,
+            mt: { xs: 1, md: 0 },
+            background:
+              "linear-gradient(140deg, rgba(25,118,210,0.1) 0%, rgba(25,118,210,0.02) 45%, #fff 100%)",
+          }}
+        >
+          <CardContent sx={{ p: { xs: 2.25, md: 2.75 } }}>
+            <Box
+              display="grid"
+              gridTemplateColumns={{ xs: "1fr", md: "1fr auto" }}
+              gap={2}
+              alignItems="center"
+            >
+              <Box>
+                <Typography variant="overline" sx={{ letterSpacing: 1 }}>
+                  New for operators
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900 }}>
+                  See your annual turnover cost in dollars
+                </Typography>
+                <Typography sx={{ color: "text.secondary", mt: 0.5 }}>
+                  Use the LTC ROI Calculator to estimate turnover impact and
+                  projected Easishift savings in under 2 minutes.
+                </Typography>
+              </Box>
+
+              <Button
+                variant="contained"
+                size="large"
+                onClick={() => navigate("/turnover-roi-calculator")}
+                sx={{ fontWeight: 900, px: 3.5, whiteSpace: "nowrap" }}
+              >
+                Open LTC ROI Calculator
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
+
         {/* BENEFITS */}
         <Section>
           <SectionTitle

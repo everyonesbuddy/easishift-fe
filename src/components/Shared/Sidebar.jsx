@@ -70,8 +70,14 @@ function Sidebar({ mobileOpen, onMobileClose }) {
     {
       id: "timeoff",
       icon: MdSchedule,
-      label: "Time Off Requests",
+      label: "Time Off Decisions",
       to: "/timeoff-decisions",
+    },
+    {
+      id: "my-timeoff",
+      icon: MdSchedule,
+      label: "My Time Off Requests",
+      to: "/timeoff-requests",
     },
     { id: "messages", icon: MdMessage, label: "Messages", to: "/messages" },
   ];
@@ -93,7 +99,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
     {
       id: "timeoff",
       icon: MdSchedule,
-      label: "Time Off",
+      label: "My Time Off Requests",
       to: "/timeoff-requests",
     },
     {

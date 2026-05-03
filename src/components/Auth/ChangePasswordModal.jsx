@@ -9,7 +9,9 @@ import {
   Alert,
   CircularProgress,
   Box,
+  IconButton,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import api from "../../config/api";
 import { toast } from "react-toastify";
 
@@ -93,7 +95,16 @@ export default function ChangePasswordModal({ open, onClose }) {
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ fontWeight: 700 }}>Change password</DialogTitle>
+      <DialogTitle sx={{ fontWeight: 700, pr: 6 }}>
+        Change password
+        <IconButton
+          aria-label="Close"
+          onClick={handleClose}
+          sx={{ position: "absolute", right: 8, top: 8 }}
+        >
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
       <DialogContent dividers>
         <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
           {error && <Alert severity="error">{error}</Alert>}

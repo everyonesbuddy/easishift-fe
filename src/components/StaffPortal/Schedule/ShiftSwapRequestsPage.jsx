@@ -22,11 +22,23 @@ import { useAuth } from "../../../context/AuthContext";
 import ShiftSwapRequestModal from "./ShiftSwapRequestModal";
 
 const STATUS_COLOR = {
-  pending: "warning",
+  pending_admin: "warning",
+  pending_receiver: "info",
   accepted: "success",
   denied: "error",
+  admin_denied: "error",
   cancelled: "default",
   expired: "default",
+};
+
+const STATUS_LABEL = {
+  pending_admin: "PENDING ADMIN",
+  pending_receiver: "PENDING RECEIVER",
+  accepted: "ACCEPTED",
+  denied: "DENIED",
+  admin_denied: "ADMIN DENIED",
+  cancelled: "CANCELLED",
+  expired: "EXPIRED",
 };
 
 const formatWindow = (startTime, endTime) => {
@@ -115,9 +127,13 @@ export default function ShiftSwapRequestsPage() {
           responseNote,
         },
       );
-      toast.success(
-        `Swap request ${decision === "accept" ? "accepted" : "denied"}`,
-      );
+      const successLabel =
+        decision === "approve"
+          ? "approved"
+          : decision === "accept"
+            ? "accepted"
+            : "denied";
+      toast.success(`Swap request ${successLabel}`);
       closeRespondDialog();
       loadSwapRequests();
     } catch (err) {
@@ -135,9 +151,12 @@ export default function ShiftSwapRequestsPage() {
     return activeTab === "inbox" ? inboxRequests : sentRequests;
   }, [activeTab, inboxRequests, sentRequests]);
 
+  const isPendingForAdmin = (requestItem) =>
+    requestItem.status === "pending_admin" && isAdmin;
+
   const isPendingForReceiver = (requestItem) => {
-    if (requestItem.status !== "pending") return false;
-    if (isAdmin) return true;
+    if (requestItem.status !== "pending_receiver") return false;
+      if (isAdmin) return false;
     return String(requestItem.receiverStaffId?._id) === String(user?._id);
   };
 
@@ -260,11 +279,45 @@ export default function ShiftSwapRequestsPage() {
                   </Box>
 
                   <Chip
-                    label={status.toUpperCase()}
+                    label={STATUS_LABEL[status] || status.toUpperCase()}
                     color={STATUS_COLOR[status] || "default"}
-                    variant={status === "pending" ? "filled" : "outlined"}
+                    variant={
+                      status === "pending_admin" || status === "pending_receiver"
+                        ? "filled"
+                        : "outlined"
+                    }
                   />
                 </Box>
+
+                {isPendingForAdmin(requestItem) && (
+                  <Box
+                    sx={{ mt: 2, display: "flex", gap: 1, flexWrap: "wrap" }}
+                  >
+                    <Button
+                      size="small"
+                      variant="contained"
+                      startIcon={<FiCheck />}
+                      onClick={() => openRespondDialog(requestItem, "approve")}
+                      sx={{
+                        textTransform: "none",
+                        bgcolor: "#15803d",
+                        "&:hover": { bgcolor: "#166534" },
+                      }}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      startIcon={<FiX />}
+                      onClick={() => openRespondDialog(requestItem, "deny")}
+                      sx={{ textTransform: "none" }}
+                      color="error"
+                    >
+                      Deny
+                    </Button>
+                  </Box>
+                )}
 
                 {isPendingForReceiver(requestItem) && (
                   <Box
@@ -316,7 +369,11 @@ export default function ShiftSwapRequestsPage() {
         maxWidth="sm"
       >
         <DialogTitle>
-          {decision === "accept" ? "Accept Swap Request" : "Deny Swap Request"}
+          {decision === "approve"
+            ? "Approve Swap Request"
+            : decision === "accept"
+              ? "Accept Swap Request"
+              : "Deny Swap Request"}
         </DialogTitle>
         <DialogContent>
           <TextField
@@ -337,9 +394,13 @@ export default function ShiftSwapRequestsPage() {
             variant="contained"
             onClick={submitDecision}
             disabled={submittingResponse}
-            color={decision === "accept" ? "success" : "error"}
+            color={decision === "deny" ? "error" : "success"}
           >
-            {decision === "accept" ? "Accept" : "Deny"}
+            {decision === "approve"
+              ? "Approve"
+              : decision === "accept"
+                ? "Accept"
+                : "Deny"}
           </Button>
         </DialogActions>
       </Dialog>

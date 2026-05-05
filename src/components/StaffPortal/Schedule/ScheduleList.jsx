@@ -35,6 +35,7 @@ import {
   FiEdit,
   FiDelete,
   FiRepeat,
+  FiPrinter,
 } from "react-icons/fi";
 import ScheduleForm from "./ScheduleForm";
 import AutoGenerateScheduleForm from "./AutoGenerateScheduleForm";
@@ -108,6 +109,9 @@ export default function ScheduleList() {
   const [swapSchedule, setSwapSchedule] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [monthDate, setMonthDate] = useState(new Date());
+  const [staffVisibility, setStaffVisibility] = useState("mine");
+  const [shiftTimeFilter, setShiftTimeFilter] = useState("");
 
   useEffect(() => {
     fetchSchedules();
@@ -127,6 +131,24 @@ export default function ScheduleList() {
       hour12: true,
     });
 
+  const getTimeKey = (value) => {
+    const d = new Date(value);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
+
+  const getLocalDateKey = (value) => {
+    const date = new Date(value);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const parseLocalDateKey = (dateKey) => {
+    const [year, month, day] = dateKey.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   // ---------------------------
   // Fetch schedules
   // ---------------------------
@@ -134,12 +156,8 @@ export default function ScheduleList() {
     try {
       const res = await api.get("/schedules");
 
-      const raw = isAdmin
-        ? res.data
-        : res.data.filter((s) => s.staffId?._id === user._id);
-
       // sort by startTime descending (newest first). fallback to createdAt when startTime missing
-      const data = raw.sort((a, b) => {
+      const data = res.data.sort((a, b) => {
         const ta = new Date(a.startTime || a.createdAt).getTime();
         const tb = new Date(b.startTime || b.createdAt).getTime();
         return tb - ta;
@@ -214,24 +232,129 @@ export default function ScheduleList() {
     setSwapSchedule(null);
   };
 
+  const canManageSchedule = (schedule) => {
+    if (isAdmin) return true;
+    return schedule?.staffId?._id === user?._id;
+  };
+
+  const uniqueShiftTimes = useMemo(() => {
+    const seen = new Set();
+    const options = [];
+    schedules.forEach((s) => {
+      if (!s.startTime || !s.endTime) return;
+      const key = `${getTimeKey(s.startTime)}|${getTimeKey(s.endTime)}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        const startLabel = new Date(s.startTime).toLocaleTimeString("default", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        });
+        const endLabel = new Date(s.endTime).toLocaleTimeString("default", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        });
+        options.push({ key, label: `${startLabel} – ${endLabel}` });
+      }
+    });
+    return options.sort((a, b) => a.key.localeCompare(b.key));
+  }, [schedules]);
+
   // ---------------------------
   // Filtered schedules
   // ---------------------------
   const filteredSchedules = useMemo(() => {
     return schedules.filter((s) => {
+      if (
+        !isAdmin &&
+        staffVisibility === "mine" &&
+        s.staffId?._id !== user?._id
+      )
+        return false;
       // roleFilter is 'all' to allow all roles
       if (roleFilter && roleFilter !== "all" && s.role !== roleFilter)
         return false;
       if (statusFilter && statusFilter !== "" && s.status !== statusFilter)
         return false;
+      if (shiftTimeFilter) {
+        const [startKey, endKey] = shiftTimeFilter.split("|");
+        if (
+          getTimeKey(s.startTime) !== startKey ||
+          getTimeKey(s.endTime) !== endKey
+        )
+          return false;
+      }
       return true;
     });
-  }, [schedules, roleFilter, statusFilter]);
+  }, [
+    schedules,
+    roleFilter,
+    statusFilter,
+    shiftTimeFilter,
+    isAdmin,
+    staffVisibility,
+    user?._id,
+  ]);
 
   // Reset page when filters change or filtered length shrinks
   useEffect(() => {
     setPage(0);
-  }, [roleFilter, statusFilter]);
+  }, [roleFilter, statusFilter, staffVisibility, shiftTimeFilter]);
+
+  // ---------------------------
+  // Month view helpers
+  // ---------------------------
+  const getDaysInMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  const getMonthStartDay = (date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  };
+
+  const getShiftsForStaffOnDate = (staffId, dateStr) => {
+    return schedules.filter(
+      (s) =>
+        s.staffId?._id === staffId && getLocalDateKey(s.startTime) === dateStr,
+    );
+  };
+
+  const getAllStaffInMonth = useMemo(() => {
+    const staffMap = new Map();
+    schedules.forEach((s) => {
+      const date = new Date(s.startTime);
+      if (
+        date.getFullYear() === monthDate.getFullYear() &&
+        date.getMonth() === monthDate.getMonth()
+      ) {
+        if (s.staffId?._id && !staffMap.has(s.staffId._id)) {
+          staffMap.set(s.staffId._id, s.staffId);
+        }
+      }
+    });
+    return Array.from(staffMap.values()).sort((a, b) =>
+      (a.name || "").localeCompare(b.name || ""),
+    );
+  }, [schedules, monthDate]);
+
+  const monthDays = useMemo(() => {
+    const daysCount = getDaysInMonth(monthDate);
+    const days = [];
+    for (let i = 1; i <= daysCount; i++) {
+      days.push(
+        getLocalDateKey(
+          new Date(monthDate.getFullYear(), monthDate.getMonth(), i),
+        ),
+      );
+    }
+    return days;
+  }, [monthDate]);
+
+  const monthYear = monthDate.toLocaleString("default", {
+    month: "long",
+    year: "numeric",
+  });
 
   const statusColors = {
     scheduled: "#fbc02d",
@@ -241,6 +364,22 @@ export default function ScheduleList() {
 
   return (
     <Container sx={{ mt: 4, px: { xs: 2, sm: 3 } }}>
+      <GlobalStyles
+        styles={{
+          "@media print": {
+            "body:not(.printing-roster) *": { visibility: "hidden" },
+            "body.printing-roster *": { visibility: "hidden" },
+            "body.printing-roster #roster-print-section, body.printing-roster #roster-print-section *":
+              { visibility: "visible" },
+            "body.printing-roster #roster-print-section": {
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100%",
+            },
+          },
+        }}
+      />
       <Box
         display="flex"
         justifyContent="space-between"
@@ -287,15 +426,21 @@ export default function ScheduleList() {
           >
             <ToggleButton
               value="table"
-              sx={{ width: { xs: "50%", md: "auto" } }}
+              sx={{ width: { xs: "33%", md: "auto" } }}
             >
               <FiList style={{ marginRight: 6 }} /> List
             </ToggleButton>
             <ToggleButton
               value="calendar"
-              sx={{ width: { xs: "50%", md: "auto" } }}
+              sx={{ width: { xs: "33%", md: "auto" } }}
             >
               <FiCalendar style={{ marginRight: 6 }} /> Calendar
+            </ToggleButton>
+            <ToggleButton
+              value="month"
+              sx={{ width: { xs: "34%", md: "auto" } }}
+            >
+              <FiPrinter style={{ marginRight: 6 }} /> Roster
             </ToggleButton>
           </ToggleButtonGroup>
 
@@ -375,6 +520,26 @@ export default function ScheduleList() {
             alignItems={{ xs: "stretch", sm: "center" }}
             sx={{ width: { xs: "100%", md: "auto" } }}
           >
+            {!isAdmin && (
+              <ToggleButtonGroup
+                value={staffVisibility}
+                exclusive
+                onChange={(e, next) => next && setStaffVisibility(next)}
+                size="small"
+                sx={{
+                  backgroundColor: "#f3f4f6",
+                  borderRadius: 2,
+                  "& .MuiToggleButton-root": {
+                    textTransform: "none",
+                    px: 1.5,
+                  },
+                }}
+              >
+                <ToggleButton value="mine">My Schedule</ToggleButton>
+                <ToggleButton value="all">Everyone</ToggleButton>
+              </ToggleButtonGroup>
+            )}
+
             {isAdmin && (
               <FormControl
                 size="small"
@@ -425,6 +590,27 @@ export default function ScheduleList() {
                 <MenuItem value="call_out">Call Out</MenuItem>
               </Select>
             </FormControl>
+
+            {uniqueShiftTimes.length > 0 && (
+              <FormControl
+                size="small"
+                sx={{ minWidth: { xs: "100%", sm: 200 } }}
+              >
+                <InputLabel>Shift Time</InputLabel>
+                <Select
+                  value={shiftTimeFilter}
+                  label="Shift Time"
+                  onChange={(e) => setShiftTimeFilter(e.target.value)}
+                >
+                  <MenuItem value="">All Times</MenuItem>
+                  {uniqueShiftTimes.map((t) => (
+                    <MenuItem key={t.key} value={t.key}>
+                      {t.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
           </Box>
         </Box>
       </Paper>
@@ -460,24 +646,28 @@ export default function ScheduleList() {
                       </Typography>
                     </Box>
                     <Stack spacing={1}>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => openEdit(s)}
-                      >
-                        Edit
-                      </Button>
-                      {!isAdmin && s.status === "scheduled" && (
+                      {canManageSchedule(s) && (
                         <Button
                           size="small"
-                          variant="contained"
-                          startIcon={<FiRepeat />}
-                          onClick={() => openSwapRequestModal(s)}
-                          sx={{ textTransform: "none" }}
+                          variant="outlined"
+                          onClick={() => openEdit(s)}
                         >
-                          Swap Shift
+                          Edit
                         </Button>
                       )}
+                      {!isAdmin &&
+                        canManageSchedule(s) &&
+                        s.status === "scheduled" && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<FiRepeat />}
+                            onClick={() => openSwapRequestModal(s)}
+                            sx={{ textTransform: "none" }}
+                          >
+                            Swap Shift
+                          </Button>
+                        )}
                       {isAdmin && (
                         <Button
                           size="small"
@@ -591,37 +781,41 @@ export default function ScheduleList() {
                         {s.notes || "—"}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          color="info"
-                          startIcon={<FiEdit />}
-                          onClick={() => openEdit(s)}
-                          sx={{
-                            mr: 1,
-                            borderRadius: 2,
-                            textTransform: "none",
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        {!isAdmin && s.status === "scheduled" && (
+                        {canManageSchedule(s) && (
                           <Button
                             size="small"
                             variant="contained"
-                            startIcon={<FiRepeat />}
-                            onClick={() => openSwapRequestModal(s)}
+                            color="info"
+                            startIcon={<FiEdit />}
+                            onClick={() => openEdit(s)}
                             sx={{
                               mr: 1,
                               borderRadius: 2,
                               textTransform: "none",
-                              bgcolor: "#7c3aed",
-                              "&:hover": { bgcolor: "#6d28d9" },
                             }}
                           >
-                            Swap Shift
+                            Edit
                           </Button>
                         )}
+                        {!isAdmin &&
+                          canManageSchedule(s) &&
+                          s.status === "scheduled" && (
+                            <Button
+                              size="small"
+                              variant="contained"
+                              startIcon={<FiRepeat />}
+                              onClick={() => openSwapRequestModal(s)}
+                              sx={{
+                                mr: 1,
+                                borderRadius: 2,
+                                textTransform: "none",
+                                bgcolor: "#7c3aed",
+                                "&:hover": { bgcolor: "#6d28d9" },
+                              }}
+                            >
+                              Swap Shift
+                            </Button>
+                          )}
                         {isAdmin && (
                           <Button
                             size="small"
@@ -655,6 +849,269 @@ export default function ScheduleList() {
             />
           </>
         )
+      ) : view === "month" ? (
+        <Box mt={3} id="roster-print-section">
+          {/* Month view header with navigation */}
+          <Box
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
+            sx={{ mb: 2, gap: 2, flexDirection: { xs: "column", sm: "row" } }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              {monthYear}
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() =>
+                  setMonthDate(
+                    new Date(monthDate.getFullYear(), monthDate.getMonth() - 1),
+                  )
+                }
+              >
+                Previous
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => setMonthDate(new Date())}
+              >
+                Today
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() =>
+                  setMonthDate(
+                    new Date(monthDate.getFullYear(), monthDate.getMonth() + 1),
+                  )
+                }
+              >
+                Next
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<FiPrinter />}
+                onClick={() => {
+                  document.body.classList.add("printing-roster");
+                  window.print();
+                  document.body.classList.remove("printing-roster");
+                }}
+                sx={{ textTransform: "none" }}
+              >
+                Print
+              </Button>
+            </Stack>
+          </Box>
+
+          {/* Schedule matrix table */}
+          <Box
+            sx={{
+              background: "white",
+              borderRadius: 2,
+              border: "1px solid #e5e7eb",
+              "@media print": {
+                border: "none",
+                borderRadius: 0,
+              },
+            }}
+          >
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ background: "#f3f4f6" }}>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      width: 130,
+                      borderRight: "1px solid #e5e7eb",
+                    }}
+                  >
+                    Date
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Staff on Shift</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {monthDays.map((day) => {
+                  const date = parseLocalDateKey(day);
+                  const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                  const dayLabel = date.toLocaleDateString("default", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  });
+                  const shiftsOnDay = filteredSchedules.filter(
+                    (s) => getLocalDateKey(s.startTime) === day,
+                  );
+
+                  return (
+                    <TableRow
+                      key={day}
+                      sx={{
+                        background: isWeekend ? "#f9fafb" : "#fff",
+                        "&:hover": { background: "#f0f4ff" },
+                        "@media print": { pageBreakInside: "avoid" },
+                      }}
+                    >
+                      <TableCell
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: "0.8rem",
+                          borderRight: "1px solid #e5e7eb",
+                          color: isWeekend ? "#6b7280" : "#111827",
+                          whiteSpace: "nowrap",
+                          verticalAlign: "top",
+                          pt: 1.5,
+                        }}
+                      >
+                        {dayLabel}
+                      </TableCell>
+                      <TableCell sx={{ py: 1 }}>
+                        {shiftsOnDay.length === 0 ? (
+                          <Typography
+                            variant="caption"
+                            color="text.disabled"
+                            sx={{ fontStyle: "italic" }}
+                          >
+                            No shifts
+                          </Typography>
+                        ) : (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: 0.75,
+                            }}
+                          >
+                            {shiftsOnDay.map((shift, idx) => (
+                              <Box
+                                key={idx}
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 0.5,
+                                  border: "1px solid #e5e7eb",
+                                  borderRadius: 1.5,
+                                  px: 1,
+                                  py: 0.4,
+                                  background: "#f8faff",
+                                  "@media print": {
+                                    fontSize: "9px",
+                                    px: 0.5,
+                                  },
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: "50%",
+                                    background:
+                                      ROLE_COLORS[shift.role] || "#6b7280",
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                <Typography
+                                  sx={{
+                                    fontSize: "0.78rem",
+                                    fontWeight: 600,
+                                    color: "#111827",
+                                  }}
+                                >
+                                  {shift.staffId?.name || "Unknown"}
+                                </Typography>
+                                <Box
+                                  sx={{
+                                    fontSize: "0.7rem",
+                                    background:
+                                      (ROLE_COLORS[shift.role] || "#6b7280") +
+                                      "22",
+                                    color: ROLE_COLORS[shift.role] || "#6b7280",
+                                    px: 0.75,
+                                    py: 0.1,
+                                    borderRadius: 1,
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {getRoleDisplayName(shift.role)}
+                                </Box>
+                                <Typography
+                                  sx={{
+                                    fontSize: "0.7rem",
+                                    color: "#6b7280",
+                                  }}
+                                >
+                                  {new Date(shift.startTime).toLocaleTimeString(
+                                    "default",
+                                    {
+                                      hour: "numeric",
+                                      minute: "2-digit",
+                                      hour12: true,
+                                    },
+                                  )}
+                                  {" – "}
+                                  {new Date(shift.endTime).toLocaleTimeString(
+                                    "default",
+                                    {
+                                      hour: "numeric",
+                                      minute: "2-digit",
+                                      hour12: true,
+                                    },
+                                  )}
+                                </Typography>
+                              </Box>
+                            ))}
+                          </Box>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Box>
+
+          {/* Print-friendly legend */}
+          <Box
+            sx={{
+              mt: 3,
+              display: "flex",
+              gap: 2,
+              flexWrap: "wrap",
+              "@media print": { mt: 1 },
+            }}
+          >
+            <Typography variant="caption" sx={{ fontWeight: 700 }}>
+              Role Legend:
+            </Typography>
+            {Object.entries(ROLE_COLORS)
+              .slice(0, 8)
+              .map(([role, color]) => (
+                <Box
+                  key={role}
+                  display="flex"
+                  alignItems="center"
+                  gap={0.5}
+                  sx={{ "@media print": { fontSize: "9px" } }}
+                >
+                  <Box
+                    sx={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: 1,
+                      background: color,
+                    }}
+                  />
+                  <Typography variant="caption">
+                    {getRoleDisplayName(role)}
+                  </Typography>
+                </Box>
+              ))}
+          </Box>
+        </Box>
       ) : (
         <Box
           mt={3}
@@ -714,9 +1171,14 @@ export default function ScheduleList() {
               borderColor: statusColors[s.status],
               textColor: "#fff",
             }))}
-            eventClick={(info) =>
-              openEdit(schedules.find((a) => a._id === info.event.id))
-            }
+            eventClick={(info) => {
+              const clicked = filteredSchedules.find(
+                (a) => a._id === info.event.id,
+              );
+              if (clicked && canManageSchedule(clicked)) {
+                openEdit(clicked);
+              }
+            }}
             height="72vh"
             nowIndicator={true}
           />

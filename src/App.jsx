@@ -19,6 +19,7 @@ import MessageList from "./components/StaffPortal/Messages/MessageList";
 import TimeOffRequestList from "./components/StaffPortal/TimeOff/TimeOffRequestList";
 import TimeOffDecision from "./components/StaffPortal/TimeOff/TimeOffDecision";
 import PreferencesPage from "./components/StaffPortal/NoAdminPreferences/PreferencesPage";
+import FacilityPreferencesPage from "./components/StaffPortal/FacilityPreferences/FacilityPreferencesPage";
 import CoveragePlanningPage from "./components/StaffPortal/Coverage/CoveragePlanningPage";
 import { ToastContainer } from "react-toastify";
 import { Box } from "@mui/material";
@@ -147,6 +148,14 @@ export default function App() {
             element={
               <PrivateRoute>
                 <TimeOffRequestList />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/facility-preferences"
+            element={
+              <PrivateRoute>
+                <FacilityPreferencesPage />
               </PrivateRoute>
             }
           />

@@ -25,6 +25,7 @@ import {
   MdAccountCircle,
   MdMoreVert,
   MdClose,
+  MdTune,
 } from "react-icons/md";
 import logo from "../../assets/logos/easishift-logo-plus-text2.svg";
 import { useAuth } from "../../context/AuthContext";
@@ -68,6 +69,12 @@ function Sidebar({ mobileOpen, onMobileClose }) {
       to: "/billing",
     },
     {
+      id: "facility-preferences",
+      icon: MdTune,
+      label: "Facility Preferences",
+      to: "/facility-preferences",
+    },
+    {
       id: "timeoff",
       icon: MdSchedule,
       label: "Time Off Decisions",
@@ -78,6 +85,12 @@ function Sidebar({ mobileOpen, onMobileClose }) {
       icon: MdSchedule,
       label: "My Time Off Requests",
       to: "/timeoff-requests",
+    },
+    {
+      id: "swap-requests",
+      icon: MdSwapHoriz,
+      label: "Shift Swaps",
+      to: "/swap-requests",
     },
     { id: "messages", icon: MdMessage, label: "Messages", to: "/messages" },
   ];
@@ -180,9 +193,9 @@ function Sidebar({ mobileOpen, onMobileClose }) {
                   onClick={() => navigate(item.to)}
                   sx={{
                     borderRadius: 2,
-                    px: 2,
-                    py: 1.5,
-                    gap: 1.5,
+                    px: 1.5,
+                    py: 0.9,
+                    gap: 1,
                     color: isActive ? "white" : "#d1d5db", // gray-300
                     bgcolor: isActive ? "#2563eb" : "transparent", // blue-600
                     transition: "background-color 0.2s ease",
@@ -191,12 +204,12 @@ function Sidebar({ mobileOpen, onMobileClose }) {
                     },
                   }}
                 >
-                  <ListItemIcon sx={{ minWidth: 32, color: "inherit" }}>
-                    <Icon size={20} />
+                  <ListItemIcon sx={{ minWidth: 28, color: "inherit" }}>
+                    <Icon size={17} />
                   </ListItemIcon>
                   <ListItemText
                     primary={item.label}
-                    primaryTypographyProps={{ fontSize: "0.95rem" }}
+                    primaryTypographyProps={{ fontSize: "0.82rem" }}
                   />
                 </ListItemButton>
               </ListItem>

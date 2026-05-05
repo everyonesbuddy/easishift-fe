@@ -107,13 +107,13 @@ export default function SignupTenant() {
             align="center"
             sx={{ color: "black", mb: 2 }}
           >
-            Sign Up Hospital
+            Sign Up Facility
           </Typography>
 
           {error && <Alert severity="error">{error}</Alert>}
 
           <TextField
-            label="Hospital Name"
+            label="Facility Name"
             fullWidth
             value={hospitalName}
             onChange={(e) => setHospitalName(e.target.value)}

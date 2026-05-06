@@ -367,15 +367,40 @@ export default function ScheduleList() {
       <GlobalStyles
         styles={{
           "@media print": {
+            "@page": {
+              margin: "0",
+            },
             "body:not(.printing-roster) *": { visibility: "hidden" },
             "body.printing-roster *": { visibility: "hidden" },
             "body.printing-roster #roster-print-section, body.printing-roster #roster-print-section *":
               { visibility: "visible" },
             "body.printing-roster #roster-print-section": {
-              position: "fixed",
+              position: "absolute",
               top: 0,
               left: 0,
+              right: 0,
               width: "100%",
+              height: "auto",
+              overflow: "visible",
+              margin: "0 !important",
+              padding: "6mm 0 0 0 !important",
+            },
+            "body.printing-roster #roster-print-section .no-print": {
+              display: "none !important",
+            },
+            "body.printing-roster #roster-print-section table": {
+              marginLeft: "0 !important",
+            },
+            "body.printing-roster #roster-print-section th, body.printing-roster #roster-print-section td":
+              {
+                paddingLeft: "8px",
+              },
+            "body.printing-roster table": {
+              pageBreakInside: "auto",
+            },
+            "body.printing-roster tr": {
+              pageBreakInside: "avoid",
+              breakInside: "avoid",
             },
           },
         }}
@@ -850,7 +875,10 @@ export default function ScheduleList() {
           </>
         )
       ) : view === "month" ? (
-        <Box mt={3} id="roster-print-section">
+        <Box
+          id="roster-print-section"
+          sx={{ mt: 3, "@media print": { mt: 0 } }}
+        >
           {/* Month view header with navigation */}
           <Box
             display="flex"
@@ -861,7 +889,7 @@ export default function ScheduleList() {
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               {monthYear}
             </Typography>
-            <Stack direction="row" spacing={1}>
+            <Stack direction="row" spacing={1} className="no-print">
               <Button
                 size="small"
                 variant="outlined"

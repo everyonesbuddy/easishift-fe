@@ -25,30 +25,13 @@ import api from "../../../config/api";
 import { toast } from "react-toastify";
 
 const SCHEDULING_PATTERNS = [
+  { value: "balance", label: "Balance (fairness-based)" },
   { value: "4_on_4_off", label: "4 On / 4 Off" },
   { value: "2_2_3", label: "2-2-3 (Pitman)" },
   { value: "panama", label: "Panama (28-day cycle)" },
   { value: "fixed_5_2", label: "Fixed 5/2 (Mon–Fri)" },
   { value: "rotating_3", label: "Rotating 3 shifts/week" },
   { value: "custom", label: "Custom (coverage-driven)" },
-];
-
-const PREFERENCE_WEIGHTS = [
-  {
-    value: "strict",
-    label: "Strict",
-    description: "Preference mismatches are near-disqualifying",
-  },
-  {
-    value: "balanced",
-    label: "Balanced",
-    description: "Preferences are a meaningful but not dominant factor",
-  },
-  {
-    value: "loose",
-    label: "Loose",
-    description: "Preferences are a tiebreaker only; fairness dominates",
-  },
 ];
 
 export default function FacilityPreferencesPage() {
@@ -207,7 +190,7 @@ export default function FacilityPreferencesPage() {
             <InputLabel>Pattern</InputLabel>
             <Select
               label="Pattern"
-              value={prefs.schedulingPattern || "4_on_4_off"}
+              value={prefs.schedulingPattern || "balance"}
               onChange={(e) =>
                 handleChange("schedulingPattern", e.target.value)
               }
@@ -222,7 +205,7 @@ export default function FacilityPreferencesPage() {
           </FormControl>
         </Paper>
 
-        {/* ── Workload Limits ── */}
+        {/* ── Workload Signals ── */}
         <Paper
           sx={{
             p: { xs: 2, md: 3 },
@@ -233,61 +216,25 @@ export default function FacilityPreferencesPage() {
           }}
         >
           <Typography variant="h6" mb={0.5} sx={{ fontWeight: 700 }}>
-            Workload Limits
+            Workload Signals
           </Typography>
           <Typography variant="body2" color="text.secondary" mb={2.25}>
-            Maximum work thresholds applied during auto-generation
+            Thresholds used as signals during auto-generation ranking
           </Typography>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" },
-              gap: 2,
-            }}
-          >
-            <TextField
-              label="Max Consecutive Work Days"
-              type="number"
-              value={prefs.maxConsecutiveWorkDays ?? 4}
-              onChange={(e) =>
-                handleChange(
-                  "maxConsecutiveWorkDays",
-                  parseInt(e.target.value) || 1,
-                )
-              }
-              inputProps={{ min: 1, max: 14 }}
-              helperText="1 – 14 days"
-              fullWidth
-            />
-            <TextField
-              label="Default Max Hours / Week"
-              type="number"
-              value={prefs.defaultMaxHoursPerWeek ?? 40}
-              onChange={(e) =>
-                handleChange(
-                  "defaultMaxHoursPerWeek",
-                  parseInt(e.target.value) || 1,
-                )
-              }
-              inputProps={{ min: 1 }}
-              helperText="Facility-level cap"
-              fullWidth
-            />
-            <TextField
-              label="Min Rest Between Shifts (hrs)"
-              type="number"
-              value={prefs.minRestHoursBetweenShifts ?? 8}
-              onChange={(e) =>
-                handleChange(
-                  "minRestHoursBetweenShifts",
-                  parseInt(e.target.value) || 0,
-                )
-              }
-              inputProps={{ min: 0 }}
-              helperText="Hours between shift end and next start"
-              fullWidth
-            />
-          </Box>
+          <TextField
+            label="Weekly Overtime Threshold (hours)"
+            type="number"
+            value={prefs.weeklyOvertimeThresholdHours ?? 40}
+            onChange={(e) =>
+              handleChange(
+                "weeklyOvertimeThresholdHours",
+                parseInt(e.target.value) || 1,
+              )
+            }
+            inputProps={{ min: 1 }}
+            helperText="Hours/week at which projected overtime is flagged"
+            sx={{ maxWidth: 320 }}
+          />
         </Paper>
 
         {/* ── Fairness & Distribution ── */}
@@ -307,51 +254,6 @@ export default function FacilityPreferencesPage() {
             Controls how auto-generate distributes high-demand shifts
           </Typography>
 
-          <Stack spacing={2} mb={2.5}>
-            {[
-              {
-                field: "evenWeekendDistribution",
-                label: "Even Weekend Distribution",
-                caption:
-                  "Distribute weekend shifts evenly across eligible staff",
-              },
-              {
-                field: "evenNightDistribution",
-                label: "Even Night Distribution",
-                caption: "Distribute night shifts evenly across eligible staff",
-              },
-            ].map(({ field, label, caption }) => (
-              <Box
-                key={field}
-                sx={{
-                  p: 1.5,
-                  borderRadius: 2,
-                  bgcolor: "grey.50",
-                  border: "1px solid",
-                  borderColor: "divider",
-                }}
-              >
-                <FormControlLabel
-                  sx={{ m: 0, width: "100%" }}
-                  control={
-                    <Switch
-                      checked={prefs[field] ?? true}
-                      onChange={(e) => handleChange(field, e.target.checked)}
-                    />
-                  }
-                  label={
-                    <Box>
-                      <Typography>{label}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {caption}
-                      </Typography>
-                    </Box>
-                  }
-                />
-              </Box>
-            ))}
-          </Stack>
-
           <TextField
             label="Fairness Lookback Period (days)"
             type="number"
@@ -366,61 +268,6 @@ export default function FacilityPreferencesPage() {
             helperText="7 – 90 days of history used for workload fairness scoring"
             sx={{ maxWidth: 320 }}
           />
-        </Paper>
-
-        {/* ── Staff Preference Weight ── */}
-        <Paper
-          sx={{
-            p: { xs: 2, md: 3 },
-            borderRadius: 3,
-            border: "1px solid",
-            borderColor: "divider",
-            boxShadow: 1,
-          }}
-        >
-          <Typography variant="h6" mb={0.5} sx={{ fontWeight: 700 }}>
-            Staff Preference Weight
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mb={2.25}>
-            How strongly individual staff preferences influence auto-generate
-            assignment ranking
-          </Typography>
-          <Stack spacing={1.5}>
-            {PREFERENCE_WEIGHTS.map((opt) => {
-              const selected =
-                (prefs.staffPreferenceWeight || "balanced") === opt.value;
-              return (
-                <Box
-                  key={opt.value}
-                  onClick={() =>
-                    handleChange("staffPreferenceWeight", opt.value)
-                  }
-                  sx={{
-                    p: 1.75,
-                    borderRadius: 2,
-                    border: "2px solid",
-                    borderColor: selected ? "primary.main" : "divider",
-                    bgcolor: selected ? "primary.lighter" : "background.paper",
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                    "&:hover": {
-                      borderColor: selected ? "primary.main" : "primary.light",
-                    },
-                  }}
-                >
-                  <Typography
-                    fontWeight={selected ? 700 : 500}
-                    color={selected ? "primary.dark" : "text.primary"}
-                  >
-                    {opt.label}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {opt.description}
-                  </Typography>
-                </Box>
-              );
-            })}
-          </Stack>
         </Paper>
 
         {/* ── Notifications ── */}

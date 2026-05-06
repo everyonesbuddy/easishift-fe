@@ -158,15 +158,12 @@ export default function PreferencesPage() {
           >
             {DAYS.map((d, i) => {
               const isPreferred = hasPref(prefs.preferredDaysOfWeek, i);
-              const isUnavailable = hasPref(prefs.unavailableDaysOfWeek, i);
               return (
                 <ToggleButton
                   key={i}
                   value={d}
                   selected={isPreferred}
-                  onClick={() =>
-                    !isUnavailable && toggleArrayItem("preferredDaysOfWeek", i)
-                  }
+                  onClick={() => toggleArrayItem("preferredDaysOfWeek", i)}
                   sx={{
                     borderRadius: 2,
                     minHeight: 44,
@@ -175,89 +172,12 @@ export default function PreferencesPage() {
                       ? "success.lighter"
                       : "background.paper",
                     color: isPreferred ? "success.dark" : "text.primary",
-                    border: isPreferred
-                      ? "2px solid"
-                      : isUnavailable
-                        ? "1px solid"
-                        : "1px solid",
-                    borderColor: isPreferred
-                      ? "success.main"
-                      : isUnavailable
-                        ? "grey.200"
-                        : "divider",
-                    opacity: isUnavailable ? 0.6 : 1,
-                    cursor: isUnavailable ? "not-allowed" : "pointer",
+                    border: isPreferred ? "2px solid" : "1px solid",
+                    borderColor: isPreferred ? "success.main" : "divider",
                     "&:hover": {
-                      borderColor: isUnavailable ? "grey.200" : "success.light",
+                      borderColor: "success.light",
                     },
                   }}
-                  disabled={isUnavailable}
-                >
-                  {d}
-                </ToggleButton>
-              );
-            })}
-          </ToggleButtonGroup>
-        </Paper>
-
-        <Paper
-          sx={{
-            p: { xs: 2, md: 3 },
-            borderRadius: 3,
-            border: "1px solid",
-            borderColor: "divider",
-            boxShadow: 1,
-          }}
-        >
-          <Typography variant="h6" mb={0.5} sx={{ fontWeight: 700 }}>
-            Unavailable Days
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mb={2.25}>
-            Select days when you cannot work
-          </Typography>
-          <ToggleButtonGroup
-            sx={{
-              display: "grid",
-              gridTemplateColumns: "repeat(7, minmax(42px, 1fr))",
-              gap: 1,
-            }}
-          >
-            {DAYS.map((d, i) => {
-              const isPreferred = hasPref(prefs.preferredDaysOfWeek, i);
-              const isUnavailable = hasPref(prefs.unavailableDaysOfWeek, i);
-              return (
-                <ToggleButton
-                  key={i}
-                  value={d}
-                  selected={isUnavailable}
-                  onClick={() =>
-                    !isPreferred && toggleArrayItem("unavailableDaysOfWeek", i)
-                  }
-                  sx={{
-                    borderRadius: 2,
-                    minHeight: 44,
-                    fontWeight: 600,
-                    bgcolor: isUnavailable
-                      ? "error.lighter"
-                      : "background.paper",
-                    color: isUnavailable ? "error.dark" : "text.primary",
-                    border: isUnavailable
-                      ? "2px solid"
-                      : isPreferred
-                        ? "1px solid"
-                        : "1px solid",
-                    borderColor: isUnavailable
-                      ? "error.main"
-                      : isPreferred
-                        ? "grey.200"
-                        : "divider",
-                    opacity: isPreferred ? 0.6 : 1,
-                    cursor: isPreferred ? "not-allowed" : "pointer",
-                    "&:hover": {
-                      borderColor: isPreferred ? "grey.200" : "error.light",
-                    },
-                  }}
-                  disabled={isPreferred}
                 >
                   {d}
                 </ToggleButton>
@@ -568,28 +488,6 @@ export default function PreferencesPage() {
               />
             </Box>
           </Stack>
-        </Paper>
-
-        <Paper
-          sx={{
-            p: { xs: 2, md: 3 },
-            borderRadius: 3,
-            border: "1px solid",
-            borderColor: "divider",
-            boxShadow: 1,
-          }}
-        >
-          <Typography variant="h6" mb={1.5} sx={{ fontWeight: 700 }}>
-            Additional Notes
-          </Typography>
-          <TextField
-            multiline
-            minRows={5}
-            value={prefs.notes || ""}
-            onChange={(e) => handleChange("notes", e.target.value)}
-            placeholder="Add any additional scheduling preferences or constraints..."
-            fullWidth
-          />
         </Paper>
 
         <Box display="flex" justifyContent="flex-end">

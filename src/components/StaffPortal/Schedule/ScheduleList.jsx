@@ -1229,7 +1229,7 @@ export default function ScheduleList() {
             onClose={() => setOpenAutoModal(false)}
             onSuccess={() => {
               setOpenAutoModal(false);
-              window.location.reload();
+              fetchSchedules();
             }}
           />
         </DialogContent>

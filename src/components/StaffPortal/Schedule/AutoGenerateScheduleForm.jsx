@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Typography,
@@ -60,6 +60,26 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
   const [selectedRole, setSelectedRole] = useState(""); // optional role filter
   const [fetching, setFetching] = useState(false);
 
+  const selectableCoverageIds = useMemo(
+    () =>
+      coverages
+        .filter((cov) => Number(cov.remaining) > 0)
+        .map((cov) => cov._id),
+    [coverages],
+  );
+
+  const selectedSelectableCount = useMemo(
+    () => selectedIds.filter((id) => selectableCoverageIds.includes(id)).length,
+    [selectedIds, selectableCoverageIds],
+  );
+
+  const allSelectableSelected =
+    selectableCoverageIds.length > 0 &&
+    selectedSelectableCount === selectableCoverageIds.length;
+
+  const hasSomeSelectableSelected =
+    selectedSelectableCount > 0 && !allSelectableSelected;
+
   const toastOptions = {
     position: "top-right",
     autoClose: 3500,
@@ -100,6 +120,20 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const handleToggleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedIds((prev) => {
+        const merged = new Set([...prev, ...selectableCoverageIds]);
+        return Array.from(merged);
+      });
+      return;
+    }
+
+    setSelectedIds((prev) =>
+      prev.filter((id) => !selectableCoverageIds.includes(id)),
     );
   };
 
@@ -355,156 +389,187 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
             No unfilled coverages available.
           </Typography>
         ) : (
-          <Box
-            sx={{
-              maxHeight: { xs: "60vh", md: 320 },
-              overflowY: "auto",
-              pr: 0.5,
-            }}
-          >
-            {coverages
-              .slice()
-              .sort((a, b) => {
-                // Move items with remaining === 0 to the bottom
-                const aZero = a.remaining === 0;
-                const bZero = b.remaining === 0;
-                if (aZero === bZero) return 0;
-                return aZero ? 1 : -1;
-              })
-              .map((cov) => {
-                const dateStr = new Date(cov.date).toLocaleDateString("en-US", {
-                  timeZone: "UTC",
-                });
-                const startStr = new Date(cov.startTime).toLocaleTimeString(
-                  [],
-                  {
+          <>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                px: 0.5,
+              }}
+            >
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={allSelectableSelected}
+                    indeterminate={hasSomeSelectableSelected}
+                    onChange={(e) => handleToggleSelectAll(e.target.checked)}
+                    disabled={selectableCoverageIds.length === 0}
+                  />
+                }
+                label={`Select all (${selectedSelectableCount}/${selectableCoverageIds.length})`}
+                sx={{ m: 0 }}
+              />
+            </Box>
+
+            <Box
+              sx={{
+                maxHeight: { xs: "60vh", md: 320 },
+                overflowY: "auto",
+                pr: 0.5,
+              }}
+            >
+              {coverages
+                .slice()
+                .sort((a, b) => {
+                  // Move items with remaining === 0 to the bottom
+                  const aZero = a.remaining === 0;
+                  const bZero = b.remaining === 0;
+                  if (aZero === bZero) return 0;
+                  return aZero ? 1 : -1;
+                })
+                .map((cov) => {
+                  const dateStr = new Date(cov.date).toLocaleDateString(
+                    "en-US",
+                    {
+                      timeZone: "UTC",
+                    },
+                  );
+                  const startStr = new Date(cov.startTime).toLocaleTimeString(
+                    [],
+                    {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    },
+                  );
+                  const endStr = new Date(cov.endTime).toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
-                  },
-                );
-                const endStr = new Date(cov.endTime).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
+                  });
 
-                const selected = selectedIds.includes(cov._id);
-                const isZero = cov.remaining === 0;
+                  const selected = selectedIds.includes(cov._id);
+                  const isZero = cov.remaining === 0;
 
-                return (
-                  <Paper
-                    key={cov._id}
-                    onClick={() => !isZero && toggleSelect(cov._id)}
-                    elevation={selected ? 6 : 0}
-                    sx={{
-                      p: { xs: 0.75, md: 1 },
-                      my: 0.5,
-                      display: "flex",
-                      flexDirection: { xs: "column", sm: "row" },
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      cursor: isZero ? "default" : "pointer",
-                      borderRadius: 1,
-                      backgroundColor: selected
-                        ? "rgba(25,118,210,0.06)"
-                        : isZero
-                          ? "rgba(255,255,255,0.01)"
-                          : "transparent",
-                      border: "1px solid rgba(255,255,255,0.03)",
-                      opacity: isZero ? 0.65 : 1,
-                    }}
-                  >
-                    <Box
+                  return (
+                    <Paper
+                      key={cov._id}
+                      onClick={() => !isZero && toggleSelect(cov._id)}
+                      elevation={selected ? 6 : 0}
                       sx={{
+                        p: { xs: 0.75, md: 1 },
+                        my: 0.5,
                         display: "flex",
+                        flexDirection: { xs: "column", sm: "row" },
                         alignItems: "center",
-                        gap: 1,
-                        width: "100%",
+                        justifyContent: "space-between",
+                        cursor: isZero ? "default" : "pointer",
+                        borderRadius: 1,
+                        backgroundColor: selected
+                          ? "rgba(25,118,210,0.06)"
+                          : isZero
+                            ? "rgba(255,255,255,0.01)"
+                            : "transparent",
+                        border: "1px solid rgba(255,255,255,0.03)",
+                        opacity: isZero ? 0.65 : 1,
                       }}
                     >
-                      <Checkbox
-                        size="small"
-                        checked={selected}
-                        onChange={() => toggleSelect(cov._id)}
-                        onClick={(e) => e.stopPropagation()}
-                        disabled={isZero}
-                      />
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          width: "100%",
+                        }}
+                      >
+                        <Checkbox
+                          size="small"
+                          checked={selected}
+                          onChange={() => toggleSelect(cov._id)}
+                          onClick={(e) => e.stopPropagation()}
+                          disabled={isZero}
+                        />
+
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            minWidth: 0,
+                            mr: 1,
+                          }}
+                        >
+                          <Typography
+                            sx={{
+                              fontWeight: 600,
+                              fontSize: { xs: 12, md: 13 },
+                              lineHeight: 1,
+                            }}
+                            noWrap
+                          >
+                            {dateStr} · {roleLabels[cov.role] || cov.role}
+                          </Typography>
+                          <Typography
+                            sx={{ fontSize: { xs: 12, md: 13 }, color: "gray" }}
+                            noWrap
+                          >
+                            {startStr} — {endStr}
+                            {cov.location ? ` · ${cov.location}` : ""}
+                          </Typography>
+                        </Box>
+                      </Box>
 
                       <Box
                         sx={{
                           display: "flex",
-                          flexDirection: "column",
-                          minWidth: 0,
-                          mr: 1,
+                          gap: 2,
+                          alignItems: "center",
+                          mt: { xs: 1, sm: 0 },
                         }}
                       >
-                        <Typography
-                          sx={{
-                            fontWeight: 600,
-                            fontSize: { xs: 12, md: 13 },
-                            lineHeight: 1,
-                          }}
-                          noWrap
-                        >
-                          {dateStr} · {roleLabels[cov.role] || cov.role}
-                        </Typography>
-                        <Typography
-                          sx={{ fontSize: { xs: 12, md: 13 }, color: "gray" }}
-                          noWrap
-                        >
-                          {startStr} — {endStr}
-                          {cov.location ? ` · ${cov.location}` : ""}
-                        </Typography>
-                      </Box>
-                    </Box>
+                        <Box sx={{ textAlign: "right" }}>
+                          <Typography
+                            variant="caption"
+                            sx={{ color: "gray", display: "block" }}
+                          >
+                            Required
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontWeight: 700,
+                              fontSize: { xs: 13, md: 14 },
+                            }}
+                          >
+                            {cov.requiredCount}
+                          </Typography>
+                        </Box>
 
-                    <Box
-                      sx={{
-                        display: "flex",
-                        gap: 2,
-                        alignItems: "center",
-                        mt: { xs: 1, sm: 0 },
-                      }}
-                    >
-                      <Box sx={{ textAlign: "right" }}>
-                        <Typography
-                          variant="caption"
-                          sx={{ color: "gray", display: "block" }}
-                        >
-                          Required
-                        </Typography>
-                        <Typography
-                          sx={{ fontWeight: 700, fontSize: { xs: 13, md: 14 } }}
-                        >
-                          {cov.requiredCount}
-                        </Typography>
+                        <Box sx={{ textAlign: "right" }}>
+                          <Typography
+                            variant="caption"
+                            sx={{ color: "gray", display: "block" }}
+                          >
+                            Remaining
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontWeight: 700,
+                              fontSize: { xs: 13, md: 14 },
+                              color: isZero
+                                ? "text.secondary"
+                                : cov.remaining === 0
+                                  ? "error.main"
+                                  : "success.main",
+                            }}
+                          >
+                            {cov.remaining}
+                          </Typography>
+                        </Box>
                       </Box>
-
-                      <Box sx={{ textAlign: "right" }}>
-                        <Typography
-                          variant="caption"
-                          sx={{ color: "gray", display: "block" }}
-                        >
-                          Remaining
-                        </Typography>
-                        <Typography
-                          sx={{
-                            fontWeight: 700,
-                            fontSize: { xs: 13, md: 14 },
-                            color: isZero
-                              ? "text.secondary"
-                              : cov.remaining === 0
-                                ? "error.main"
-                                : "success.main",
-                          }}
-                        >
-                          {cov.remaining}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Paper>
-                );
-              })}
-          </Box>
+                    </Paper>
+                  );
+                })}
+            </Box>
+          </>
         )}
 
         {errorMsg && <Typography color="error">{errorMsg}</Typography>}

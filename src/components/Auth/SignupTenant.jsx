@@ -149,7 +149,7 @@ export default function SignupTenant() {
           </Box>
 
           <TextField
-            label="Hospital Address"
+            label="Facility Address"
             fullWidth
             value={address}
             onChange={(e) => setAddress(e.target.value)}
@@ -234,7 +234,7 @@ export default function SignupTenant() {
               fontWeight: 600,
             }}
           >
-            Create Hospital
+            Create Facility
           </Button>
         </Box>
       </Paper>

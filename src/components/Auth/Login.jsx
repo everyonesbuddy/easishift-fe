@@ -139,7 +139,7 @@ export default function Login() {
             align="center"
             sx={{ color: "black", mt: 2 }}
           >
-            Don’t have an account? Contact your hospital admin.
+            Don’t have an account? Contact your facility admin.
           </Typography>
 
           <Box

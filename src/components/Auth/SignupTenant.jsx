@@ -17,18 +17,6 @@ const validateEmail = (email) => {
   return emailRegex.test(email);
 };
 
-const createTemporaryDomain = (name) => {
-  const slug = name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
-
-  const base = slug || "tenant";
-  return `${base}-${Date.now()}`;
-};
-
 export default function SignupTenant() {
   const [hospitalName, setHospitalName] = useState("");
   const [adminName, setAdminName] = useState("");
@@ -67,11 +55,8 @@ export default function SignupTenant() {
     }
 
     try {
-      const domain = createTemporaryDomain(hospitalName);
-
       const res = await api.post("/auth/signup/tenant", {
         name: hospitalName,
-        domain,
         email: adminEmail,
         password: adminPassword,
         tenantPhoneCountryCode,

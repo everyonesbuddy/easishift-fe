@@ -10,6 +10,7 @@ import {
   Chip,
   Avatar,
 } from "@mui/material";
+import { useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FiUser,
@@ -19,21 +20,35 @@ import {
   FiShuffle,
   FiTrendingDown,
   FiCheckCircle,
-  FiCalendar,
-  FiShield,
-  FiZap,
 } from "react-icons/fi";
 
 import clinicImage from "../../assets/images/pexels-cottonbro-7579831.jpg";
 
 const NAVBAR_HEIGHT = 80;
 
+const INDUSTRIES = [
+  "Healthcare",
+  "Hospitality",
+  "Retail",
+  "Warehousing & Logistics",
+  "Security Services",
+  "Manufacturing",
+  "Cleaning & Janitorial",
+  "Home Care",
+  "Construction",
+  "Education",
+  "Restaurants",
+  "Events & Venues",
+  "Transportation",
+  "Customer Support",
+];
+
 const Section = ({ children, sx }) => (
   <Box sx={{ py: { xs: 6, md: 9 }, ...sx }}>{children}</Box>
 );
 
-const SectionTitle = ({ eyebrow, title, subtitle }) => (
-  <Box textAlign="center" mb={4}>
+const SectionTitle = ({ eyebrow, title, subtitle, mb = 4 }) => (
+  <Box textAlign="center" mb={mb}>
     {eyebrow && (
       <Typography
         variant="overline"
@@ -117,37 +132,107 @@ const Testimonial = ({ quote, name, role }) => (
 export default function Home() {
   const navigate = useNavigate();
   const clinicImageUrl = new URL(clinicImage, import.meta.url).href;
+  const industryRowRef = useRef(null);
+
+  const scrollIndustryRow = useCallback(() => {
+    const row = industryRowRef.current;
+    if (!row) {
+      return;
+    }
+
+    const firstItem = row.querySelector("[data-industry-item='true']");
+    if (!firstItem) {
+      return;
+    }
+
+    const firstItemWidth = firstItem.getBoundingClientRect().width;
+    const step = firstItemWidth + 8;
+    const maxLeft = row.scrollWidth - row.clientWidth;
+
+    if (row.scrollLeft >= maxLeft - 4) {
+      row.scrollTo({ left: 0, behavior: "smooth" });
+      return;
+    }
+
+    row.scrollBy({ left: step, behavior: "smooth" });
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      scrollIndustryRow();
+    }, 3200);
+
+    return () => clearInterval(timer);
+  }, [scrollIndustryRow]);
 
   return (
     <Box
       sx={{
         minHeight: `calc(100vh - ${NAVBAR_HEIGHT}px)`,
-        bgcolor: "#fff",
+        bgcolor: "#f8f9fb",
         pt: { xs: 3, md: 5 },
         pb: { xs: 10, md: 6 },
         position: "relative",
         overflow: "hidden",
       }}
     >
-      <Container maxWidth="lg">
+      <Box
+        sx={{
+          position: "absolute",
+          top: 0,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "100vw",
+          height: { xs: 520, md: 700 },
+          overflow: "hidden",
+          pointerEvents: "none",
+          zIndex: 0,
+          "&::before": {
+            content: '""',
+            position: "absolute",
+            width: { xs: 760, md: 1400 },
+            height: { xs: 760, md: 1400 },
+            borderRadius: "50%",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            background:
+              "repeating-radial-gradient(circle at center, rgba(0,113,227,0.24) 0px, rgba(0,113,227,0.24) 3px, rgba(0,113,227,0.12) 42px, rgba(0,113,227,0.05) 90px, rgba(29,29,31,0.03) 138px, rgba(0,113,227,0) 190px)",
+            filter: "blur(1px)",
+            animation:
+              "heroRipplePulse 10s cubic-bezier(0.22, 1, 0.36, 1) infinite",
+          },
+          "@keyframes heroRipplePulse": {
+            "0%": {
+              transform: "translate(-50%, -50%) scale(0.94)",
+              opacity: 0.72,
+            },
+            "50%": {
+              transform: "translate(-50%, -50%) scale(1.08)",
+              opacity: 0.38,
+            },
+            "100%": {
+              transform: "translate(-50%, -50%) scale(0.94)",
+              opacity: 0.72,
+            },
+          },
+        }}
+      />
+
+      <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
         {/* HERO */}
         <Box
           sx={{
             display: "grid",
             gridTemplateColumns: { xs: "1fr", md: "1.1fr 0.9fr" },
             gap: { xs: 4, md: 6 },
-            alignItems: "center",
+            alignItems: { xs: "center", md: "flex-start" },
             py: { xs: 4, md: 7 },
+            position: "relative",
           }}
         >
           {/* LEFT */}
           <Box>
-            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
-              <Chip icon={<FiZap />} label="AI Workforce scheduling" />
-              <Chip icon={<FiShield />} label="Flexible by design" />
-              <Chip icon={<FiCalendar />} label="Simple to use" />
-            </Stack>
-
             <Typography
               variant="h3"
               sx={{
@@ -156,23 +241,97 @@ export default function Home() {
                 lineHeight: 1.02,
               }}
             >
-              Workforce Scheduling Made For Healthcare Facilities
+              Workforce Scheduling
+              <br />
+              Made For You
             </Typography>
 
             <Typography
               variant="h6"
-              sx={{ color: "text.secondary", mt: 2, maxWidth: 680 }}
+              sx={{ color: "text.secondary", mt: 5, maxWidth: 680 }}
             >
-              Modern scheduling for healthcare facilities, minus the chaos
+              We support various industries like:
             </Typography>
 
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} mt={3}>
+            <Box
+              sx={{
+                mt: 1.25,
+                mb: 5,
+                px: 1,
+                py: 1,
+                width: "100%",
+                maxWidth: 680,
+                border: "1px solid #e5e5ea",
+                borderRadius: 3,
+                bgcolor: "#fafafc",
+              }}
+            >
+              <Stack direction="row" alignItems="center" spacing={0.25}>
+                <Stack
+                  ref={industryRowRef}
+                  direction="row"
+                  spacing={1}
+                  justifyContent="flex-start"
+                  sx={{
+                    width: "100%",
+                    overflowX: "auto",
+                    scrollbarWidth: "none",
+                    "&::-webkit-scrollbar": { display: "none" },
+                    scrollBehavior: "smooth",
+                    pr: 0.5,
+                  }}
+                >
+                  {INDUSTRIES.map((industry) => (
+                    <Chip
+                      data-industry-item="true"
+                      key={industry}
+                      label={industry}
+                      size="small"
+                      sx={{
+                        fontWeight: 500,
+                        color: "#1d1d1f",
+                        bgcolor: "transparent",
+                        border: "none",
+                        borderRadius: 1,
+                        height: 34,
+                        flex: "0 0 calc(25% - 6px)",
+                        maxWidth: "calc(25% - 6px)",
+                        "& .MuiChip-label": {
+                          px: 0.5,
+                        },
+                      }}
+                    />
+                  ))}
+                </Stack>
+              </Stack>
+            </Box>
+
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1.5}
+              mt={3.5}
+            >
               <Button
                 variant="contained"
                 size="large"
                 startIcon={<FiUser />}
                 onClick={() => navigate("/signup-tenant")}
-                sx={{ fontWeight: 900 }}
+                sx={{
+                  fontWeight: 600,
+                  textTransform: "none",
+                  borderRadius: 999,
+                  // bgcolor: "#1d1d1f",
+                  color: "#fff",
+                  px: 3,
+                  py: 1.2,
+                  // boxShadow:
+                  //   "0 1px 2px rgba(0,0,0,0.08), 0 6px 18px rgba(0,0,0,0.16)",
+                  // "&:hover": {
+                  //   bgcolor: "#000",
+                  //   boxShadow:
+                  //     "0 2px 6px rgba(0,0,0,0.12), 0 10px 24px rgba(0,0,0,0.2)",
+                  // },
+                }}
               >
                 Sign Up
               </Button>
@@ -181,7 +340,20 @@ export default function Home() {
                 size="large"
                 startIcon={<FiUser />}
                 onClick={() => navigate("/login")}
-                sx={{ fontWeight: 900, px: 4 }}
+                sx={{
+                  fontWeight: 600,
+                  textTransform: "none",
+                  borderRadius: 999,
+                  px: 3.5,
+                  py: 1.2,
+                  color: "#1d1d1f",
+                  borderColor: "#d2d2d7",
+                  bgcolor: "#fff",
+                  "&:hover": {
+                    borderColor: "#b9b9be",
+                    bgcolor: "#f5f5f7",
+                  },
+                }}
               >
                 Log in
               </Button>
@@ -279,7 +451,7 @@ export default function Home() {
                   See your annual turnover cost in dollars
                 </Typography>
                 <Typography sx={{ color: "text.secondary", mt: 0.5 }}>
-                  Use the LTC ROI Calculator to estimate turnover impact and
+                  Use the ROI Calculator to estimate turnover impact and
                   projected Easishift savings in under 2 minutes.
                 </Typography>
               </Box>
@@ -288,9 +460,14 @@ export default function Home() {
                 variant="contained"
                 size="large"
                 onClick={() => navigate("/turnover-roi-calculator")}
-                sx={{ fontWeight: 900, px: 3.5, whiteSpace: "nowrap" }}
+                sx={{
+                  fontWeight: 900,
+                  px: 3.5,
+                  whiteSpace: "nowrap",
+                  borderRadius: 999,
+                }}
               >
-                Open LTC ROI Calculator
+                Open ROI Calculator
               </Button>
             </Box>
           </CardContent>
@@ -300,7 +477,7 @@ export default function Home() {
         <Section>
           <SectionTitle
             eyebrow="Why it works"
-            title="Workforce Scheduling built for real healthcare facility conditions"
+            title="Workforce Scheduling built for real business conditions"
             subtitle="Designed around constant change, not ideal scenarios."
           />
 
@@ -393,7 +570,7 @@ export default function Home() {
                   href="https://calendly.com/easishift-info/30min?month=2026-01"
                   target="_blank"
                   rel="noopener noreferrer"
-                  sx={{ fontWeight: 900 }}
+                  sx={{ fontWeight: 900, borderRadius: 999 }}
                 >
                   Request a demo
                 </Button>
@@ -401,7 +578,7 @@ export default function Home() {
                   variant="outlined"
                   size="large"
                   onClick={() => navigate("/signup-tenant")}
-                  sx={{ fontWeight: 900 }}
+                  sx={{ fontWeight: 900, borderRadius: 999 }}
                 >
                   Sign Up
                 </Button>

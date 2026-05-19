@@ -232,6 +232,7 @@ export default function SignupTenant() {
               "&:hover": { bgcolor: "#1e88e5" },
               color: "white",
               fontWeight: 600,
+              borderRadius: 999,
             }}
           >
             Create Facility

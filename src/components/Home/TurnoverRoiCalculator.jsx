@@ -317,7 +317,7 @@ export default function TurnoverRoiCalculator() {
             variant="h4"
             sx={{ fontWeight: 950, letterSpacing: "-0.02em", lineHeight: 1.1 }}
           >
-            LTC Turnover To ROI Calculator
+            Turnover To ROI Calculator
           </Typography>
           <Typography
             sx={{ color: "text.secondary", mt: 0.8, fontSize: "1rem" }}

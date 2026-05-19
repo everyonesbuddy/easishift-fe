@@ -30,13 +30,15 @@ export default function Navbar({ onMobileOpen }) {
     <AppBar
       position="sticky"
       sx={{
-        bgcolor: "background.paper",
+        bgcolor: "rgba(255,255,255,0.9)",
+        backdropFilter: "blur(14px)",
         borderBottom: 1,
         borderColor: "divider",
+        boxShadow: "none",
         zIndex: 30,
       }}
     >
-      <Toolbar sx={{ px: 4, height: 80, minHeight: 80 }}>
+      <Toolbar sx={{ px: 4, height: 72, minHeight: 72 }}>
         <Box sx={{ flex: 1, display: "flex", alignItems: "center" }}>
           {!user ? (
             <>
@@ -58,7 +60,7 @@ export default function Navbar({ onMobileOpen }) {
                   aria-label="Easishift"
                   sx={{
                     width: 220,
-                    height: 44,
+                    height: 40,
                     display: "block",
                     objectFit: "contain",
                   }}

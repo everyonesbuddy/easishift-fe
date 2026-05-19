@@ -127,6 +127,7 @@ export default function Login() {
                 backgroundColor: "#1e88e5",
                 boxShadow: "0 0 8px rgba(66,165,245,0.7)",
               },
+              borderRadius: 999,
               py: 1.2,
               fontWeight: 600,
             }}

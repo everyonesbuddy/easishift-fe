@@ -183,21 +183,21 @@ export default function Home() {
           left: "50%",
           transform: "translateX(-50%)",
           width: "100vw",
-          height: { xs: 520, md: 700 },
+          height: { xs: 430, md: 700 },
           overflow: "hidden",
           pointerEvents: "none",
           zIndex: 0,
           "&::before": {
             content: '""',
             position: "absolute",
-            width: { xs: 760, md: 1400 },
-            height: { xs: 760, md: 1400 },
+            width: { xs: 560, md: 1400 },
+            height: { xs: 560, md: 1400 },
             borderRadius: "50%",
             top: "50%",
             left: "50%",
             transform: "translate(-50%, -50%)",
             background:
-              "repeating-radial-gradient(circle at center, rgba(0,113,227,0.24) 0px, rgba(0,113,227,0.24) 3px, rgba(0,113,227,0.12) 42px, rgba(0,113,227,0.05) 90px, rgba(29,29,31,0.03) 138px, rgba(0,113,227,0) 190px)",
+              "repeating-radial-gradient(circle at center, rgba(0,113,227,0.17) 0px, rgba(0,113,227,0.17) 3px, rgba(0,113,227,0.09) 34px, rgba(0,113,227,0.04) 74px, rgba(29,29,31,0.02) 112px, rgba(0,113,227,0) 156px)",
             filter: "blur(1px)",
             animation:
               "heroRipplePulse 10s cubic-bezier(0.22, 1, 0.36, 1) infinite",
@@ -229,16 +229,20 @@ export default function Home() {
             alignItems: { xs: "center", md: "flex-start" },
             py: { xs: 4, md: 7 },
             position: "relative",
+            width: "100%",
+            maxWidth: "100%",
+            overflowX: "clip",
           }}
         >
           {/* LEFT */}
-          <Box>
+          <Box sx={{ minWidth: 0 }}>
             <Typography
               variant="h3"
               sx={{
                 fontWeight: 950,
                 letterSpacing: "-0.035em",
                 lineHeight: 1.02,
+                fontSize: { xs: "2rem", md: "3rem" },
               }}
             >
               Workforce Scheduling
@@ -248,7 +252,11 @@ export default function Home() {
 
             <Typography
               variant="h6"
-              sx={{ color: "text.secondary", mt: 5, maxWidth: 680 }}
+              sx={{
+                color: "text.secondary",
+                mt: { xs: 2, md: 5 },
+                maxWidth: 680,
+              }}
             >
               We support various industries like:
             </Typography>
@@ -256,14 +264,15 @@ export default function Home() {
             <Box
               sx={{
                 mt: 1.25,
-                mb: 5,
-                px: 1,
-                py: 1,
+                mb: { xs: 2.5, md: 5 },
+                px: { xs: 0.75, md: 1 },
+                py: { xs: 0.75, md: 1 },
                 width: "100%",
-                maxWidth: 680,
+                maxWidth: "100%",
                 border: "1px solid #e5e5ea",
                 borderRadius: 3,
                 bgcolor: "#fafafc",
+                boxSizing: "border-box",
               }}
             >
               <Stack direction="row" alignItems="center" spacing={0.25}>
@@ -274,6 +283,7 @@ export default function Home() {
                   justifyContent="flex-start"
                   sx={{
                     width: "100%",
+                    minWidth: 0,
                     overflowX: "auto",
                     scrollbarWidth: "none",
                     "&::-webkit-scrollbar": { display: "none" },
@@ -293,11 +303,12 @@ export default function Home() {
                         bgcolor: "transparent",
                         border: "none",
                         borderRadius: 1,
-                        height: 34,
-                        flex: "0 0 calc(25% - 6px)",
-                        maxWidth: "calc(25% - 6px)",
+                        height: { xs: 30, md: 34 },
+                        flex: { xs: "0 0 auto", md: "0 0 calc(25% - 6px)" },
+                        maxWidth: { xs: "none", md: "calc(25% - 6px)" },
                         "& .MuiChip-label": {
-                          px: 0.5,
+                          px: { xs: 0.25, md: 0.5 },
+                          fontSize: { xs: "0.78rem", md: "0.86rem" },
                         },
                       }}
                     />
@@ -309,7 +320,11 @@ export default function Home() {
             <Stack
               direction={{ xs: "column", sm: "row" }}
               spacing={1.5}
-              mt={3.5}
+              mt={{ xs: 2.25, md: 3.5 }}
+              sx={{
+                width: "100%",
+                alignItems: { xs: "stretch", sm: "center" },
+              }}
             >
               <Button
                 variant="contained"
@@ -317,12 +332,13 @@ export default function Home() {
                 startIcon={<FiUser />}
                 onClick={() => navigate("/signup-tenant")}
                 sx={{
+                  width: { xs: "100%", sm: "auto" },
                   fontWeight: 600,
                   textTransform: "none",
                   borderRadius: 999,
                   // bgcolor: "#1d1d1f",
                   color: "#fff",
-                  px: 3,
+                  px: { xs: 2.25, sm: 3 },
                   py: 1.2,
                   // boxShadow:
                   //   "0 1px 2px rgba(0,0,0,0.08), 0 6px 18px rgba(0,0,0,0.16)",
@@ -341,10 +357,11 @@ export default function Home() {
                 startIcon={<FiUser />}
                 onClick={() => navigate("/login")}
                 sx={{
+                  width: { xs: "100%", sm: "auto" },
                   fontWeight: 600,
                   textTransform: "none",
                   borderRadius: 999,
-                  px: 3.5,
+                  px: { xs: 2.5, sm: 3.5 },
                   py: 1.2,
                   color: "#1d1d1f",
                   borderColor: "#d2d2d7",
@@ -380,7 +397,12 @@ export default function Home() {
           </Box>
 
           {/* RIGHT */}
-          <Box display="flex" flexDirection="column" gap={2}>
+          <Box
+            display="flex"
+            flexDirection="column"
+            gap={2}
+            sx={{ minWidth: 0 }}
+          >
             {/* IMAGE */}
             <Box
               sx={{
@@ -587,34 +609,6 @@ export default function Home() {
           </Card>
         </Section>
       </Container>
-
-      {/* MOBILE CTA */}
-      <Box
-        sx={{
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          display: { xs: "block", md: "none" },
-          bgcolor: "#fff",
-          borderTop: "1px solid rgba(0,0,0,0.08)",
-          p: 1.5,
-        }}
-      >
-        <Button
-          fullWidth
-          variant="contained"
-          size="large"
-          startIcon={<FiPhoneCall />}
-          component="a"
-          href="https://calendly.com/easishift-info/30min?month=2026-01"
-          target="_blank"
-          rel="noopener noreferrer"
-          sx={{ fontWeight: 950 }}
-        >
-          Book a demo
-        </Button>
-      </Box>
     </Box>
   );
 }

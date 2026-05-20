@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import api from "../config/api";
+import { ALL_USER_ROLES } from "../constants/industryRoles";
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -113,23 +114,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const isPatient = role === "patient";
-  const isAdmin = role === "admin";
-  const isStaff = [
-    "staff",
-    "admin",
-    "doctor",
-    "nurse",
-    "rn",
-    "lpn",
-    "cna",
-    "med_aide",
-    "caregiver",
-    "activity_aide",
-    "dietary_aide",
-    "housekeeper",
-    "receptionist",
-    "billing",
-  ].includes(role);
+  const isAdmin = role === "admin" || role === "superadmin";
+  const isStaff = ALL_USER_ROLES.includes(role);
 
   return (
     <AuthContext.Provider

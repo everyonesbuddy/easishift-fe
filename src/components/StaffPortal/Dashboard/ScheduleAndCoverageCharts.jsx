@@ -18,6 +18,11 @@ import {
   FiCheckCircle,
   FiAlertTriangle,
 } from "react-icons/fi";
+import {
+  ALL_NON_ADMIN_ROLES,
+  getRoleColor as getMappedRoleColor,
+  getRoleDisplayName as getMappedRoleDisplayName,
+} from "../../../constants/industryRoles";
 
 // -------------------
 // Utilities
@@ -241,22 +246,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
   // -------------------
   // Roles & role selector (only roles that actually have coverage)
   // -------------------
-  const allRoles = [
-    "doctor",
-    "nurse",
-    "rn",
-    "lpn",
-    "cna",
-    "med_aide",
-    "caregiver",
-    "activity_aide",
-    "dietary_aide",
-    "housekeeper",
-    "receptionist",
-    "billing",
-    "staff",
-    "other",
-  ];
+  const allRoles = ALL_NON_ADMIN_ROLES;
 
   const rolesWithCoverage = useMemo(() => {
     const setRoles = new Set(coverageNormalized.map((c) => c.role));
@@ -523,55 +513,11 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
 
   // small helpers
   function getRoleDisplayName(role) {
-    if (!role) return "Staff";
-    const labels = {
-      doctor: "Doctor",
-      nurse: "Nurse",
-      rn: "RN",
-      lpn: "LPN",
-      cna: "CNA",
-      med_aide: "Med Aide",
-      caregiver: "Caregiver",
-      activity_aide: "Activity Aide",
-      dietary_aide: "Dietary Aide",
-      housekeeper: "Housekeeper",
-      receptionist: "Receptionist",
-      billing: "Billing",
-      staff: "Staff",
-      other: "Other",
-    };
-    return labels[role] || role;
+    return getMappedRoleDisplayName(role || "staff");
   }
 
   function getRoleColor(role) {
-    switch (role) {
-      case "doctor":
-        return "#1e88e5";
-      case "nurse":
-        return "#66bb6a";
-      case "rn":
-        return "#26a69a";
-      case "lpn":
-        return "#ffb74d";
-      case "cna":
-        return "#ffa726";
-      case "med_aide":
-        return "#ab47bc";
-      case "caregiver":
-        return "#43a047";
-      case "activity_aide":
-        return "#26c6da";
-      case "dietary_aide":
-        return "#fdd835";
-      case "housekeeper":
-        return "#78909c";
-      case "receptionist":
-        return "#ffb74d";
-      case "billing":
-        return "#ab47bc";
-      default:
-        return "#90a4ae";
-    }
+    return getMappedRoleColor(role);
   }
 
   const todayShift = schedulesNormalized.find(

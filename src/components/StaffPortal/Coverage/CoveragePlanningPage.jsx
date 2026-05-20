@@ -36,38 +36,10 @@ import ConfirmDialog from "../../Shared/ConfirmDialog";
 import { useAuth } from "../../../context/AuthContext";
 import CoverageCreateForm from "./CoverageCreateForm";
 import CoverageEditCountForm from "./CoverageEditCountForm";
-
-const ROLE_LABELS = {
-  doctor: "Doctor",
-  nurse: "Nurse",
-  rn: "RN",
-  lpn: "LPN",
-  cna: "CNA",
-  med_aide: "Med Aide",
-  caregiver: "Caregiver",
-  activity_aide: "Activity Aide",
-  dietary_aide: "Dietary Aide",
-  housekeeper: "Housekeeper",
-  receptionist: "Receptionist",
-  billing: "Billing",
-  staff: "Staff",
-  other: "Other",
-};
-
-const FILTER_ROLES = [
-  "doctor",
-  "nurse",
-  "rn",
-  "lpn",
-  "cna",
-  "med_aide",
-  "caregiver",
-  "activity_aide",
-  "dietary_aide",
-  "housekeeper",
-  "receptionist",
-  "billing",
-];
+import {
+  getRoleDisplayName,
+  getRoleOptionsForIndustry,
+} from "../../../constants/industryRoles";
 
 const statusColors = {
   open: "#f59e0b",
@@ -76,7 +48,7 @@ const statusColors = {
 };
 
 export default function CoveragePlanningPage() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, tenant } = useAuth();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -93,6 +65,17 @@ export default function CoveragePlanningPage() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [error, setError] = useState("");
+
+  const roleOptions = useMemo(
+    () => getRoleOptionsForIndustry(tenant?.industry),
+    [tenant?.industry],
+  );
+
+  const filterRoleOptions = useMemo(() => {
+    const existingRoles = coverages.map((c) => c.role).filter(Boolean);
+    const industryRoles = roleOptions.map((item) => item.value);
+    return Array.from(new Set([...industryRoles, ...existingRoles]));
+  }, [coverages, roleOptions]);
 
   const getCoverageDayKey = (coverageDate) => {
     if (!coverageDate) return "";
@@ -123,10 +106,7 @@ export default function CoveragePlanningPage() {
     const datePart = parseCoverageDateAsLocal(coverageDate);
     const timePart = new Date(shiftTime);
 
-    if (
-      !datePart ||
-      Number.isNaN(timePart.getTime())
-    ) {
+    if (!datePart || Number.isNaN(timePart.getTime())) {
       return shiftTime;
     }
 
@@ -188,7 +168,7 @@ export default function CoveragePlanningPage() {
       .filter((c) => selectedRole === "all" || c.role === selectedRole)
       .map((c) => ({
         id: c._id,
-        title: `${ROLE_LABELS[c.role] || c.role} (${c.requiredCount || 1})`,
+        title: `${getRoleDisplayName(c.role)} (${c.requiredCount || 1})`,
         start: buildEventDateTime(c.date, c.startTime),
         end: buildEventDateTime(c.date, c.endTime),
         backgroundColor:
@@ -386,13 +366,11 @@ export default function CoveragePlanningPage() {
                 onChange={(e) => setSelectedRole(e.target.value)}
               >
                 <MenuItem value="all">All Roles</MenuItem>
-                {Object.keys(ROLE_LABELS)
-                  .filter((r) => FILTER_ROLES.includes(r))
-                  .map((role) => (
-                    <MenuItem key={role} value={role}>
-                      {ROLE_LABELS[role]}
-                    </MenuItem>
-                  ))}
+                {filterRoleOptions.map((role) => (
+                  <MenuItem key={role} value={role}>
+                    {getRoleDisplayName(role)}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Box>
@@ -413,10 +391,13 @@ export default function CoveragePlanningPage() {
                 >
                   <Box>
                     <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
-                      {ROLE_LABELS[c.role] || c.role}
+                      {getRoleDisplayName(c.role)}
                     </Typography>
                     <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                      {parseCoverageDateAsLocal(c.date || c.startTime)?.toLocaleDateString()} •{" "}
+                      {parseCoverageDateAsLocal(
+                        c.date || c.startTime,
+                      )?.toLocaleDateString()}{" "}
+                      •{" "}
                       {toLocal(c.startTime)?.toLocaleTimeString([], {
                         hour: "numeric",
                         minute: "2-digit",
@@ -526,7 +507,7 @@ export default function CoveragePlanningPage() {
                           c.date || c.startTime,
                         )?.toLocaleDateString()}
                       </TableCell>
-                      <TableCell>{ROLE_LABELS[c.role] || c.role}</TableCell>
+                      <TableCell>{getRoleDisplayName(c.role)}</TableCell>
                       <TableCell>{`${toLocal(c.startTime)?.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} - ${toLocal(c.endTime)?.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}</TableCell>
                       <TableCell>{c.requiredCount}</TableCell>
                       <TableCell>{c.note || "—"}</TableCell>

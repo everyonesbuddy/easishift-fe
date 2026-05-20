@@ -27,8 +27,16 @@ export default function SignupTenant() {
   const [userPhoneCountryCode, setUserPhoneCountryCode] = useState("");
   const [userPhone, setUserPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [industry, setIndustry] = useState("");
   const [error, setError] = useState("");
+  const [hospitalNameError, setHospitalNameError] = useState("");
+  const [adminNameError, setAdminNameError] = useState("");
+  const [addressError, setAddressError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [emailError, setEmailError] = useState("");
+  const [industryError, setIndustryError] = useState("");
+  const [tenantPhoneError, setTenantPhoneError] = useState("");
+  const [adminPhoneError, setAdminPhoneError] = useState("");
   const navigate = useNavigate();
 
   const phoneCountryCodes = [
@@ -44,13 +52,83 @@ export default function SignupTenant() {
     { code: "+33", label: "France (+33)" },
   ];
 
+  const industries = [
+    "Healthcare",
+    "Senior Living",
+    "Retail",
+    "Hospitality",
+    "Manufacturing",
+    "Education",
+    "Transportation",
+    "Finance",
+    "Police",
+    "Warehouse and Logistics",
+    "Security Service",
+    "Other",
+  ];
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setHospitalNameError("");
+    setAdminNameError("");
+    setAddressError("");
+    setPasswordError("");
     setEmailError("");
+    setIndustryError("");
+    setTenantPhoneError("");
+    setAdminPhoneError("");
+
+    if (!hospitalName.trim()) {
+      setHospitalNameError("Facility name is required");
+      return;
+    }
+
+    if (!address.trim()) {
+      setAddressError("Facility address is required");
+      return;
+    }
+
+    if (!adminName.trim()) {
+      setAdminNameError("Admin name is required");
+      return;
+    }
+
+    if (!adminPassword.trim()) {
+      setPasswordError("Password is required");
+      return;
+    }
+
+    if (adminPassword.length < 8) {
+      setPasswordError("Password must be at least 8 characters");
+      return;
+    }
+
+    const hasTenantPhoneCountryCode = Boolean(tenantPhoneCountryCode.trim());
+    const hasTenantPhone = Boolean(tenantPhone.trim());
+    if (hasTenantPhoneCountryCode !== hasTenantPhone) {
+      setTenantPhoneError(
+        "Facility phone and country code must be provided together",
+      );
+      return;
+    }
+
+    const hasAdminPhoneCountryCode = Boolean(userPhoneCountryCode.trim());
+    const hasAdminPhone = Boolean(userPhone.trim());
+    if (hasAdminPhoneCountryCode !== hasAdminPhone) {
+      setAdminPhoneError(
+        "Admin phone and country code must be provided together",
+      );
+      return;
+    }
 
     if (!validateEmail(adminEmail)) {
       setEmailError("Please enter a valid email address");
+      return;
+    }
+
+    if (!industry) {
+      setIndustryError("Please select an industry");
       return;
     }
 
@@ -64,6 +142,7 @@ export default function SignupTenant() {
         userPhoneCountryCode,
         userPhone,
         address,
+        industry,
         adminName,
       });
 
@@ -116,9 +195,15 @@ export default function SignupTenant() {
             label="Facility Name"
             fullWidth
             value={hospitalName}
-            onChange={(e) => setHospitalName(e.target.value)}
+            onChange={(e) => {
+              setHospitalName(e.target.value);
+              setHospitalNameError("");
+            }}
+            error={!!hospitalNameError}
+            helperText={hospitalNameError}
             variant="outlined"
             sx={whiteTextField}
+            required
           />
 
           <Box display="flex" gap={2}>
@@ -126,7 +211,12 @@ export default function SignupTenant() {
               select
               label="Country Code"
               value={tenantPhoneCountryCode}
-              onChange={(e) => setTenantPhoneCountryCode(e.target.value)}
+              onChange={(e) => {
+                setTenantPhoneCountryCode(e.target.value);
+                setTenantPhoneError("");
+              }}
+              error={!!tenantPhoneError}
+              helperText={tenantPhoneError}
               variant="outlined"
               sx={{ ...whiteTextField, minWidth: 160 }}
             >
@@ -142,7 +232,11 @@ export default function SignupTenant() {
               label="Facility Phone"
               fullWidth
               value={tenantPhone}
-              onChange={(e) => setTenantPhone(e.target.value)}
+              onChange={(e) => {
+                setTenantPhone(e.target.value);
+                setTenantPhoneError("");
+              }}
+              error={!!tenantPhoneError}
               variant="outlined"
               sx={whiteTextField}
             />
@@ -152,10 +246,39 @@ export default function SignupTenant() {
             label="Facility Address"
             fullWidth
             value={address}
-            onChange={(e) => setAddress(e.target.value)}
+            onChange={(e) => {
+              setAddress(e.target.value);
+              setAddressError("");
+            }}
+            error={!!addressError}
+            helperText={addressError}
             variant="outlined"
             sx={whiteTextField}
+            required
           />
+
+          <TextField
+            select
+            label="Industry"
+            fullWidth
+            value={industry}
+            onChange={(e) => {
+              setIndustry(e.target.value);
+              setIndustryError("");
+            }}
+            error={!!industryError}
+            helperText={industryError}
+            variant="outlined"
+            sx={whiteTextField}
+            required
+          >
+            <MenuItem value="">Select Industry</MenuItem>
+            {industries.map((item) => (
+              <MenuItem key={item} value={item}>
+                {item}
+              </MenuItem>
+            ))}
+          </TextField>
 
           <Typography variant="h6" sx={{ color: "black" }}>
             Admin Info
@@ -165,9 +288,15 @@ export default function SignupTenant() {
             label="Admin Name"
             fullWidth
             value={adminName}
-            onChange={(e) => setAdminName(e.target.value)}
+            onChange={(e) => {
+              setAdminName(e.target.value);
+              setAdminNameError("");
+            }}
+            error={!!adminNameError}
+            helperText={adminNameError}
             variant="outlined"
             sx={whiteTextField}
+            required
           />
 
           <Box display="flex" gap={2}>
@@ -175,7 +304,12 @@ export default function SignupTenant() {
               select
               label="Country Code"
               value={userPhoneCountryCode}
-              onChange={(e) => setUserPhoneCountryCode(e.target.value)}
+              onChange={(e) => {
+                setUserPhoneCountryCode(e.target.value);
+                setAdminPhoneError("");
+              }}
+              error={!!adminPhoneError}
+              helperText={adminPhoneError}
               variant="outlined"
               sx={{ ...whiteTextField, minWidth: 160 }}
             >
@@ -191,7 +325,11 @@ export default function SignupTenant() {
               label="Admin Phone"
               fullWidth
               value={userPhone}
-              onChange={(e) => setUserPhone(e.target.value)}
+              onChange={(e) => {
+                setUserPhone(e.target.value);
+                setAdminPhoneError("");
+              }}
+              error={!!adminPhoneError}
               variant="outlined"
               sx={whiteTextField}
             />
@@ -210,6 +348,7 @@ export default function SignupTenant() {
             helperText={emailError}
             variant="outlined"
             sx={whiteTextField}
+            required
           />
 
           <TextField
@@ -217,9 +356,15 @@ export default function SignupTenant() {
             type="password"
             fullWidth
             value={adminPassword}
-            onChange={(e) => setAdminPassword(e.target.value)}
+            onChange={(e) => {
+              setAdminPassword(e.target.value);
+              setPasswordError("");
+            }}
+            error={!!passwordError}
+            helperText={passwordError}
             variant="outlined"
             sx={whiteTextField}
+            required
           />
 
           <Button

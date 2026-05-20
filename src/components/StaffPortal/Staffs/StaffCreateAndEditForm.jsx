@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   TextField,
   Button,
@@ -13,6 +13,10 @@ import CloseIcon from "@mui/icons-material/Close";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
+import {
+  getRoleOptionsForIndustry,
+  getRoleDisplayName,
+} from "../../../constants/industryRoles";
 
 const validateEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -40,12 +44,28 @@ export default function StaffCreateAndEditForm({
 }) {
   const { user, role: loggedInRole, tenant } = useAuth();
 
+  const roleOptions = useMemo(
+    () => getRoleOptionsForIndustry(tenant?.industry),
+    [tenant?.industry],
+  );
+
+  const selectableRoleOptions = useMemo(() => {
+    if (!staff?.role || roleOptions.some((item) => item.value === staff.role)) {
+      return roleOptions;
+    }
+
+    return [
+      ...roleOptions,
+      { value: staff.role, label: getRoleDisplayName(staff.role) },
+    ];
+  }, [roleOptions, staff?.role]);
+
   const [form, setForm] = useState({
     name: "",
     email: "",
     phoneCountryCode: "",
     phone: "",
-    role: "doctor",
+    role: "",
   });
   const [emailError, setEmailError] = useState("");
   const [phoneError, setPhoneError] = useState("");
@@ -65,6 +85,19 @@ export default function StaffCreateAndEditForm({
       });
     }
   }, [staff]);
+
+  useEffect(() => {
+    if (staff) return;
+    if (!roleOptions.length) return;
+
+    setForm((prev) => {
+      if (prev.role && roleOptions.some((item) => item.value === prev.role)) {
+        return prev;
+      }
+
+      return { ...prev, role: roleOptions[0].value };
+    });
+  }, [roleOptions, staff]);
 
   const handleSubmit = async () => {
     setEmailError("");
@@ -239,19 +272,11 @@ export default function StaffCreateAndEditForm({
           disabled={disableRoleChange}
           onChange={(e) => setForm({ ...form, role: e.target.value })}
         >
-          <MenuItem value="doctor">Doctor</MenuItem>
-          <MenuItem value="nurse">Nurse</MenuItem>
-          <MenuItem value="rn">RN</MenuItem>
-          <MenuItem value="lpn">LPN</MenuItem>
-          <MenuItem value="cna">CNA</MenuItem>
-          <MenuItem value="med_aide">Med Aide</MenuItem>
-          <MenuItem value="caregiver">Caregiver</MenuItem>
-          <MenuItem value="activity_aide">Activity Aide</MenuItem>
-          <MenuItem value="dietary_aide">Dietary Aide</MenuItem>
-          <MenuItem value="housekeeper">Housekeeper</MenuItem>
-          <MenuItem value="receptionist">Receptionist</MenuItem>
-          <MenuItem value="billing">Billing</MenuItem>
-          <MenuItem value="staff">General Staff</MenuItem>
+          {selectableRoleOptions.map((item) => (
+            <MenuItem key={item.value} value={item.value}>
+              {item.label}
+            </MenuItem>
+          ))}
         </TextField>
 
         <Box sx={{ display: "flex", gap: 2, mt: 1 }}>

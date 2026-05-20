@@ -38,49 +38,14 @@ import ConfirmDialog from "../../Shared/ConfirmDialog";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { Stack } from "@mui/material";
-
-// small role color helper — matches the mock idea; tweak as needed
-const ROLE_COLORS = {
-  admin: "#7c3aed",
-  doctor: "#0ea5a4",
-  nurse: "#f97316",
-  rn: "#14b8a6",
-  lpn: "#fb923c",
-  cna: "#fdba74",
-  med_aide: "#a855f7",
-  caregiver: "#10b981",
-  activity_aide: "#22c55e",
-  dietary_aide: "#f59e0b",
-  housekeeper: "#64748b",
-  receptionist: "#2563eb",
-  billing: "#f59e0b",
-  staff: "#6b7280",
-  general: "#6b7280",
-};
-
-const getRoleDisplayName = (role) => {
-  const labels = {
-    admin: "Admin",
-    doctor: "Doctor",
-    nurse: "Nurse",
-    rn: "RN",
-    lpn: "LPN",
-    cna: "CNA",
-    med_aide: "Med Aide",
-    caregiver: "Caregiver",
-    activity_aide: "Activity Aide",
-    dietary_aide: "Dietary Aide",
-    housekeeper: "Housekeeper",
-    receptionist: "Receptionist",
-    billing: "Billing",
-    staff: "Staff",
-    general: "General",
-  };
-  return labels[role] || role;
-};
+import {
+  getRoleDisplayName,
+  getRoleColor,
+  getRolesForIndustry,
+} from "../../../constants/industryRoles";
 
 export default function StaffList() {
-  const { role } = useAuth();
+  const { role, tenant } = useAuth();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -143,25 +108,17 @@ export default function StaffList() {
     if (refresh) fetchStaff();
   };
 
-  // filters
-  const roles = [
-    "all",
-    "admin",
-    "doctor",
-    "nurse",
-    "rn",
-    "lpn",
-    "cna",
-    "med_aide",
-    "caregiver",
-    "activity_aide",
-    "dietary_aide",
-    "housekeeper",
-    "receptionist",
-    "billing",
-    "staff",
-    "general",
-  ];
+  const roles = useMemo(() => {
+    const industryRoles = getRolesForIndustry(tenant?.industry, {
+      includeAdmin: true,
+    });
+    const existingRoles = staff.map((u) => u.role).filter(Boolean);
+
+    return [
+      "all",
+      ...Array.from(new Set([...industryRoles, ...existingRoles])),
+    ];
+  }, [staff, tenant?.industry]);
 
   const filteredUsers = useMemo(() => {
     return staff.filter((u) => {
@@ -180,9 +137,7 @@ export default function StaffList() {
       <Box display="flex" justifyContent="space-between" alignItems="center">
         <Box>
           <Typography variant="h5">Staff Management</Typography>
-          <Typography color="text.secondary">
-            Manage your healthcare team
-          </Typography>
+          <Typography color="text.secondary">Manage your team</Typography>
         </Box>
 
         {role === "admin" && (
@@ -288,7 +243,7 @@ export default function StaffList() {
               return (
                 <Paper key={u._id || u.id} sx={{ p: 2 }}>
                   <Box display="flex" alignItems="center" gap={2}>
-                    <Avatar sx={{ bgcolor: ROLE_COLORS[u.role] || "#6b7280" }}>
+                    <Avatar sx={{ bgcolor: getRoleColor(u.role) }}>
                       {initials}
                     </Avatar>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -386,9 +341,7 @@ export default function StaffList() {
                     <TableRow key={u._1d || u.id} hover>
                       <TableCell>
                         <Box display="flex" alignItems="center" gap={2}>
-                          <Avatar
-                            sx={{ bgcolor: ROLE_COLORS[u.role] || "#6b7280" }}
-                          >
+                          <Avatar sx={{ bgcolor: getRoleColor(u.role) }}>
                             {initials}
                           </Avatar>
                           <Box>
@@ -406,7 +359,7 @@ export default function StaffList() {
                               width: 10,
                               height: 10,
                               borderRadius: "50%",
-                              backgroundColor: ROLE_COLORS[u.role] || "#6b7280",
+                              backgroundColor: getRoleColor(u.role),
                             }}
                           />
                           <Typography>{getRoleDisplayName(u.role)}</Typography>

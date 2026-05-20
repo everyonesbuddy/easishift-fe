@@ -20,40 +20,11 @@ import CloseIcon from "@mui/icons-material/Close";
 import { MdAdd, MdDelete, MdAccessTime, MdGroups2 } from "react-icons/md";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
-
-const roles = [
-  "doctor",
-  "nurse",
-  "rn",
-  "lpn",
-  "cna",
-  "med_aide",
-  "caregiver",
-  "activity_aide",
-  "dietary_aide",
-  "housekeeper",
-  "receptionist",
-  "billing",
-  "staff",
-  "other",
-];
-
-const roleLabels = {
-  doctor: "Doctor",
-  nurse: "Nurse",
-  rn: "RN",
-  lpn: "LPN",
-  cna: "CNA",
-  med_aide: "Med Aide",
-  caregiver: "Caregiver",
-  activity_aide: "Activity Aide",
-  dietary_aide: "Dietary Aide",
-  housekeeper: "Housekeeper",
-  receptionist: "Receptionist",
-  billing: "Billing",
-  staff: "Staff",
-  other: "Other",
-};
+import { useAuth } from "../../../context/AuthContext";
+import {
+  getRoleDisplayName,
+  getRoleOptionsForIndustry,
+} from "../../../constants/industryRoles";
 
 const weekdayOptions = [
   { value: 1, label: "Mon" },
@@ -144,6 +115,12 @@ function buildDatesFromPattern(
 }
 
 export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
+  const { tenant } = useAuth();
+  const roleOptions = useMemo(
+    () => getRoleOptionsForIndustry(tenant?.industry),
+    [tenant?.industry],
+  );
+
   const today = new Date().toISOString().slice(0, 10);
   const [requirements, setRequirements] = useState([{ ...defaultRequirement }]);
   const [plannerStartDate, setPlannerStartDate] = useState(today);
@@ -198,7 +175,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
         ),
         rows: requirements.map((req, reqIndex) => ({
           id: `${dateValue}-${reqIndex}`,
-          role: req.role ? roleLabels[req.role] || req.role : "—",
+          role: req.role ? getRoleDisplayName(req.role) : "—",
           timeLabel: `${req.startTime} – ${req.endTime}`,
           count: Number(req.requiredCount) || 0,
         })),
@@ -701,9 +678,9 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                     }
                     required
                   >
-                    {roles.map((r) => (
-                      <MenuItem key={r} value={r}>
-                        {roleLabels[r] || r}
+                    {roleOptions.map((item) => (
+                      <MenuItem key={item.value} value={item.value}>
+                        {item.label}
                       </MenuItem>
                     ))}
                   </TextField>

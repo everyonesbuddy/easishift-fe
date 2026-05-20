@@ -45,52 +45,14 @@ import { useAuth } from "../../../context/AuthContext";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Stack from "@mui/material/Stack";
-
-// Local role helpers (small mapping to match Figma colors)
-const ROLE_COLORS = {
-  admin: "#7c3aed",
-  doctor: "#0ea5a4",
-  nurse: "#f97316",
-  rn: "#14b8a6",
-  lpn: "#fb923c",
-  cna: "#fdba74",
-  med_aide: "#a855f7",
-  caregiver: "#10b981",
-  activity_aide: "#22c55e",
-  dietary_aide: "#f59e0b",
-  housekeeper: "#64748b",
-  receptionist: "#2563eb",
-  billing: "#f59e0b",
-  staff: "#6b7280",
-  other: "#6b7280",
-  general: "#6b7280",
-};
-
-const getRoleDisplayName = (r) => {
-  const map = {
-    admin: "Admin",
-    doctor: "Doctor",
-    nurse: "Nurse",
-    rn: "RN",
-    lpn: "LPN",
-    cna: "CNA",
-    med_aide: "Med Aide",
-    caregiver: "Caregiver",
-    activity_aide: "Activity Aide",
-    dietary_aide: "Dietary Aide",
-    housekeeper: "Housekeeper",
-    receptionist: "Receptionist",
-    billing: "Billing",
-    staff: "Staff",
-    other: "Other",
-    general: "General",
-  };
-  if (!r) return "Unknown";
-  return map[r] || r.charAt(0).toUpperCase() + r.slice(1);
-};
+import {
+  getRoleColor,
+  getRoleDisplayName,
+  getRolesForIndustry,
+} from "../../../constants/industryRoles";
 
 export default function ScheduleList() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, tenant } = useAuth();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -112,6 +74,23 @@ export default function ScheduleList() {
   const [monthDate, setMonthDate] = useState(new Date());
   const [staffVisibility, setStaffVisibility] = useState("mine");
   const [shiftTimeFilter, setShiftTimeFilter] = useState("");
+
+  const roleFilterOptions = useMemo(() => {
+    const industryRoles = getRolesForIndustry(tenant?.industry);
+    const scheduleRoles = schedules.map((s) => s.role).filter(Boolean);
+    const staffRoles = staff.map((s) => s.role).filter(Boolean);
+    return [
+      "all",
+      ...Array.from(
+        new Set([...industryRoles, ...scheduleRoles, ...staffRoles]),
+      ),
+    ];
+  }, [schedules, staff, tenant?.industry]);
+
+  const legendRoles = useMemo(
+    () => roleFilterOptions.filter((role) => role !== "all").slice(0, 8),
+    [roleFilterOptions],
+  );
 
   useEffect(() => {
     fetchSchedules();
@@ -576,21 +555,7 @@ export default function ScheduleList() {
                   label="Role"
                   onChange={(e) => setRoleFilter(e.target.value)}
                 >
-                  {[
-                    "all",
-                    "doctor",
-                    "nurse",
-                    "rn",
-                    "lpn",
-                    "cna",
-                    "med_aide",
-                    "caregiver",
-                    "activity_aide",
-                    "dietary_aide",
-                    "housekeeper",
-                    "receptionist",
-                    "billing",
-                  ].map((r) => (
+                  {roleFilterOptions.map((r) => (
                     <MenuItem key={r} value={r}>
                       {r === "all" ? "All Roles" : getRoleDisplayName(r)}
                     </MenuItem>
@@ -755,7 +720,7 @@ export default function ScheduleList() {
                               width: 10,
                               height: 10,
                               borderRadius: "50%",
-                              backgroundColor: ROLE_COLORS[s.role] || "#6b7280",
+                              backgroundColor: getRoleColor(s.role),
                             }}
                           />
                           <Box>{s.staffId?.name || "Unknown"}</Box>
@@ -768,9 +733,8 @@ export default function ScheduleList() {
                             px: 1,
                             py: 0.4,
                             borderRadius: 1,
-                            backgroundColor:
-                              (ROLE_COLORS[s.role] || "#6b7280") + "22",
-                            color: ROLE_COLORS[s.role] || "#000",
+                            backgroundColor: getRoleColor(s.role) + "22",
+                            color: getRoleColor(s.role),
                             fontWeight: 600,
                             fontSize: 13,
                           }}
@@ -1037,8 +1001,7 @@ export default function ScheduleList() {
                                     width: 8,
                                     height: 8,
                                     borderRadius: "50%",
-                                    background:
-                                      ROLE_COLORS[shift.role] || "#6b7280",
+                                    background: getRoleColor(shift.role),
                                     flexShrink: 0,
                                   }}
                                 />
@@ -1054,10 +1017,8 @@ export default function ScheduleList() {
                                 <Box
                                   sx={{
                                     fontSize: "0.7rem",
-                                    background:
-                                      (ROLE_COLORS[shift.role] || "#6b7280") +
-                                      "22",
-                                    color: ROLE_COLORS[shift.role] || "#6b7280",
+                                    background: getRoleColor(shift.role) + "22",
+                                    color: getRoleColor(shift.role),
                                     px: 0.75,
                                     py: 0.1,
                                     borderRadius: 1,
@@ -1115,29 +1076,27 @@ export default function ScheduleList() {
             <Typography variant="caption" sx={{ fontWeight: 700 }}>
               Role Legend:
             </Typography>
-            {Object.entries(ROLE_COLORS)
-              .slice(0, 8)
-              .map(([role, color]) => (
+            {legendRoles.map((role) => (
+              <Box
+                key={role}
+                display="flex"
+                alignItems="center"
+                gap={0.5}
+                sx={{ "@media print": { fontSize: "9px" } }}
+              >
                 <Box
-                  key={role}
-                  display="flex"
-                  alignItems="center"
-                  gap={0.5}
-                  sx={{ "@media print": { fontSize: "9px" } }}
-                >
-                  <Box
-                    sx={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: 1,
-                      background: color,
-                    }}
-                  />
-                  <Typography variant="caption">
-                    {getRoleDisplayName(role)}
-                  </Typography>
-                </Box>
-              ))}
+                  sx={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: 1,
+                    background: getRoleColor(role),
+                  }}
+                />
+                <Typography variant="caption">
+                  {getRoleDisplayName(role)}
+                </Typography>
+              </Box>
+            ))}
           </Box>
         </Box>
       ) : (

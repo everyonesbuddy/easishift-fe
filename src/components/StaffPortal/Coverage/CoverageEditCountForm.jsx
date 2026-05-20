@@ -11,23 +11,7 @@ import {
 import { MdAdd, MdRemove } from "react-icons/md";
 import { toast } from "react-toastify";
 import api from "../../../config/api";
-
-const ROLE_LABELS = {
-  doctor: "Doctor",
-  nurse: "Nurse",
-  rn: "RN",
-  lpn: "LPN",
-  cna: "CNA",
-  med_aide: "Med Aide",
-  caregiver: "Caregiver",
-  activity_aide: "Activity Aide",
-  dietary_aide: "Dietary Aide",
-  housekeeper: "Housekeeper",
-  receptionist: "Receptionist",
-  billing: "Billing",
-  staff: "Staff",
-  other: "Other",
-};
+import { getRoleDisplayName } from "../../../constants/industryRoles";
 
 export default function CoverageEditCountForm({
   coverage,
@@ -106,8 +90,7 @@ export default function CoverageEditCountForm({
             Edit Coverage Count
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {ROLE_LABELS[coverage?.role] || coverage?.role || "Role"} • adjust
-            required staff
+            {getRoleDisplayName(coverage?.role)} • adjust required staff
           </Typography>
         </Box>
 

@@ -17,48 +17,25 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
-
-const roles = [
-  "doctor",
-  "nurse",
-  "rn",
-  "lpn",
-  "cna",
-  "med_aide",
-  "caregiver",
-  "activity_aide",
-  "dietary_aide",
-  "housekeeper",
-  "receptionist",
-  "billing",
-  "staff",
-  "other",
-];
-
-const roleLabels = {
-  doctor: "Doctor",
-  nurse: "Nurse",
-  rn: "RN",
-  lpn: "LPN",
-  cna: "CNA",
-  med_aide: "Med Aide",
-  caregiver: "Caregiver",
-  activity_aide: "Activity Aide",
-  dietary_aide: "Dietary Aide",
-  housekeeper: "Housekeeper",
-  receptionist: "Receptionist",
-  billing: "Billing",
-  staff: "Staff",
-  other: "Other",
-};
+import { useAuth } from "../../../context/AuthContext";
+import {
+  getRoleDisplayName,
+  getRoleOptionsForIndustry,
+} from "../../../constants/industryRoles";
 
 export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
+  const { tenant } = useAuth();
   const [coverages, setCoverages] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [selectedRole, setSelectedRole] = useState(""); // optional role filter
   const [fetching, setFetching] = useState(false);
+
+  const roleOptions = useMemo(
+    () => getRoleOptionsForIndustry(tenant?.industry),
+    [tenant?.industry],
+  );
 
   const selectableCoverageIds = useMemo(
     () =>
@@ -220,7 +197,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
 
       const coverageLines = coverageResults.slice(0, 3).map((item) => {
         const sourceCoverage = findSourceCoverage(item);
-        const role = roleLabels[item?.role] || item?.role || "Role";
+        const role = getRoleDisplayName(item?.role);
         const dateValue =
           item?.startTime ||
           sourceCoverage?.startTime ||
@@ -374,9 +351,9 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
             onChange={(e) => setSelectedRole(e.target.value)}
           >
             <MenuItem value="">All Roles</MenuItem>
-            {roles.map((r) => (
-              <MenuItem key={r} value={r}>
-                {roleLabels[r] || r}
+            {roleOptions.map((item) => (
+              <MenuItem key={item.value} value={item.value}>
+                {item.label}
               </MenuItem>
             ))}
           </Select>
@@ -506,7 +483,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                             }}
                             noWrap
                           >
-                            {dateStr} · {roleLabels[cov.role] || cov.role}
+                            {dateStr} · {getRoleDisplayName(cov.role)}
                           </Typography>
                           <Typography
                             sx={{ fontSize: { xs: 12, md: 13 }, color: "gray" }}

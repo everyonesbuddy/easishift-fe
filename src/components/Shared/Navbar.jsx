@@ -84,12 +84,6 @@ export default function Navbar({ onMobileOpen }) {
                     >
                       {role.charAt(0).toUpperCase() + role.slice(1)} Dashboard
                     </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{ color: "text.secondary", mt: 0.5 }}
-                    >
-                      Manage your healthcare workforce efficiently
-                    </Typography>
                   </Box>
                   {/* no collapse controls on desktop */}
                 </Box>

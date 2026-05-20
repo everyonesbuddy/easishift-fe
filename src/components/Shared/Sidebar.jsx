@@ -27,7 +27,7 @@ import {
   MdClose,
   MdTune,
 } from "react-icons/md";
-import logo from "../../assets/logos/easishift-logo-plus-text2.svg";
+import logo from "../../assets/logos/wisershifts-logo-plus-text1.svg";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
@@ -161,7 +161,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
           <Box
             component="img"
             src={logo}
-            alt="Easishift logo"
+            alt="Wisershifts logo"
             sx={{
               width: 180,
               height: "auto",

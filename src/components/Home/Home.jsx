@@ -474,7 +474,7 @@ export default function Home() {
                 </Typography>
                 <Typography sx={{ color: "text.secondary", mt: 0.5 }}>
                   Use the ROI Calculator to estimate turnover impact and
-                  projected Easishift savings in under 2 minutes.
+                  projected WiserShifts savings in under 2 minutes.
                 </Typography>
               </Box>
 

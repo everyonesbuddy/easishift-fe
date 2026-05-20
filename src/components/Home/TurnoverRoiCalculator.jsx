@@ -511,7 +511,7 @@ export default function TurnoverRoiCalculator() {
                   rel="noopener noreferrer"
                   sx={{ fontWeight: 900, textTransform: "none", py: 0.8 }}
                 >
-                  See how Easishift reduces this - book a 30 min call
+                  See how WiserShifts reduces this - book a 30 min call
                 </Button>
               </Stack>
             </CardContent>

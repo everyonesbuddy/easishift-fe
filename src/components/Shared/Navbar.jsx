@@ -12,7 +12,7 @@ import { useTheme } from "@mui/material/styles";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { MdNotifications, MdLogout } from "react-icons/md";
-import logo from "../../assets/logos/wisershifts-logo-plus-text2.svg";
+import logo from "../../assets/logos/wiserShifts-logo-light.svg";
 import { MdMenu } from "react-icons/md";
 
 export default function Navbar({ onMobileOpen }) {

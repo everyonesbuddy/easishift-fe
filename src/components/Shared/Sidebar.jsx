@@ -27,7 +27,7 @@ import {
   MdClose,
   MdTune,
 } from "react-icons/md";
-import logo from "../../assets/logos/wisershifts-logo-plus-text1.svg";
+import logo from "../../assets/logos/wiserShifts-logo-dark.svg";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";

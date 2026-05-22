@@ -1,6 +1,6 @@
-# Easishift — Frontend
+# WiserShifts — Frontend
 
-Easishift is a **multi-tenant workforce scheduling and management SaaS** built for care facilities. Admins get tools to plan coverage, build schedules, manage staff, and review time-off requests. Staff members get a self-service portal for their own schedule, shift swaps, time-off, messaging, and preferences.
+WiserShifts is a **multi-tenant workforce scheduling and management SaaS** built for care facilities. Admins get tools to plan coverage, build schedules, manage staff, and review time-off requests. Staff members get a self-service portal for their own schedule, shift swaps, time-off, messaging, and preferences.
 
 ---
 

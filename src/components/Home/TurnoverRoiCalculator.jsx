@@ -30,7 +30,7 @@ const MANAGER_HOURLY_RATE = 25;
 const SCHEDULING_HOURS_PER_WEEK = 10;
 const WEEKS_PER_YEAR = 52;
 const PRODUCTIVITY_FACTOR = 0.5;
-const EASISHIFT_SAVINGS_RATE = 0.28;
+const WISERSHIFTS_SAVINGS_RATE = 0.28;
 const BEEHIIV_MAGIC_LINK_TEMPLATE =
   "https://magic.beehiiv.com/v1/861bd1b1-f350-4ecc-a6fc-ab3e0eca93f6?email=<email>";
 
@@ -223,7 +223,7 @@ export default function TurnoverRoiCalculator() {
       MANAGER_HOURLY_RATE * SCHEDULING_HOURS_PER_WEEK * WEEKS_PER_YEAR;
 
     const totalCost = annualTurnoverCost + schedulingAdminCost;
-    const projectedSavings = totalCost * EASISHIFT_SAVINGS_RATE;
+    const projectedSavings = totalCost * WISERSHIFTS_SAVINGS_RATE;
 
     return {
       annualTurnoverEvents,
@@ -258,7 +258,7 @@ export default function TurnoverRoiCalculator() {
 
     const payload = {
       recipientEmail: trimmedEmail,
-      source: "easishift.com/turnover-roi-calculator",
+      source: "wisershifts.com/turnover-roi-calculator",
       calculatorType: "LTC turnover ROI calculator",
       inputs: {
         employees,
@@ -274,7 +274,7 @@ export default function TurnoverRoiCalculator() {
         schedulingAdminCost: metrics.schedulingAdminCost,
         totalCost: metrics.totalCost,
         projectedSavings: metrics.projectedSavings,
-        savingsRate: EASISHIFT_SAVINGS_RATE,
+        savingsRate: WISERSHIFTS_SAVINGS_RATE,
       },
       costDrivers: metrics.drivers.map((driver) => ({
         label: driver.label,

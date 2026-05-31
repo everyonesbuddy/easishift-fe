@@ -15,6 +15,7 @@ import {
   TableHead,
   TableRow,
   TablePagination,
+  Checkbox,
   ToggleButton,
   ToggleButtonGroup,
   FormControl,
@@ -61,6 +62,8 @@ export default function CoveragePlanningPage() {
   const [editingCoverage, setEditingCoverage] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [selectedCoverageIds, setSelectedCoverageIds] = useState([]);
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -108,7 +111,13 @@ export default function CoveragePlanningPage() {
     setLoading(true);
     try {
       const res = await api.get("/coverage");
-      setCoverages(res.data || []);
+      const nextCoverages = res.data || [];
+      setCoverages(nextCoverages);
+      setSelectedCoverageIds((prev) =>
+        prev.filter((id) =>
+          nextCoverages.some((coverage) => coverage._id === id),
+        ),
+      );
       setError("");
     } catch (err) {
       console.error("Failed to fetch coverage", err);
@@ -139,6 +148,47 @@ export default function CoveragePlanningPage() {
     } finally {
       setConfirmOpen(false);
       setDeleteId(null);
+    }
+  };
+
+  const toggleCoverageSelection = (id) => {
+    setSelectedCoverageIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
+  const toggleSelectAllPaginated = () => {
+    const paginatedIds = paginated.map((coverage) => coverage._id);
+    const allSelected =
+      paginatedIds.length > 0 &&
+      paginatedIds.every((id) => selectedCoverageIds.includes(id));
+
+    if (allSelected) {
+      setSelectedCoverageIds((prev) =>
+        prev.filter((id) => !paginatedIds.includes(id)),
+      );
+      return;
+    }
+
+    setSelectedCoverageIds((prev) =>
+      Array.from(new Set([...prev, ...paginatedIds])),
+    );
+  };
+
+  const confirmBulkDelete = async () => {
+    try {
+      await api.delete("/coverage/bulk", {
+        data: { ids: selectedCoverageIds },
+      });
+      await fetchCoverages();
+      setSelectedCoverageIds([]);
+    } catch (err) {
+      console.error("Failed to delete selected coverages", err);
+      const msg =
+        err?.response?.data?.message || "Failed to delete selected coverage";
+      setError(msg);
+    } finally {
+      setBulkConfirmOpen(false);
     }
   };
 
@@ -270,6 +320,11 @@ export default function CoveragePlanningPage() {
     page * rowsPerPage + rowsPerPage,
   );
 
+  const paginatedIds = paginated.map((coverage) => coverage._id);
+  const allPaginatedSelected =
+    paginatedIds.length > 0 &&
+    paginatedIds.every((id) => selectedCoverageIds.includes(id));
+
   return (
     <Container sx={{ mt: 4, px: { xs: 2, sm: 3 } }}>
       <Box
@@ -351,22 +406,46 @@ export default function CoveragePlanningPage() {
           </Stack>
 
           {isAdmin && (
-            <Button
-              size="small"
-              variant="contained"
-              startIcon={<FiPlus />}
-              onClick={() => setOpenAdd(true)}
-              sx={{
-                textTransform: "none",
-                borderRadius: 2,
-                px: 3,
-                bgcolor: "#2563EB",
-                width: { xs: "100%", md: "auto" },
-                "&:hover": { bgcolor: "#1D4ED8" },
-              }}
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              spacing={1.5}
+              sx={{ width: { xs: "100%", md: "auto" } }}
             >
-              Add Coverage
-            </Button>
+              {view === "table" && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  disabled={selectedCoverageIds.length === 0}
+                  onClick={() => setBulkConfirmOpen(true)}
+                  sx={{
+                    textTransform: "none",
+                    borderRadius: 2,
+                    px: 3,
+                    width: { xs: "100%", md: "auto" },
+                  }}
+                >
+                  Delete Selected ({selectedCoverageIds.length})
+                </Button>
+              )}
+
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<FiPlus />}
+                onClick={() => setOpenAdd(true)}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: 2,
+                  px: 3,
+                  bgcolor: "#2563EB",
+                  width: { xs: "100%", md: "auto" },
+                  "&:hover": { bgcolor: "#1D4ED8" },
+                }}
+              >
+                Add Coverage
+              </Button>
+            </Stack>
           )}
         </Box>
       </Box>
@@ -434,6 +513,14 @@ export default function CoveragePlanningPage() {
                   alignItems="center"
                 >
                   <Box>
+                    {isAdmin && (
+                      <Checkbox
+                        size="small"
+                        checked={selectedCoverageIds.includes(c._id)}
+                        onChange={() => toggleCoverageSelection(c._id)}
+                        sx={{ p: 0, mb: 0.5 }}
+                      />
+                    )}
                     <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
                       {getRoleDisplayName(c.role)}
                     </Typography>
@@ -514,6 +601,19 @@ export default function CoveragePlanningPage() {
               <Table size="small">
                 <TableHead>
                   <TableRow sx={{ background: "#F8FAFC" }}>
+                    {isAdmin && (
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          size="small"
+                          checked={allPaginatedSelected}
+                          indeterminate={
+                            selectedCoverageIds.length > 0 &&
+                            !allPaginatedSelected
+                          }
+                          onChange={toggleSelectAllPaginated}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
                       Role
                     </TableCell>
@@ -539,6 +639,15 @@ export default function CoveragePlanningPage() {
                       key={c._id}
                       sx={{ "&:hover": { background: "#f3f4f6" } }}
                     >
+                      {isAdmin && (
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            size="small"
+                            checked={selectedCoverageIds.includes(c._id)}
+                            onChange={() => toggleCoverageSelection(c._id)}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell>{getRoleDisplayName(c.role)}</TableCell>
                       <TableCell>{formatCoverageTimeLabel(c)}</TableCell>
                       <TableCell>{c.requiredCount}</TableCell>
@@ -717,6 +826,14 @@ export default function CoveragePlanningPage() {
         message="This action cannot be undone."
         onCancel={() => setConfirmOpen(false)}
         onConfirm={confirmDelete}
+      />
+
+      <ConfirmDialog
+        open={bulkConfirmOpen}
+        title="Delete Selected Coverage?"
+        message={`Delete ${selectedCoverageIds.length} selected coverage item(s)? This action cannot be undone.`}
+        onCancel={() => setBulkConfirmOpen(false)}
+        onConfirm={confirmBulkDelete}
       />
     </Container>
   );

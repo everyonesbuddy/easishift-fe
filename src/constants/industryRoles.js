@@ -11,6 +11,30 @@ const HEALTHCARE_AND_SENIOR_LIVING_ROLES = [
   "activity_aide",
   "dietary_aide",
   "housekeeper",
+  "al_doctor",
+  "al_nurse",
+  "al_receptionist",
+  "al_billing",
+  "al_rn",
+  "al_lpn",
+  "al_cna",
+  "al_med_aide",
+  "al_caregiver",
+  "al_activity_aide",
+  "al_dietary_aide",
+  "al_housekeeper",
+  "il_doctor",
+  "il_nurse",
+  "il_receptionist",
+  "il_billing",
+  "il_rn",
+  "il_lpn",
+  "il_cna",
+  "il_med_aide",
+  "il_caregiver",
+  "il_activity_aide",
+  "il_dietary_aide",
+  "il_housekeeper",
 ];
 
 const POLICE_ROLES = [
@@ -111,6 +135,32 @@ export const INDUSTRY_ROLE_MAP = {
   Other: COMMON_STAFF_ROLES,
 };
 
+const normalizeIndustryKey = (industry) =>
+  String(industry || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s*&\s*/g, " and ")
+    .replace(/\s+/g, " ");
+
+const INDUSTRY_ALIASES = {
+  healthcare: "Healthcare",
+  "health care": "Healthcare",
+  "senior living": "Senior Living",
+  "healthcare and senior living": "Healthcare",
+  "assisted living": "Senior Living",
+  "independent living": "Senior Living",
+  retail: "Retail",
+  hospitality: "Hospitality",
+  manufacturing: "Manufacturing",
+  education: "Education",
+  transportation: "Transportation",
+  finance: "Finance",
+  police: "Police",
+  "warehouse and logistics": "Warehouse and Logistics",
+  "security service": "Security Service",
+  other: "Other",
+};
+
 const toRoleLabel = (role) =>
   String(role || "")
     .split("_")
@@ -133,6 +183,30 @@ export const ROLE_LABEL_MAP = {
   activity_aide: "Activity Aide",
   dietary_aide: "Dietary Aide",
   housekeeper: "Housekeeper",
+  al_doctor: "AL Doctor",
+  al_nurse: "AL Nurse",
+  al_receptionist: "AL Receptionist",
+  al_billing: "AL Billing",
+  al_rn: "AL RN",
+  al_lpn: "AL LPN",
+  al_cna: "AL CNA",
+  al_med_aide: "AL Med Aide",
+  al_caregiver: "AL Caregiver",
+  al_activity_aide: "AL Activity Aide",
+  al_dietary_aide: "AL Dietary Aide",
+  al_housekeeper: "AL Housekeeper",
+  il_doctor: "IL Doctor",
+  il_nurse: "IL Nurse",
+  il_receptionist: "IL Receptionist",
+  il_billing: "IL Billing",
+  il_rn: "IL RN",
+  il_lpn: "IL LPN",
+  il_cna: "IL CNA",
+  il_med_aide: "IL Med Aide",
+  il_caregiver: "IL Caregiver",
+  il_activity_aide: "IL Activity Aide",
+  il_dietary_aide: "IL Dietary Aide",
+  il_housekeeper: "IL Housekeeper",
   police_officer: "Police Officer",
   police_sergeant: "Police Sergeant",
   police_detective: "Police Detective",
@@ -207,6 +281,30 @@ const ROLE_COLOR_MAP = {
   activity_aide: "#22c55e",
   dietary_aide: "#f59e0b",
   housekeeper: "#64748b",
+  al_doctor: "#0ea5a4",
+  al_nurse: "#f97316",
+  al_receptionist: "#2563eb",
+  al_billing: "#f59e0b",
+  al_rn: "#14b8a6",
+  al_lpn: "#fb923c",
+  al_cna: "#fdba74",
+  al_med_aide: "#a855f7",
+  al_caregiver: "#10b981",
+  al_activity_aide: "#22c55e",
+  al_dietary_aide: "#f59e0b",
+  al_housekeeper: "#64748b",
+  il_doctor: "#0ea5a4",
+  il_nurse: "#f97316",
+  il_receptionist: "#2563eb",
+  il_billing: "#f59e0b",
+  il_rn: "#14b8a6",
+  il_lpn: "#fb923c",
+  il_cna: "#fdba74",
+  il_med_aide: "#a855f7",
+  il_caregiver: "#10b981",
+  il_activity_aide: "#22c55e",
+  il_dietary_aide: "#f59e0b",
+  il_housekeeper: "#64748b",
 
   // Police
   police_officer: "#1d4ed8",
@@ -313,7 +411,11 @@ export const getRolesForIndustry = (
   industry,
   { includeCommon = true, includeAdmin = false } = {},
 ) => {
-  const industryRoles = INDUSTRY_ROLE_MAP[industry] || ALL_NON_ADMIN_ROLES;
+  const normalizedIndustry = normalizeIndustryKey(industry);
+  const resolvedIndustry =
+    INDUSTRY_ALIASES[normalizedIndustry] || industry || "";
+  const industryRoles =
+    INDUSTRY_ROLE_MAP[resolvedIndustry] || ALL_NON_ADMIN_ROLES;
   const result = [...industryRoles];
 
   if (includeCommon) {

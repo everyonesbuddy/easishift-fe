@@ -284,6 +284,13 @@ export default function StaffCreateAndEditForm({
           value={form.role}
           disabled={disableRoleChange}
           onChange={(e) => setForm({ ...form, role: e.target.value })}
+          SelectProps={{
+            MenuProps: {
+              PaperProps: {
+                sx: { maxHeight: 480 },
+              },
+            },
+          }}
         >
           {selectableRoleOptions.map((item) => (
             <MenuItem key={item.value} value={item.value}>

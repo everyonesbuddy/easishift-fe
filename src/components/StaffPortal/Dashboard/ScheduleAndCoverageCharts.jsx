@@ -22,6 +22,7 @@ import {
   ALL_NON_ADMIN_ROLES,
   getRoleColor as getMappedRoleColor,
   getRoleDisplayName as getMappedRoleDisplayName,
+  isRoleCompatible,
 } from "../../../constants/industryRoles";
 
 // -------------------
@@ -250,7 +251,11 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
 
   const rolesWithCoverage = useMemo(() => {
     const setRoles = new Set(coverageNormalized.map((c) => c.role));
-    return allRoles.filter((r) => setRoles.has(r));
+    return allRoles.filter((r) =>
+      Array.from(setRoles).some((coverageRole) =>
+        isRoleCompatible(r, coverageRole),
+      ),
+    );
   }, [coverageNormalized]);
 
   // default selected role: first role with coverage
@@ -271,7 +276,10 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
     const weekDayKeys = new Set(weekDays.map((d) => getLocalDayKey(d)));
 
     const roleCoverage = coverageNormalized
-      .filter((c) => c.role === selectedRole && weekDayKeys.has(c.dayKey))
+      .filter(
+        (c) =>
+          isRoleCompatible(c.role, selectedRole) && weekDayKeys.has(c.dayKey),
+      )
       .sort((a, b) => {
         if (a.dayKey === b.dayKey) return a.startTime - b.startTime;
         return a.dayKey.localeCompare(b.dayKey);
@@ -282,7 +290,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
       // count scheduled that match this role/day/start
       const scheduledCount = schedulesNormalized.filter(
         (s) =>
-          s.staffRole === selectedRole &&
+          isRoleCompatible(s.staffRole, c.role) &&
           s.dayKey === c.dayKey &&
           s.start.getTime() === c.startTime.getTime() &&
           s.status !== "call_out",
@@ -403,7 +411,8 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
     if (!isAdmin) return [];
     return weeklyOvertimeData.filter(
       (row) =>
-        selectedOvertimeRole === "all" || row.role === selectedOvertimeRole,
+        selectedOvertimeRole === "all" ||
+        isRoleCompatible(row.role, selectedOvertimeRole),
     );
   }, [isAdmin, weeklyOvertimeData, selectedOvertimeRole]);
 
@@ -442,7 +451,8 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
     return coverageNormalized
       .filter((c) => {
         const inRole =
-          selectedCoverageRole === "all" || c.role === selectedCoverageRole;
+          selectedCoverageRole === "all" ||
+          isRoleCompatible(c.role, selectedCoverageRole);
         const inStartRange = startKey ? c.dayKey >= startKey : true;
         const inEndRange = endKey ? c.dayKey <= endKey : true;
         return inRole && inStartRange && inEndRange;
@@ -459,7 +469,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
             s.dayKey === c.dayKey &&
             s.start.getTime() === new Date(c.startTime).getTime() &&
             s.status !== "call_out" &&
-            scheduleRole === c.role
+            isRoleCompatible(scheduleRole, c.role)
           );
         }).length;
 

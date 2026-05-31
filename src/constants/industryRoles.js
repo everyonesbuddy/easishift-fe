@@ -168,6 +168,31 @@ const toRoleLabel = (role) =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 
+const normalizeRoleKey = (role) =>
+  String(role || "")
+    .trim()
+    .toLowerCase();
+
+export const getRoleFamilyKey = (role) => {
+  const normalizedRole = normalizeRoleKey(role);
+  if (!normalizedRole) return "";
+
+  if (normalizedRole.startsWith("al_") || normalizedRole.startsWith("il_")) {
+    return normalizedRole.slice(3);
+  }
+
+  return normalizedRole;
+};
+
+export const isRoleCompatible = (staffRole, coverageRole) => {
+  const staffFamily = getRoleFamilyKey(staffRole);
+  const coverageFamily = getRoleFamilyKey(coverageRole);
+
+  if (!staffFamily || !coverageFamily) return false;
+
+  return staffFamily === coverageFamily;
+};
+
 export const ROLE_LABEL_MAP = {
   admin: "Admin",
   superadmin: "Super Admin",

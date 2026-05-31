@@ -21,6 +21,7 @@ import { useAuth } from "../../../context/AuthContext";
 import {
   getRoleDisplayName,
   getRoleOptionsForIndustry,
+  isRoleCompatible,
 } from "../../../constants/industryRoles";
 
 export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
@@ -72,13 +73,15 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
       setFetching(true);
       try {
         const res = await api.get("/coverage/unfilled-auto", {
-          params: selectedRole ? { role: selectedRole } : {},
+          params: {},
         });
 
         // Filter out past coverages
         const now = new Date();
         const upcoming = (Array.isArray(res.data) ? res.data : []).filter(
-          (cov) => new Date(cov.endTime) >= now,
+          (cov) =>
+            new Date(cov.endTime) >= now &&
+            (!selectedRole || isRoleCompatible(selectedRole, cov.role)),
         );
 
         setCoverages(upcoming);
@@ -163,7 +166,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
 
         return (
           coverages.find((cov) => {
-            const sameRole = (cov?.role || "") === (item?.role || "");
+            const sameRole = isRoleCompatible(cov?.role, item?.role);
             const covStart = new Date(cov?.startTime || "").getTime();
             const covEnd = new Date(cov?.endTime || "").getTime();
             return sameRole && covStart === resultStart && covEnd === resultEnd;

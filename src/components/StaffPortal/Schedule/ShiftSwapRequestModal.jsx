@@ -17,6 +17,7 @@ import {
 import { toast } from "react-toastify";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
+import { isRoleCompatible } from "../../../constants/industryRoles";
 
 const formatWindow = (startTime, endTime) => {
   const start = new Date(startTime);
@@ -89,7 +90,7 @@ export default function ShiftSwapRequestModal({
     return staffList.filter((staff) => {
       if (!staff?._id) return false;
       if (String(staff._id) === String(assignedStaffId)) return false;
-      return staff.role === activeSchedule.role;
+      return isRoleCompatible(staff.role, activeSchedule.role);
     });
   }, [activeSchedule, staffList]);
 

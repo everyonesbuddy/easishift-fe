@@ -40,6 +40,7 @@ import CoverageEditCountForm from "./CoverageEditCountForm";
 import {
   getRoleDisplayName,
   getRoleOptionsForIndustry,
+  isRoleCompatible,
 } from "../../../constants/industryRoles";
 
 const statusColors = {
@@ -271,7 +272,9 @@ export default function CoveragePlanningPage() {
 
   const calendarEvents = useMemo(() => {
     return coverages
-      .filter((c) => selectedRole === "all" || c.role === selectedRole)
+      .filter(
+        (c) => selectedRole === "all" || isRoleCompatible(c.role, selectedRole),
+      )
       .map((c) => ({
         id: c._id,
         title: `${getRoleDisplayName(c.role)} (${c.requiredCount || 1})`,
@@ -305,7 +308,7 @@ export default function CoveragePlanningPage() {
 
   const displayedCoverages = useMemo(() => {
     const filtered = coverages.filter(
-      (c) => selectedRole === "all" || c.role === selectedRole,
+      (c) => selectedRole === "all" || isRoleCompatible(c.role, selectedRole),
     );
     return filtered.sort((a, b) => {
       const da = getCoverageDayKey(a.date);

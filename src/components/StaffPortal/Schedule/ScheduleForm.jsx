@@ -16,6 +16,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import { useAuth } from "../../../context/AuthContext";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
+import { isRoleCompatible } from "../../../constants/industryRoles";
 
 // Convert UTC → local string for <input type="datetime-local">
 function toLocalInputValue(dateString) {
@@ -121,13 +122,16 @@ export default function ScheduleForm({
       if (!selectedStaff) return;
 
       try {
-        const res = await api.get(
-          `/coverage/unfilled?role=${selectedStaff.role}`,
-        );
+        const res = await api.get(`/coverage`);
 
         // Filter out past shifts (based on startTime)
         const now = new Date();
-        const validShifts = res.data.filter((c) => new Date(c.startTime) > now);
+        const validShifts = (res.data || []).filter(
+          (c) =>
+            new Date(c.startTime) > now &&
+            (c.remaining == null || Number(c.remaining) > 0) &&
+            isRoleCompatible(selectedStaff.role, c.role),
+        );
 
         setCoverageOptions(validShifts);
       } catch (err) {

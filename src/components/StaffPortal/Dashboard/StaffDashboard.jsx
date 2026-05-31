@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Container,
   Typography,
@@ -8,7 +8,6 @@ import {
   CircularProgress,
   Dialog,
   DialogContent,
-  Paper,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
@@ -23,6 +22,7 @@ import {
   FiUserCheck,
   FiCalendar,
   FiPlus,
+  FiUpload,
 } from "react-icons/fi";
 import {
   FiCheckCircle,
@@ -39,9 +39,10 @@ import CoverageCreateForm from "../Coverage/CoverageCreateForm";
 import ScheduleForm from "../Schedule/ScheduleForm";
 import AutoGenerateScheduleForm from "../Schedule/AutoGenerateScheduleForm";
 import Paywall from "./Paywall";
+import { toast } from "react-toastify";
 
 export default function StaffDashboard() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, updateCurrentUser } = useAuth();
 
   const [summary, setSummary] = useState(null);
   const [tenant, setTenant] = useState(null);
@@ -52,8 +53,10 @@ export default function StaffDashboard() {
   const [openCoverageModal, setOpenCoverageModal] = useState(false);
   const [openScheduleModal, setOpenScheduleModal] = useState(false);
   const [openAutoModal, setOpenAutoModal] = useState(false);
+  const [uploadingProfile, setUploadingProfile] = useState(false);
 
   const [staffList, setStaffList] = useState([]);
+  const profileInputRef = useRef(null);
 
   const navigate = useNavigate();
   const theme = useTheme();
@@ -92,6 +95,65 @@ export default function StaffDashboard() {
     loadDashboardData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isAdmin]);
+
+  const handleProfileButtonClick = () => {
+    if (profileInputRef.current) profileInputRef.current.click();
+  };
+
+  const fileToBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const handleProfileImageChange = async (event) => {
+    const file = event.target.files?.[0];
+    // Allow re-selecting same file on next click.
+    event.target.value = "";
+
+    if (!file || !user?._id) return;
+
+    const maxSizeBytes = 2 * 1024 * 1024;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file.");
+      return;
+    }
+
+    if (file.size > maxSizeBytes) {
+      toast.error("Image is too large. Please use a file under 2MB.");
+      return;
+    }
+
+    try {
+      setUploadingProfile(true);
+      const base64Image = await fileToBase64(file);
+      const response = await api.put(`/auth/${user._id}`, {
+        profilePicture: base64Image,
+      });
+
+      const updatedUser = response?.data?.user;
+      if (updatedUser) {
+        updateCurrentUser({
+          profilePicture: updatedUser.profilePicture,
+          name: updatedUser.name,
+          email: updatedUser.email,
+          role: updatedUser.role,
+          userPhone: updatedUser.userPhone,
+          userPhoneCountryCode: updatedUser.userPhoneCountryCode,
+        });
+      }
+
+      toast.success("Profile picture updated.");
+    } catch (err) {
+      const message =
+        err?.response?.data?.message || "Failed to upload profile picture.";
+      toast.error(message);
+    } finally {
+      setUploadingProfile(false);
+    }
+  };
 
   if (loading)
     return (
@@ -246,21 +308,81 @@ export default function StaffDashboard() {
           {/* Avatar */}
           <Box
             sx={{
-              width: 96,
-              height: 96,
-              borderRadius: "50%",
               display: "flex",
+              flexDirection: "column",
               alignItems: "center",
-              justifyContent: "center",
-              fontSize: "2rem",
-              fontWeight: 700,
-              backgroundColor: "rgba(255,255,255,0.2)",
+              gap: 1.25,
             }}
           >
-            {user?.name
-              ?.split(" ")
-              .map((n) => n[0])
-              .join("")}
+            <Box
+              sx={{
+                width: 96,
+                height: 96,
+                borderRadius: "50%",
+                border: "2px solid rgba(255,255,255,0.45)",
+                backgroundColor: "rgba(255,255,255,0.12)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+              }}
+            >
+              {user?.profilePicture ? (
+                <Box
+                  component="img"
+                  src={user.profilePicture}
+                  alt={`${user?.name || "User"} profile`}
+                  sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <Typography
+                  sx={{ fontSize: "2rem", fontWeight: 700, color: "#fff" }}
+                >
+                  {user?.name
+                    ?.split(" ")
+                    .filter(Boolean)
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase() || ""}
+                </Typography>
+              )}
+            </Box>
+
+            <Button
+              size="small"
+              variant="contained"
+              onClick={handleProfileButtonClick}
+              disabled={uploadingProfile}
+              startIcon={<FiUpload size={13} />}
+              sx={{
+                textTransform: "none",
+                fontSize: "0.72rem",
+                lineHeight: 1.2,
+                px: 1.2,
+                py: 0.4,
+                borderRadius: 999,
+                bgcolor: "rgba(255,255,255,0.2)",
+                color: "#fff",
+                border: "1px solid rgba(255,255,255,0.25)",
+                "& .MuiButton-startIcon": { mr: 0.5 },
+                "&:hover": { bgcolor: "rgba(255,255,255,0.28)" },
+              }}
+            >
+              {uploadingProfile
+                ? "Uploading..."
+                : user?.profilePicture
+                  ? "Change Profile Picture"
+                  : "Add Profile Picture"}
+            </Button>
+
+            <Box
+              component="input"
+              type="file"
+              accept="image/*"
+              ref={profileInputRef}
+              onChange={handleProfileImageChange}
+              sx={{ display: "none" }}
+            />
           </Box>
         </Box>
       </Box>

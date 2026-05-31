@@ -44,21 +44,34 @@ export default function StaffCreateAndEditForm({
 }) {
   const { user, role: loggedInRole, tenant } = useAuth();
 
+  const canAssignAdminRole = loggedInRole === "admin";
+
   const roleOptions = useMemo(
     () => getRoleOptionsForIndustry(tenant?.industry),
     [tenant?.industry],
   );
 
   const selectableRoleOptions = useMemo(() => {
-    if (!staff?.role || roleOptions.some((item) => item.value === staff.role)) {
-      return roleOptions;
+    const options = canAssignAdminRole
+      ? [...roleOptions, { value: "admin", label: getRoleDisplayName("admin") }]
+      : roleOptions;
+
+    const dedupedOptions = Array.from(
+      new Map(options.map((item) => [item.value, item])).values(),
+    );
+
+    if (
+      !staff?.role ||
+      dedupedOptions.some((item) => item.value === staff.role)
+    ) {
+      return dedupedOptions;
     }
 
     return [
-      ...roleOptions,
+      ...dedupedOptions,
       { value: staff.role, label: getRoleDisplayName(staff.role) },
     ];
-  }, [roleOptions, staff?.role]);
+  }, [roleOptions, staff?.role, canAssignAdminRole]);
 
   const [form, setForm] = useState({
     name: "",

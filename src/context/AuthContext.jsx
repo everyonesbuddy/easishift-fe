@@ -101,6 +101,20 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateCurrentUser = (partialUser) => {
+    if (!partialUser) return;
+
+    setUser((prev) => {
+      const nextUser = { ...(prev || {}), ...partialUser };
+      localStorage.setItem("user", JSON.stringify(nextUser));
+      if (nextUser.role) {
+        localStorage.setItem("role", nextUser.role);
+        setRole(nextUser.role);
+      }
+      return nextUser;
+    });
+  };
+
   const logout = () => {
     setUser(null);
     setRole("");
@@ -129,6 +143,7 @@ export const AuthProvider = ({ children }) => {
         isAdmin,
         login,
         logout,
+        updateCurrentUser,
         loading,
       }}
     >

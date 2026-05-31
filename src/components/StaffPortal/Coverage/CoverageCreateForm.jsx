@@ -76,6 +76,35 @@ const defaultRequirement = {
   endTime: "17:00",
 };
 
+function isOvernightTimeRange(startTime, endTime) {
+  if (!startTime || !endTime) return false;
+  return endTime <= startTime;
+}
+
+function formatShiftPreview(dateValue, startTime, endTime) {
+  if (!dateValue || !startTime || !endTime) {
+    return `${startTime || "--:--"} - ${endTime || "--:--"}`;
+  }
+
+  const start = new Date(`${dateValue}T${startTime}:00`);
+  const end = new Date(`${dateValue}T${endTime}:00`);
+
+  if (isOvernightTimeRange(startTime, endTime)) {
+    end.setDate(end.getDate() + 1);
+  }
+
+  return `${start.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  })} - ${end.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  })} ${end.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  })}`;
+}
+
 function toUTC(dateStr, timeStr) {
   const local = new Date(`${dateStr}T${timeStr}:00`);
   return new Date(local.toISOString());
@@ -176,8 +205,9 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
         rows: requirements.map((req, reqIndex) => ({
           id: `${dateValue}-${reqIndex}`,
           role: req.role ? getRoleDisplayName(req.role) : "—",
-          timeLabel: `${req.startTime} – ${req.endTime}`,
+          timeLabel: formatShiftPreview(dateValue, req.startTime, req.endTime),
           count: Number(req.requiredCount) || 0,
+          spansOvernight: isOvernightTimeRange(req.startTime, req.endTime),
         })),
       })),
     [dates, requirements],
@@ -238,16 +268,6 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
       const req = requirements[index];
       if (!req.role || !req.startTime || !req.endTime) {
         const msg = `Requirement ${index + 1} must include role, start time, and end time.`;
-        setError(msg);
-        toast.error(msg);
-        return;
-      }
-
-      const startUTC = toUTC(referenceDate, req.startTime);
-      const endUTC = toUTC(referenceDate, req.endTime);
-
-      if (startUTC >= endUTC) {
-        const msg = `Requirement ${index + 1} must have end time after start time.`;
         setError(msg);
         toast.error(msg);
         return;
@@ -752,6 +772,13 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                     required
                   />
                 </Stack>
+
+                {isOvernightTimeRange(req.startTime, req.endTime) && (
+                  <Alert severity="info" sx={{ py: 0 }}>
+                    This shift will be treated as overnight and end the next
+                    day.
+                  </Alert>
+                )}
               </Stack>
             </Paper>
           ))}
@@ -859,6 +886,14 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                       >
                         {row.timeLabel}
                       </Typography>
+                      {row.spansOvernight && (
+                        <Chip
+                          label="Overnight"
+                          size="small"
+                          color="info"
+                          variant="outlined"
+                        />
+                      )}
                       <Typography
                         variant="caption"
                         sx={{ fontWeight: 600, whiteSpace: "nowrap" }}

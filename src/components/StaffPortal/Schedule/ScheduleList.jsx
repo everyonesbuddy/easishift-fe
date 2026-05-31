@@ -128,6 +128,73 @@ export default function ScheduleList() {
     return new Date(year, month - 1, day);
   };
 
+  const isOvernightShift = (schedule) => {
+    const start = new Date(schedule?.startTime);
+    const end = new Date(schedule?.endTime);
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return false;
+    }
+
+    return start.toDateString() !== end.toDateString();
+  };
+
+  const formatScheduleDateRange = (schedule) => {
+    const start = new Date(schedule?.startTime);
+    const end = new Date(schedule?.endTime);
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return "";
+    }
+
+    const startLabel = start.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    if (!isOvernightShift(schedule)) {
+      return startLabel;
+    }
+
+    const endLabel = end.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    return `${startLabel} - ${endLabel}`;
+  };
+
+  const formatScheduleTimeRange = (
+    schedule,
+    { withNextDayHint = true } = {},
+  ) => {
+    const start = new Date(schedule?.startTime);
+    const end = new Date(schedule?.endTime);
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return "";
+    }
+
+    const startLabel = start.toLocaleTimeString("default", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    const endLabel = end.toLocaleTimeString("default", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+
+    if (isOvernightShift(schedule) && withNextDayHint) {
+      return `${startLabel} - ${endLabel} next day`;
+    }
+
+    return `${startLabel} - ${endLabel}`;
+  };
+
   // ---------------------------
   // Fetch schedules
   // ---------------------------
@@ -224,17 +291,11 @@ export default function ScheduleList() {
       const key = `${getTimeKey(s.startTime)}|${getTimeKey(s.endTime)}`;
       if (!seen.has(key)) {
         seen.add(key);
-        const startLabel = new Date(s.startTime).toLocaleTimeString("default", {
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
+        const overnightLabel = isOvernightShift(s) ? " (+1 day)" : "";
+        options.push({
+          key,
+          label: `${formatScheduleTimeRange(s, { withNextDayHint: false })}${overnightLabel}`,
         });
-        const endLabel = new Date(s.endTime).toLocaleTimeString("default", {
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        });
-        options.push({ key, label: `${startLabel} – ${endLabel}` });
       }
     });
     return options.sort((a, b) => a.key.localeCompare(b.key));
@@ -626,8 +687,20 @@ export default function ScheduleList() {
                         sx={{ fontSize: 12, color: "text.secondary" }}
                       >
                         {getRoleDisplayName(s.role)} •{" "}
-                        {formatLocal(s.startTime)} - {formatLocal(s.endTime)}
+                        {formatScheduleDateRange(s)}
                       </Typography>
+                      <Typography
+                        sx={{ fontSize: 12, color: "text.secondary" }}
+                      >
+                        {formatScheduleTimeRange(s)}
+                      </Typography>
+                      {isOvernightShift(s) && (
+                        <Typography
+                          sx={{ fontSize: 12, color: "info.main", mt: 0.5 }}
+                        >
+                          Overnight shift
+                        </Typography>
+                      )}
                       <Typography
                         sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
                         noWrap
@@ -1033,23 +1106,10 @@ export default function ScheduleList() {
                                     color: "#6b7280",
                                   }}
                                 >
-                                  {new Date(shift.startTime).toLocaleTimeString(
-                                    "default",
-                                    {
-                                      hour: "numeric",
-                                      minute: "2-digit",
-                                      hour12: true,
-                                    },
-                                  )}
-                                  {" – "}
-                                  {new Date(shift.endTime).toLocaleTimeString(
-                                    "default",
-                                    {
-                                      hour: "numeric",
-                                      minute: "2-digit",
-                                      hour12: true,
-                                    },
-                                  )}
+                                  {formatScheduleTimeRange(shift, {
+                                    withNextDayHint: false,
+                                  })}
+                                  {isOvernightShift(shift) ? " (+1 day)" : ""}
                                 </Typography>
                               </Box>
                             ))}
@@ -1148,7 +1208,7 @@ export default function ScheduleList() {
               right: "",
             }}
             slotMinTime="06:00:00"
-            slotMaxTime="22:00:00"
+            slotMaxTime="24:00:00"
             events={filteredSchedules.map((s) => ({
               id: s._id,
               title: s.staffId?.name,

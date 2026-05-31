@@ -48,7 +48,7 @@ const statusColors = {
 };
 
 export default function CoveragePlanningPage() {
-  const { user, isAdmin, tenant } = useAuth();
+  const { isAdmin, tenant } = useAuth();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -142,6 +142,83 @@ export default function CoveragePlanningPage() {
     }
   };
 
+  function toLocal(utc) {
+    if (!utc) return null;
+    return new Date(utc);
+  }
+
+  function spansOvernight(coverage) {
+    if (typeof coverage?.spansOvernight === "boolean") {
+      return coverage.spansOvernight;
+    }
+
+    const start = toLocal(coverage?.startTime);
+    const end = toLocal(coverage?.endTime);
+
+    if (!start || !end) return false;
+
+    return start.toDateString() !== end.toDateString();
+  }
+
+  function formatCoverageDateLabel(coverage) {
+    const start = toLocal(coverage?.startTime);
+
+    if (!start) {
+      return parseCoverageDateAsLocal(
+        coverage?.date || coverage?.startTime,
+      )?.toLocaleDateString();
+    }
+
+    const startLabel = start.toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    if (!spansOvernight(coverage)) {
+      return startLabel;
+    }
+
+    const nextDay = new Date(start);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    const endLabel = nextDay.toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    return `${startLabel} - ${endLabel}`;
+  }
+
+  function formatCoverageTimeLabel(coverage) {
+    const start = toLocal(coverage?.startTime);
+    const end = toLocal(coverage?.endTime);
+
+    if (!start || !end) return "";
+
+    const startDateLabel = start.toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const endDateLabel = end.toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const startLabel = start.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    const endLabel = end.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+    return `${startDateLabel} ${startLabel} - ${endDateLabel} ${endLabel}`;
+  }
+
   const calendarEvents = useMemo(() => {
     return coverages
       .filter((c) => selectedRole === "all" || c.role === selectedRole)
@@ -167,7 +244,6 @@ export default function CoveragePlanningPage() {
               : "filled"
           ] || "#6b7280",
         textColor: "#fff",
-        // use coverage date as canonical display day
         extendedProps: {
           note: c.note,
           date: c.date || c.startTime,
@@ -177,78 +253,6 @@ export default function CoveragePlanningPage() {
       }));
   }, [coverages, selectedRole]);
 
-  // Helper: backend stores times in UTC; convert to local Date for display
-  function toLocal(utc) {
-    if (!utc) return null;
-    // Accept Date objects or ISO strings
-    // new Date(isoString) already produces a Date object in the local timezone
-    // If utc is already a Date, new Date(utc) will clone it.
-    return new Date(utc);
-  }
-
-  function spansOvernight(coverage) {
-    if (coverage?.spansOvernight) return true;
-
-    const start = toLocal(coverage?.startTime);
-    const end = toLocal(coverage?.endTime);
-
-    if (!start || !end) return false;
-
-    return start.toDateString() !== end.toDateString();
-  }
-
-  function formatCoverageDateLabel(coverage) {
-    const start = toLocal(coverage?.startTime);
-    const end = toLocal(coverage?.endTime);
-
-    if (!start || !end) {
-      return parseCoverageDateAsLocal(
-        coverage?.date || coverage?.startTime,
-      )?.toLocaleDateString();
-    }
-
-    const startLabel = start.toLocaleDateString([], {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-
-    if (!spansOvernight(coverage)) {
-      return startLabel;
-    }
-
-    const endLabel = end.toLocaleDateString([], {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-
-    return `${startLabel} - ${endLabel}`;
-  }
-
-  function formatCoverageTimeLabel(coverage) {
-    const start = toLocal(coverage?.startTime);
-    const end = toLocal(coverage?.endTime);
-
-    if (!start || !end) return "";
-
-    const startLabel = start.toLocaleTimeString([], {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-    const endLabel = end.toLocaleTimeString([], {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-
-    if (!spansOvernight(coverage)) {
-      return `${startLabel} - ${endLabel}`;
-    }
-
-    return `${startLabel} - ${endLabel} next day`;
-  }
-
-  // Filtered + sorted coverages (most recent -> least recent)
   const displayedCoverages = useMemo(() => {
     const filtered = coverages.filter(
       (c) => selectedRole === "all" || c.role === selectedRole,
@@ -256,8 +260,7 @@ export default function CoveragePlanningPage() {
     return filtered.sort((a, b) => {
       const da = getCoverageDayKey(a.date);
       const db = getCoverageDayKey(b.date);
-      if (db !== da) return db.localeCompare(da); // most recent first
-      // fallback: compare startTime
+      if (db !== da) return db.localeCompare(da);
       return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
     });
   }, [coverages, selectedRole]);
@@ -374,7 +377,6 @@ export default function CoveragePlanningPage() {
         </Alert>
       )}
 
-      {/* Filters + List view */}
       <Paper sx={{ bgcolor: "white", borderRadius: 2, p: 2, mb: 3 }}>
         <Box
           display="flex"
@@ -436,20 +438,16 @@ export default function CoveragePlanningPage() {
                       {getRoleDisplayName(c.role)}
                     </Typography>
                     <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                      {parseCoverageDateAsLocal(
-                        c.date || c.startTime,
-                      )?.toLocaleDateString()}{" "}
-                      •{" "}
-                      {toLocal(c.startTime)?.toLocaleTimeString([], {
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}{" "}
-                      -{" "}
-                      {toLocal(c.endTime)?.toLocaleTimeString([], {
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
+                      {formatCoverageDateLabel(c)} •{" "}
+                      {formatCoverageTimeLabel(c)}
                     </Typography>
+                    {spansOvernight(c) && (
+                      <Typography
+                        sx={{ fontSize: 12, color: "info.main", mt: 0.5 }}
+                      >
+                        Overnight shift
+                      </Typography>
+                    )}
                     <Typography
                       sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
                       noWrap
@@ -517,9 +515,6 @@ export default function CoveragePlanningPage() {
                 <TableHead>
                   <TableRow sx={{ background: "#F8FAFC" }}>
                     <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
-                      Date
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
                       Role
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
@@ -544,7 +539,6 @@ export default function CoveragePlanningPage() {
                       key={c._id}
                       sx={{ "&:hover": { background: "#f3f4f6" } }}
                     >
-                      <TableCell>{formatCoverageDateLabel(c)}</TableCell>
                       <TableCell>{getRoleDisplayName(c.role)}</TableCell>
                       <TableCell>{formatCoverageTimeLabel(c)}</TableCell>
                       <TableCell>{c.requiredCount}</TableCell>

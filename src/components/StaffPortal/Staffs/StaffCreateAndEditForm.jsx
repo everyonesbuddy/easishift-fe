@@ -8,6 +8,7 @@ import {
   Paper,
   Stack,
   IconButton,
+  Chip,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import api from "../../../config/api";
@@ -45,6 +46,39 @@ const normalizeStringArray = (values) =>
         .filter(Boolean),
     ),
   );
+
+const toDisplayLabel = (value) => {
+  const normalized = String(value || "")
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+
+  if (!normalized) return "";
+
+  return normalized
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
+
+const normalizeToken = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase();
+
+const buildTimeSlotLabel = (slot) => {
+  const tag = normalizeToken(slot?.tag);
+  const label = String(slot?.label || "").trim();
+  const start = String(slot?.startLocalTime || "").trim();
+  const end = String(slot?.endLocalTime || "").trim();
+
+  const displayName = label || toDisplayLabel(tag);
+  if (start && end) {
+    return `${displayName} (${start}-${end})`;
+  }
+
+  return displayName;
+};
 
 export default function StaffCreateAndEditForm({
   staff,
@@ -94,6 +128,7 @@ export default function StaffCreateAndEditForm({
     phoneCountryCode: "",
     phone: "",
     allowedAreas: [],
+    allowedShiftTags: [],
     allowedShiftTypes: [],
     certificationTags: [],
     role: "",
@@ -125,11 +160,104 @@ export default function StaffCreateAndEditForm({
     [facilityPreferences?.certificationTags, form?.certificationTags],
   );
 
+  const shiftSlotOptions = useMemo(() => {
+    const optionsByTag = new Map();
+
+    (facilityPreferences?.shiftTypeDefinitions || []).forEach((definition) => {
+      const shiftType = normalizeToken(definition?.key);
+      if (!shiftType) return;
+
+      const shiftTypeLabel =
+        String(definition?.label || "").trim() || toDisplayLabel(shiftType);
+
+      const slots = Array.isArray(definition?.timeSlots)
+        ? definition.timeSlots
+        : [];
+
+      slots.forEach((slot) => {
+        const tag = normalizeToken(slot?.tag);
+        if (!tag) return;
+
+        optionsByTag.set(tag, {
+          value: tag,
+          label: buildTimeSlotLabel(slot),
+          shiftType,
+          shiftTypeLabel,
+        });
+      });
+    });
+
+    (Array.isArray(form?.allowedShiftTags)
+      ? form.allowedShiftTags
+      : []
+    ).forEach((rawTag) => {
+      const tag = normalizeToken(rawTag);
+      if (!tag || optionsByTag.has(tag)) return;
+
+      optionsByTag.set(tag, {
+        value: tag,
+        label: toDisplayLabel(tag),
+        shiftType: "",
+        shiftTypeLabel: "",
+      });
+    });
+
+    return Array.from(optionsByTag.values());
+  }, [facilityPreferences?.shiftTypeDefinitions, form?.allowedShiftTags]);
+
+  const shiftSlotTypeLookup = useMemo(() => {
+    const lookup = new Map();
+    shiftSlotOptions.forEach((option) => {
+      lookup.set(option.value, option.shiftType);
+    });
+    return lookup;
+  }, [shiftSlotOptions]);
+
+  const areaLabelLookup = useMemo(
+    () =>
+      new Map(
+        allowedAreaOptions.map((value) => [value, toDisplayLabel(value)]),
+      ),
+    [allowedAreaOptions],
+  );
+
+  const certificationLabelLookup = useMemo(
+    () =>
+      new Map(
+        certificationTagOptions.map((value) => [value, toDisplayLabel(value)]),
+      ),
+    [certificationTagOptions],
+  );
+
+  const shiftSlotLabelLookup = useMemo(() => {
+    const lookup = new Map();
+    shiftSlotOptions.forEach((option) => {
+      lookup.set(
+        option.value,
+        option.shiftTypeLabel
+          ? `${option.shiftTypeLabel} - ${option.label}`
+          : option.label,
+      );
+    });
+    return lookup;
+  }, [shiftSlotOptions]);
+
   const isEditingSelf = staff && staff._id === user._id;
   const disableRoleChange = isEditingSelf && loggedInRole === "admin";
 
   useEffect(() => {
     if (staff) {
+      const savedShiftTags = normalizeStringArray(staff.allowedShiftTags);
+      const derivedShiftTags =
+        savedShiftTags.length > 0
+          ? savedShiftTags
+          : normalizeStringArray(staff.allowedShiftTypes)
+              .map((value) => {
+                const colonIndex = value.indexOf(":");
+                return colonIndex !== -1 ? value.slice(colonIndex + 1) : value;
+              })
+              .filter(Boolean);
+
       setForm({
         name: staff.name,
         email: staff.email,
@@ -137,6 +265,7 @@ export default function StaffCreateAndEditForm({
           staff.userPhoneCountryCode || staff.phoneCountryCode || "",
         phone: staff.userPhone || staff.phone || "",
         allowedAreas: normalizeStringArray(staff.allowedAreas),
+        allowedShiftTags: derivedShiftTags,
         allowedShiftTypes: normalizeStringArray(staff.allowedShiftTypes),
         certificationTags: normalizeStringArray(staff.certificationTags),
         role: staff.role,
@@ -182,6 +311,25 @@ export default function StaffCreateAndEditForm({
     }
 
     try {
+      const normalizedShiftTags = normalizeStringArray(
+        form.allowedShiftTags,
+      ).map((value) => normalizeToken(value));
+
+      const slotSpecificShiftValues = Array.from(
+        new Set(
+          normalizedShiftTags.map((tag) => {
+            const shiftType = shiftSlotTypeLookup.get(tag);
+            return shiftType ? `${shiftType}:${tag}` : tag;
+          }),
+        ),
+      );
+
+      const normalizedShiftTypes = slotSpecificShiftValues.length
+        ? slotSpecificShiftValues
+        : normalizeStringArray(form.allowedShiftTypes).map((value) =>
+            normalizeToken(value),
+          );
+
       if (staff) {
         // Prevent self-role modification
         const payload = {
@@ -189,7 +337,8 @@ export default function StaffCreateAndEditForm({
           email: form.email,
           role: disableRoleChange ? staff.role : form.role,
           allowedAreas: normalizeStringArray(form.allowedAreas),
-          allowedShiftTypes: normalizeStringArray(form.allowedShiftTypes),
+          allowedShiftTags: normalizedShiftTags,
+          allowedShiftTypes: normalizedShiftTypes,
           certificationTags: normalizeStringArray(form.certificationTags),
         };
 
@@ -225,7 +374,8 @@ export default function StaffCreateAndEditForm({
           email: form.email,
           role: form.role,
           allowedAreas: normalizeStringArray(form.allowedAreas),
-          allowedShiftTypes: normalizeStringArray(form.allowedShiftTypes),
+          allowedShiftTags: normalizedShiftTags,
+          allowedShiftTypes: normalizedShiftTypes,
           certificationTags: normalizeStringArray(form.certificationTags),
           ...(normalizedPhone && normalizedPhoneCountryCode
             ? {
@@ -248,6 +398,69 @@ export default function StaffCreateAndEditForm({
       const msg = err?.response?.data?.message || "Failed to save staff";
       toast.error(msg, { position: "top-right", autoClose: 4000 });
     }
+  };
+
+  const MultiChipSelector = ({
+    label,
+    helperText,
+    options,
+    values,
+    onChange,
+    getOptionValue,
+    getOptionLabel,
+  }) => {
+    const selectedValues = normalizeStringArray(values);
+
+    const toggleValue = (option) => {
+      const value = getOptionValue(option);
+      if (!value) return;
+
+      const isSelected = selectedValues.includes(value);
+      const nextValues = isSelected
+        ? selectedValues.filter((item) => item !== value)
+        : [...selectedValues, value];
+
+      onChange(normalizeStringArray(nextValues));
+    };
+
+    return (
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+          {label}
+        </Typography>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", mb: 1 }}
+        >
+          {helperText}
+        </Typography>
+
+        {!options.length ? (
+          <Typography variant="caption" color="text.secondary">
+            No options configured yet
+          </Typography>
+        ) : (
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            {options.map((option) => {
+              const value = getOptionValue(option);
+              const selected = selectedValues.includes(value);
+
+              return (
+                <Chip
+                  key={value}
+                  label={getOptionLabel(option)}
+                  clickable
+                  color={selected ? "primary" : "default"}
+                  variant={selected ? "filled" : "outlined"}
+                  onClick={() => toggleValue(option)}
+                />
+              );
+            })}
+          </Stack>
+        )}
+      </Box>
+    );
   };
 
   return (
@@ -354,69 +567,51 @@ export default function StaffCreateAndEditForm({
           ))}
         </TextField>
 
-        <TextField
-          select
-          fullWidth
-          label="Allowed Unit Areas"
-          value={form.allowedAreas}
-          onChange={(e) => setForm({ ...form, allowedAreas: e.target.value })}
-          SelectProps={{ multiple: true }}
-          disabled={!allowedAreaOptions.length}
-          helperText={
-            allowedAreaOptions.length
-              ? "Leave empty to allow any area"
-              : "Admin has not configured unit areas yet"
-          }
-        >
-          {allowedAreaOptions.map((area) => (
-            <MenuItem key={area} value={area}>
-              {area}
-            </MenuItem>
-          ))}
-        </TextField>
-
-        {facilityPreferences?.shiftTypes?.length > 0 && (
-          <TextField
-            select
-            fullWidth
-            label="Allowed Shift Types"
-            value={form.allowedShiftTypes}
-            onChange={(e) =>
-              setForm({ ...form, allowedShiftTypes: e.target.value })
+        {allowedAreaOptions.length > 0 && (
+          <MultiChipSelector
+            label="Allowed Unit Areas"
+            helperText="Click chips to select or remove areas"
+            options={allowedAreaOptions}
+            values={form.allowedAreas}
+            onChange={(value) => setForm({ ...form, allowedAreas: value })}
+            getOptionValue={(option) => option}
+            getOptionLabel={(option) =>
+              areaLabelLookup.get(option) || toDisplayLabel(option)
             }
-            SelectProps={{ multiple: true }}
-            helperText="Leave empty to allow any shift type"
-          >
-            {facilityPreferences.shiftTypes.map((shiftType) => (
-              <MenuItem key={shiftType} value={shiftType}>
-                {shiftType}
-              </MenuItem>
-            ))}
-          </TextField>
+          />
         )}
 
-        <TextField
-          select
-          fullWidth
-          label="Certification Tags"
-          value={form.certificationTags}
-          onChange={(e) =>
-            setForm({ ...form, certificationTags: e.target.value })
+        <MultiChipSelector
+          label="Allowed Shift Time Slots"
+          helperText={
+            shiftSlotOptions.length
+              ? "Select exact slots, e.g. Day - Day 1 or Day - Day 2"
+              : "No shift definitions configured yet. Define shift type time slots in Facility Preferences to use this."
           }
-          SelectProps={{ multiple: true }}
-          disabled={!certificationTagOptions.length}
+          options={shiftSlotOptions}
+          values={form.allowedShiftTags}
+          onChange={(value) => setForm({ ...form, allowedShiftTags: value })}
+          getOptionValue={(option) => option.value}
+          getOptionLabel={(option) =>
+            shiftSlotLabelLookup.get(option.value) || option.label
+          }
+        />
+
+        <MultiChipSelector
+          label="Certification Tags"
           helperText={
             certificationTagOptions.length
-              ? "Optional staff capabilities"
-              : "Admin has not configured certification tags yet"
+              ? "Click chips to select or remove certifications"
+              : "No certification tags configured yet — add them in Facility Preferences"
           }
-        >
-          {certificationTagOptions.map((tag) => (
-            <MenuItem key={tag} value={tag}>
-              {tag}
-            </MenuItem>
-          ))}
-        </TextField>
+          options={certificationTagOptions}
+          values={form.certificationTags}
+          onChange={(value) => setForm({ ...form, certificationTags: value })}
+          getOptionValue={(option) => option}
+          getOptionLabel={(option) =>
+            certificationLabelLookup.get(option) || toDisplayLabel(option)
+          }
+        />
 
         <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
           <Button variant="contained" fullWidth onClick={handleSubmit}>

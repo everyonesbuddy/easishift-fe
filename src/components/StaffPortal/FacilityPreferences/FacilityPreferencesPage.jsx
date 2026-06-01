@@ -78,9 +78,58 @@ const normalizeTaxonomyPrefs = (inputPrefs) => {
   const safePrefs = inputPrefs || {};
   const next = { ...safePrefs };
 
+  delete next.facilityTimezone;
+
   TAXONOMY_FIELDS.forEach((field) => {
     next[field] = normalizeArrayValues(safePrefs[field]);
   });
+
+  next.shiftTypeDefinitions = (
+    Array.isArray(safePrefs.shiftTypeDefinitions)
+      ? safePrefs.shiftTypeDefinitions
+      : []
+  )
+    .map((definition) => {
+      const key = toSnakeCase(definition?.key);
+      if (!key) return null;
+
+      const timeSlots = Array.from(
+        new Map(
+          (Array.isArray(definition?.timeSlots) ? definition.timeSlots : [])
+            .map((slot) => {
+              const tag = toSnakeCase(slot?.tag);
+              const startLocalTime = String(slot?.startLocalTime || "").trim();
+              const endLocalTime = String(slot?.endLocalTime || "").trim();
+
+              if (!tag || !startLocalTime || !endLocalTime) return null;
+
+              return [
+                tag,
+                {
+                  tag,
+                  label: String(slot?.label || "").trim() || null,
+                  startLocalTime,
+                  endLocalTime,
+                  spansOvernight: Boolean(slot?.spansOvernight),
+                },
+              ];
+            })
+            .filter(Boolean),
+        ).values(),
+      );
+
+      return {
+        key,
+        label: String(definition?.label || "").trim() || null,
+        timeSlots,
+      };
+    })
+    .filter(Boolean);
+
+  const definitionKeys = next.shiftTypeDefinitions.map((item) => item.key);
+  next.shiftTypes = Array.from(
+    new Set([...(next.shiftTypes || []), ...definitionKeys]),
+  );
 
   return next;
 };
@@ -100,6 +149,7 @@ export default function FacilityPreferencesPage() {
     shiftTypes: "",
     certificationTags: "",
   });
+  const [slotInputsByShiftType, setSlotInputsByShiftType] = useState({});
   useEffect(() => {
     async function fetchPrefs() {
       try {
@@ -154,6 +204,139 @@ export default function FacilityPreferencesPage() {
   const handleArrayInputChange = (field, value) => {
     setArrayInputs((prev) => ({ ...prev, [field]: value }));
   };
+
+  const getShiftTypeDefinition = (shiftTypeKey) => {
+    const key = toSnakeCase(shiftTypeKey);
+    return (prefs.shiftTypeDefinitions || []).find((item) => item.key === key);
+  };
+
+  const getSlotInput = (shiftTypeKey) => {
+    const key = toSnakeCase(shiftTypeKey);
+    return (
+      slotInputsByShiftType[key] || {
+        tag: "",
+        startLocalTime: "",
+        endLocalTime: "",
+        spansOvernight: false,
+      }
+    );
+  };
+
+  const handleSlotInputChange = (shiftTypeKey, field, value) => {
+    const key = toSnakeCase(shiftTypeKey);
+    setSlotInputsByShiftType((prev) => ({
+      ...prev,
+      [key]: {
+        ...getSlotInput(key),
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleAddShiftSlot = (shiftTypeKey) => {
+    const key = toSnakeCase(shiftTypeKey);
+    const input = getSlotInput(key);
+    const tag = toSnakeCase(input.tag);
+    const startLocalTime = String(input.startLocalTime || "").trim();
+    const endLocalTime = String(input.endLocalTime || "").trim();
+
+    if (!tag || !startLocalTime || !endLocalTime) {
+      toast.warning("Provide slot tag, start time, and end time", {
+        autoClose: 1500,
+      });
+      return;
+    }
+
+    setPrefs((prev) => {
+      const existingDefinitions = Array.isArray(prev.shiftTypeDefinitions)
+        ? prev.shiftTypeDefinitions
+        : [];
+
+      const defIndex = existingDefinitions.findIndex(
+        (item) => item.key === key,
+      );
+      const nextDefinitions = [...existingDefinitions];
+
+      if (defIndex === -1) {
+        nextDefinitions.push({
+          key,
+          label: null,
+          timeSlots: [
+            {
+              tag,
+              label: null,
+              startLocalTime,
+              endLocalTime,
+              spansOvernight: Boolean(input.spansOvernight),
+            },
+          ],
+        });
+      } else {
+        const definition = nextDefinitions[defIndex];
+        const currentSlots = Array.isArray(definition.timeSlots)
+          ? definition.timeSlots
+          : [];
+
+        if (currentSlots.some((slot) => slot.tag === tag)) {
+          toast.warning(
+            `${toDisplayLabel(tag)} already exists for ${toDisplayLabel(key)}`,
+            {
+              autoClose: 1500,
+            },
+          );
+          return prev;
+        }
+
+        nextDefinitions[defIndex] = {
+          ...definition,
+          timeSlots: [
+            ...currentSlots,
+            {
+              tag,
+              label: null,
+              startLocalTime,
+              endLocalTime,
+              spansOvernight: Boolean(input.spansOvernight),
+            },
+          ],
+        };
+      }
+
+      return {
+        ...prev,
+        shiftTypeDefinitions: nextDefinitions,
+      };
+    });
+
+    setSlotInputsByShiftType((prev) => ({
+      ...prev,
+      [key]: {
+        tag: "",
+        startLocalTime: "",
+        endLocalTime: "",
+        spansOvernight: false,
+      },
+    }));
+  };
+
+  const handleRemoveShiftSlot = (shiftTypeKey, slotIndex) => {
+    const key = toSnakeCase(shiftTypeKey);
+    setPrefs((prev) => ({
+      ...prev,
+      shiftTypeDefinitions: (prev.shiftTypeDefinitions || []).map(
+        (definition) => {
+          if (definition.key !== key) return definition;
+          return {
+            ...definition,
+            timeSlots: (definition.timeSlots || []).filter(
+              (_, idx) => idx !== slotIndex,
+            ),
+          };
+        },
+      ),
+    }));
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setError("");
@@ -509,6 +692,155 @@ export default function FacilityPreferencesPage() {
               </Box>
             </Box>
 
+            {/* Shift Slot Definitions */}
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                Shift Type Time Slots
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mb: 1.5 }}
+              >
+                Configure local-time slots for each shift type (e.g. day_am
+                07:00-11:00). Coverage can then use shift type + slot tag.
+              </Typography>
+
+              {(prefs.shiftTypes || []).length === 0 ? (
+                <Alert severity="info" sx={{ mb: 1.5 }}>
+                  Add at least one shift type before configuring time slots.
+                </Alert>
+              ) : (
+                <Stack spacing={2}>
+                  {(prefs.shiftTypes || []).map((shiftTypeKey) => {
+                    const definition = getShiftTypeDefinition(shiftTypeKey);
+                    const slots = definition?.timeSlots || [];
+                    const slotInput = getSlotInput(shiftTypeKey);
+
+                    return (
+                      <Box
+                        key={shiftTypeKey}
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 2,
+                          bgcolor: "grey.50",
+                          border: "1px solid",
+                          borderColor: "divider",
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 600, mb: 1 }}
+                        >
+                          {toDisplayLabel(shiftTypeKey)}
+                        </Typography>
+
+                        <Stack spacing={1} mb={1.5}>
+                          {slots.length === 0 ? (
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              No slots configured yet.
+                            </Typography>
+                          ) : (
+                            slots.map((slot, idx) => (
+                              <Box
+                                key={`${slot.tag}-${idx}`}
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  p: 1,
+                                  borderRadius: 1.5,
+                                  bgcolor: "background.paper",
+                                  border: "1px solid",
+                                  borderColor: "divider",
+                                }}
+                              >
+                                <Typography variant="body2">
+                                  {toDisplayLabel(slot.tag)} (
+                                  {slot.startLocalTime} - {slot.endLocalTime})
+                                  {slot.spansOvernight ? " • Overnight" : ""}
+                                </Typography>
+                                <Button
+                                  size="small"
+                                  color="error"
+                                  onClick={() =>
+                                    handleRemoveShiftSlot(shiftTypeKey, idx)
+                                  }
+                                  startIcon={<FiX size={14} />}
+                                  sx={{ minWidth: "auto" }}
+                                >
+                                  Remove
+                                </Button>
+                              </Box>
+                            ))
+                          )}
+                        </Stack>
+
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          spacing={1}
+                        >
+                          <TextField
+                            size="small"
+                            label="Slot Tag"
+                            placeholder="e.g., day_am"
+                            value={slotInput.tag}
+                            onChange={(e) =>
+                              handleSlotInputChange(
+                                shiftTypeKey,
+                                "tag",
+                                e.target.value,
+                              )
+                            }
+                            sx={{ flex: 1 }}
+                          />
+                          <TextField
+                            size="small"
+                            label="Start"
+                            type="time"
+                            value={slotInput.startLocalTime}
+                            onChange={(e) =>
+                              handleSlotInputChange(
+                                shiftTypeKey,
+                                "startLocalTime",
+                                e.target.value,
+                              )
+                            }
+                            InputLabelProps={{ shrink: true }}
+                          />
+                          <TextField
+                            size="small"
+                            label="End"
+                            type="time"
+                            value={slotInput.endLocalTime}
+                            onChange={(e) =>
+                              handleSlotInputChange(
+                                shiftTypeKey,
+                                "endLocalTime",
+                                e.target.value,
+                              )
+                            }
+                            InputLabelProps={{ shrink: true }}
+                          />
+                          <Button
+                            variant="contained"
+                            size="small"
+                            startIcon={<FiPlus size={14} />}
+                            onClick={() => handleAddShiftSlot(shiftTypeKey)}
+                          >
+                            Add Slot
+                          </Button>
+                        </Stack>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              )}
+            </Box>
+
             {/* Certification Tags */}
             <Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
@@ -719,6 +1051,14 @@ export default function FacilityPreferencesPage() {
             helperText="How many hours before a shift staff receive a reminder"
             sx={{ maxWidth: 320 }}
           />
+
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ mt: 2, display: "block" }}
+          >
+            Timezone is fixed to UTC and converted to local time in the app.
+          </Typography>
         </Paper>
 
         {/* Save button */}

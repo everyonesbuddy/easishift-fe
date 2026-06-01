@@ -20,6 +20,9 @@ import {
   FormControl,
   InputLabel,
   GlobalStyles,
+  Checkbox,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
 
 import FullCalendar from "@fullcalendar/react";
@@ -68,6 +71,8 @@ export default function ScheduleList() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [selectedScheduleIds, setSelectedScheduleIds] = useState([]);
   const [swapModalOpen, setSwapModalOpen] = useState(false);
   const [swapSchedule, setSwapSchedule] = useState(null);
   const [page, setPage] = useState(0);
@@ -116,6 +121,25 @@ export default function ScheduleList() {
       minute: "2-digit",
       hour12: true,
     });
+
+  const formatCompactDateTime = (date) => {
+    const value = new Date(date);
+    if (Number.isNaN(value.getTime())) {
+      return { date: "-", time: "-" };
+    }
+
+    return {
+      date: value.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      }),
+      time: value.toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }),
+    };
+  };
 
   const getTimeKey = (value) => {
     const d = new Date(value);
@@ -225,6 +249,9 @@ export default function ScheduleList() {
       });
 
       setSchedules(data);
+      setSelectedScheduleIds((prev) =>
+        prev.filter((id) => data.some((schedule) => schedule._id === id)),
+      );
     } catch (err) {
       console.error("Failed to fetch schedules", err);
     }
@@ -280,6 +307,44 @@ export default function ScheduleList() {
     } finally {
       setConfirmOpen(false);
       setDeleteId(null);
+    }
+  };
+
+  const toggleScheduleSelection = (id) => {
+    setSelectedScheduleIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
+  const toggleSelectAllPaginated = () => {
+    const paginatedIds = paginatedSchedules.map((schedule) => schedule._id);
+    const allSelected =
+      paginatedIds.length > 0 &&
+      paginatedIds.every((id) => selectedScheduleIds.includes(id));
+
+    if (allSelected) {
+      setSelectedScheduleIds((prev) =>
+        prev.filter((id) => !paginatedIds.includes(id)),
+      );
+      return;
+    }
+
+    setSelectedScheduleIds((prev) =>
+      Array.from(new Set([...prev, ...paginatedIds])),
+    );
+  };
+
+  const confirmBulkDelete = async () => {
+    try {
+      await api.delete("/schedules/bulk", {
+        data: { ids: selectedScheduleIds },
+      });
+      await fetchSchedules();
+      setSelectedScheduleIds([]);
+    } catch (err) {
+      console.error("Failed to delete selected schedules", err);
+    } finally {
+      setBulkConfirmOpen(false);
     }
   };
 
@@ -351,6 +416,22 @@ export default function ScheduleList() {
     staffVisibility,
     user?._id,
   ]);
+
+  const paginatedSchedules = useMemo(
+    () =>
+      filteredSchedules.slice(
+        page * rowsPerPage,
+        page * rowsPerPage + rowsPerPage,
+      ),
+    [filteredSchedules, page, rowsPerPage],
+  );
+
+  const paginatedScheduleIds = paginatedSchedules.map(
+    (schedule) => schedule._id,
+  );
+  const allPaginatedSelected =
+    paginatedScheduleIds.length > 0 &&
+    paginatedScheduleIds.every((id) => selectedScheduleIds.includes(id));
 
   // Reset page when filters change or filtered length shrinks
   useEffect(() => {
@@ -545,6 +626,24 @@ export default function ScheduleList() {
             </Button>
           )}
 
+          {isAdmin && view === "table" && (
+            <Button
+              size="small"
+              variant="outlined"
+              color="error"
+              disabled={selectedScheduleIds.length === 0}
+              onClick={() => setBulkConfirmOpen(true)}
+              sx={{
+                textTransform: "none",
+                borderRadius: 2,
+                px: 3,
+                width: { xs: "100%", md: "auto" },
+              }}
+            >
+              Delete Selected ({selectedScheduleIds.length})
+            </Button>
+          )}
+
           {/* Individual schedule: show to everyone. Non-admins will schedule themselves. */}
           <Button
             size="small"
@@ -685,96 +784,95 @@ export default function ScheduleList() {
       {view === "table" ? (
         isCompact ? (
           <Box sx={{ mt: 2, display: "grid", gap: 2 }}>
-            {filteredSchedules
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((s) => (
-                <Paper key={s._id} sx={{ p: 2 }}>
-                  <Box
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="space-between"
-                  >
-                    <Box>
-                      <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
-                        {s.staffId?.name || "Unknown"}
-                      </Typography>
+            {paginatedSchedules.map((s) => (
+              <Paper key={s._id} sx={{ p: 2 }}>
+                <Box
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="space-between"
+                >
+                  <Box>
+                    {isAdmin && (
+                      <Checkbox
+                        size="small"
+                        checked={selectedScheduleIds.includes(s._id)}
+                        onChange={() => toggleScheduleSelection(s._id)}
+                        sx={{ p: 0, mb: 0.5 }}
+                      />
+                    )}
+                    <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                      {s.staffId?.name || "Unknown"}
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                      {getRoleDisplayName(s.role)} •{" "}
+                      {formatScheduleDateRange(s)}
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                      {formatScheduleTimeRange(s)}
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                      Unit Area: {s.unitArea || "-"}
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                      Shift Type: {s.shiftType || "-"}
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                      Shift Slot: {s.shiftTag || "-"}
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                      Cert Tags: {formatCertificationTags(s)}
+                    </Typography>
+                    {isOvernightShift(s) && (
                       <Typography
-                        sx={{ fontSize: 12, color: "text.secondary" }}
+                        sx={{ fontSize: 12, color: "info.main", mt: 0.5 }}
                       >
-                        {getRoleDisplayName(s.role)} •{" "}
-                        {formatScheduleDateRange(s)}
+                        Overnight shift
                       </Typography>
-                      <Typography
-                        sx={{ fontSize: 12, color: "text.secondary" }}
-                      >
-                        {formatScheduleTimeRange(s)}
-                      </Typography>
-                      <Typography
-                        sx={{ fontSize: 12, color: "text.secondary" }}
-                      >
-                        Unit Area: {s.unitArea || "-"}
-                      </Typography>
-                      <Typography
-                        sx={{ fontSize: 12, color: "text.secondary" }}
-                      >
-                        Shift Type: {s.shiftType || "-"}
-                      </Typography>
-                      <Typography
-                        sx={{ fontSize: 12, color: "text.secondary" }}
-                      >
-                        Cert Tags: {formatCertificationTags(s)}
-                      </Typography>
-                      {isOvernightShift(s) && (
-                        <Typography
-                          sx={{ fontSize: 12, color: "info.main", mt: 0.5 }}
-                        >
-                          Overnight shift
-                        </Typography>
-                      )}
-                      <Typography
-                        sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
-                        noWrap
-                      >
-                        {s.notes || "—"}
-                      </Typography>
-                    </Box>
-                    <Stack spacing={1}>
-                      {canManageSchedule(s) && (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => openEdit(s)}
-                        >
-                          Edit
-                        </Button>
-                      )}
-                      {!isAdmin &&
-                        canManageSchedule(s) &&
-                        s.status === "scheduled" && (
-                          <Button
-                            size="small"
-                            variant="contained"
-                            startIcon={<FiRepeat />}
-                            onClick={() => openSwapRequestModal(s)}
-                            sx={{ textTransform: "none" }}
-                          >
-                            Swap Shift
-                          </Button>
-                        )}
-                      {isAdmin && (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color="error"
-                          onClick={() => askDelete(s._id)}
-                        >
-                          Delete
-                        </Button>
-                      )}
-                    </Stack>
+                    )}
+                    <Typography
+                      sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
+                      noWrap
+                    >
+                      {s.notes || "—"}
+                    </Typography>
                   </Box>
-                </Paper>
-              ))}
+                  <Stack spacing={1}>
+                    {canManageSchedule(s) && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => openEdit(s)}
+                      >
+                        Edit
+                      </Button>
+                    )}
+                    {!isAdmin &&
+                      canManageSchedule(s) &&
+                      s.status === "scheduled" && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<FiRepeat />}
+                          onClick={() => openSwapRequestModal(s)}
+                          sx={{ textTransform: "none" }}
+                        >
+                          Swap Shift
+                        </Button>
+                      )}
+                    {isAdmin && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="error"
+                        onClick={() => askDelete(s._id)}
+                      >
+                        Delete
+                      </Button>
+                    )}
+                  </Stack>
+                </Box>
+              </Paper>
+            ))}
 
             <Box display="flex" justifyContent="center">
               <TablePagination
@@ -796,145 +894,217 @@ export default function ScheduleList() {
             <Table sx={{ mt: 2, background: "white" }} size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ color: "black", fontWeight: 700 }}>
+                  {isAdmin && (
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        size="small"
+                        checked={allPaginatedSelected}
+                        indeterminate={
+                          selectedScheduleIds.length > 0 &&
+                          !allPaginatedSelected
+                        }
+                        onChange={toggleSelectAllPaginated}
+                      />
+                    </TableCell>
+                  )}
+                  <TableCell
+                    sx={{
+                      color: "black",
+                      fontWeight: 700,
+                      fontSize: "0.72rem",
+                    }}
+                  >
                     Staff
                   </TableCell>
-                  <TableCell sx={{ color: "black" }}>Role</TableCell>
-                  <TableCell sx={{ color: "black" }}>Start</TableCell>
-                  <TableCell sx={{ color: "black" }}>End</TableCell>
-                  <TableCell sx={{ color: "black" }}>Unit Area</TableCell>
-                  <TableCell sx={{ color: "black" }}>Shift Type</TableCell>
-                  <TableCell sx={{ color: "black" }}>Cert Tags</TableCell>
-                  <TableCell sx={{ color: "black" }}>Status</TableCell>
-                  <TableCell sx={{ color: "black" }}>Notes</TableCell>
-                  <TableCell sx={{ color: "black" }}>Actions</TableCell>
+                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                    Role
+                  </TableCell>
+                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                    Start
+                  </TableCell>
+                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                    End
+                  </TableCell>
+                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                    Unit Area
+                  </TableCell>
+                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                    Shift Type
+                  </TableCell>
+                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                    Shift Slot
+                  </TableCell>
+                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                    Cert Tags
+                  </TableCell>
+                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                    Status
+                  </TableCell>
+                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                    Notes
+                  </TableCell>
+                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                    Actions
+                  </TableCell>
                 </TableRow>
               </TableHead>
 
               <TableBody>
-                {filteredSchedules
-                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map((s) => (
-                    <TableRow
-                      key={s._id}
-                      sx={{ "&:hover": { background: "#f3f4f6" } }}
+                {paginatedSchedules.map((s) => (
+                  <TableRow
+                    key={s._id}
+                    sx={{ "&:hover": { background: "#f3f4f6" } }}
+                  >
+                    {isAdmin && (
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          size="small"
+                          checked={selectedScheduleIds.includes(s._id)}
+                          onChange={() => toggleScheduleSelection(s._id)}
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <Box
+                          sx={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: "50%",
+                            backgroundColor: getRoleColor(s.role),
+                          }}
+                        />
+                        <Box sx={{ fontSize: "0.78rem", fontWeight: 600 }}>
+                          {s.staffId?.name || "Unknown"}
+                        </Box>
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                      <Box
+                        component="span"
+                        sx={{
+                          px: 1,
+                          py: 0.4,
+                          borderRadius: 1,
+                          backgroundColor: getRoleColor(s.role) + "22",
+                          color: getRoleColor(s.role),
+                          fontWeight: 600,
+                          fontSize: "0.72rem",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {getRoleDisplayName(s.role)}
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                      <Typography sx={{ fontSize: "0.76rem", fontWeight: 600 }}>
+                        {formatCompactDateTime(s.startTime).date}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{ fontSize: "0.7rem", color: "text.secondary" }}
+                      >
+                        {formatCompactDateTime(s.startTime).time}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                      <Typography sx={{ fontSize: "0.76rem", fontWeight: 600 }}>
+                        {formatCompactDateTime(s.endTime).date}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{ fontSize: "0.7rem", color: "text.secondary" }}
+                      >
+                        {formatCompactDateTime(s.endTime).time}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                      {s.unitArea || "-"}
+                    </TableCell>
+                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                      {s.shiftType || "-"}
+                    </TableCell>
+                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                      {s.shiftTag || "-"}
+                    </TableCell>
+                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                      {formatCertificationTags(s)}
+                    </TableCell>
+                    <TableCell>
+                      <Box
+                        component="span"
+                        sx={{
+                          display: "inline-block",
+                          px: 1,
+                          py: 0.4,
+                          borderRadius: 1,
+                          border: `1px solid ${statusColors[s.status] || "#9e9e9e"}`,
+                          color: statusColors[s.status] || "#000",
+                          fontWeight: 600,
+                          fontSize: "0.7rem",
+                          background: "#fff",
+                        }}
+                      >
+                        {s.status.replace("_", " ").toUpperCase()}
+                      </Box>
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        color: "black",
+                        fontSize: "0.78rem",
+                        maxWidth: 180,
+                      }}
                     >
-                      <TableCell sx={{ color: "black" }}>
-                        <Box display="flex" alignItems="center" gap={1}>
-                          <Box
-                            sx={{
-                              width: 10,
-                              height: 10,
-                              borderRadius: "50%",
-                              backgroundColor: getRoleColor(s.role),
-                            }}
-                          />
-                          <Box>{s.staffId?.name || "Unknown"}</Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ color: "black" }}>
-                        <Box
-                          component="span"
-                          sx={{
-                            px: 1,
-                            py: 0.4,
-                            borderRadius: 1,
-                            backgroundColor: getRoleColor(s.role) + "22",
-                            color: getRoleColor(s.role),
-                            fontWeight: 600,
-                            fontSize: 13,
-                          }}
-                        >
-                          {getRoleDisplayName(s.role)}
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ color: "black" }}>
-                        {formatLocal(s.startTime)}
-                      </TableCell>
-                      <TableCell sx={{ color: "black" }}>
-                        {formatLocal(s.endTime)}
-                      </TableCell>
-                      <TableCell sx={{ color: "black" }}>
-                        {s.unitArea || "-"}
-                      </TableCell>
-                      <TableCell sx={{ color: "black" }}>
-                        {s.shiftType || "-"}
-                      </TableCell>
-                      <TableCell sx={{ color: "black" }}>
-                        {formatCertificationTags(s)}
-                      </TableCell>
-                      <TableCell>
-                        <Box
-                          component="span"
-                          sx={{
-                            display: "inline-block",
-                            px: 1,
-                            py: 0.4,
-                            borderRadius: 1,
-                            border: `1px solid ${statusColors[s.status] || "#9e9e9e"}`,
-                            color: statusColors[s.status] || "#000",
-                            fontWeight: 600,
-                            fontSize: 12,
-                            background: "#fff",
-                          }}
-                        >
-                          {s.status.replace("_", " ").toUpperCase()}
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ color: "black" }}>
+                      <Box
+                        sx={{
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {s.notes || "—"}
-                      </TableCell>
-                      <TableCell>
-                        {canManageSchedule(s) && (
-                          <Button
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                      {canManageSchedule(s) && (
+                        <Tooltip title="Edit schedule">
+                          <IconButton
                             size="small"
-                            variant="contained"
                             color="info"
-                            startIcon={<FiEdit />}
                             onClick={() => openEdit(s)}
-                            sx={{
-                              mr: 1,
-                              borderRadius: 2,
-                              textTransform: "none",
-                            }}
+                            sx={{ mr: 0.5 }}
                           >
-                            Edit
-                          </Button>
-                        )}
-                        {!isAdmin &&
-                          canManageSchedule(s) &&
-                          s.status === "scheduled" && (
-                            <Button
+                            <FiEdit />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      {!isAdmin &&
+                        canManageSchedule(s) &&
+                        s.status === "scheduled" && (
+                          <Tooltip title="Swap shift">
+                            <IconButton
                               size="small"
-                              variant="contained"
-                              startIcon={<FiRepeat />}
                               onClick={() => openSwapRequestModal(s)}
-                              sx={{
-                                mr: 1,
-                                borderRadius: 2,
-                                textTransform: "none",
-                                bgcolor: "#7c3aed",
-                                "&:hover": { bgcolor: "#6d28d9" },
-                              }}
+                              sx={{ mr: 0.5, color: "#7c3aed" }}
                             >
-                              Swap Shift
-                            </Button>
-                          )}
-                        {isAdmin && (
-                          <Button
+                              <FiRepeat />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      {isAdmin && (
+                        <Tooltip title="Delete schedule">
+                          <IconButton
                             size="small"
-                            variant="contained"
-                            startIcon={<FiDelete />}
                             color="error"
                             onClick={() => askDelete(s._id)}
-                            sx={{ borderRadius: 2, textTransform: "none" }}
                           >
-                            Delete
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                            <FiDelete />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
 
@@ -1330,6 +1500,14 @@ export default function ScheduleList() {
         message="This action cannot be undone."
         onCancel={() => setConfirmOpen(false)}
         onConfirm={confirmDelete}
+      />
+
+      <ConfirmDialog
+        open={bulkConfirmOpen}
+        title="Delete Selected Schedules?"
+        message={`Delete ${selectedScheduleIds.length} selected schedule item(s)? This action cannot be undone.`}
+        onCancel={() => setBulkConfirmOpen(false)}
+        onConfirm={confirmBulkDelete}
       />
 
       <ShiftSwapRequestModal

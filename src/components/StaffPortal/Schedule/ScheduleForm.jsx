@@ -78,6 +78,7 @@ export default function ScheduleForm({
     role: "",
     unitArea: "",
     shiftType: "",
+    shiftTag: "",
     certificationTags: [],
     startTime: "",
     endTime: "",
@@ -98,6 +99,7 @@ export default function ScheduleForm({
         role: schedule.role || "",
         unitArea: schedule.unitArea || "",
         shiftType: schedule.shiftType || "",
+        shiftTag: schedule.shiftTag || "",
         certificationTags: schedule.certificationTags || [],
         startTime: toLocalInputValue(schedule.startTime),
         endTime: toLocalInputValue(schedule.endTime),
@@ -211,6 +213,7 @@ export default function ScheduleForm({
       role: formData.role,
       unitArea: formData.unitArea || null,
       shiftType: formData.shiftType || null,
+      shiftTag: formData.shiftTag || null,
       certificationTags: Array.isArray(formData.certificationTags)
         ? formData.certificationTags
         : [],
@@ -306,6 +309,7 @@ export default function ScheduleForm({
                 role: "",
                 unitArea: "",
                 shiftType: "",
+                shiftTag: "",
                 certificationTags: [],
               })
             }
@@ -337,6 +341,7 @@ export default function ScheduleForm({
                   role: cov.role,
                   unitArea: cov.unitArea || "",
                   shiftType: cov.shiftType || "",
+                  shiftTag: cov.shiftTag || "",
                   certificationTags: cov.requiredCertificationTags || [],
                   startTime: toLocalInputValue(cov.startTime),
                   endTime: toLocalInputValue(cov.endTime),

@@ -25,6 +25,8 @@ import {
   GlobalStyles,
   Stack,
   Alert,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
 
 import FullCalendar from "@fullcalendar/react";
@@ -290,7 +292,7 @@ export default function CoveragePlanningPage() {
         id: c._id,
         title: `${getRoleDisplayName(c.role)} (${c.requiredCount || 1})${
           c.unitArea ? ` • ${c.unitArea}` : ""
-        }${c.shiftType ? ` • ${c.shiftType}` : ""}`,
+        }${c.shiftType ? ` • ${c.shiftType}` : ""}${c.shiftTag ? ` • ${c.shiftTag}` : ""}`,
         start: c.startTime,
         end: c.endTime,
         backgroundColor:
@@ -553,6 +555,9 @@ export default function CoveragePlanningPage() {
                       Shift Type: {c.shiftType || "—"}
                     </Typography>
                     <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                      Shift Slot: {c.shiftTag || "—"}
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
                       Cert Tags: {formatRequiredCertTags(c)}
                     </Typography>
                     {spansOvernight(c) && (
@@ -641,23 +646,59 @@ export default function CoveragePlanningPage() {
                         />
                       </TableCell>
                     )}
-                    <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
+                    <TableCell
+                      sx={{
+                        fontWeight: 700,
+                        color: "#0F172A",
+                        fontSize: "0.72rem",
+                      }}
+                    >
                       Role
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
+                    <TableCell
+                      sx={{
+                        fontWeight: 700,
+                        color: "#0F172A",
+                        fontSize: "0.72rem",
+                      }}
+                    >
                       Shift Time
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
+                    <TableCell
+                      sx={{
+                        fontWeight: 700,
+                        color: "#0F172A",
+                        fontSize: "0.72rem",
+                      }}
+                    >
                       Required Staff
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
+                    <TableCell
+                      sx={{
+                        fontWeight: 700,
+                        color: "#0F172A",
+                        fontSize: "0.72rem",
+                      }}
+                    >
                       Details
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
+                    <TableCell
+                      sx={{
+                        fontWeight: 700,
+                        color: "#0F172A",
+                        fontSize: "0.72rem",
+                      }}
+                    >
                       Notes
                     </TableCell>
                     {isAdmin && (
-                      <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
+                      <TableCell
+                        sx={{
+                          fontWeight: 700,
+                          color: "#0F172A",
+                          fontSize: "0.72rem",
+                        }}
+                      >
                         Actions
                       </TableCell>
                     )}
@@ -678,43 +719,118 @@ export default function CoveragePlanningPage() {
                           />
                         </TableCell>
                       )}
-                      <TableCell>{getRoleDisplayName(c.role)}</TableCell>
-                      <TableCell>{formatCoverageTimeLabel(c)}</TableCell>
-                      <TableCell>{c.requiredCount}</TableCell>
+                      <TableCell sx={{ fontSize: "0.78rem" }}>
+                        <Box
+                          component="span"
+                          sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            px: 1,
+                            py: 0.35,
+                            borderRadius: 1,
+                            backgroundColor: "#EEF2FF",
+                            color: "#1E3A8A",
+                            fontWeight: 700,
+                            fontSize: "0.72rem",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {getRoleDisplayName(c.role)}
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ fontSize: "0.78rem" }}>
+                        <Typography
+                          sx={{ fontSize: "0.76rem", fontWeight: 600 }}
+                        >
+                          {formatCoverageDateLabel(c)}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ fontSize: "0.7rem", color: "text.secondary" }}
+                        >
+                          {formatCoverageTimeLabel(c)
+                            .replace(`${formatCoverageDateLabel(c)} `, "")
+                            .replace(
+                              ` - ${formatCoverageDateLabel(c)} `,
+                              " - ",
+                            )}
+                        </Typography>
+                      </TableCell>
+                      <TableCell sx={{ fontSize: "0.78rem" }}>
+                        <Typography
+                          sx={{
+                            fontSize: "0.95rem",
+                            fontWeight: 700,
+                            lineHeight: 1,
+                          }}
+                        >
+                          {c.requiredCount}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ fontSize: "0.68rem", color: "text.secondary" }}
+                        >
+                          needed
+                        </Typography>
+                      </TableCell>
                       <TableCell>
-                        <Typography variant="caption" sx={{ display: "block" }}>
+                        <Typography
+                          variant="caption"
+                          sx={{ display: "block", fontSize: "0.7rem" }}
+                        >
                           Unit: {c.unitArea || "—"}
                         </Typography>
-                        <Typography variant="caption" sx={{ display: "block" }}>
+                        <Typography
+                          variant="caption"
+                          sx={{ display: "block", fontSize: "0.7rem" }}
+                        >
                           Shift: {c.shiftType || "—"}
                         </Typography>
-                        <Typography variant="caption" sx={{ display: "block" }}>
+                        <Typography
+                          variant="caption"
+                          sx={{ display: "block", fontSize: "0.7rem" }}
+                        >
+                          Slot: {c.shiftTag || "—"}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ display: "block", fontSize: "0.7rem" }}
+                        >
                           Certs: {formatRequiredCertTags(c)}
                         </Typography>
                       </TableCell>
-                      <TableCell>{c.note || "—"}</TableCell>
+                      <TableCell sx={{ fontSize: "0.78rem", maxWidth: 220 }}>
+                        <Box
+                          sx={{
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {c.note || "—"}
+                        </Box>
+                      </TableCell>
                       {isAdmin && (
-                        <TableCell>
+                        <TableCell sx={{ whiteSpace: "nowrap" }}>
                           <Stack direction="row" spacing={1}>
-                            <Button
-                              size="small"
-                              variant="contained"
-                              startIcon={<FiEdit2 />}
-                              onClick={() => openEdit(c)}
-                              sx={{ textTransform: "none", borderRadius: 2 }}
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              size="small"
-                              variant="contained"
-                              startIcon={<FiDelete />}
-                              color="error"
-                              onClick={() => askDelete(c._id)}
-                              sx={{ textTransform: "none", borderRadius: 2 }}
-                            >
-                              Delete
-                            </Button>
+                            <Tooltip title="Edit coverage">
+                              <IconButton
+                                size="small"
+                                color="info"
+                                onClick={() => openEdit(c)}
+                              >
+                                <FiEdit2 />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete coverage">
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => askDelete(c._id)}
+                              >
+                                <FiDelete />
+                              </IconButton>
+                            </Tooltip>
                           </Stack>
                         </TableCell>
                       )}

@@ -67,6 +67,7 @@ const defaultRequirement = {
   endTime: "17:00",
   unitArea: "",
   shiftType: "",
+  shiftTag: "",
   requiredCertificationTags: [],
 };
 
@@ -81,6 +82,25 @@ const dedupeStrings = (values) =>
         .filter(Boolean),
     ),
   );
+
+const normalizeToken = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase();
+
+const toDisplayLabel = (value) => {
+  const normalized = String(value || "")
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+
+  if (!normalized) return "";
+
+  return normalized
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
 
 const isOvernightTimeRange = (startTime, endTime) => {
   if (!startTime || !endTime) return false;
@@ -140,6 +160,52 @@ const buildDatesFromPattern = (startDateStr, horizonDays, mode, weekdays) => {
 
 export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   const { tenant, facilityPreferences } = useAuth();
+
+  const shiftTypeDefinitions = useMemo(() => {
+    const defs = Array.isArray(facilityPreferences?.shiftTypeDefinitions)
+      ? facilityPreferences.shiftTypeDefinitions
+      : [];
+
+    return defs
+      .map((def) => ({
+        key: normalizeToken(def?.key),
+        label: String(def?.label || "").trim(),
+        timeSlots: (Array.isArray(def?.timeSlots) ? def.timeSlots : [])
+          .map((slot) => ({
+            tag: normalizeToken(slot?.tag),
+            label: String(slot?.label || "").trim(),
+            startLocalTime: String(slot?.startLocalTime || "").trim(),
+            endLocalTime: String(slot?.endLocalTime || "").trim(),
+          }))
+          .filter(
+            (slot) => slot.tag && slot.startLocalTime && slot.endLocalTime,
+          ),
+      }))
+      .filter((def) => def.key);
+  }, [facilityPreferences?.shiftTypeDefinitions]);
+
+  const slotLookup = useMemo(() => {
+    const map = new Map();
+
+    shiftTypeDefinitions.forEach((def) => {
+      def.timeSlots.forEach((slot) => {
+        map.set(`${def.key}:${slot.tag}`, slot);
+      });
+    });
+
+    return map;
+  }, [shiftTypeDefinitions]);
+
+  const shiftDefinitionOptions = useMemo(() => {
+    return shiftTypeDefinitions.flatMap((def) =>
+      def.timeSlots.map((slot) => ({
+        value: `${def.key}:${slot.tag}`,
+        shiftType: def.key,
+        shiftTag: slot.tag,
+        label: `${def.label || toDisplayLabel(def.key)} - ${slot.label || toDisplayLabel(slot.tag)} (${slot.startLocalTime} - ${slot.endLocalTime})`,
+      })),
+    );
+  }, [shiftTypeDefinitions]);
 
   const roleOptions = useMemo(() => {
     const facilityOptions =
@@ -208,6 +274,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
           spansOvernight: isOvernightTimeRange(req.startTime, req.endTime),
           unitArea: req.unitArea || "",
           shiftType: req.shiftType || "",
+          shiftTag: req.shiftTag || "",
         })),
       })),
     [activeDates, requirements],
@@ -234,6 +301,55 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
     setRequirements((prev) =>
       prev.map((req, i) => (i === index ? { ...req, [field]: value } : req)),
     );
+  };
+
+  const getShiftSlotsForType = (shiftType) => {
+    const key = normalizeToken(shiftType);
+    if (!key) return [];
+    const matched = shiftTypeDefinitions.find((def) => def.key === key);
+    return matched?.timeSlots || [];
+  };
+
+  const getSelectedSlot = (req) => {
+    const shiftType = normalizeToken(req?.shiftType);
+    const shiftTag = normalizeToken(req?.shiftTag);
+    if (!shiftType || !shiftTag) return null;
+    return slotLookup.get(`${shiftType}:${shiftTag}`) || null;
+  };
+
+  const getShiftDefinitionValue = (req) => {
+    const shiftType = normalizeToken(req?.shiftType);
+    const shiftTag = normalizeToken(req?.shiftTag);
+    if (!shiftType || !shiftTag) return "";
+    return `${shiftType}:${shiftTag}`;
+  };
+
+  const handleShiftDefinitionSelect = (index, selectionValue) => {
+    const normalizedValue = String(selectionValue || "").trim();
+
+    if (!normalizedValue) {
+      handleRequirementChange(index, "shiftType", "");
+      handleRequirementChange(index, "shiftTag", "");
+      return;
+    }
+
+    const selectedOption = shiftDefinitionOptions.find(
+      (option) => option.value === normalizedValue,
+    );
+
+    if (!selectedOption) return;
+
+    const selectedSlot = slotLookup.get(
+      `${selectedOption.shiftType}:${selectedOption.shiftTag}`,
+    );
+
+    handleRequirementChange(index, "shiftType", selectedOption.shiftType);
+    handleRequirementChange(index, "shiftTag", selectedOption.shiftTag);
+
+    if (selectedSlot?.startLocalTime && selectedSlot?.endLocalTime) {
+      handleRequirementChange(index, "startTime", selectedSlot.startLocalTime);
+      handleRequirementChange(index, "endTime", selectedSlot.endLocalTime);
+    }
   };
 
   const handleAddRequirement = () => {
@@ -284,8 +400,27 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
 
     for (let index = 0; index < requirements.length; index += 1) {
       const req = requirements[index];
-      if (!req.role || !req.startTime || !req.endTime) {
-        const msg = `Requirement ${index + 1} must include role, start time, and end time.`;
+      const slotsForType = getShiftSlotsForType(req.shiftType);
+      const selectedSlot = getSelectedSlot(req);
+      const requiresSlotTag =
+        !!normalizeToken(req.shiftType) && slotsForType.length > 0;
+
+      if (!req.role) {
+        const msg = `Requirement ${index + 1} must include a role.`;
+        setError(msg);
+        toast.error(msg);
+        return;
+      }
+
+      if (requiresSlotTag && !selectedSlot) {
+        const msg = `Requirement ${index + 1} must include a shift slot for selected shift type.`;
+        setError(msg);
+        toast.error(msg);
+        return;
+      }
+
+      if (!selectedSlot && (!req.startTime || !req.endTime)) {
+        const msg = `Requirement ${index + 1} must include start time and end time.`;
         setError(msg);
         toast.error(msg);
         return;
@@ -300,18 +435,26 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
 
       const createResponses = await Promise.all(
         activeDates.map((date) => {
-          const shifts = requirements.map((req) => ({
-            role: req.role,
-            requiredCount: Number(req.requiredCount) || 0,
-            unitArea: req.unitArea || null,
-            shiftType: req.shiftType || null,
-            requiredCertificationTags: dedupeStrings(
-              req.requiredCertificationTags,
-            ),
-            startTime: toUTCISOString(date, req.startTime),
-            endTime: toUTCISOString(date, req.endTime),
-            note,
-          }));
+          const shifts = requirements.map((req) => {
+            const selectedSlot = getSelectedSlot(req);
+            const startTime = selectedSlot?.startLocalTime || req.startTime;
+            const endTime = selectedSlot?.endLocalTime || req.endTime;
+            const shiftPayload = {
+              role: req.role,
+              requiredCount: Number(req.requiredCount) || 0,
+              unitArea: req.unitArea || null,
+              shiftType: req.shiftType || null,
+              shiftTag: req.shiftTag || null,
+              startTime: toUTCISOString(date, startTime),
+              endTime: toUTCISOString(date, endTime),
+              requiredCertificationTags: dedupeStrings(
+                req.requiredCertificationTags,
+              ),
+              note,
+            };
+
+            return shiftPayload;
+          });
 
           return api.post("/coverage", {
             tenantId,
@@ -695,7 +838,9 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                     fullWidth
                     label="Start"
                     type="time"
-                    value={req.startTime}
+                    value={
+                      getSelectedSlot(req)?.startLocalTime || req.startTime
+                    }
                     onChange={(e) =>
                       handleRequirementChange(
                         index,
@@ -703,6 +848,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                         e.target.value,
                       )
                     }
+                    disabled={Boolean(getSelectedSlot(req))}
                     InputLabelProps={{ shrink: true }}
                     InputProps={{
                       startAdornment: (
@@ -718,10 +864,11 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                     fullWidth
                     label="End"
                     type="time"
-                    value={req.endTime}
+                    value={getSelectedSlot(req)?.endLocalTime || req.endTime}
                     onChange={(e) =>
                       handleRequirementChange(index, "endTime", e.target.value)
                     }
+                    disabled={Boolean(getSelectedSlot(req))}
                     InputLabelProps={{ shrink: true }}
                     InputProps={{
                       startAdornment: (
@@ -769,28 +916,28 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                     ))}
                   </TextField>
 
-                  {facilityPreferences?.shiftTypes?.length > 0 && (
-                    <TextField
-                      select
-                      fullWidth
-                      label="Shift Type (Optional)"
-                      value={req.shiftType || ""}
-                      onChange={(e) =>
-                        handleRequirementChange(
-                          index,
-                          "shiftType",
-                          e.target.value || "",
-                        )
-                      }
-                    >
-                      <MenuItem value="">Auto Infer</MenuItem>
-                      {facilityPreferences.shiftTypes.map((shiftType) => (
-                        <MenuItem key={shiftType} value={shiftType}>
-                          {shiftType}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  )}
+                  <TextField
+                    select
+                    fullWidth
+                    label="Shift Definition (Optional)"
+                    value={getShiftDefinitionValue(req)}
+                    onChange={(e) =>
+                      handleShiftDefinitionSelect(index, e.target.value)
+                    }
+                    disabled={shiftDefinitionOptions.length === 0}
+                    helperText={
+                      shiftDefinitionOptions.length > 0
+                        ? "Selecting one definition auto-populates start/end and saves shift type + slot tag."
+                        : "No shift definitions configured yet. Configure shift type time slots in Facility Preferences."
+                    }
+                  >
+                    <MenuItem value="">Manual Time Entry</MenuItem>
+                    {shiftDefinitionOptions.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
                 </Stack>
 
                 <Box>
@@ -940,6 +1087,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                         {row.timeLabel}
                         {row.unitArea ? ` • ${row.unitArea}` : ""}
                         {row.shiftType ? ` • ${row.shiftType}` : ""}
+                        {row.shiftTag ? ` • ${row.shiftTag}` : ""}
                       </Typography>
                       {row.spansOvernight && (
                         <Chip

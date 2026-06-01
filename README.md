@@ -270,9 +270,15 @@ While paywalled, the entire app collapses to a single `/billing` route served by
 - `roleFamilies`
 - `unitAreas`
 - `shiftTypes`
+- `shiftTypeDefinitions` (shift type + time-slot definitions)
 - `certificationTags`
 
 Values are normalized to `snake_case` for storage/reference and displayed as human-friendly words in UI.
+
+Timezone behavior:
+
+- Facility timezone is fixed to UTC in persisted configuration.
+- Frontend handles local-time conversion for display/input.
 
 Examples:
 
@@ -306,12 +312,15 @@ Coverage now supports taxonomy-aware fields:
 
 - `unitArea` (optional)
 - `shiftType` (optional)
+- `shiftTag` (optional, tied to shift definition time slots)
 - `requiredCertificationTags` (optional)
 
 UI notes:
 
-- `Shift Type` supports `Auto Infer`; frontend sends `null` when no explicit type is selected, allowing backend inference.
-- Coverage list/cards now display unit area, shift type, and required cert tags.
+- Coverage creation uses `Shift Definition` options generated from facility `shiftTypeDefinitions` and stores both `shiftType` and `shiftTag`.
+- Selecting a definition auto-populates start/end time from the selected slot.
+- If no shift definitions are configured, the shift-definition field remains visible but disabled with guidance text.
+- Coverage list/cards now display unit area, shift type, shift slot, and required cert tags.
 
 API endpoints used: `GET /api/v1/coverage`, `POST /api/v1/coverage`, `PATCH /api/v1/coverage/:id`, `DELETE /api/v1/coverage/:id`.
 
@@ -328,6 +337,7 @@ Schedule rows now include:
 
 - `unitArea`
 - `shiftType`
+- `shiftTag`
 - `certificationTags`
 
 **Creating / editing shifts:**
@@ -352,8 +362,15 @@ Schedule rows now include:
 Staff capability model now includes:
 
 - `allowedAreas`
+- `allowedShiftTags`
 - `allowedShiftTypes`
 - `certificationTags`
+
+Notes:
+
+- Staff create/edit uses shift-slot selection derived from facility shift definitions.
+- The shift-slot section remains visible even when definitions are not configured and shows guidance text directing admins to Facility Preferences.
+- `allowedShiftTypes` is still persisted for compatibility, and slot selections are mapped to slot-specific values when available.
 
 Profile picture flow update:
 
@@ -492,15 +509,16 @@ Highlights:
 
 2. Coverage model expansion
 
-- Coverage creation/edit and display now include `unitArea`, `shiftType`, and `requiredCertificationTags`.
+- Coverage creation/edit and display now include `unitArea`, `shiftType`, `shiftTag`, and `requiredCertificationTags`.
+- Coverage creation is now slot-definition-first via facility `shiftTypeDefinitions`; legacy auto-infer fallback has been removed.
 
 3. Schedule model expansion
 
-- Schedule form/list now include `unitArea`, `shiftType`, and `certificationTags`.
+- Schedule form/list now include `unitArea`, `shiftType`, `shiftTag`, and `certificationTags`.
 
 4. Staff capability model
 
-- Staff create/edit and list support `allowedAreas`, `allowedShiftTypes`, and `certificationTags`.
+- Staff create/edit and list support `allowedAreas`, `allowedShiftTags`, `allowedShiftTypes`, and `certificationTags`.
 
 5. Profile picture responsibility
 

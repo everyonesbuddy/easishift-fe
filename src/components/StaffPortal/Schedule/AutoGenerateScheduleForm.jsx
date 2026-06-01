@@ -515,6 +515,8 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                             noWrap
                           >
                             {startStr} — {endStr}
+                            {cov.shiftType ? ` · ${cov.shiftType}` : ""}
+                            {cov.shiftTag ? ` · ${cov.shiftTag}` : ""}
                             {cov.location ? ` · ${cov.location}` : ""}
                           </Typography>
                         </Box>

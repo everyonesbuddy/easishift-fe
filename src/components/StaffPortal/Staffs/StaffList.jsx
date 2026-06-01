@@ -41,11 +41,12 @@ import { Stack } from "@mui/material";
 import {
   getRoleDisplayName,
   getRoleColor,
+  getRoleOptionsFromFacilityPreferences,
   getRolesForIndustry,
 } from "../../../constants/industryRoles";
 
 export default function StaffList() {
-  const { role, tenant } = useAuth();
+  const { role, tenant, facilityPreferences } = useAuth();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -109,16 +110,23 @@ export default function StaffList() {
   };
 
   const roles = useMemo(() => {
-    const industryRoles = getRolesForIndustry(tenant?.industry, {
-      includeAdmin: true,
-    });
+    const facilityRoleValues = getRoleOptionsFromFacilityPreferences(
+      facilityPreferences,
+      { includeAdmin: true },
+    ).map((option) => option.value);
+
+    const industryRoles = facilityRoleValues.length
+      ? facilityRoleValues
+      : getRolesForIndustry(tenant?.industry, {
+          includeAdmin: true,
+        });
     const existingRoles = staff.map((u) => u.role).filter(Boolean);
 
     return [
       "all",
       ...Array.from(new Set([...industryRoles, ...existingRoles])),
     ];
-  }, [staff, tenant?.industry]);
+  }, [staff, tenant?.industry, facilityPreferences]);
 
   const filteredUsers = useMemo(() => {
     return staff.filter((u) => {
@@ -131,6 +139,23 @@ export default function StaffList() {
       return matchesSearch && matchesRole;
     });
   }, [staff, searchTerm, filterRole]);
+
+  const getInitials = (name) =>
+    (name || "")
+      .split(" ")
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+
+  const formatStringArray = (values) => {
+    if (!Array.isArray(values)) return "-";
+    const normalized = values
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+    return normalized.length ? normalized.join(", ") : "-";
+  };
 
   return (
     <Container sx={{ mt: 4 }}>
@@ -233,17 +258,16 @@ export default function StaffList() {
           {filteredUsers
             .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
             .map((u) => {
-              const initials = (u.name || "")
-                .split(" ")
-                .map((n) => n[0])
-                .join("")
-                .slice(0, 2)
-                .toUpperCase();
+              const initials = getInitials(u.name);
 
               return (
                 <Paper key={u._id || u.id} sx={{ p: 2 }}>
                   <Box display="flex" alignItems="center" gap={2}>
-                    <Avatar sx={{ bgcolor: getRoleColor(u.role) }}>
+                    <Avatar
+                      src={u.profilePicture || ""}
+                      alt={`${u.name || "Staff"} profile`}
+                      sx={{ bgcolor: getRoleColor(u.role) }}
+                    >
                       {initials}
                     </Avatar>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -261,6 +285,18 @@ export default function StaffList() {
                         noWrap
                       >
                         {u.email || "No email"}
+                      </Typography>
+                      <Typography
+                        sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
+                        noWrap
+                      >
+                        Areas: {formatStringArray(u.allowedAreas)}
+                      </Typography>
+                      <Typography
+                        sx={{ fontSize: 12, color: "text.secondary" }}
+                        noWrap
+                      >
+                        Certs: {formatStringArray(u.certificationTags)}
                       </Typography>
                     </Box>
 
@@ -322,6 +358,8 @@ export default function StaffList() {
                 <TableCell>Role</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Phone</TableCell>
+                <TableCell>Allowed Areas</TableCell>
+                <TableCell>Certification Tags</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -330,18 +368,17 @@ export default function StaffList() {
               {filteredUsers
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((u) => {
-                  const initials = (u.name || "")
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .slice(0, 2)
-                    .toUpperCase();
+                  const initials = getInitials(u.name);
 
                   return (
-                    <TableRow key={u._1d || u.id} hover>
+                    <TableRow key={u._id || u.id} hover>
                       <TableCell>
                         <Box display="flex" alignItems="center" gap={2}>
-                          <Avatar sx={{ bgcolor: getRoleColor(u.role) }}>
+                          <Avatar
+                            src={u.profilePicture || ""}
+                            alt={`${u.name || "Staff"} profile`}
+                            sx={{ bgcolor: getRoleColor(u.role) }}
+                          >
                             {initials}
                           </Avatar>
                           <Box>
@@ -403,6 +440,18 @@ export default function StaffList() {
                             No phone
                           </Typography>
                         )}
+                      </TableCell>
+
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {formatStringArray(u.allowedAreas)}
+                        </Typography>
+                      </TableCell>
+
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {formatStringArray(u.certificationTags)}
+                        </Typography>
                       </TableCell>
 
                       <TableCell>

@@ -14,6 +14,7 @@ import api from "../../../config/api";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 import {
+  getRoleOptionsFromFacilityPreferences,
   getRoleOptionsForIndustry,
   getRoleDisplayName,
 } from "../../../constants/industryRoles";
@@ -36,20 +37,34 @@ const PHONE_COUNTRY_CODES = [
   { code: "+33", label: "France (+33)" },
 ];
 
+const normalizeStringArray = (values) =>
+  Array.from(
+    new Set(
+      (Array.isArray(values) ? values : [])
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+  );
+
 export default function StaffCreateAndEditForm({
   staff,
   onSuccess,
   onClose,
   staffList = [],
 }) {
-  const { user, role: loggedInRole, tenant } = useAuth();
+  const { user, role: loggedInRole, tenant, facilityPreferences } = useAuth();
 
   const canAssignAdminRole = loggedInRole === "admin";
 
-  const roleOptions = useMemo(
-    () => getRoleOptionsForIndustry(tenant?.industry),
-    [tenant?.industry],
+  const facilityRoleOptions = useMemo(
+    () => getRoleOptionsFromFacilityPreferences(facilityPreferences),
+    [facilityPreferences],
   );
+
+  const roleOptions = useMemo(() => {
+    if (facilityRoleOptions.length) return facilityRoleOptions;
+    return getRoleOptionsForIndustry(tenant?.industry);
+  }, [facilityRoleOptions, tenant?.industry]);
 
   const selectableRoleOptions = useMemo(() => {
     const options = canAssignAdminRole
@@ -78,10 +93,37 @@ export default function StaffCreateAndEditForm({
     email: "",
     phoneCountryCode: "",
     phone: "",
+    allowedAreas: [],
+    allowedShiftTypes: [],
+    certificationTags: [],
     role: "",
   });
   const [emailError, setEmailError] = useState("");
   const [phoneError, setPhoneError] = useState("");
+
+  const allowedAreaOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...(facilityPreferences?.unitAreas || []),
+          ...(Array.isArray(form?.allowedAreas) ? form.allowedAreas : []),
+        ]),
+      ),
+    [facilityPreferences?.unitAreas, form?.allowedAreas],
+  );
+
+  const certificationTagOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...(facilityPreferences?.certificationTags || []),
+          ...(Array.isArray(form?.certificationTags)
+            ? form.certificationTags
+            : []),
+        ]),
+      ),
+    [facilityPreferences?.certificationTags, form?.certificationTags],
+  );
 
   const isEditingSelf = staff && staff._id === user._id;
   const disableRoleChange = isEditingSelf && loggedInRole === "admin";
@@ -94,6 +136,9 @@ export default function StaffCreateAndEditForm({
         phoneCountryCode:
           staff.userPhoneCountryCode || staff.phoneCountryCode || "",
         phone: staff.userPhone || staff.phone || "",
+        allowedAreas: normalizeStringArray(staff.allowedAreas),
+        allowedShiftTypes: normalizeStringArray(staff.allowedShiftTypes),
+        certificationTags: normalizeStringArray(staff.certificationTags),
         role: staff.role,
       });
     }
@@ -101,9 +146,13 @@ export default function StaffCreateAndEditForm({
 
   useEffect(() => {
     if (staff) return;
-    if (!roleOptions.length) return;
 
     setForm((prev) => {
+      if (!roleOptions.length) {
+        if (prev.role) return prev;
+        return { ...prev, role: "staff" };
+      }
+
       if (prev.role && roleOptions.some((item) => item.value === prev.role)) {
         return prev;
       }
@@ -139,6 +188,9 @@ export default function StaffCreateAndEditForm({
           name: form.name,
           email: form.email,
           role: disableRoleChange ? staff.role : form.role,
+          allowedAreas: normalizeStringArray(form.allowedAreas),
+          allowedShiftTypes: normalizeStringArray(form.allowedShiftTypes),
+          certificationTags: normalizeStringArray(form.certificationTags),
         };
 
         if (normalizedPhone && normalizedPhoneCountryCode) {
@@ -172,6 +224,9 @@ export default function StaffCreateAndEditForm({
           name: form.name,
           email: form.email,
           role: form.role,
+          allowedAreas: normalizeStringArray(form.allowedAreas),
+          allowedShiftTypes: normalizeStringArray(form.allowedShiftTypes),
+          certificationTags: normalizeStringArray(form.certificationTags),
           ...(normalizedPhone && normalizedPhoneCountryCode
             ? {
                 userPhoneCountryCode: normalizedPhoneCountryCode,
@@ -295,6 +350,70 @@ export default function StaffCreateAndEditForm({
           {selectableRoleOptions.map((item) => (
             <MenuItem key={item.value} value={item.value}>
               {item.label}
+            </MenuItem>
+          ))}
+        </TextField>
+
+        <TextField
+          select
+          fullWidth
+          label="Allowed Unit Areas"
+          value={form.allowedAreas}
+          onChange={(e) => setForm({ ...form, allowedAreas: e.target.value })}
+          SelectProps={{ multiple: true }}
+          disabled={!allowedAreaOptions.length}
+          helperText={
+            allowedAreaOptions.length
+              ? "Leave empty to allow any area"
+              : "Admin has not configured unit areas yet"
+          }
+        >
+          {allowedAreaOptions.map((area) => (
+            <MenuItem key={area} value={area}>
+              {area}
+            </MenuItem>
+          ))}
+        </TextField>
+
+        {facilityPreferences?.shiftTypes?.length > 0 && (
+          <TextField
+            select
+            fullWidth
+            label="Allowed Shift Types"
+            value={form.allowedShiftTypes}
+            onChange={(e) =>
+              setForm({ ...form, allowedShiftTypes: e.target.value })
+            }
+            SelectProps={{ multiple: true }}
+            helperText="Leave empty to allow any shift type"
+          >
+            {facilityPreferences.shiftTypes.map((shiftType) => (
+              <MenuItem key={shiftType} value={shiftType}>
+                {shiftType}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
+
+        <TextField
+          select
+          fullWidth
+          label="Certification Tags"
+          value={form.certificationTags}
+          onChange={(e) =>
+            setForm({ ...form, certificationTags: e.target.value })
+          }
+          SelectProps={{ multiple: true }}
+          disabled={!certificationTagOptions.length}
+          helperText={
+            certificationTagOptions.length
+              ? "Optional staff capabilities"
+              : "Admin has not configured certification tags yet"
+          }
+        >
+          {certificationTagOptions.map((tag) => (
+            <MenuItem key={tag} value={tag}>
+              {tag}
             </MenuItem>
           ))}
         </TextField>

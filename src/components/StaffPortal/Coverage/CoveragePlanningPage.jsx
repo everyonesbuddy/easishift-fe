@@ -39,6 +39,7 @@ import CoverageCreateForm from "./CoverageCreateForm";
 import CoverageEditCountForm from "./CoverageEditCountForm";
 import {
   getRoleDisplayName,
+  getRoleOptionsFromFacilityPreferences,
   getRoleOptionsForIndustry,
   isRoleCompatible,
 } from "../../../constants/industryRoles";
@@ -50,7 +51,7 @@ const statusColors = {
 };
 
 export default function CoveragePlanningPage() {
-  const { isAdmin, tenant } = useAuth();
+  const { isAdmin, tenant, facilityPreferences } = useAuth();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -70,10 +71,12 @@ export default function CoveragePlanningPage() {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [error, setError] = useState("");
 
-  const roleOptions = useMemo(
-    () => getRoleOptionsForIndustry(tenant?.industry),
-    [tenant?.industry],
-  );
+  const roleOptions = useMemo(() => {
+    const facilityOptions =
+      getRoleOptionsFromFacilityPreferences(facilityPreferences);
+    if (facilityOptions.length) return facilityOptions;
+    return getRoleOptionsForIndustry(tenant?.industry);
+  }, [facilityPreferences, tenant?.industry]);
 
   const filterRoleOptions = useMemo(() => {
     const existingRoles = coverages.map((c) => c.role).filter(Boolean);
@@ -270,6 +273,14 @@ export default function CoveragePlanningPage() {
     return `${startDateLabel} ${startLabel} - ${endDateLabel} ${endLabel}`;
   }
 
+  function formatRequiredCertTags(coverage) {
+    if (!Array.isArray(coverage?.requiredCertificationTags)) return "—";
+    const tags = coverage.requiredCertificationTags
+      .map((tag) => String(tag || "").trim())
+      .filter(Boolean);
+    return tags.length ? tags.join(", ") : "—";
+  }
+
   const calendarEvents = useMemo(() => {
     return coverages
       .filter(
@@ -277,7 +288,9 @@ export default function CoveragePlanningPage() {
       )
       .map((c) => ({
         id: c._id,
-        title: `${getRoleDisplayName(c.role)} (${c.requiredCount || 1})`,
+        title: `${getRoleDisplayName(c.role)} (${c.requiredCount || 1})${
+          c.unitArea ? ` • ${c.unitArea}` : ""
+        }${c.shiftType ? ` • ${c.shiftType}` : ""}`,
         start: c.startTime,
         end: c.endTime,
         backgroundColor:
@@ -531,6 +544,17 @@ export default function CoveragePlanningPage() {
                       {formatCoverageDateLabel(c)} •{" "}
                       {formatCoverageTimeLabel(c)}
                     </Typography>
+                    <Typography
+                      sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
+                    >
+                      Unit Area: {c.unitArea || "—"}
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                      Shift Type: {c.shiftType || "—"}
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                      Cert Tags: {formatRequiredCertTags(c)}
+                    </Typography>
                     {spansOvernight(c) && (
                       <Typography
                         sx={{ fontSize: 12, color: "info.main", mt: 0.5 }}
@@ -627,6 +651,9 @@ export default function CoveragePlanningPage() {
                       Required Staff
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
+                      Details
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>
                       Notes
                     </TableCell>
                     {isAdmin && (
@@ -654,6 +681,17 @@ export default function CoveragePlanningPage() {
                       <TableCell>{getRoleDisplayName(c.role)}</TableCell>
                       <TableCell>{formatCoverageTimeLabel(c)}</TableCell>
                       <TableCell>{c.requiredCount}</TableCell>
+                      <TableCell>
+                        <Typography variant="caption" sx={{ display: "block" }}>
+                          Unit: {c.unitArea || "—"}
+                        </Typography>
+                        <Typography variant="caption" sx={{ display: "block" }}>
+                          Shift: {c.shiftType || "—"}
+                        </Typography>
+                        <Typography variant="caption" sx={{ display: "block" }}>
+                          Certs: {formatRequiredCertTags(c)}
+                        </Typography>
+                      </TableCell>
                       <TableCell>{c.note || "—"}</TableCell>
                       {isAdmin && (
                         <TableCell>

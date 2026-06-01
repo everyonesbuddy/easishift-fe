@@ -20,12 +20,13 @@ import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 import {
   getRoleDisplayName,
+  getRoleOptionsFromFacilityPreferences,
   getRoleOptionsForIndustry,
   isRoleCompatible,
 } from "../../../constants/industryRoles";
 
 export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
-  const { tenant } = useAuth();
+  const { tenant, facilityPreferences } = useAuth();
   const [coverages, setCoverages] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -33,15 +34,17 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
   const [selectedRole, setSelectedRole] = useState(""); // optional role filter
   const [fetching, setFetching] = useState(false);
 
-  const roleOptions = useMemo(
-    () => getRoleOptionsForIndustry(tenant?.industry),
-    [tenant?.industry],
-  );
+  const roleOptions = useMemo(() => {
+    const facilityOptions =
+      getRoleOptionsFromFacilityPreferences(facilityPreferences);
+    if (facilityOptions.length) return facilityOptions;
+    return getRoleOptionsForIndustry(tenant?.industry);
+  }, [facilityPreferences, tenant?.industry]);
 
   const selectableCoverageIds = useMemo(
     () =>
       coverages
-        .filter((cov) => Number(cov.remaining) > 0)
+        .filter((cov) => Number(cov.spotsRemaining) > 0)
         .map((cov) => cov._id),
     [coverages],
   );
@@ -78,11 +81,30 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
 
         // Filter out past coverages
         const now = new Date();
-        const upcoming = (Array.isArray(res.data) ? res.data : []).filter(
-          (cov) =>
-            new Date(cov.endTime) >= now &&
-            (!selectedRole || isRoleCompatible(selectedRole, cov.role)),
-        );
+        const upcoming = (Array.isArray(res.data) ? res.data : [])
+          .filter(
+            (cov) =>
+              new Date(cov.endTime) >= now &&
+              (!selectedRole || isRoleCompatible(selectedRole, cov.role)),
+          )
+          .map((cov) => {
+            const requiredCount = Number(cov.requiredCount) || 0;
+            const assignedCount = Number(cov.assignedCount);
+            const directRemaining = Number(cov.remaining);
+
+            const computedRemaining = Number.isFinite(assignedCount)
+              ? Math.max(0, requiredCount - assignedCount)
+              : Math.max(0, requiredCount);
+
+            const spotsRemaining = Number.isFinite(directRemaining)
+              ? Math.max(0, directRemaining)
+              : computedRemaining;
+
+            return {
+              ...cov,
+              spotsRemaining,
+            };
+          });
 
         setCoverages(upcoming);
         setSelectedIds([]);
@@ -404,8 +426,8 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                 .slice()
                 .sort((a, b) => {
                   // Move items with remaining === 0 to the bottom
-                  const aZero = a.remaining === 0;
-                  const bZero = b.remaining === 0;
+                  const aZero = Number(a.spotsRemaining) <= 0;
+                  const bZero = Number(b.spotsRemaining) <= 0;
                   if (aZero === bZero) return 0;
                   return aZero ? 1 : -1;
                 })
@@ -429,7 +451,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                   });
 
                   const selected = selectedIds.includes(cov._id);
-                  const isZero = cov.remaining === 0;
+                  const isZero = Number(cov.spotsRemaining) <= 0;
 
                   return (
                     <Paper
@@ -536,12 +558,12 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                               fontSize: { xs: 13, md: 14 },
                               color: isZero
                                 ? "text.secondary"
-                                : cov.remaining === 0
+                                : cov.spotsRemaining <= 0
                                   ? "error.main"
                                   : "success.main",
                             }}
                           >
-                            {cov.remaining}
+                            {cov.spotsRemaining}
                           </Typography>
                         </Box>
                       </Box>

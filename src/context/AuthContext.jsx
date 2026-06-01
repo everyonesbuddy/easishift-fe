@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import api from "../config/api";
-import { ALL_USER_ROLES } from "../constants/industryRoles";
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -33,6 +32,7 @@ export const AuthProvider = ({ children }) => {
             const res = await api.get(`/tenants/${parsedUser.tenantId}`);
             // Normalize: API may return { tenant: {...} } or raw tenant
             setTenant(res.data?.tenant || res.data || null);
+            await fetchFacilityPreferences();
           } catch (err) {
             // swallow — tenant can be fetched later
             console.error("Failed to fetch tenant in AuthProvider", err);
@@ -45,6 +45,19 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {}, [role, user]);
 
+  const [facilityPreferences, setFacilityPreferences] = useState(null);
+
+  const fetchFacilityPreferences = async () => {
+    try {
+      const res = await api.get("/facility-preferences");
+      setFacilityPreferences(res.data || {});
+      return res.data;
+    } catch (err) {
+      console.error("Failed to fetch facility preferences", err);
+      setFacilityPreferences({});
+      return {};
+    }
+  };
   const login = (data) => {
     let userData = null;
     let detectedRole = "staff";
@@ -74,6 +87,8 @@ export const AuthProvider = ({ children }) => {
         try {
           const res = await api.get(`/tenants/${userData.tenantId}`);
           setTenant(res.data?.tenant || res.data || null);
+          // Also fetch facility preferences on login
+          await fetchFacilityPreferences();
         } catch (err) {
           console.error("Failed to fetch tenant after login", err);
           setTenant(null);
@@ -119,6 +134,7 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setRole("");
     setTenant(null);
+    setFacilityPreferences(null);
     localStorage.removeItem("user");
     localStorage.removeItem("role");
     try {
@@ -127,9 +143,10 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {}
   };
 
-  const isPatient = role === "patient";
-  const isAdmin = role === "admin" || role === "superadmin";
-  const isStaff = ALL_USER_ROLES.includes(role);
+  const normalizedRole = String(role || "").toLowerCase();
+  const isPatient = normalizedRole === "patient";
+  const isAdmin = normalizedRole === "admin" || normalizedRole === "superadmin";
+  const isStaff = Boolean(user) && !isPatient;
 
   return (
     <AuthContext.Provider
@@ -138,6 +155,8 @@ export const AuthProvider = ({ children }) => {
         role,
         tenant,
         refreshTenant,
+        facilityPreferences,
+        fetchFacilityPreferences,
         isPatient,
         isStaff,
         isAdmin,

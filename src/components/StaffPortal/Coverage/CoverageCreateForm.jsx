@@ -1,29 +1,29 @@
 ﻿import { useMemo, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
-  TextField,
-  Typography,
+  Chip,
+  Divider,
+  IconButton,
+  InputAdornment,
   MenuItem,
-  Alert,
   Paper,
   Stack,
-  Chip,
-  IconButton,
-  Divider,
-  InputAdornment,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
-  Tooltip,
+  Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { MdAdd, MdDelete, MdAccessTime, MdGroups2 } from "react-icons/md";
+import { MdAccessTime, MdAdd, MdDelete, MdGroups2 } from "react-icons/md";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 import {
   getRoleDisplayName,
   getRoleOptionsForIndustry,
+  getRoleOptionsFromFacilityPreferences,
 } from "../../../constants/industryRoles";
 
 const weekdayOptions = [
@@ -35,6 +35,8 @@ const weekdayOptions = [
   { value: 6, label: "Sat" },
   { value: 0, label: "Sun" },
 ];
+
+const horizonOptions = [1, 2, 3, 7, 14, 28, 42, 56];
 
 const requirementTemplates = [
   {
@@ -55,18 +57,7 @@ const requirementTemplates = [
     startTime: "15:00",
     endTime: "23:00",
   },
-  { id: "day12", label: "Day 07-19", startTime: "07:00", endTime: "19:00" },
-];
-
-const horizonOptions = [
-  { value: 1, label: "1 Day" },
-  { value: 2, label: "2 Days" },
-  { value: 3, label: "3 Days" },
-  { value: 7, label: "1 Week" },
-  { value: 14, label: "2 Weeks" },
-  { value: 28, label: "4 Weeks" },
-  { value: 42, label: "6 Weeks" },
-  { value: 56, label: "8 Weeks" },
+  { id: "night", label: "Night 23-07", startTime: "23:00", endTime: "07:00" },
 ];
 
 const defaultRequirement = {
@@ -74,14 +65,29 @@ const defaultRequirement = {
   requiredCount: 1,
   startTime: "09:00",
   endTime: "17:00",
+  unitArea: "",
+  shiftType: "",
+  requiredCertificationTags: [],
 };
 
-function isOvernightTimeRange(startTime, endTime) {
+const toUTCISOString = (dateStr, timeStr) =>
+  new Date(`${dateStr}T${timeStr}:00`).toISOString();
+
+const dedupeStrings = (values) =>
+  Array.from(
+    new Set(
+      (Array.isArray(values) ? values : [])
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+const isOvernightTimeRange = (startTime, endTime) => {
   if (!startTime || !endTime) return false;
   return endTime <= startTime;
-}
+};
 
-function formatShiftPreview(dateValue, startTime, endTime) {
+const formatShiftPreview = (dateValue, startTime, endTime) => {
   if (!dateValue || !startTime || !endTime) {
     return `${startTime || "--:--"} - ${endTime || "--:--"}`;
   }
@@ -103,62 +109,54 @@ function formatShiftPreview(dateValue, startTime, endTime) {
     hour: "numeric",
     minute: "2-digit",
   })}`;
-}
+};
 
-function toUTC(dateStr, timeStr) {
-  const local = new Date(`${dateStr}T${timeStr}:00`);
-  return new Date(local.toISOString());
-}
-
-function buildDatesFromPattern(
-  startDateStr,
-  horizonDays,
-  mode,
-  selectedWeekdays,
-) {
+const buildDatesFromPattern = (startDateStr, horizonDays, mode, weekdays) => {
   const start = new Date(`${startDateStr}T00:00:00`);
   const totalDays = Number(horizonDays);
-  const selectedSet = new Set(selectedWeekdays);
-  const generated = [];
+  const selectedWeekdays = new Set(weekdays);
 
-  for (let dayOffset = 0; dayOffset < totalDays; dayOffset += 1) {
-    const next = new Date(start);
-    next.setDate(start.getDate() + dayOffset);
+  if (!Number.isFinite(totalDays) || totalDays <= 0) return [];
+  if (Number.isNaN(start.getTime())) return [];
 
-    if (mode === "weekdays" && (next.getDay() === 0 || next.getDay() === 6)) {
-      continue;
-    }
+  const dates = [];
 
-    if (mode === "weekends" && next.getDay() !== 0 && next.getDay() !== 6) {
-      continue;
-    }
+  for (let offset = 0; offset < totalDays; offset += 1) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + offset);
 
-    if (mode === "custom" && !selectedSet.has(next.getDay())) {
-      continue;
-    }
+    const day = date.getDay();
+    const isWeekend = day === 0 || day === 6;
 
-    generated.push(next.toISOString().slice(0, 10));
+    if (mode === "weekdays" && isWeekend) continue;
+    if (mode === "weekends" && !isWeekend) continue;
+    if (mode === "custom" && !selectedWeekdays.has(day)) continue;
+
+    dates.push(date.toISOString().slice(0, 10));
   }
 
-  return generated;
-}
+  return dates;
+};
 
 export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
-  const { tenant } = useAuth();
-  const roleOptions = useMemo(
-    () => getRoleOptionsForIndustry(tenant?.industry),
-    [tenant?.industry],
-  );
+  const { tenant, facilityPreferences } = useAuth();
+
+  const roleOptions = useMemo(() => {
+    const facilityOptions =
+      getRoleOptionsFromFacilityPreferences(facilityPreferences);
+    if (facilityOptions.length) return facilityOptions;
+    return getRoleOptionsForIndustry(tenant?.industry);
+  }, [facilityPreferences, tenant?.industry]);
 
   const today = new Date().toISOString().slice(0, 10);
-  const [requirements, setRequirements] = useState([{ ...defaultRequirement }]);
+
   const [plannerStartDate, setPlannerStartDate] = useState(today);
   const [horizonDays, setHorizonDays] = useState(14);
   const [repeatMode, setRepeatMode] = useState("weekdays");
   const [selectedWeekdays, setSelectedWeekdays] = useState([1, 2, 3, 4, 5]);
   const [excludedDates, setExcludedDates] = useState([]);
+  const [requirements, setRequirements] = useState([{ ...defaultRequirement }]);
   const [note, setNote] = useState("");
-
   const [loading, setLoading] = useState(false);
   const [loadingMode, setLoadingMode] = useState("create");
   const [error, setError] = useState("");
@@ -175,16 +173,16 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
     [plannerStartDate, horizonDays, repeatMode, selectedWeekdays],
   );
 
-  const dates = useMemo(
-    () => generatedDates.filter((d) => !excludedDates.includes(d)),
+  const activeDates = useMemo(
+    () => generatedDates.filter((date) => !excludedDates.includes(date)),
     [generatedDates, excludedDates],
   );
 
-  const includedDateSet = useMemo(() => new Set(dates), [dates]);
+  const includedDateSet = useMemo(() => new Set(activeDates), [activeDates]);
 
-  const totalShiftBlocks = dates.length * requirements.length;
+  const totalShiftBlocks = activeDates.length * requirements.length;
   const totalRequestedStaff =
-    dates.length *
+    activeDates.length *
     requirements.reduce(
       (sum, req) => sum + (Number(req.requiredCount) || 0),
       0,
@@ -192,7 +190,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
 
   const previewByDate = useMemo(
     () =>
-      dates.map((dateValue) => ({
+      activeDates.map((dateValue) => ({
         dateValue,
         dateLabel: new Date(`${dateValue}T00:00:00`).toLocaleDateString(
           undefined,
@@ -208,148 +206,33 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
           timeLabel: formatShiftPreview(dateValue, req.startTime, req.endTime),
           count: Number(req.requiredCount) || 0,
           spansOvernight: isOvernightTimeRange(req.startTime, req.endTime),
+          unitArea: req.unitArea || "",
+          shiftType: req.shiftType || "",
         })),
       })),
-    [dates, requirements],
+    [activeDates, requirements],
   );
 
-  const handleDateToggle = (dateValue) => {
-    setExcludedDates((prev) =>
-      prev.includes(dateValue)
-        ? prev.filter((d) => d !== dateValue)
-        : [...prev, dateValue],
-    );
-    setError("");
-  };
-
-  const clearExcludedDates = () => {
-    setExcludedDates([]);
-    setError("");
-  };
-
-  const handleWeekdayToggle = (weekday) => {
-    if (repeatMode !== "custom") {
-      setRepeatMode("custom");
-    }
-
+  const handleToggleWeekday = (day) => {
+    setRepeatMode("custom");
     setSelectedWeekdays((prev) => {
-      if (prev.includes(weekday)) {
-        return prev.length === 1 ? prev : prev.filter((d) => d !== weekday);
+      if (prev.includes(day)) {
+        return prev.length === 1 ? prev : prev.filter((item) => item !== day);
       }
-      return [...prev, weekday];
+      return [...prev, day];
     });
-    setError("");
   };
 
-  const handleRepeatModeChange = (_, mode) => {
-    if (!mode) return;
+  const handleRepeatModeChange = (mode) => {
     setRepeatMode(mode);
     if (mode === "weekdays") setSelectedWeekdays([1, 2, 3, 4, 5]);
-    else if (mode === "weekends") setSelectedWeekdays([6, 0]);
-    else if (mode === "everyday") setSelectedWeekdays([0, 1, 2, 3, 4, 5, 6]);
+    if (mode === "weekends") setSelectedWeekdays([6, 0]);
+    if (mode === "everyday") setSelectedWeekdays([0, 1, 2, 3, 4, 5, 6]);
   };
 
-  const handleSubmit = async (e, autoGenerate = false) => {
-    if (e) e.preventDefault();
-
-    if (!dates.length || requirements.length === 0) {
-      setError(
-        "Please add at least one active date and one coverage requirement.",
-      );
-      toast.error(
-        "Please add at least one active date and one coverage requirement.",
-      );
-      return;
-    }
-
-    const referenceDate = dates[0];
-
-    for (let index = 0; index < requirements.length; index += 1) {
-      const req = requirements[index];
-      if (!req.role || !req.startTime || !req.endTime) {
-        const msg = `Requirement ${index + 1} must include role, start time, and end time.`;
-        setError(msg);
-        toast.error(msg);
-        return;
-      }
-    }
-
-    setLoadingMode(autoGenerate ? "ai" : "create");
-    setLoading(true);
-    setError("");
-    setSuccess("");
-
-    try {
-      const allCreated = [];
-
-      const createResponses = await Promise.all(
-        dates.map((selectedDate) => {
-          const shifts = requirements.map((req) => ({
-            role: req.role,
-            requiredCount: Number(req.requiredCount) || 0,
-            startTime: toUTC(selectedDate, req.startTime),
-            endTime: toUTC(selectedDate, req.endTime),
-            note,
-          }));
-
-          return api.post("/coverage", {
-            tenantId,
-            dates: [selectedDate],
-            shifts,
-          });
-        }),
-      );
-
-      createResponses.forEach((createRes) => {
-        const createdForDate = Array.isArray(createRes.data)
-          ? createRes.data
-          : Array.isArray(createRes.data?.created)
-            ? createRes.data.created
-            : [];
-
-        allCreated.push(...createdForDate);
-      });
-
-      let generatedCount = 0;
-      if (autoGenerate) {
-        const coverageIds = allCreated.map((item) => item?._id).filter(Boolean);
-
-        if (coverageIds.length > 0) {
-          const autoRes = await api.post("/schedules/auto-generate", {
-            coverageIds,
-          });
-          generatedCount = autoRes.data?.generatedCount ?? 0;
-        }
-      }
-
-      const successMsg = autoGenerate
-        ? `Coverage created + AI auto-schedule complete (${generatedCount} shifts generated).`
-        : "Coverage requirements added successfully!";
-
-      setSuccess(successMsg);
-      toast.success(successMsg);
-      setRequirements([{ ...defaultRequirement }]);
-      setPlannerStartDate(today);
-      setHorizonDays(14);
-      setRepeatMode("weekdays");
-      setSelectedWeekdays([1, 2, 3, 4, 5]);
-      setExcludedDates([]);
-      setNote("");
-
-      if (onSuccess) onSuccess();
-    } catch (err) {
-      const msg = err.response?.data?.message || "Failed to add coverage.";
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-      setLoadingMode("create");
-    }
-  };
-
-  const handleRequirementChange = (index, key, value) => {
+  const handleRequirementChange = (index, field, value) => {
     setRequirements((prev) =>
-      prev.map((req, i) => (i === index ? { ...req, [key]: value } : req)),
+      prev.map((req, i) => (i === index ? { ...req, [field]: value } : req)),
     );
   };
 
@@ -372,6 +255,111 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
     setRequirements((prev) =>
       prev.length === 1 ? prev : prev.filter((_, i) => i !== index),
     );
+  };
+
+  const handleToggleDate = (date) => {
+    setExcludedDates((prev) =>
+      prev.includes(date)
+        ? prev.filter((value) => value !== date)
+        : [...prev, date],
+    );
+  };
+
+  const clearExcludedDates = () => {
+    setExcludedDates([]);
+  };
+
+  const handleSubmit = async (event, autoGenerate = false) => {
+    if (event) event.preventDefault();
+
+    setError("");
+    setSuccess("");
+
+    if (!activeDates.length) {
+      const msg = "Please include at least one active date.";
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    for (let index = 0; index < requirements.length; index += 1) {
+      const req = requirements[index];
+      if (!req.role || !req.startTime || !req.endTime) {
+        const msg = `Requirement ${index + 1} must include role, start time, and end time.`;
+        setError(msg);
+        toast.error(msg);
+        return;
+      }
+    }
+
+    setLoadingMode(autoGenerate ? "ai" : "create");
+    setLoading(true);
+
+    try {
+      const createdCoverages = [];
+
+      const createResponses = await Promise.all(
+        activeDates.map((date) => {
+          const shifts = requirements.map((req) => ({
+            role: req.role,
+            requiredCount: Number(req.requiredCount) || 0,
+            unitArea: req.unitArea || null,
+            shiftType: req.shiftType || null,
+            requiredCertificationTags: dedupeStrings(
+              req.requiredCertificationTags,
+            ),
+            startTime: toUTCISOString(date, req.startTime),
+            endTime: toUTCISOString(date, req.endTime),
+            note,
+          }));
+
+          return api.post("/coverage", {
+            tenantId,
+            dates: [date],
+            shifts,
+          });
+        }),
+      );
+
+      createResponses.forEach((response) => {
+        const createdForDate = Array.isArray(response.data)
+          ? response.data
+          : Array.isArray(response.data?.created)
+            ? response.data.created
+            : [];
+
+        createdCoverages.push(...createdForDate);
+      });
+
+      if (autoGenerate && createdCoverages.length) {
+        await api.post("/schedules/auto-generate", {
+          coverageIds: createdCoverages.map((item) => item._id),
+        });
+      }
+
+      const message = autoGenerate
+        ? "Coverage created and auto-scheduling completed."
+        : "Coverage requirements added successfully.";
+
+      setSuccess(message);
+      toast.success(message);
+
+      setRequirements([{ ...defaultRequirement }]);
+      setPlannerStartDate(today);
+      setHorizonDays(14);
+      setRepeatMode("weekdays");
+      setSelectedWeekdays([1, 2, 3, 4, 5]);
+      setExcludedDates([]);
+      setNote("");
+      onSuccess?.();
+    } catch (err) {
+      const message = err?.response?.data?.message || "Failed to add coverage.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+      setLoadingMode("create");
+    }
   };
 
   return (
@@ -446,9 +434,9 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                 value={horizonDays}
                 onChange={(e) => setHorizonDays(Number(e.target.value))}
               >
-                {horizonOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
+                {horizonOptions.map((value) => (
+                  <MenuItem key={value} value={value}>
+                    {value} day{value > 1 ? "s" : ""}
                   </MenuItem>
                 ))}
               </TextField>
@@ -466,7 +454,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
               <ToggleButtonGroup
                 value={repeatMode}
                 exclusive
-                onChange={handleRepeatModeChange}
+                onChange={(_, mode) => mode && handleRepeatModeChange(mode)}
                 size="small"
                 sx={{
                   display: "flex",
@@ -491,29 +479,25 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
             </Box>
 
             <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-              {weekdayOptions.map((weekday) => (
+              {weekdayOptions.map((day) => (
                 <Chip
-                  key={weekday.value}
-                  label={weekday.label}
+                  key={day.value}
+                  label={day.label}
                   color={
-                    selectedWeekdays.includes(weekday.value)
-                      ? "primary"
-                      : "default"
+                    selectedWeekdays.includes(day.value) ? "primary" : "default"
                   }
                   variant={
-                    selectedWeekdays.includes(weekday.value)
-                      ? "filled"
-                      : "outlined"
+                    selectedWeekdays.includes(day.value) ? "filled" : "outlined"
                   }
-                  onClick={() => handleWeekdayToggle(weekday.value)}
+                  onClick={() => handleToggleWeekday(day.value)}
                   size="small"
                 />
               ))}
             </Stack>
 
             <Typography variant="caption" color="text.secondary">
-              Generated {generatedDates.length} dates, using {dates.length}{" "}
-              active dates.
+              Generated {generatedDates.length} dates, using{" "}
+              {activeDates.length} active dates.
             </Typography>
           </Stack>
         </Box>
@@ -536,9 +520,14 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
             <Typography variant="body1" sx={{ fontWeight: 700 }}>
               Generated Dates
             </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Tap a date chip to include or skip it.
-            </Typography>
+            <Button
+              size="small"
+              onClick={clearExcludedDates}
+              sx={{ textTransform: "none", px: 0 }}
+              disabled={!excludedDates.length}
+            >
+              Re-include all
+            </Button>
           </Stack>
 
           <Box
@@ -552,45 +541,22 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
               pr: 0.5,
             }}
           >
-            {generatedDates.map((d) => (
+            {generatedDates.map((date) => (
               <Chip
-                key={d}
-                label={new Date(`${d}T00:00:00`).toLocaleDateString()}
-                onClick={() => handleDateToggle(d)}
-                color={includedDateSet.has(d) ? "primary" : "default"}
-                variant={includedDateSet.has(d) ? "filled" : "outlined"}
+                key={date}
+                label={new Date(`${date}T00:00:00`).toLocaleDateString()}
+                onClick={() => handleToggleDate(date)}
+                color={includedDateSet.has(date) ? "primary" : "default"}
+                variant={includedDateSet.has(date) ? "filled" : "outlined"}
                 size="small"
                 sx={{
-                  textDecoration: includedDateSet.has(d)
+                  textDecoration: includedDateSet.has(date)
                     ? "none"
                     : "line-through",
                 }}
               />
             ))}
           </Box>
-
-          <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-            spacing={1}
-            sx={{ mt: 1 }}
-          >
-            <Typography variant="caption" color="text.secondary">
-              Active dates: {dates.length}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Skipped: {generatedDates.length - dates.length}
-            </Typography>
-          </Stack>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "block", mt: 0.5 }}
-          >
-            Horizon starts{" "}
-            {new Date(`${plannerStartDate}T00:00:00`).toLocaleDateString()}.
-          </Typography>
         </Box>
 
         <Box
@@ -599,7 +565,6 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
             alignItems: { xs: "stretch", sm: "center" },
             justifyContent: "space-between",
             gap: 1,
-            mt: 0.5,
             flexDirection: { xs: "column", sm: "row" },
           }}
         >
@@ -617,11 +582,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
             variant="outlined"
             onClick={handleAddRequirement}
             startIcon={<MdAdd size={18} />}
-            sx={{
-              textTransform: "none",
-              whiteSpace: "nowrap",
-              width: { xs: "100%", sm: "auto" },
-            }}
+            sx={{ textTransform: "none", width: { xs: "100", sm: "auto" } }}
           >
             Add Requirement
           </Button>
@@ -713,7 +674,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                       handleRequirementChange(
                         index,
                         "requiredCount",
-                        Number(e.target.value),
+                        Math.max(0, Number(e.target.value) || 0),
                       )
                     }
                     inputProps={{ min: 0 }}
@@ -779,6 +740,107 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                     day.
                   </Alert>
                 )}
+
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="Unit Area (Optional)"
+                    value={req.unitArea || ""}
+                    onChange={(e) =>
+                      handleRequirementChange(
+                        index,
+                        "unitArea",
+                        e.target.value || "",
+                      )
+                    }
+                    disabled={!facilityPreferences?.unitAreas?.length}
+                    helperText={
+                      facilityPreferences?.unitAreas?.length
+                        ? ""
+                        : "Admin has not configured unit areas yet."
+                    }
+                  >
+                    <MenuItem value="">Any Area</MenuItem>
+                    {(facilityPreferences?.unitAreas || []).map((area) => (
+                      <MenuItem key={area} value={area}>
+                        {area}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+
+                  {facilityPreferences?.shiftTypes?.length > 0 && (
+                    <TextField
+                      select
+                      fullWidth
+                      label="Shift Type (Optional)"
+                      value={req.shiftType || ""}
+                      onChange={(e) =>
+                        handleRequirementChange(
+                          index,
+                          "shiftType",
+                          e.target.value || "",
+                        )
+                      }
+                    >
+                      <MenuItem value="">Auto Infer</MenuItem>
+                      {facilityPreferences.shiftTypes.map((shiftType) => (
+                        <MenuItem key={shiftType} value={shiftType}>
+                          {shiftType}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                </Stack>
+
+                <Box>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", mb: 0.75 }}
+                  >
+                    Required Certifications (Optional)
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    select
+                    label="Cert Tags (Optional)"
+                    value={req.requiredCertificationTags || []}
+                    onChange={(e) => {
+                      const selectedValues =
+                        typeof e.target.value === "string"
+                          ? e.target.value.split(",")
+                          : e.target.value;
+
+                      handleRequirementChange(
+                        index,
+                        "requiredCertificationTags",
+                        dedupeStrings(selectedValues),
+                      );
+                    }}
+                    SelectProps={{
+                      multiple: true,
+                      renderValue: (selected) =>
+                        selected?.length
+                          ? selected.join(", ")
+                          : "None required",
+                    }}
+                    disabled={!facilityPreferences?.certificationTags?.length}
+                    helperText={
+                      facilityPreferences?.certificationTags?.length
+                        ? ""
+                        : "Admin has not configured certification tags yet."
+                    }
+                  >
+                    {(facilityPreferences?.certificationTags || []).map(
+                      (cert) => (
+                        <MenuItem key={cert} value={cert}>
+                          {cert}
+                        </MenuItem>
+                      ),
+                    )}
+                  </TextField>
+                </Box>
               </Stack>
             </Paper>
           ))}
@@ -807,19 +869,10 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                 Plan Summary
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                {totalShiftBlocks} coverage entries &middot;{" "}
-                {totalRequestedStaff} staff positions &middot; {dates.length}{" "}
-                active dates
+                {totalShiftBlocks} coverage entries • {totalRequestedStaff}{" "}
+                staff positions • {activeDates.length} active dates
               </Typography>
             </Box>
-            <Tooltip title="Duplicate checking is enforced by the server on save.">
-              <Chip
-                size="small"
-                label="Duplicate protection on"
-                color="warning"
-                variant="outlined"
-              />
-            </Tooltip>
           </Stack>
 
           {previewByDate.length === 0 ? (
@@ -885,6 +938,8 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                         sx={{ flex: 1 }}
                       >
                         {row.timeLabel}
+                        {row.unitArea ? ` • ${row.unitArea}` : ""}
+                        {row.shiftType ? ` • ${row.shiftType}` : ""}
                       </Typography>
                       {row.spansOvernight && (
                         <Chip

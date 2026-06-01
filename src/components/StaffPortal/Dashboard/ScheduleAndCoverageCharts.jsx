@@ -19,7 +19,6 @@ import {
   FiAlertTriangle,
 } from "react-icons/fi";
 import {
-  ALL_NON_ADMIN_ROLES,
   getRoleColor as getMappedRoleColor,
   getRoleDisplayName as getMappedRoleDisplayName,
   isRoleCompatible,
@@ -247,7 +246,14 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
   // -------------------
   // Roles & role selector (only roles that actually have coverage)
   // -------------------
-  const allRoles = ALL_NON_ADMIN_ROLES;
+  const allRoles = useMemo(() => {
+    return Array.from(
+      new Set([
+        ...coverageNormalized.map((item) => item.role),
+        ...schedulesNormalized.map((item) => item.staffRole || item.role),
+      ]),
+    ).filter(Boolean);
+  }, [coverageNormalized, schedulesNormalized]);
 
   const rolesWithCoverage = useMemo(() => {
     const setRoles = new Set(coverageNormalized.map((c) => c.role));

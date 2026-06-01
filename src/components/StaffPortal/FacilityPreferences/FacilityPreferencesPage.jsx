@@ -21,6 +21,7 @@ import {
   DialogActions,
 } from "@mui/material";
 import { FiSave, FiInfo, FiRotateCcw } from "react-icons/fi";
+import { FiX, FiPlus } from "react-icons/fi";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 
@@ -34,6 +35,56 @@ const SCHEDULING_PATTERNS = [
   { value: "custom", label: "Custom (coverage-driven)" },
 ];
 
+const TAXONOMY_FIELDS = [
+  "roleFamilies",
+  "unitAreas",
+  "shiftTypes",
+  "certificationTags",
+];
+
+const toSnakeCase = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_")
+    .replace(/[^a-z0-9_]/g, "")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const toDisplayLabel = (value) => {
+  const normalized = String(value || "")
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+
+  if (!normalized) return "";
+
+  return normalized
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
+
+const normalizeArrayValues = (values) =>
+  Array.from(
+    new Set(
+      (Array.isArray(values) ? values : [])
+        .map((item) => toSnakeCase(item))
+        .filter(Boolean),
+    ),
+  );
+
+const normalizeTaxonomyPrefs = (inputPrefs) => {
+  const safePrefs = inputPrefs || {};
+  const next = { ...safePrefs };
+
+  TAXONOMY_FIELDS.forEach((field) => {
+    next[field] = normalizeArrayValues(safePrefs[field]);
+  });
+
+  return next;
+};
+
 export default function FacilityPreferencesPage() {
   const [prefs, setPrefs] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -42,11 +93,18 @@ export default function FacilityPreferencesPage() {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
 
+  // UI state for adding new items to arrays
+  const [arrayInputs, setArrayInputs] = useState({
+    roleFamilies: "",
+    unitAreas: "",
+    shiftTypes: "",
+    certificationTags: "",
+  });
   useEffect(() => {
     async function fetchPrefs() {
       try {
         const res = await api.get("/facility-preferences");
-        setPrefs(res.data);
+        setPrefs(normalizeTaxonomyPrefs(res.data));
       } catch (err) {
         console.error(err);
         setError("Failed to load facility preferences");
@@ -68,12 +126,41 @@ export default function FacilityPreferencesPage() {
     setPrefs((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleArrayAdd = (field) => {
+    const value = toSnakeCase(arrayInputs[field]);
+    if (!value) return;
+
+    setPrefs((prev) => {
+      const existing = normalizeArrayValues(prev[field]);
+      if (existing.includes(value)) {
+        toast.warning(`${toDisplayLabel(value)} is already in the list`, {
+          autoClose: 1500,
+        });
+        return prev;
+      }
+      return { ...prev, [field]: [...existing, value] };
+    });
+
+    setArrayInputs((prev) => ({ ...prev, [field]: "" }));
+  };
+
+  const handleArrayRemove = (field, index) => {
+    setPrefs((prev) => ({
+      ...prev,
+      [field]: prev[field]?.filter((_, i) => i !== index) || [],
+    }));
+  };
+
+  const handleArrayInputChange = (field, value) => {
+    setArrayInputs((prev) => ({ ...prev, [field]: value }));
+  };
   const handleSave = async () => {
     setSaving(true);
     setError("");
     try {
-      const res = await api.post("/facility-preferences", prefs);
-      setPrefs(res.data);
+      const payload = normalizeTaxonomyPrefs(prefs);
+      const res = await api.post("/facility-preferences", payload);
+      setPrefs(normalizeTaxonomyPrefs(res.data));
       toast.success("Facility preferences saved", {
         position: "top-right",
         autoClose: 2000,
@@ -91,7 +178,7 @@ export default function FacilityPreferencesPage() {
     setError("");
     try {
       const res = await api.delete("/facility-preferences/reset");
-      setPrefs(res.data);
+      setPrefs(normalizeTaxonomyPrefs(res.data));
       setResetDialogOpen(false);
       toast.info("Facility preferences reset to defaults", {
         position: "top-right",
@@ -205,6 +292,302 @@ export default function FacilityPreferencesPage() {
           </FormControl>
         </Paper>
 
+        {/* ── Facility Taxonomy ── */}
+        <Paper
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "divider",
+            boxShadow: 1,
+          }}
+        >
+          <Typography variant="h6" mb={0.5} sx={{ fontWeight: 700 }}>
+            Facility Taxonomy
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mb={2.25}>
+            Define the roles, areas, shift types, and certifications valid at
+            your facility
+          </Typography>
+
+          <Stack spacing={3}>
+            {/* Role Families */}
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                Role Families
+              </Typography>
+              <Stack spacing={1} mb={2}>
+                {(prefs.roleFamilies || []).map((role, idx) => (
+                  <Box
+                    key={idx}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      p: 1.5,
+                      borderRadius: 2,
+                      bgcolor: "grey.50",
+                      border: "1px solid",
+                      borderColor: "divider",
+                    }}
+                  >
+                    <Typography>{toDisplayLabel(role)}</Typography>
+                    <Button
+                      size="small"
+                      color="error"
+                      onClick={() => handleArrayRemove("roleFamilies", idx)}
+                      startIcon={<FiX size={14} />}
+                      sx={{ minWidth: "auto" }}
+                    >
+                      Remove
+                    </Button>
+                  </Box>
+                ))}
+              </Stack>
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <TextField
+                  size="small"
+                  placeholder="e.g., receptionist, nurse, doctor"
+                  value={arrayInputs.roleFamilies}
+                  onChange={(e) =>
+                    handleArrayInputChange("roleFamilies", e.target.value)
+                  }
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleArrayAdd("roleFamilies");
+                    }
+                  }}
+                  sx={{ flex: 1 }}
+                />
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<FiPlus size={14} />}
+                  onClick={() => handleArrayAdd("roleFamilies")}
+                  sx={{ px: 2 }}
+                >
+                  Add
+                </Button>
+              </Box>
+            </Box>
+
+            {/* Unit Areas */}
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                Unit Areas{" "}
+                <Typography
+                  component="span"
+                  variant="caption"
+                  color="text.secondary"
+                >
+                  (Optional)
+                </Typography>
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mb: 1.5 }}
+              >
+                e.g., AL (Assisted Living), IL (Independent Living), MC (Memory
+                Care) – leave empty if not applicable
+              </Typography>
+              <Stack spacing={1} mb={2}>
+                {(prefs.unitAreas || []).map((area, idx) => (
+                  <Box
+                    key={idx}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      p: 1.5,
+                      borderRadius: 2,
+                      bgcolor: "grey.50",
+                      border: "1px solid",
+                      borderColor: "divider",
+                    }}
+                  >
+                    <Typography>{toDisplayLabel(area)}</Typography>
+                    <Button
+                      size="small"
+                      color="error"
+                      onClick={() => handleArrayRemove("unitAreas", idx)}
+                      startIcon={<FiX size={14} />}
+                      sx={{ minWidth: "auto" }}
+                    >
+                      Remove
+                    </Button>
+                  </Box>
+                ))}
+              </Stack>
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <TextField
+                  size="small"
+                  placeholder="e.g., AL, IL, MC"
+                  value={arrayInputs.unitAreas}
+                  onChange={(e) =>
+                    handleArrayInputChange("unitAreas", e.target.value)
+                  }
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleArrayAdd("unitAreas");
+                    }
+                  }}
+                  sx={{ flex: 1 }}
+                />
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<FiPlus size={14} />}
+                  onClick={() => handleArrayAdd("unitAreas")}
+                  sx={{ px: 2 }}
+                >
+                  Add
+                </Button>
+              </Box>
+            </Box>
+
+            {/* Shift Types */}
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                Shift Types
+              </Typography>
+              <Stack spacing={1} mb={2}>
+                {(prefs.shiftTypes || []).map((shiftType, idx) => (
+                  <Box
+                    key={idx}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      p: 1.5,
+                      borderRadius: 2,
+                      bgcolor: "grey.50",
+                      border: "1px solid",
+                      borderColor: "divider",
+                    }}
+                  >
+                    <Typography>{toDisplayLabel(shiftType)}</Typography>
+                    <Button
+                      size="small"
+                      color="error"
+                      onClick={() => handleArrayRemove("shiftTypes", idx)}
+                      startIcon={<FiX size={14} />}
+                      sx={{ minWidth: "auto" }}
+                    >
+                      Remove
+                    </Button>
+                  </Box>
+                ))}
+              </Stack>
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <TextField
+                  size="small"
+                  placeholder="e.g., day, evening, night"
+                  value={arrayInputs.shiftTypes}
+                  onChange={(e) =>
+                    handleArrayInputChange("shiftTypes", e.target.value)
+                  }
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleArrayAdd("shiftTypes");
+                    }
+                  }}
+                  sx={{ flex: 1 }}
+                />
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<FiPlus size={14} />}
+                  onClick={() => handleArrayAdd("shiftTypes")}
+                  sx={{ px: 2 }}
+                >
+                  Add
+                </Button>
+              </Box>
+            </Box>
+
+            {/* Certification Tags */}
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                Certification Tags{" "}
+                <Typography
+                  component="span"
+                  variant="caption"
+                  color="text.secondary"
+                >
+                  (Optional)
+                </Typography>
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mb: 1.5 }}
+              >
+                e.g., med-pass, bilingual, forklift-certified – leave empty if
+                not applicable
+              </Typography>
+              <Stack spacing={1} mb={2}>
+                {(prefs.certificationTags || []).map((cert, idx) => (
+                  <Box
+                    key={idx}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      p: 1.5,
+                      borderRadius: 2,
+                      bgcolor: "grey.50",
+                      border: "1px solid",
+                      borderColor: "divider",
+                    }}
+                  >
+                    <Typography>{toDisplayLabel(cert)}</Typography>
+                    <Button
+                      size="small"
+                      color="error"
+                      onClick={() =>
+                        handleArrayRemove("certificationTags", idx)
+                      }
+                      startIcon={<FiX size={14} />}
+                      sx={{ minWidth: "auto" }}
+                    >
+                      Remove
+                    </Button>
+                  </Box>
+                ))}
+              </Stack>
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <TextField
+                  size="small"
+                  placeholder="e.g., med-pass, bilingual"
+                  value={arrayInputs.certificationTags}
+                  onChange={(e) =>
+                    handleArrayInputChange("certificationTags", e.target.value)
+                  }
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleArrayAdd("certificationTags");
+                    }
+                  }}
+                  sx={{ flex: 1 }}
+                />
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<FiPlus size={14} />}
+                  onClick={() => handleArrayAdd("certificationTags")}
+                  sx={{ px: 2 }}
+                >
+                  Add
+                </Button>
+              </Box>
+            </Box>
+          </Stack>
+        </Paper>
         {/* ── Workload Signals ── */}
         <Paper
           sx={{

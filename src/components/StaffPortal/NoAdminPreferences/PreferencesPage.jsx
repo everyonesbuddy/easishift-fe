@@ -5,7 +5,6 @@ import {
   Paper,
   Button,
   CircularProgress,
-  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Switch,
@@ -62,7 +61,21 @@ export default function PreferencesPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.post("/preferences/me", prefs);
+      const payload = {
+        preferredDaysOfWeek: Array.isArray(prefs.preferredDaysOfWeek)
+          ? prefs.preferredDaysOfWeek
+          : [],
+        scheduleEmailNotificationsEnabled:
+          prefs.scheduleEmailNotificationsEnabled ?? true,
+        scheduleSmsNotificationsEnabled:
+          prefs.scheduleSmsNotificationsEnabled ?? true,
+        timeOffEmailNotificationsEnabled:
+          prefs.timeOffEmailNotificationsEnabled ?? true,
+        timeOffSmsNotificationsEnabled:
+          prefs.timeOffSmsNotificationsEnabled ?? true,
+      };
+
+      await api.post("/preferences/me", payload);
       setError("");
       // small confirmation
       toast.success("Preferences saved", {
@@ -122,12 +135,10 @@ export default function PreferencesPage() {
           </Box>
           <Box>
             <Typography variant="body2" sx={{ color: "info.dark" }}>
-              These preferences help administrators and AI systems create
-              schedules that work better for you.
+              These settings control notifications and preferred work days.
             </Typography>
             <Typography variant="body2" sx={{ color: "info.dark", mt: 0.75 }}>
-              They are soft constraints and cannot guarantee specific
-              assignments, but they will be considered when building schedules.
+              Facility rules are configured by admins in Facility Preferences.
             </Typography>
           </Box>
         </Stack>
@@ -184,163 +195,6 @@ export default function PreferencesPage() {
               );
             })}
           </ToggleButtonGroup>
-        </Paper>
-
-        <Paper
-          sx={{
-            p: { xs: 2, md: 3 },
-            borderRadius: 3,
-            border: "1px solid",
-            borderColor: "divider",
-            boxShadow: 1,
-          }}
-        >
-          <Typography variant="h6" mb={1.75} sx={{ fontWeight: 700 }}>
-            Preferred Shift Times
-          </Typography>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-              gap: 2,
-            }}
-          >
-            <TextField
-              label="Preferred Start Time"
-              type="time"
-              value={prefs.preferredShiftStart || "08:00"}
-              onChange={(e) =>
-                handleChange("preferredShiftStart", e.target.value)
-              }
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-            />
-            <TextField
-              label="Preferred End Time"
-              type="time"
-              value={prefs.preferredShiftEnd || "17:00"}
-              onChange={(e) =>
-                handleChange("preferredShiftEnd", e.target.value)
-              }
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-            />
-          </Box>
-        </Paper>
-
-        <Paper
-          sx={{
-            p: { xs: 2, md: 3 },
-            borderRadius: 3,
-            border: "1px solid",
-            borderColor: "divider",
-            boxShadow: 1,
-          }}
-        >
-          <Typography variant="h6" mb={1.75} sx={{ fontWeight: 700 }}>
-            Weekly Hours
-          </Typography>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-              gap: 2,
-            }}
-          >
-            <TextField
-              label="Minimum Hours per Week"
-              type="number"
-              value={prefs.minHoursPerWeek || 0}
-              onChange={(e) =>
-                handleChange("minHoursPerWeek", parseInt(e.target.value) || 0)
-              }
-              fullWidth
-            />
-            <TextField
-              label="Maximum Hours per Week"
-              type="number"
-              value={prefs.maxHoursPerWeek || 0}
-              onChange={(e) =>
-                handleChange("maxHoursPerWeek", parseInt(e.target.value) || 0)
-              }
-              fullWidth
-            />
-          </Box>
-        </Paper>
-
-        <Paper
-          sx={{
-            p: { xs: 2, md: 3 },
-            borderRadius: 3,
-            border: "1px solid",
-            borderColor: "divider",
-            boxShadow: 1,
-          }}
-        >
-          <Typography variant="h6" mb={1.75} sx={{ fontWeight: 700 }}>
-            Work Style Preferences
-          </Typography>
-          <Stack spacing={2}>
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: 2,
-                bgcolor: "grey.50",
-                border: "1px solid",
-                borderColor: "divider",
-              }}
-            >
-              <FormControlLabel
-                sx={{ m: 0, width: "100%" }}
-                control={
-                  <Switch
-                    checked={prefs.dislikesNights || false}
-                    onChange={(e) =>
-                      handleChange("dislikesNights", e.target.checked)
-                    }
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography>Night Shift Preference</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      I prefer working night shifts
-                    </Typography>
-                  </Box>
-                }
-              />
-            </Box>
-
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: 2,
-                bgcolor: "grey.50",
-                border: "1px solid",
-                borderColor: "divider",
-              }}
-            >
-              <FormControlLabel
-                sx={{ m: 0, width: "100%" }}
-                control={
-                  <Switch
-                    checked={prefs.prefersBlockScheduling || false}
-                    onChange={(e) =>
-                      handleChange("prefersBlockScheduling", e.target.checked)
-                    }
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography>Block Scheduling</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      I prefer working consecutive days in a row
-                    </Typography>
-                  </Box>
-                }
-              />
-            </Box>
-          </Stack>
         </Paper>
 
         <Paper

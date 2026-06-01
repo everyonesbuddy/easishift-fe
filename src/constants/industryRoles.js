@@ -119,6 +119,11 @@ const FINANCE_ROLES = [
 
 export const COMMON_STAFF_ROLES = ["staff", "other"];
 export const ADMIN_ROLES = ["admin", "superadmin"];
+export const SYSTEM_ROLE_OPTIONS = [
+  "user",
+  ...COMMON_STAFF_ROLES,
+  ...ADMIN_ROLES,
+];
 
 export const INDUSTRY_ROLE_MAP = {
   Healthcare: HEALTHCARE_AND_SENIOR_LIVING_ROLES,
@@ -177,7 +182,11 @@ export const getRoleFamilyKey = (role) => {
   const normalizedRole = normalizeRoleKey(role);
   if (!normalizedRole) return "";
 
-  if (normalizedRole.startsWith("al_") || normalizedRole.startsWith("il_")) {
+  if (
+    normalizedRole.startsWith("al_") ||
+    normalizedRole.startsWith("il_") ||
+    normalizedRole.startsWith("mc_")
+  ) {
     return normalizedRole.slice(3);
   }
 
@@ -459,3 +468,31 @@ export const getRoleOptionsForIndustry = (industry, options) =>
     value: role,
     label: getRoleDisplayName(role),
   }));
+
+export const getRoleOptionsFromFacilityPreferences = (
+  facilityPreferences,
+  { includeSystem = false, includeAdmin = false } = {},
+) => {
+  const facilityRoles = Array.from(
+    new Set(
+      (facilityPreferences?.roleFamilies || [])
+        .map((role) => normalizeRoleKey(role))
+        .filter(Boolean),
+    ),
+  );
+
+  const roles = [...facilityRoles];
+
+  if (includeSystem) {
+    roles.push("user", ...COMMON_STAFF_ROLES);
+  }
+
+  if (includeAdmin) {
+    roles.push(...ADMIN_ROLES);
+  }
+
+  return Array.from(new Set(roles)).map((role) => ({
+    value: role,
+    label: getRoleDisplayName(role),
+  }));
+};

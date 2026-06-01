@@ -23,7 +23,7 @@ import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 
 const SAMPLE_CSV =
-  "name,email,role,userPhone,userPhoneCountryCode\nA,a@x.com,nurse,5551112222,+1\nB,b@x.com,doctor,5553334444,+1";
+  "name,email,role,userPhone,userPhoneCountryCode,profilePicture,allowedAreas,allowedShiftTypes,certificationTags\nA,a@x.com,nurse,5551112222,+1,https://example.com/a.jpg,AL|IL,day|evening,med-pass|bilingual\nB,b@x.com,doctor,5553334444,+1,,IL,day,rn";
 const MAX_ROWS = 500;
 
 const statusLabel = (status) => {
@@ -224,7 +224,9 @@ export default function BulkStaffModal({
         <Alert severity="info" sx={{ mb: 2 }}>
           Upload a .csv file or paste CSV content below. Required columns are
           name, email, and role. Optional columns are userPhone and
-          userPhoneCountryCode. Maximum {MAX_ROWS} rows per import.
+          userPhoneCountryCode, profilePicture, allowedAreas, allowedShiftTypes,
+          and certificationTags. Use | to separate multiple values in array
+          fields. Maximum {MAX_ROWS} rows per import.
         </Alert>
 
         <Box

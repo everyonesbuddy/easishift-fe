@@ -48,11 +48,12 @@ import Stack from "@mui/material/Stack";
 import {
   getRoleColor,
   getRoleDisplayName,
+  getRoleOptionsFromFacilityPreferences,
   getRolesForIndustry,
 } from "../../../constants/industryRoles";
 
 export default function ScheduleList() {
-  const { user, isAdmin, tenant } = useAuth();
+  const { user, isAdmin, tenant, facilityPreferences } = useAuth();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -76,7 +77,13 @@ export default function ScheduleList() {
   const [shiftTimeFilter, setShiftTimeFilter] = useState("");
 
   const roleFilterOptions = useMemo(() => {
-    const industryRoles = getRolesForIndustry(tenant?.industry);
+    const facilityRoleValues = getRoleOptionsFromFacilityPreferences(
+      facilityPreferences,
+    ).map((option) => option.value);
+
+    const industryRoles = facilityRoleValues.length
+      ? facilityRoleValues
+      : getRolesForIndustry(tenant?.industry);
     const scheduleRoles = schedules.map((s) => s.role).filter(Boolean);
     const staffRoles = staff.map((s) => s.role).filter(Boolean);
     return [
@@ -85,7 +92,7 @@ export default function ScheduleList() {
         new Set([...industryRoles, ...scheduleRoles, ...staffRoles]),
       ),
     ];
-  }, [schedules, staff, tenant?.industry]);
+  }, [schedules, staff, tenant?.industry, facilityPreferences]);
 
   const legendRoles = useMemo(
     () => roleFilterOptions.filter((role) => role !== "all").slice(0, 8),
@@ -193,6 +200,14 @@ export default function ScheduleList() {
     }
 
     return `${startLabel} - ${endLabel}`;
+  };
+
+  const formatCertificationTags = (schedule) => {
+    if (!Array.isArray(schedule?.certificationTags)) return "-";
+    const tags = schedule.certificationTags
+      .map((tag) => String(tag || "").trim())
+      .filter(Boolean);
+    return tags.length ? tags.join(", ") : "-";
   };
 
   // ---------------------------
@@ -694,6 +709,21 @@ export default function ScheduleList() {
                       >
                         {formatScheduleTimeRange(s)}
                       </Typography>
+                      <Typography
+                        sx={{ fontSize: 12, color: "text.secondary" }}
+                      >
+                        Unit Area: {s.unitArea || "-"}
+                      </Typography>
+                      <Typography
+                        sx={{ fontSize: 12, color: "text.secondary" }}
+                      >
+                        Shift Type: {s.shiftType || "-"}
+                      </Typography>
+                      <Typography
+                        sx={{ fontSize: 12, color: "text.secondary" }}
+                      >
+                        Cert Tags: {formatCertificationTags(s)}
+                      </Typography>
                       {isOvernightShift(s) && (
                         <Typography
                           sx={{ fontSize: 12, color: "info.main", mt: 0.5 }}
@@ -772,6 +802,9 @@ export default function ScheduleList() {
                   <TableCell sx={{ color: "black" }}>Role</TableCell>
                   <TableCell sx={{ color: "black" }}>Start</TableCell>
                   <TableCell sx={{ color: "black" }}>End</TableCell>
+                  <TableCell sx={{ color: "black" }}>Unit Area</TableCell>
+                  <TableCell sx={{ color: "black" }}>Shift Type</TableCell>
+                  <TableCell sx={{ color: "black" }}>Cert Tags</TableCell>
                   <TableCell sx={{ color: "black" }}>Status</TableCell>
                   <TableCell sx={{ color: "black" }}>Notes</TableCell>
                   <TableCell sx={{ color: "black" }}>Actions</TableCell>
@@ -820,6 +853,15 @@ export default function ScheduleList() {
                       </TableCell>
                       <TableCell sx={{ color: "black" }}>
                         {formatLocal(s.endTime)}
+                      </TableCell>
+                      <TableCell sx={{ color: "black" }}>
+                        {s.unitArea || "-"}
+                      </TableCell>
+                      <TableCell sx={{ color: "black" }}>
+                        {s.shiftType || "-"}
+                      </TableCell>
+                      <TableCell sx={{ color: "black" }}>
+                        {formatCertificationTags(s)}
                       </TableCell>
                       <TableCell>
                         <Box

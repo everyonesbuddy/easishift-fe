@@ -16,7 +16,10 @@ import CloseIcon from "@mui/icons-material/Close";
 import { useAuth } from "../../../context/AuthContext";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
-import { isRoleCompatible } from "../../../constants/industryRoles";
+import {
+  getRoleDisplayName,
+  isRoleCompatible,
+} from "../../../constants/industryRoles";
 
 // Convert UTC → local string for <input type="datetime-local">
 function toLocalInputValue(dateString) {
@@ -73,6 +76,9 @@ export default function ScheduleForm({
     staffId: "",
     coverageId: "",
     role: "",
+    unitArea: "",
+    shiftType: "",
+    certificationTags: [],
     startTime: "",
     endTime: "",
     notes: "",
@@ -90,6 +96,9 @@ export default function ScheduleForm({
         staffId: schedule.staffId?._id || "",
         coverageId: "",
         role: schedule.role || "",
+        unitArea: schedule.unitArea || "",
+        shiftType: schedule.shiftType || "",
+        certificationTags: schedule.certificationTags || [],
         startTime: toLocalInputValue(schedule.startTime),
         endTime: toLocalInputValue(schedule.endTime),
         notes: schedule.notes || "",
@@ -122,16 +131,64 @@ export default function ScheduleForm({
       if (!selectedStaff) return;
 
       try {
-        const res = await api.get(`/coverage`);
+        const [coverageRes, schedulesRes] = await Promise.all([
+          api.get(`/coverage`),
+          api.get(`/schedules`),
+        ]);
 
         // Filter out past shifts (based on startTime)
         const now = new Date();
-        const validShifts = (res.data || []).filter(
-          (c) =>
-            new Date(c.startTime) > now &&
-            (c.remaining == null || Number(c.remaining) > 0) &&
-            isRoleCompatible(selectedStaff.role, c.role),
-        );
+        const schedules = Array.isArray(schedulesRes.data)
+          ? schedulesRes.data
+          : [];
+
+        const getScheduledCount = (coverage) => {
+          const assignedCount = Number(coverage?.assignedCount);
+          if (Number.isFinite(assignedCount)) return assignedCount;
+
+          const startMs = new Date(coverage?.startTime).getTime();
+          const endMs = new Date(coverage?.endTime).getTime();
+
+          return schedules.filter((scheduleItem) => {
+            if (!scheduleItem) return false;
+            if (scheduleItem.status === "call_out") return false;
+
+            const scheduleStartMs = new Date(scheduleItem.startTime).getTime();
+            const scheduleEndMs = new Date(scheduleItem.endTime).getTime();
+
+            return (
+              scheduleStartMs === startMs &&
+              scheduleEndMs === endMs &&
+              isRoleCompatible(scheduleItem.role, coverage.role)
+            );
+          }).length;
+        };
+
+        const validShifts = (coverageRes.data || [])
+          .filter(
+            (c) =>
+              new Date(c.startTime) > now &&
+              isRoleCompatible(selectedStaff.role, c.role),
+          )
+          .map((c) => {
+            const requiredCount = Number(c.requiredCount) || 0;
+            const directRemaining = Number(c.remaining);
+            const scheduledCount = getScheduledCount(c);
+            const computedRemaining = Math.max(
+              0,
+              requiredCount - scheduledCount,
+            );
+
+            const spotsRemaining = Number.isFinite(directRemaining)
+              ? Math.max(0, directRemaining)
+              : computedRemaining;
+
+            return {
+              ...c,
+              spotsRemaining,
+            };
+          })
+          .filter((c) => c.spotsRemaining > 0);
 
         setCoverageOptions(validShifts);
       } catch (err) {
@@ -152,6 +209,11 @@ export default function ScheduleForm({
     const payload = {
       staffId: formData.staffId,
       role: formData.role,
+      unitArea: formData.unitArea || null,
+      shiftType: formData.shiftType || null,
+      certificationTags: Array.isArray(formData.certificationTags)
+        ? formData.certificationTags
+        : [],
       startTime: toUTC(formData.startTime),
       endTime: toUTC(formData.endTime),
       notes: formData.notes,
@@ -242,6 +304,9 @@ export default function ScheduleForm({
                 startTime: "",
                 endTime: "",
                 role: "",
+                unitArea: "",
+                shiftType: "",
+                certificationTags: [],
               })
             }
           >
@@ -270,6 +335,9 @@ export default function ScheduleForm({
                   ...formData,
                   coverageId: cov._id,
                   role: cov.role,
+                  unitArea: cov.unitArea || "",
+                  shiftType: cov.shiftType || "",
+                  certificationTags: cov.requiredCertificationTags || [],
                   startTime: toLocalInputValue(cov.startTime),
                   endTime: toLocalInputValue(cov.endTime),
                 });
@@ -282,11 +350,13 @@ export default function ScheduleForm({
                   <MenuItem
                     key={c._id}
                     value={c._id}
-                    disabled={c.remaining === 0}
+                    disabled={c.spotsRemaining <= 0}
                   >
-                    {formatShiftLabel(c)}
-                    {"  "}({c.remaining} spots left
-                    {c.remaining === 0 ? " • Full" : ""})
+                    {getRoleDisplayName(c.role)} • {formatShiftLabel(c)}
+                    {c.unitArea ? ` • ${c.unitArea}` : ""}
+                    {c.shiftType ? ` • ${c.shiftType}` : ""}
+                    {"  "}({c.spotsRemaining} spots left
+                    {c.spotsRemaining <= 0 ? " • Full" : ""})
                   </MenuItem>
                 ))
               )}

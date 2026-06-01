@@ -26,7 +26,8 @@ WiserShifts is a **multi-tenant workforce scheduling and management SaaS** built
    - [Billing / Subscription](#billing--subscription)
 10. [Shared Components](#shared-components)
 11. [Key Developer Patterns](#key-developer-patterns)
-12. [Deployment](#deployment)
+12. [Recent Major Changes](#recent-major-changes)
+13. [Deployment](#deployment)
 
 ---
 
@@ -262,6 +263,24 @@ While paywalled, the entire app collapses to a single `/billing` route served by
 
 ## Feature Areas
 
+### Facility Preferences
+
+`FacilityPreferencesPage` now drives the app taxonomy model used by staff, coverage, and scheduling:
+
+- `roleFamilies`
+- `unitAreas`
+- `shiftTypes`
+- `certificationTags`
+
+Values are normalized to `snake_case` for storage/reference and displayed as human-friendly words in UI.
+
+Examples:
+
+- `memory_care` is displayed as `Memory Care`
+- typing `Memory Care` is saved as `memory_care`
+
+---
+
 ### Dashboard
 
 **`StaffDashboard`** is the operational hub. On mount it calls `GET /api/v1/dashboard/summary` and renders:
@@ -280,8 +299,19 @@ The dashboard is visible to both admins and staff, but admin sees the full summa
 
 - **List view** — paginated table of all coverage records with edit/delete.
 - **Calendar view** — FullCalendar time-grid showing coverage blocks as events.
-- **`CoverageCreateForm`** — creates a new coverage slot (role, required count, start/end time).
+- **`CoverageCreateForm`** — planner-style creation flow with start date, horizon, repeat mode, generated dates, and templates.
 - **`CoverageEditCountForm`** — quick edit to change the headcount on an existing slot.
+
+Coverage now supports taxonomy-aware fields:
+
+- `unitArea` (optional)
+- `shiftType` (optional)
+- `requiredCertificationTags` (optional)
+
+UI notes:
+
+- `Shift Type` supports `Auto Infer`; frontend sends `null` when no explicit type is selected, allowing backend inference.
+- Coverage list/cards now display unit area, shift type, and required cert tags.
 
 API endpoints used: `GET /api/v1/coverage`, `POST /api/v1/coverage`, `PATCH /api/v1/coverage/:id`, `DELETE /api/v1/coverage/:id`.
 
@@ -291,8 +321,14 @@ API endpoints used: `GET /api/v1/coverage`, `POST /api/v1/coverage`, `PATCH /api
 
 **`ScheduleList`** is a dual-mode shift management page.
 
-- **Table view** — paginated list with columns for staff name, role, shift window, and status. Admins see all shifts; staff see only their own.
+- **Table view** — paginated list with columns for staff name, role, shift window, status, plus taxonomy details.
 - **Calendar view** — FullCalendar day/week grid with colour-coded events by role (colours defined in the local `ROLE_COLORS` map).
+
+Schedule rows now include:
+
+- `unitArea`
+- `shiftType`
+- `certificationTags`
 
 **Creating / editing shifts:**
 
@@ -312,6 +348,18 @@ API endpoints used: `GET /api/v1/coverage`, `POST /api/v1/coverage`, `PATCH /api
 - Create / edit a staff member via `StaffCreateAndEditForm` (dialog form).
 - **Bulk import** — `BulkStaffModal` accepts a CSV file and posts all rows to the backend in a single request.
 - Delete with a `ConfirmDialog` prompt before the API call.
+
+Staff capability model now includes:
+
+- `allowedAreas`
+- `allowedShiftTypes`
+- `certificationTags`
+
+Profile picture flow update:
+
+- Staff list now displays profile pictures with initials fallback.
+- Profile picture is no longer managed in admin create/edit form.
+- Users manage profile pictures from the dashboard profile upload action.
 
 Staff records carry a `role` field that maps to the `ROLE_COLORS` lookup used across the schedule and coverage views.
 
@@ -370,8 +418,8 @@ All messages are scoped to the tenant so staff from different facilities never s
 **`PreferencesPage`** is visible only to non-admin staff. Staff declare:
 
 - Preferred days of the week.
-- Preferred shift times.
-- Any scheduling constraints.
+
+Staff preferences payload is intentionally simplified to backend-supported fields (days + notification preferences) and no longer attempts to persist removed legacy preference fields.
 
 These preferences are stored on the backend and consumed by the `AutoGenerateScheduleForm` when building schedules.
 
@@ -402,6 +450,19 @@ These preferences are stored on the backend and consumed by the `AutoGenerateSch
 
 ## Key Developer Patterns
 
+### Taxonomy-driven role/options model
+
+Role options and related taxonomy should come from facility preferences first, with industry fallback only when preferences are unavailable.
+
+- Primary source: `facilityPreferences`
+- Fallback: industry defaults
+
+Use helper utilities in `src/constants/industryRoles.js`:
+
+- `getRoleOptionsFromFacilityPreferences(...)`
+- `getRoleOptionsForIndustry(...)`
+- `isRoleCompatible(...)`
+
 ### API calls
 
 Every component imports `api` from `src/config/api.js` and calls `api.get(...)`, `api.post(...)`, etc. No component calls `axios` directly (except dead-code comments). Error handling consistently follows:
@@ -417,6 +478,41 @@ try {
 ```
 
 ### Role-aware rendering
+
+## Recent Major Changes
+
+The frontend has been migrated from hardcoded role assumptions to a facility-driven taxonomy model.
+
+Highlights:
+
+1. Dynamic roles and compatibility
+
+- Role options now derive from facility preferences when configured.
+- Compatibility checks are handled by shared role helper utilities.
+
+2. Coverage model expansion
+
+- Coverage creation/edit and display now include `unitArea`, `shiftType`, and `requiredCertificationTags`.
+
+3. Schedule model expansion
+
+- Schedule form/list now include `unitArea`, `shiftType`, and `certificationTags`.
+
+4. Staff capability model
+
+- Staff create/edit and list support `allowedAreas`, `allowedShiftTypes`, and `certificationTags`.
+
+5. Profile picture responsibility
+
+- Profile image upload moved to self-service dashboard flow; removed from admin staff create/edit form.
+
+6. Facility taxonomy normalization
+
+- Facility taxonomy entries are normalized to `snake_case` for storage and shown as readable labels in UI.
+
+7. Staff preferences simplification
+
+- Preferences now submit only backend-supported fields to prevent schema mismatch.
 
 Components check `isAdmin` or `role` from `useAuth()` to show/hide UI sections rather than maintaining separate pages. For example, `TimeOffRequestList` shows admin approve/deny actions inline when `isAdmin === true`.
 

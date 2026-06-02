@@ -893,7 +893,7 @@ export default function ScheduleList() {
           <>
             <Table sx={{ mt: 2, background: "white" }} size="small">
               <TableHead>
-                <TableRow>
+                <TableRow sx={{ background: "#F8FAFC" }}>
                   {isAdmin && (
                     <TableCell padding="checkbox">
                       <Checkbox
@@ -909,41 +909,101 @@ export default function ScheduleList() {
                   )}
                   <TableCell
                     sx={{
-                      color: "black",
                       fontWeight: 700,
+                      color: "#0F172A",
                       fontSize: "0.72rem",
                     }}
                   >
                     Staff
                   </TableCell>
-                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
                     Role
                   </TableCell>
-                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
                     Start
                   </TableCell>
-                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
                     End
                   </TableCell>
-                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
                     Unit Area
                   </TableCell>
-                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
                     Shift Type
                   </TableCell>
-                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
                     Shift Slot
                   </TableCell>
-                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
                     Cert Tags
                   </TableCell>
-                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
                     Status
                   </TableCell>
-                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
                     Notes
                   </TableCell>
-                  <TableCell sx={{ color: "black", fontSize: "0.72rem" }}>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
                     Actions
                   </TableCell>
                 </TableRow>
@@ -964,7 +1024,7 @@ export default function ScheduleList() {
                         />
                       </TableCell>
                     )}
-                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                    <TableCell sx={{ color: "black", fontSize: "0.74rem" }}>
                       <Box display="flex" alignItems="center" gap={1}>
                         <Box
                           sx={{
@@ -974,7 +1034,7 @@ export default function ScheduleList() {
                             backgroundColor: getRoleColor(s.role),
                           }}
                         />
-                        <Box sx={{ fontSize: "0.78rem", fontWeight: 600 }}>
+                        <Box sx={{ fontSize: "0.72rem", fontWeight: 600 }}>
                           {s.staffId?.name || "Unknown"}
                         </Box>
                       </Box>
@@ -984,11 +1044,11 @@ export default function ScheduleList() {
                         component="span"
                         sx={{
                           px: 1,
-                          py: 0.4,
+                          py: 0.35,
                           borderRadius: 1,
-                          backgroundColor: getRoleColor(s.role) + "22",
-                          color: getRoleColor(s.role),
-                          fontWeight: 600,
+                          backgroundColor: "#EEF2FF",
+                          color: "#1E3A8A",
+                          fontWeight: 700,
                           fontSize: "0.72rem",
                           whiteSpace: "nowrap",
                         }}
@@ -1383,25 +1443,87 @@ export default function ScheduleList() {
         >
           <GlobalStyles
             styles={{
-              ".fc-timegrid-slot-label": {
-                color: "#374151 !important",
-                fontSize: "13px !important",
+              ".fc": {
+                "--fc-border-color": "#E2E8F0",
               },
-              ".fc-timegrid-axis-frame": { color: "#374151 !important" },
+              ".fc .fc-toolbar": {
+                marginBottom: "0.85rem",
+              },
+              ".fc .fc-toolbar-title": {
+                color: "#0F172A",
+                fontWeight: 700,
+                fontSize: "1rem",
+                letterSpacing: "0.01em",
+              },
+              ".fc .fc-button": {
+                background: "#FFFFFF",
+                border: "1px solid #CBD5E1",
+                color: "#0F172A",
+                boxShadow: "none",
+                textTransform: "capitalize",
+                borderRadius: "8px",
+              },
+              ".fc .fc-button:hover": {
+                background: "#F8FAFC",
+                borderColor: "#94A3B8",
+              },
+              ".fc .fc-button-primary:not(:disabled).fc-button-active, .fc .fc-button-primary:not(:disabled):active":
+                {
+                  background: "#2563EB",
+                  borderColor: "#2563EB",
+                  color: "#FFFFFF",
+                },
+              ".fc .fc-scrollgrid": {
+                border: "1px solid #E2E8F0",
+                borderRadius: "12px",
+                overflow: "hidden",
+              },
+              ".fc .fc-col-header-cell-cushion": {
+                color: "#334155",
+                fontWeight: 700,
+                fontSize: "0.75rem",
+                padding: "0.55rem 0.35rem",
+              },
+              ".fc-timegrid-slot-label": {
+                color: "#475569 !important",
+                fontSize: "12px !important",
+              },
+              ".fc-timegrid-axis-frame": { color: "#475569 !important" },
               ".fc-scrollgrid-sync-table .fc-timegrid-axis-frame": {
-                color: "#374151 !important",
+                color: "#475569 !important",
               },
               ".fc-daygrid-day-number": { color: "#374151 !important" },
               ".fc-daygrid-day-top": { color: "#374151 !important" },
+              ".fc .fc-timegrid-slot": {
+                height: "2.6rem",
+              },
+              ".fc .fc-timegrid-col.fc-day-today": {
+                background: "#EFF6FF",
+              },
+              ".fc .fc-timegrid-now-indicator-line": {
+                borderColor: "#DC2626",
+                borderWidth: "2px",
+              },
+              ".fc .fc-timegrid-now-indicator-arrow": {
+                borderColor: "#DC2626",
+              },
               ".fc-daygrid-event": {
                 color: "#fff !important",
-                borderRadius: "8px !important",
-                padding: "2px 4px",
+                borderRadius: "10px !important",
+                padding: "2px 6px",
               },
-              ".fc-event-main": { color: "#fff !important" },
+              ".fc-event-main": {
+                color: "#fff !important",
+                fontWeight: 600,
+                fontSize: "0.72rem",
+              },
+              ".fc .fc-event": {
+                border: "none",
+                boxShadow: "0 1px 2px rgba(15, 23, 42, 0.2)",
+              },
               ".fc-col-header-cell(fc-day)": { color: "#374151" },
               ".fc-daygrid-day.fc-day-today, .fc-timegrid-now": {
-                background: "#eef2ff",
+                background: "#EFF6FF",
               },
             }}
           />
@@ -1419,8 +1541,15 @@ export default function ScheduleList() {
               center: "title",
               right: "",
             }}
-            slotMinTime="06:00:00"
+            slotMinTime="00:00:00"
             slotMaxTime="24:00:00"
+            slotLabelInterval="01:00:00"
+            slotDuration="00:30:00"
+            dayHeaderFormat={{
+              weekday: "short",
+              month: "numeric",
+              day: "numeric",
+            }}
             events={filteredSchedules.map((s) => ({
               id: s._id,
               title: s.staffId?.name,

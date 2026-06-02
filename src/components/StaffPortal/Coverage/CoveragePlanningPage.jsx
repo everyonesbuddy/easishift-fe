@@ -204,10 +204,8 @@ export default function CoveragePlanningPage() {
   }
 
   function spansOvernight(coverage) {
-    if (typeof coverage?.spansOvernight === "boolean") {
-      return coverage.spansOvernight;
-    }
-
+    // Always compute from local time — the backend's spansOvernight is UTC-based
+    // and will be wrong when the UTC dates match but local dates differ (e.g. 11 PM → 7 AM shift)
     const start = toLocal(coverage?.startTime);
     const end = toLocal(coverage?.endTime);
 
@@ -629,274 +627,345 @@ export default function CoveragePlanningPage() {
           </Box>
         ) : (
           <>
-            <Paper sx={{ mt: 3, p: 2 }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow sx={{ background: "#F8FAFC" }}>
+            <Table sx={{ mt: 2, background: "white" }} size="small">
+              <TableHead>
+                <TableRow sx={{ background: "#F8FAFC" }}>
+                  {isAdmin && (
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        size="small"
+                        checked={allPaginatedSelected}
+                        indeterminate={
+                          selectedCoverageIds.length > 0 &&
+                          !allPaginatedSelected
+                        }
+                        onChange={toggleSelectAllPaginated}
+                      />
+                    </TableCell>
+                  )}
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
+                    Role
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
+                    Start
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
+                    End
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
+                    Required
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
+                    Unit Area
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
+                    Shift Type
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
+                    Shift Slot
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
+                    Cert Tags
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
+                    Notes
+                  </TableCell>
+                  {isAdmin && (
+                    <TableCell
+                      sx={{
+                        fontWeight: 700,
+                        color: "#0F172A",
+                        fontSize: "0.72rem",
+                      }}
+                    >
+                      Actions
+                    </TableCell>
+                  )}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {paginated.map((c) => (
+                  <TableRow
+                    key={c._id}
+                    sx={{ "&:hover": { background: "#f3f4f6" } }}
+                  >
                     {isAdmin && (
                       <TableCell padding="checkbox">
                         <Checkbox
                           size="small"
-                          checked={allPaginatedSelected}
-                          indeterminate={
-                            selectedCoverageIds.length > 0 &&
-                            !allPaginatedSelected
-                          }
-                          onChange={toggleSelectAllPaginated}
+                          checked={selectedCoverageIds.includes(c._id)}
+                          onChange={() => toggleCoverageSelection(c._id)}
                         />
                       </TableCell>
                     )}
-                    <TableCell
-                      sx={{
-                        fontWeight: 700,
-                        color: "#0F172A",
-                        fontSize: "0.72rem",
-                      }}
-                    >
-                      Role
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        fontWeight: 700,
-                        color: "#0F172A",
-                        fontSize: "0.72rem",
-                      }}
-                    >
-                      Shift Time
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        fontWeight: 700,
-                        color: "#0F172A",
-                        fontSize: "0.72rem",
-                      }}
-                    >
-                      Required Staff
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        fontWeight: 700,
-                        color: "#0F172A",
-                        fontSize: "0.72rem",
-                      }}
-                    >
-                      Details
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        fontWeight: 700,
-                        color: "#0F172A",
-                        fontSize: "0.72rem",
-                      }}
-                    >
-                      Notes
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell
+                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                      <Box
+                        component="span"
                         sx={{
-                          fontWeight: 700,
-                          color: "#0F172A",
+                          px: 1,
+                          py: 0.4,
+                          borderRadius: 1,
+                          backgroundColor: "#EEF2FF",
+                          color: "#1E3A8A",
+                          fontWeight: 600,
                           fontSize: "0.72rem",
+                          whiteSpace: "nowrap",
                         }}
                       >
-                        Actions
+                        {getRoleDisplayName(c.role)}
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                      <Typography sx={{ fontSize: "0.76rem", fontWeight: 600 }}>
+                        {formatCoverageDateLabel(c)}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{ fontSize: "0.7rem", color: "text.secondary" }}
+                      >
+                        {toLocal(c.startTime)?.toLocaleTimeString([], {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        }) || "-"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                      <Typography sx={{ fontSize: "0.76rem", fontWeight: 600 }}>
+                        {spansOvernight(c)
+                          ? toLocal(c.endTime)?.toLocaleDateString([], {
+                              month: "short",
+                              day: "numeric",
+                            })
+                          : formatCoverageDateLabel(c)}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{ fontSize: "0.7rem", color: "text.secondary" }}
+                      >
+                        {toLocal(c.endTime)?.toLocaleTimeString([], {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        }) || "-"}
+                        {spansOvernight(c) ? " (+1 day)" : ""}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                      <Typography
+                        sx={{
+                          fontSize: "0.95rem",
+                          fontWeight: 700,
+                          lineHeight: 1,
+                        }}
+                      >
+                        {c.requiredCount}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{ fontSize: "0.68rem", color: "text.secondary" }}
+                      >
+                        needed
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                      {c.unitArea || "—"}
+                    </TableCell>
+                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                      {c.shiftType || "—"}
+                    </TableCell>
+                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                      {c.shiftTag || "—"}
+                    </TableCell>
+                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                      {formatRequiredCertTags(c)}
+                    </TableCell>
+                    <TableCell sx={{ fontSize: "0.78rem", maxWidth: 220 }}>
+                      <Box
+                        sx={{
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {c.note || "—"}
+                      </Box>
+                    </TableCell>
+                    {isAdmin && (
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        <Stack direction="row" spacing={1}>
+                          <Tooltip title="Edit coverage">
+                            <IconButton
+                              size="small"
+                              color="info"
+                              onClick={() => openEdit(c)}
+                            >
+                              <FiEdit2 />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete coverage">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => askDelete(c._id)}
+                            >
+                              <FiDelete />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
                       </TableCell>
                     )}
                   </TableRow>
-                </TableHead>
-                <TableBody>
-                  {paginated.map((c) => (
-                    <TableRow
-                      key={c._id}
-                      sx={{ "&:hover": { background: "#f3f4f6" } }}
-                    >
-                      {isAdmin && (
-                        <TableCell padding="checkbox">
-                          <Checkbox
-                            size="small"
-                            checked={selectedCoverageIds.includes(c._id)}
-                            onChange={() => toggleCoverageSelection(c._id)}
-                          />
-                        </TableCell>
-                      )}
-                      <TableCell sx={{ fontSize: "0.78rem" }}>
-                        <Box
-                          component="span"
-                          sx={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            px: 1,
-                            py: 0.35,
-                            borderRadius: 1,
-                            backgroundColor: "#EEF2FF",
-                            color: "#1E3A8A",
-                            fontWeight: 700,
-                            fontSize: "0.72rem",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {getRoleDisplayName(c.role)}
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ fontSize: "0.78rem" }}>
-                        <Typography
-                          sx={{ fontSize: "0.76rem", fontWeight: 600 }}
-                        >
-                          {formatCoverageDateLabel(c)}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{ fontSize: "0.7rem", color: "text.secondary" }}
-                        >
-                          {formatCoverageTimeLabel(c)
-                            .replace(`${formatCoverageDateLabel(c)} `, "")
-                            .replace(
-                              ` - ${formatCoverageDateLabel(c)} `,
-                              " - ",
-                            )}
-                        </Typography>
-                      </TableCell>
-                      <TableCell sx={{ fontSize: "0.78rem" }}>
-                        <Typography
-                          sx={{
-                            fontSize: "0.95rem",
-                            fontWeight: 700,
-                            lineHeight: 1,
-                          }}
-                        >
-                          {c.requiredCount}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{ fontSize: "0.68rem", color: "text.secondary" }}
-                        >
-                          needed
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography
-                          variant="caption"
-                          sx={{ display: "block", fontSize: "0.7rem" }}
-                        >
-                          Unit: {c.unitArea || "—"}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{ display: "block", fontSize: "0.7rem" }}
-                        >
-                          Shift: {c.shiftType || "—"}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{ display: "block", fontSize: "0.7rem" }}
-                        >
-                          Slot: {c.shiftTag || "—"}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{ display: "block", fontSize: "0.7rem" }}
-                        >
-                          Certs: {formatRequiredCertTags(c)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell sx={{ fontSize: "0.78rem", maxWidth: 220 }}>
-                        <Box
-                          sx={{
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {c.note || "—"}
-                        </Box>
-                      </TableCell>
-                      {isAdmin && (
-                        <TableCell sx={{ whiteSpace: "nowrap" }}>
-                          <Stack direction="row" spacing={1}>
-                            <Tooltip title="Edit coverage">
-                              <IconButton
-                                size="small"
-                                color="info"
-                                onClick={() => openEdit(c)}
-                              >
-                                <FiEdit2 />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Delete coverage">
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => askDelete(c._id)}
-                              >
-                                <FiDelete />
-                              </IconButton>
-                            </Tooltip>
-                          </Stack>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                ))}
+              </TableBody>
+            </Table>
 
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mt: 2,
-                }}
-              >
-                <Typography variant="body2" color="text.secondary">
-                  Showing {page * rowsPerPage + 1} to{" "}
-                  {Math.min((page + 1) * rowsPerPage, coverages.length)} of{" "}
-                  {coverages.length}
-                </Typography>
-                <Box>
-                  <Button
-                    size="small"
-                    sx={{ mr: 1 }}
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    disabled={page === 0}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    size="small"
-                    onClick={() =>
-                      setPage((p) =>
-                        Math.min(
-                          Math.floor((coverages.length - 1) / rowsPerPage),
-                          p + 1,
-                        ),
-                      )
-                    }
-                    disabled={(page + 1) * rowsPerPage >= coverages.length}
-                  >
-                    Next
-                  </Button>
-                </Box>
-              </Box>
-            </Paper>
+            <TablePagination
+              component="div"
+              count={displayedCoverages.length}
+              page={page}
+              onPageChange={(e, newPage) => setPage(newPage)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
+              rowsPerPageOptions={[5, 10, 25]}
+              sx={{ mt: 1 }}
+            />
           </>
         )
       ) : (
         <Box mt={3} sx={{ background: "white", borderRadius: 2, p: 2 }}>
           <GlobalStyles
             styles={{
+              ".fc": {
+                "--fc-border-color": "#E2E8F0",
+              },
+              ".fc .fc-toolbar": {
+                marginBottom: "0.85rem",
+              },
+              ".fc .fc-toolbar-title": {
+                color: "#0F172A",
+                fontWeight: 700,
+                fontSize: "1rem",
+                letterSpacing: "0.01em",
+              },
+              ".fc .fc-button": {
+                background: "#FFFFFF",
+                border: "1px solid #CBD5E1",
+                color: "#0F172A",
+                boxShadow: "none",
+                textTransform: "capitalize",
+                borderRadius: "8px",
+              },
+              ".fc .fc-button:hover": {
+                background: "#F8FAFC",
+                borderColor: "#94A3B8",
+              },
+              ".fc .fc-button-primary:not(:disabled).fc-button-active, .fc .fc-button-primary:not(:disabled):active":
+                {
+                  background: "#2563EB",
+                  borderColor: "#2563EB",
+                  color: "#FFFFFF",
+                },
+              ".fc .fc-scrollgrid": {
+                border: "1px solid #E2E8F0",
+                borderRadius: "12px",
+                overflow: "hidden",
+              },
+              ".fc .fc-col-header-cell-cushion": {
+                color: "#334155",
+                fontWeight: 700,
+                fontSize: "0.75rem",
+                padding: "0.55rem 0.35rem",
+              },
               ".fc-timegrid-slot-label": {
-                color: "#374151 !important",
-                fontSize: "13px !important",
+                color: "#475569 !important",
+                fontSize: "12px !important",
+              },
+              ".fc .fc-timegrid-slot": {
+                height: "2.6rem",
+              },
+              ".fc .fc-timegrid-col.fc-day-today": {
+                background: "#EFF6FF",
+              },
+              ".fc .fc-timegrid-now-indicator-line": {
+                borderColor: "#DC2626",
+                borderWidth: "2px",
+              },
+              ".fc .fc-timegrid-now-indicator-arrow": {
+                borderColor: "#DC2626",
               },
               ".fc-daygrid-day-number": { color: "#374151 !important" },
               ".fc-daygrid-event": {
                 color: "#fff !important",
-                borderRadius: "8px !important",
-                padding: "2px 4px",
+                borderRadius: "10px !important",
+                padding: "2px 6px",
               },
-              ".fc-event-main": { color: "#fff !important" },
+              ".fc-event-main": {
+                color: "#fff !important",
+                fontWeight: 600,
+                fontSize: "0.72rem",
+              },
+              ".fc .fc-event": {
+                border: "none",
+                boxShadow: "0 1px 2px rgba(15, 23, 42, 0.2)",
+              },
               ".fc-daygrid-day.fc-day-today, .fc-timegrid-now": {
-                background: "#eef2ff",
+                background: "#EFF6FF",
               },
             }}
           />
@@ -912,8 +981,15 @@ export default function CoveragePlanningPage() {
               center: "title",
               right: "",
             }}
-            slotMinTime="06:00:00"
+            slotMinTime="00:00:00"
             slotMaxTime="24:00:00"
+            slotLabelInterval="01:00:00"
+            slotDuration="00:30:00"
+            dayHeaderFormat={{
+              weekday: "short",
+              month: "numeric",
+              day: "numeric",
+            }}
             events={calendarEvents.map((e) => ({
               ...e,
               start: toLocal(e.start),

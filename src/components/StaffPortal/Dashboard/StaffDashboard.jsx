@@ -4,21 +4,16 @@ import {
   Typography,
   Box,
   Button,
-  Grid,
   CircularProgress,
   Dialog,
   DialogContent,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
-import useMediaQuery from "@mui/material/useMediaQuery";
 
 import { useAuth } from "../../../context/AuthContext";
 import api from "../../../config/api";
-import { useNavigate } from "react-router-dom";
 
 import {
   FiUsers,
-  FiMessageSquare,
   FiUserCheck,
   FiCalendar,
   FiPlus,
@@ -34,11 +29,9 @@ import {
 import StatCard from "./StatCard";
 import ScheduleAndCoverageCharts from "./ScheduleAndCoverageCharts";
 import StaffCreateAndEditForm from "../Staffs/StaffCreateAndEditForm";
-import MessageComposer from "../Messages/MessageComposer";
 import CoverageCreateForm from "../Coverage/CoverageCreateForm";
 import ScheduleForm from "../Schedule/ScheduleForm";
 import AutoGenerateScheduleForm from "../Schedule/AutoGenerateScheduleForm";
-import Paywall from "./Paywall";
 import { toast } from "react-toastify";
 
 export default function StaffDashboard() {
@@ -49,7 +42,6 @@ export default function StaffDashboard() {
   const [loading, setLoading] = useState(true);
 
   const [openStaffModal, setOpenStaffModal] = useState(false);
-  const [openMessageModal, setOpenMessageModal] = useState(false);
   const [openCoverageModal, setOpenCoverageModal] = useState(false);
   const [openScheduleModal, setOpenScheduleModal] = useState(false);
   const [openAutoModal, setOpenAutoModal] = useState(false);
@@ -57,10 +49,6 @@ export default function StaffDashboard() {
 
   const [staffList, setStaffList] = useState([]);
   const profileInputRef = useRef(null);
-
-  const navigate = useNavigate();
-  const theme = useTheme();
-  const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
 
   // Extracted loader so we can refresh after modal actions
   async function loadDashboardData() {
@@ -238,35 +226,22 @@ export default function StaffDashboard() {
     },
   ];
 
-  // Determine a minWidth based on the longest label/title/subtitle across cards.
-  // We use 'ch' units (approx width of '0') as a simple heuristic.
-  const allCardLabels = [...adminCards, ...staffCards]
-    .map((c) => `${c.title} ${c.subtitle || ""} ${c.value}`)
-    .filter(Boolean);
+  const visibleCards = isAdmin ? adminCards : staffCards;
+  const mdCardColumns = Math.max(1, Math.min(4, visibleCards.length));
+  const smCardColumns = Math.max(1, Math.min(2, mdCardColumns));
 
-  const longestLabelLength = allCardLabels.reduce((max, s) => {
-    return Math.max(max, s.length);
-  }, 0);
-
-  // Add some padding characters to avoid tight fit
-  const minWidthCh = Math.max(
-    28,
-    Math.min(60, Math.ceil(longestLabelLength * 0.9)),
-  );
-
-  console.log("Tenant data on dashboard:", tenant);
-  console.log("User subscription status:", tenant.tenant.subscriptionStatus);
   return (
-    <Container sx={{ mt: 5, mb: 5 }}>
+    <Container sx={{ mt: 4, mb: 5 }}>
       {/* Welcome Banner */}
       <Box
         sx={{
-          mb: 5,
-          p: 4,
-          borderRadius: 3,
+          mb: 4,
+          p: { xs: 2.5, md: 3.5 },
+          borderRadius: 4,
           color: "white",
-          background: "linear-gradient(90deg, #1e88e5, #1565c0)",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+          background:
+            "radial-gradient(circle at 0% 0%, rgba(255,255,255,0.22), transparent 36%), linear-gradient(120deg, #0F4C81 0%, #0E7490 58%, #06B6D4 100%)",
+          boxShadow: "0 12px 28px rgba(15, 23, 42, 0.2)",
         }}
       >
         <Box
@@ -278,13 +253,13 @@ export default function StaffDashboard() {
         >
           {/* Left content */}
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
+            <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.75 }}>
               Welcome back, {user?.name?.split(" ")[0]}!
             </Typography>
 
             <Typography
               variant="body1"
-              sx={{ color: "rgba(255,255,255,0.85)", mb: 2 }}
+              sx={{ color: "rgba(255,255,255,0.88)", mb: 1.5 }}
             >
               {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}
               {tenant && ` • ${tenant.tenant.name}`}
@@ -296,8 +271,9 @@ export default function StaffDashboard() {
                   px: 2,
                   py: 0.5,
                   borderRadius: 999,
-                  backgroundColor: "rgba(255,255,255,0.2)",
-                  fontSize: "0.85rem",
+                  backgroundColor: "rgba(255,255,255,0.16)",
+                  border: "1px solid rgba(255,255,255,0.22)",
+                  fontSize: "0.8rem",
                 }}
               >
                 {user?.email}
@@ -394,27 +370,41 @@ export default function StaffDashboard() {
           display: "flex",
           gap: 2,
           flexWrap: "wrap",
-          justifyContent: { xs: "center", md: "flex-end" },
+          justifyContent: { xs: "center", md: "space-between" },
           flexDirection: { xs: "column", sm: "row" },
           alignItems: { xs: "stretch", sm: "center" },
-          mr: { xs: 0, md: 4 },
         }}
       >
+        <Box>
+          <Typography
+            sx={{
+              color: "#0F172A",
+              fontWeight: 700,
+              fontSize: { xs: "0.92rem", md: "1rem" },
+            }}
+          >
+            Quick Actions
+          </Typography>
+          <Typography sx={{ color: "#64748B", fontSize: "0.8rem" }}>
+            Manage staff, coverage, and schedules with action buttons.
+          </Typography>
+        </Box>
+
         {isAdmin ? (
           <>
             <Button
               size="small"
-              variant="contained"
+              variant="outlined"
               startIcon={<FiUsers />}
               onClick={() => setOpenStaffModal(true)}
               sx={{
                 textTransform: "none",
                 borderRadius: 2,
                 px: 3,
-                bgcolor: "#ffffff",
-                color: "#111827",
+                color: "#1E293B",
+                borderColor: "#CBD5E1",
                 width: { xs: "100%", md: "auto" },
-                "&:hover": { bgcolor: "#f3f4f6" },
+                "&:hover": { bgcolor: "#F8FAFC", borderColor: "#94A3B8" },
               }}
             >
               Add Staff
@@ -429,10 +419,10 @@ export default function StaffDashboard() {
                 textTransform: "none",
                 borderRadius: 2,
                 px: 3,
-                bgcolor: "#2563EB",
+                bgcolor: "#0F4C81",
                 color: "#fff",
                 width: { xs: "100%", md: "auto" },
-                "&:hover": { bgcolor: "#1D4ED8" },
+                "&:hover": { bgcolor: "#0C3F6B" },
               }}
             >
               Add Coverage
@@ -447,10 +437,10 @@ export default function StaffDashboard() {
                 textTransform: "none",
                 borderRadius: 2,
                 px: 3,
-                bgcolor: "#111827",
+                bgcolor: "#1E293B",
                 color: "#fff",
                 width: { xs: "100%", md: "auto" },
-                "&:hover": { bgcolor: "#0f172a" },
+                "&:hover": { bgcolor: "#0F172A" },
               }}
             >
               Manual Schedule
@@ -465,10 +455,10 @@ export default function StaffDashboard() {
                 textTransform: "none",
                 borderRadius: 2,
                 px: 3,
-                bgcolor: "#1D4ED8",
+                bgcolor: "#0284C7",
                 color: "#fff",
                 width: { xs: "100%", md: "auto" },
-                "&:hover": { bgcolor: "#1146b1" },
+                "&:hover": { bgcolor: "#0369A1" },
               }}
             >
               AI Generated Schedule
@@ -487,10 +477,10 @@ export default function StaffDashboard() {
               textTransform: "none",
               borderRadius: 2,
               px: 3,
-              bgcolor: "#2563EB",
+              bgcolor: "#0F4C81",
               color: "#fff",
               width: { xs: "100%", md: "auto" },
-              "&:hover": { bgcolor: "#1D4ED8" },
+              "&:hover": { bgcolor: "#0C3F6B" },
             }}
           >
             Pick Up Shift
@@ -499,10 +489,19 @@ export default function StaffDashboard() {
       </Box>
 
       {/* Cards */}
-      <Grid container spacing={4} alignItems="center" justifyContent="center">
-        {(isAdmin ? adminCards : staffCards).map((card) => (
-          // Use 4 columns on medium+ screens so all 4 cards stay on a single row
-          <Grid item xs={12} sm={6} md={3} lg={3} key={card.title}>
+      <Box
+        sx={{
+          display: "grid",
+          gap: 2.5,
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: `repeat(${smCardColumns}, minmax(0, 1fr))`,
+            md: `repeat(${mdCardColumns}, minmax(0, 1fr))`,
+          },
+        }}
+      >
+        {visibleCards.map((card) => (
+          <Box key={card.title} sx={{ display: "flex" }}>
             <StatCard
               title={card.title}
               value={card.value}
@@ -510,12 +509,16 @@ export default function StaffDashboard() {
               icon={card.icon}
               layout={card.layout}
               bgColor={card.bgColor}
-              minWidth={250}
+              minWidth={0}
               badge={card.badge}
+              sx={{
+                height: { xs: 152, md: 164 },
+                width: "100%",
+              }}
             />
-          </Grid>
+          </Box>
         ))}
-      </Grid>
+      </Box>
 
       {/* Charts */}
       {/* 🔥 CHARTS STILL USE SCHEDULES + COVERAGE DIRECTLY — NOTHING TO CHANGE */}

@@ -351,16 +351,54 @@ export default function StaffList() {
         </Box>
       ) : (
         <Paper sx={{ mt: 3, overflow: "hidden" }}>
-          <Table>
-            <TableHead sx={{ background: "#f3f4f6" }}>
+          <Table size="small">
+            <TableHead sx={{ background: "#F8FAFC" }}>
               <TableRow>
-                <TableCell>Staff Member</TableCell>
-                <TableCell>Role</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Phone</TableCell>
-                <TableCell>Allowed Areas</TableCell>
-                <TableCell>Certification Tags</TableCell>
-                <TableCell>Actions</TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 700,
+                    color: "#0F172A",
+                    fontSize: "0.72rem",
+                  }}
+                >
+                  Staff Member
+                </TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 700,
+                    color: "#0F172A",
+                    fontSize: "0.72rem",
+                  }}
+                >
+                  Role
+                </TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 700,
+                    color: "#0F172A",
+                    fontSize: "0.72rem",
+                  }}
+                >
+                  Contact
+                </TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 700,
+                    color: "#0F172A",
+                    fontSize: "0.72rem",
+                  }}
+                >
+                  Qualifications
+                </TableCell>
+                <TableCell
+                  sx={{
+                    fontWeight: 700,
+                    color: "#0F172A",
+                    fontSize: "0.72rem",
+                  }}
+                >
+                  Actions
+                </TableCell>
               </TableRow>
             </TableHead>
 
@@ -372,7 +410,7 @@ export default function StaffList() {
 
                   return (
                     <TableRow key={u._id || u.id} hover>
-                      <TableCell>
+                      <TableCell sx={{ py: 1 }}>
                         <Box display="flex" alignItems="center" gap={2}>
                           <Avatar
                             src={u.profilePicture || ""}
@@ -389,72 +427,72 @@ export default function StaffList() {
                         </Box>
                       </TableCell>
 
-                      <TableCell>
-                        <Box display="flex" alignItems="center" gap={1}>
-                          <Box
-                            sx={{
-                              width: 10,
-                              height: 10,
-                              borderRadius: "50%",
-                              backgroundColor: getRoleColor(u.role),
-                            }}
-                          />
-                          <Typography>{getRoleDisplayName(u.role)}</Typography>
+                      <TableCell sx={{ py: 1 }}>
+                        <Box
+                          component="span"
+                          sx={{
+                            px: 1,
+                            py: 0.35,
+                            borderRadius: 1,
+                            backgroundColor: "#EEF2FF",
+                            color: "#1E3A8A",
+                            fontWeight: 700,
+                            fontSize: "0.72rem",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {getRoleDisplayName(u.role)}
                         </Box>
                       </TableCell>
 
-                      <TableCell>
-                        {u.email ? (
-                          <Box
-                            display="flex"
-                            alignItems="center"
-                            gap={1}
-                            color="text.secondary"
-                          >
-                            <FiMail />
-                            <Typography variant="body2">{u.email}</Typography>
-                          </Box>
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            No email
-                          </Typography>
-                        )}
-                      </TableCell>
-
-                      <TableCell>
-                        {u.userPhone !== undefined && u.userPhone !== null ? (
-                          <Box
-                            display="flex"
-                            alignItems="center"
-                            gap={1}
-                            color="text.secondary"
-                          >
-                            <FiPhone />
-                            <Typography variant="body2">
-                              {(u.userPhoneCountryCode || "") +
-                                (u.userPhone || "")}
-                            </Typography>
-                          </Box>
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            No phone
-                          </Typography>
-                        )}
-                      </TableCell>
-
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          {formatStringArray(u.allowedAreas)}
+                      <TableCell sx={{ py: 1 }}>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            fontSize: "0.78rem",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.75,
+                          }}
+                        >
+                          <FiMail /> {u.email || "No email"}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            fontSize: "0.78rem",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.75,
+                          }}
+                        >
+                          <FiPhone />
+                          {u.userPhone !== undefined && u.userPhone !== null
+                            ? `${u.userPhoneCountryCode || ""}${u.userPhone || ""}`
+                            : "No phone"}
                         </Typography>
                       </TableCell>
 
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          {formatStringArray(u.certificationTags)}
+                      <TableCell sx={{ py: 1 }}>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ fontSize: "0.72rem" }}
+                        >
+                          Areas: {formatStringArray(u.allowedAreas)}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ fontSize: "0.72rem" }}
+                        >
+                          Certs: {formatStringArray(u.certificationTags)}
                         </Typography>
                       </TableCell>
 
-                      <TableCell>
+                      <TableCell sx={{ py: 1 }}>
                         <Box display="flex" gap={1}>
                           <Button
                             size="small"

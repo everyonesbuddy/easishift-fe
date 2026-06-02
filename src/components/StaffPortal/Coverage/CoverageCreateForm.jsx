@@ -71,8 +71,27 @@ const defaultRequirement = {
   requiredCertificationTags: [],
 };
 
-const toUTCISOString = (dateStr, timeStr) =>
-  new Date(`${dateStr}T${timeStr}:00`).toISOString();
+const toUTCISOString = (dateStr, timeStr) => {
+  const [year, month, day] = String(dateStr || "")
+    .split("-")
+    .map((part) => Number(part));
+  const [hour, minute] = String(timeStr || "")
+    .split(":")
+    .map((part) => Number(part));
+
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute)
+  ) {
+    return new Date(`${dateStr}T${timeStr}:00`).toISOString();
+  }
+
+  // Create a local-time Date explicitly, then convert to UTC ISO.
+  return new Date(year, month - 1, day, hour, minute, 0, 0).toISOString();
+};
 
 const dedupeStrings = (values) =>
   Array.from(
@@ -439,6 +458,16 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
             const selectedSlot = getSelectedSlot(req);
             const startTime = selectedSlot?.startLocalTime || req.startTime;
             const endTime = selectedSlot?.endLocalTime || req.endTime;
+
+            // For overnight shifts (end <= start), the end falls on the next calendar day
+            const isOvernight = isOvernightTimeRange(startTime, endTime);
+            let endDate = date;
+            if (isOvernight) {
+              const d = new Date(`${date}T00:00:00`);
+              d.setDate(d.getDate() + 1);
+              endDate = d.toISOString().slice(0, 10);
+            }
+
             const shiftPayload = {
               role: req.role,
               requiredCount: Number(req.requiredCount) || 0,
@@ -446,7 +475,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
               shiftType: req.shiftType || null,
               shiftTag: req.shiftTag || null,
               startTime: toUTCISOString(date, startTime),
-              endTime: toUTCISOString(date, endTime),
+              endTime: toUTCISOString(endDate, endTime),
               requiredCertificationTags: dedupeStrings(
                 req.requiredCertificationTags,
               ),

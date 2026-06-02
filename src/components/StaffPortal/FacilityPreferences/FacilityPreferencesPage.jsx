@@ -110,7 +110,11 @@ const normalizeTaxonomyPrefs = (inputPrefs) => {
                   label: String(slot?.label || "").trim() || null,
                   startLocalTime,
                   endLocalTime,
-                  spansOvernight: Boolean(slot?.spansOvernight),
+                  spansOvernight: Boolean(
+                    endLocalTime &&
+                    startLocalTime &&
+                    endLocalTime <= startLocalTime,
+                  ),
                 },
               ];
             })
@@ -267,7 +271,11 @@ export default function FacilityPreferencesPage() {
               label: null,
               startLocalTime,
               endLocalTime,
-              spansOvernight: Boolean(input.spansOvernight),
+              spansOvernight: Boolean(
+                endLocalTime &&
+                startLocalTime &&
+                endLocalTime <= startLocalTime,
+              ),
             },
           ],
         });
@@ -296,7 +304,11 @@ export default function FacilityPreferencesPage() {
               label: null,
               startLocalTime,
               endLocalTime,
-              spansOvernight: Boolean(input.spansOvernight),
+              spansOvernight: Boolean(
+                endLocalTime &&
+                startLocalTime &&
+                endLocalTime <= startLocalTime,
+              ),
             },
           ],
         };

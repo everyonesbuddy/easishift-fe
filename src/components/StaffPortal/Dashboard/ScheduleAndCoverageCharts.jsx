@@ -5,6 +5,8 @@ import {
   Typography,
   Box,
   CircularProgress,
+  LinearProgress,
+  Chip,
   TextField,
   FormControl,
   InputLabel,
@@ -120,11 +122,13 @@ const CARD_SCROLL_SX = {
 
 const CARD_SX = {
   background: "white",
-  borderRadius: 2,
+  borderRadius: 3,
   maxHeight: CARD_MAX_HEIGHT,
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
+  border: "1px solid #E2E8F0",
+  boxShadow: "0 6px 20px rgba(15, 23, 42, 0.06)",
 };
 
 const CARD_INNER_SCROLL_SX = {
@@ -143,8 +147,6 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
   const [loading, setLoading] = useState(true);
 
   // UI state
-  const [selectedRole, setSelectedRole] = useState("");
-  const [nonAdminView, setNonAdminView] = useState("hours"); // 'hours' or 'table'
   const [selectedCoverageRole, setSelectedCoverageRole] = useState("all");
   const [selectedOvertimeRole, setSelectedOvertimeRole] = useState("all");
   const [coverageStartDate, setCoverageStartDate] = useState("");
@@ -263,100 +265,6 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
       ),
     );
   }, [coverageNormalized]);
-
-  // default selected role: first role with coverage
-  useEffect(() => {
-    if (!selectedRole && rolesWithCoverage.length) {
-      setSelectedRole(rolesWithCoverage[0]);
-    }
-  }, [rolesWithCoverage, selectedRole]);
-
-  // -------------------
-  // Admin consolidated role chart data (for selectedRole)
-  // -------------------
-  const roleChartData = useMemo(() => {
-    if (!isAdmin || !selectedRole) return [];
-
-    // find coverage shifts for that role, grouped/sorted by day+start
-    // keep only coverage shifts within the current week (Sunday-Saturday)
-    const weekDayKeys = new Set(weekDays.map((d) => getLocalDayKey(d)));
-
-    const roleCoverage = coverageNormalized
-      .filter(
-        (c) =>
-          isRoleCompatible(c.role, selectedRole) && weekDayKeys.has(c.dayKey),
-      )
-      .sort((a, b) => {
-        if (a.dayKey === b.dayKey) return a.startTime - b.startTime;
-        return a.dayKey.localeCompare(b.dayKey);
-      });
-
-    // build data points
-    const data = roleCoverage.map((c) => {
-      // count scheduled that match this role/day/start
-      const scheduledCount = schedulesNormalized.filter(
-        (s) =>
-          isRoleCompatible(s.staffRole, c.role) &&
-          s.dayKey === c.dayKey &&
-          s.start.getTime() === c.startTime.getTime() &&
-          s.status !== "call_out",
-      ).length;
-
-      // concise label: Mon, 6AM - 8PM
-      const dayLabel = formatDayLabel(new Date(c.dayKey + "T00:00:00"));
-      const timeLabel = `${formatTime(c.startTime)} - ${formatTime(c.endTime)}`;
-
-      return {
-        shiftLabel: `${dayLabel}, ${timeLabel}`,
-        scheduled: scheduledCount,
-        required: c.requiredCount,
-        dayKey: c.dayKey,
-        startMillis: c.startTime.getTime(),
-      };
-    });
-
-    return data;
-  }, [isAdmin, selectedRole, coverageNormalized, schedulesNormalized]);
-
-  // -------------------
-  // Non-admin: daily hours and weekly shifts
-  // -------------------
-  const dailyHours = useMemo(() => {
-    if (isAdmin) return [];
-    return weekDays.map((day) => {
-      const dayKey = getLocalDayKey(day);
-      const shifts = schedulesNormalized.filter(
-        (s) => s.dayKey === dayKey && s.status !== "call_out",
-      );
-      const hours = shifts.reduce(
-        (sum, s) =>
-          sum + (s.end.getTime() - s.start.getTime()) / 1000 / 60 / 60,
-        0,
-      );
-      // label day + numeric date to make it less ambiguous
-      const dayLabel = `${formatDayLabel(day)} ${day.getDate()}`;
-      return { day: dayLabel, hours, dayKey };
-    });
-  }, [schedulesNormalized, weekDays, isAdmin]);
-
-  const staffHeatmapData = useMemo(() => {
-    if (isAdmin) return [];
-    return weekDays.map((day) => {
-      const dayKey = getLocalDayKey(day);
-      const shifts = schedulesNormalized
-        .filter((s) => s.dayKey === dayKey && s.status !== "call_out")
-        .sort((a, b) => a.start - b.start);
-
-      if (shifts.length === 0) return { day: formatDayLabel(day), shifts: [] };
-
-      const dayShifts = shifts.map((s) => ({
-        start: s.start,
-        end: s.end,
-      }));
-
-      return { day: formatDayLabel(day), shifts: dayShifts };
-    });
-  }, [schedulesNormalized, weekDays, isAdmin]);
 
   const weeklyOvertimeData = useMemo(() => {
     if (!isAdmin) return [];
@@ -590,6 +498,40 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
     return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   }
 
+  function formatDurationHours(start, end) {
+    const durationHours =
+      (new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60);
+    if (!Number.isFinite(durationHours) || durationHours <= 0) return "";
+    return `${Math.round(durationHours * 10) / 10}h`;
+  }
+
+  function getCoverageStatusStyle(cov) {
+    if (cov.isUnderstaffed) {
+      return {
+        bg: "#FEF2F2",
+        border: "#FECACA",
+        accent: "#DC2626",
+        label: "Understaffed",
+      };
+    }
+
+    if (cov.isOverstaffed) {
+      return {
+        bg: "#FFFBEB",
+        border: "#FDE68A",
+        accent: "#D97706",
+        label: "Overstaffed",
+      };
+    }
+
+    return {
+      bg: "#ECFDF5",
+      border: "#BBF7D0",
+      accent: "#16A34A",
+      label: "Balanced",
+    };
+  }
+
   return (
     <Box mt={4} px={{ xs: 2, md: 4 }}>
       {isAdmin ? (
@@ -666,22 +608,29 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
               </Stack>
 
               <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={1.5}
-                sx={{ color: "#666" }}
+                direction="row"
+                spacing={1}
+                sx={{ flexWrap: "wrap", gap: 1 }}
               >
-                <Typography variant="body2">
-                  Slots: {consolidatedCoverageSummary.total}
-                </Typography>
-                <Typography variant="body2">
-                  Understaffed: {consolidatedCoverageSummary.understaffed}
-                </Typography>
-                <Typography variant="body2">
-                  Fully staffed: {consolidatedCoverageSummary.fullyStaffed}
-                </Typography>
-                <Typography variant="body2">
-                  Overstaffed: {consolidatedCoverageSummary.overstaffed}
-                </Typography>
+                <Chip
+                  size="small"
+                  label={`Slots: ${consolidatedCoverageSummary.total}`}
+                />
+                <Chip
+                  size="small"
+                  label={`Understaffed: ${consolidatedCoverageSummary.understaffed}`}
+                  sx={{ bgcolor: "#FEF2F2", color: "#B91C1C" }}
+                />
+                <Chip
+                  size="small"
+                  label={`Fully staffed: ${consolidatedCoverageSummary.fullyStaffed}`}
+                  sx={{ bgcolor: "#ECFDF5", color: "#166534" }}
+                />
+                <Chip
+                  size="small"
+                  label={`Overstaffed: ${consolidatedCoverageSummary.overstaffed}`}
+                  sx={{ bgcolor: "#FFFBEB", color: "#92400E" }}
+                />
               </Stack>
 
               {consolidatedCoverageWithStaffing.length === 0 ? (
@@ -697,80 +646,105 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                     <Box
                       key={cov.id}
                       sx={{
-                        p: 2,
-                        borderRadius: 1,
+                        p: 1.6,
+                        borderRadius: 2,
                         display: "flex",
-                        justifyContent: "space-between",
-                        gap: 2,
-                        backgroundColor: cov.isUnderstaffed
-                          ? "#ffebee"
-                          : cov.isOverstaffed
-                            ? "#fff8e1"
-                            : "#e8f5e9",
-                        borderLeft: `4px solid ${
-                          cov.isUnderstaffed
-                            ? "#f44336"
-                            : cov.isOverstaffed
-                              ? "#fbc02d"
-                              : "#66bb6a"
-                        }`,
+                        flexDirection: "column",
+                        gap: 1.1,
+                        backgroundColor: getCoverageStatusStyle(cov).bg,
+                        border: `1px solid ${getCoverageStatusStyle(cov).border}`,
                       }}
                     >
+                      <Box
+                        display="flex"
+                        justifyContent="space-between"
+                        gap={1}
+                        flexWrap="wrap"
+                      >
+                        <Box>
+                          <Box
+                            display="flex"
+                            alignItems="center"
+                            gap={0.8}
+                            mb={0.3}
+                          >
+                            <Box
+                              sx={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: "50%",
+                                backgroundColor: getRoleColor(cov.role),
+                              }}
+                            />
+                            <Typography
+                              variant="subtitle2"
+                              sx={{ color: "#0F172A" }}
+                            >
+                              {getRoleDisplayName(cov.role)}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              sx={{ color: "#64748B" }}
+                            >
+                              {formatDate(cov.dayKey)}
+                            </Typography>
+                          </Box>
+                          <Typography variant="body2" sx={{ color: "#334155" }}>
+                            {formatTime(cov.shiftStart)} -{" "}
+                            {formatTime(cov.shiftEnd)}
+                          </Typography>
+                        </Box>
+
+                        <Chip
+                          size="small"
+                          label={getCoverageStatusStyle(cov).label}
+                          sx={{
+                            bgcolor: "#FFFFFF",
+                            color: getCoverageStatusStyle(cov).accent,
+                            border: `1px solid ${getCoverageStatusStyle(cov).border}`,
+                            fontWeight: 700,
+                          }}
+                        />
+                      </Box>
+
                       <Box>
                         <Box
                           display="flex"
+                          justifyContent="space-between"
                           alignItems="center"
-                          gap={1}
                           mb={0.5}
-                          flexWrap="wrap"
                         >
-                          <Box
-                            sx={{
-                              width: 10,
-                              height: 10,
-                              borderRadius: "50%",
-                              backgroundColor: getRoleColor(cov.role),
-                            }}
-                          />
-                          <Typography variant="subtitle1">
-                            {getRoleDisplayName(cov.role)}
+                          <Typography
+                            variant="caption"
+                            sx={{ color: "#64748B" }}
+                          >
+                            Assigned vs required
                           </Typography>
-                          <Typography variant="caption" sx={{ color: "#666" }}>
-                            {formatDate(cov.dayKey)}
-                            {/* {getRelativeDateString(cov.dayKey)} */}
-                          </Typography>
-                        </Box>
-                        <Typography variant="body2" sx={{ color: "#666" }}>
-                          {formatTime(cov.shiftStart)} -{" "}
-                          {formatTime(cov.shiftEnd)}
-                        </Typography>
-                      </Box>
-
-                      <Box textAlign="right">
-                        <Box
-                          display="flex"
-                          alignItems="center"
-                          justifyContent="flex-end"
-                          gap={1}
-                        >
-                          {cov.isUnderstaffed ? (
-                            <FiAlertTriangle size={16} color="#c62828" />
-                          ) : cov.isOverstaffed ? (
-                            <FiAlertTriangle size={16} color="#f9a825" />
-                          ) : (
-                            <FiCheckCircle size={16} color="#2e7d32" />
-                          )}
-                          <Typography sx={{ fontWeight: 700 }}>
+                          <Typography
+                            sx={{ fontWeight: 700, color: "#0F172A" }}
+                          >
                             {cov.assignedCount} / {cov.requiredStaff}
                           </Typography>
                         </Box>
-                        <Typography variant="caption" sx={{ color: "#666" }}>
-                          {cov.isUnderstaffed
-                            ? `Need ${cov.requiredStaff - cov.assignedCount} more`
-                            : cov.isOverstaffed
-                              ? `${cov.assignedCount - cov.requiredStaff} extra`
-                              : "Fully staffed"}
-                        </Typography>
+                        <LinearProgress
+                          variant="determinate"
+                          value={Math.min(
+                            100,
+                            cov.requiredStaff > 0
+                              ? (cov.assignedCount / cov.requiredStaff) * 100
+                              : 0,
+                          )}
+                          sx={{
+                            height: 8,
+                            borderRadius: 999,
+                            bgcolor: "rgba(15, 23, 42, 0.08)",
+                            "& .MuiLinearProgress-bar": {
+                              borderRadius: 999,
+                              backgroundColor:
+                                getCoverageStatusStyle(cov).accent,
+                            },
+                          }}
+                        />
                       </Box>
                     </Box>
                   ))}
@@ -838,19 +812,24 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
               ) : (
                 <>
                   <Stack
-                    direction={{ xs: "column", sm: "row" }}
-                    spacing={1.5}
-                    sx={{ color: "#666" }}
+                    direction="row"
+                    spacing={1}
+                    sx={{ flexWrap: "wrap", gap: 1 }}
                   >
-                    <Typography variant="body2">
-                      Staff tracked: {filteredWeeklyOvertimeData.length}
-                    </Typography>
-                    <Typography variant="body2">
-                      Near overtime (36–39.9h): {overtimeSummary.nearCount}
-                    </Typography>
-                    <Typography variant="body2">
-                      Overtime (40h+): {overtimeSummary.overtimeCount}
-                    </Typography>
+                    <Chip
+                      size="small"
+                      label={`Staff tracked: ${filteredWeeklyOvertimeData.length}`}
+                    />
+                    <Chip
+                      size="small"
+                      label={`Near overtime: ${overtimeSummary.nearCount}`}
+                      sx={{ bgcolor: "#FFFBEB", color: "#92400E" }}
+                    />
+                    <Chip
+                      size="small"
+                      label={`Overtime: ${overtimeSummary.overtimeCount}`}
+                      sx={{ bgcolor: "#FEF2F2", color: "#B91C1C" }}
+                    />
                   </Stack>
 
                   <Box
@@ -880,12 +859,12 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                           key={row.staffId}
                           sx={{
                             p: 1.5,
-                            borderRadius: 1,
+                            borderRadius: 2,
                             backgroundColor: cardBg,
-                            borderLeft: `4px solid ${accent}`,
+                            border: `1px solid ${accent}33`,
                             display: "flex",
                             flexDirection: "column",
-                            gap: 0.75,
+                            gap: 0.85,
                           }}
                         >
                           <Typography
@@ -914,6 +893,20 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                               {statusLabel}
                             </Typography>
                           </Box>
+
+                          <LinearProgress
+                            variant="determinate"
+                            value={Math.min(100, (row.hours / 40) * 100)}
+                            sx={{
+                              height: 6,
+                              borderRadius: 999,
+                              bgcolor: "rgba(15, 23, 42, 0.1)",
+                              "& .MuiLinearProgress-bar": {
+                                borderRadius: 999,
+                                backgroundColor: accent,
+                              },
+                            }}
+                          />
                         </Box>
                       );
                     })}
@@ -949,7 +942,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                   mb={1}
                 >
                   <Box>
-                    <Typography variant="subtitle1">
+                    <Typography variant="subtitle1" sx={{ color: "#0F172A" }}>
                       {formatDate(todayShift.dayKey)}
                     </Typography>
                     <Typography variant="body2" sx={{ color: "#666" }}>
@@ -978,10 +971,10 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                   sx={{ color: "#424242" }}
                 >
                   <FiClock />
-                  <span>
+                  <Typography variant="body2" component="span">
                     {formatTime(todayShift.start)} -{" "}
                     {formatTime(todayShift.end)}
-                  </span>
+                  </Typography>
                 </Box>
                 {todayShift.notes && (
                   <Typography
@@ -1032,7 +1025,12 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                   {upcomingShifts.map((shift) => (
                     <Box
                       key={shift.id}
-                      sx={{ p: 2, borderRadius: 1, backgroundColor: "#fafafa" }}
+                      sx={{
+                        p: 1.7,
+                        borderRadius: 2,
+                        backgroundColor: "#F8FAFC",
+                        border: "1px solid #E2E8F0",
+                      }}
                     >
                       <Box
                         display="flex"
@@ -1049,22 +1047,36 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                           </Typography>
                         </Box>
                         <Box>
-                          <Typography variant="caption" sx={{ color: "#666" }}>
-                            {getRoleDisplayName(shift.role)}
-                          </Typography>
+                          <Chip
+                            size="small"
+                            label={getRoleDisplayName(shift.role)}
+                            sx={{
+                              bgcolor: "#EEF2FF",
+                              color: "#1E3A8A",
+                              fontWeight: 700,
+                            }}
+                          />
                         </Box>
                       </Box>
                       <Box
                         display="flex"
                         alignItems="center"
-                        gap={2}
-                        sx={{ color: "#666" }}
+                        gap={1.2}
+                        sx={{ color: "#475569" }}
                       >
                         <FiClock />
-                        <span>
+                        <Typography variant="body2" component="span">
                           {formatTime(shift.shiftStart)} -{" "}
                           {formatTime(shift.shiftEnd)}
-                        </span>
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "#64748B" }}>
+                          (
+                          {formatDurationHours(
+                            shift.shiftStart,
+                            shift.shiftEnd,
+                          )}
+                          )
+                        </Typography>
                         <Box
                           sx={{
                             width: 10,

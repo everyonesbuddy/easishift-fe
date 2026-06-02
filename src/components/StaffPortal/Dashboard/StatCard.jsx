@@ -1,4 +1,4 @@
-import { Card, Typography, Button, Box, Badge } from "@mui/material";
+import { Card, Typography, Box, Chip } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
 // Props:
@@ -21,48 +21,84 @@ export default function StatCard({
   badge,
   // optional minWidth (e.g. '28ch' or '240px') to keep all cards equal width
   minWidth,
+  sx,
 }) {
   const navigate = useNavigate();
+  const isClickable = Boolean(to);
 
-  // Use two distinct layouts to avoid flex shrink/grow inconsistencies.
-  // Also enforce a minHeight so cards appear visually consistent.
   return (
     <Card
+      onClick={isClickable ? () => navigate(to) : undefined}
       sx={{
         background: "white",
-        borderRadius: 2,
-        p: { xs: 1.25, sm: 2 },
-        border: "1px solid rgba(0,0,0,0.04)",
+        borderRadius: 3,
+        p: { xs: 1.5, sm: 2 },
+        border: "1px solid #E2E8F0",
         position: "relative",
-        minHeight: 120,
+        minHeight: 132,
         display: "flex",
         flexDirection: "column",
-        justifyContent: "space-between",
+        justifyContent: "center",
+        gap: 1.25,
         width: "100%", // ensure card fills the Grid cell width
         maxWidth: "100%",
         boxSizing: "border-box",
         minWidth: minWidth || 0, // allow content to shrink unless minWidth provided
         alignSelf: "stretch",
+        transition:
+          "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease",
+        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.05)",
+        cursor: isClickable ? "pointer" : "default",
+        "&:hover": isClickable
+          ? {
+              transform: "translateY(-3px)",
+              boxShadow: "0 10px 24px rgba(15, 23, 42, 0.12)",
+              borderColor: "#BFDBFE",
+            }
+          : undefined,
+        ...sx,
       }}
     >
-      {/* Badge positioned absolutely so it doesn't affect sizing */}
       {badge ? (
-        <Box sx={{ position: "absolute", top: 12, right: 32 }}>
-          <Badge badgeContent={badge} color="warning" />
+        <Box sx={{ position: "absolute", top: 12, right: 12 }}>
+          <Chip
+            size="small"
+            label={badge}
+            sx={{
+              bgcolor: "#FEF3C7",
+              color: "#92400E",
+              fontWeight: 700,
+              fontSize: "0.68rem",
+              border: "1px solid #FDE68A",
+            }}
+          />
         </Box>
       ) : null}
+
+      <Typography
+        variant="overline"
+        sx={{
+          color: "#64748B",
+          letterSpacing: "0.05em",
+          fontWeight: 700,
+          lineHeight: 1,
+        }}
+      >
+        {title}
+      </Typography>
 
       {layout === "center" ? (
         <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
           <Box
             sx={{
-              width: { xs: 40, sm: 48 },
-              height: { xs: 40, sm: 48 },
-              borderRadius: 1.5,
+              width: { xs: 42, sm: 48 },
+              height: { xs: 42, sm: 48 },
+              borderRadius: 2,
               backgroundColor: bgColor,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              border: "1px solid rgba(15, 23, 42, 0.06)",
               svg: { width: { xs: 18, sm: 20 }, height: { xs: 18, sm: 20 } },
             }}
           >
@@ -74,7 +110,8 @@ export default function StatCard({
               variant="h5"
               sx={{
                 fontWeight: 700,
-                fontSize: { xs: "1.25rem", sm: "1.5rem" },
+                fontSize: { xs: "1.3rem", sm: "1.55rem" },
+                color: "#0F172A",
               }}
             >
               {value}
@@ -82,7 +119,7 @@ export default function StatCard({
             <Typography
               variant="body2"
               sx={{
-                color: "#666",
+                color: "#475569",
                 fontSize: { xs: "0.75rem", sm: "0.875rem" },
               }}
             >
@@ -94,13 +131,14 @@ export default function StatCard({
         <Box display="flex" alignItems="center" gap={2}>
           <Box
             sx={{
-              width: { xs: 40, sm: 48 },
-              height: { xs: 40, sm: 48 },
-              borderRadius: 1.5,
+              width: { xs: 42, sm: 48 },
+              height: { xs: 42, sm: 48 },
+              borderRadius: 2,
               backgroundColor: bgColor,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              border: "1px solid rgba(15, 23, 42, 0.06)",
               svg: { width: { xs: 18, sm: 20 }, height: { xs: 18, sm: 20 } },
             }}
           >
@@ -108,26 +146,13 @@ export default function StatCard({
           </Box>
 
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: "#0F172A" }}>
               {value}
             </Typography>
-            <Typography variant="body2" sx={{ color: "#666" }}>
+            <Typography variant="body2" sx={{ color: "#475569" }}>
               {subtitle || title}
             </Typography>
           </Box>
-        </Box>
-      )}
-
-      {to && (
-        <Box mt={2}>
-          <Button
-            size="small"
-            variant="contained"
-            sx={{ textTransform: "none" }}
-            onClick={() => navigate(to)}
-          >
-            View
-          </Button>
         </Box>
       )}
     </Card>

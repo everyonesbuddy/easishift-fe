@@ -65,14 +65,8 @@ export default function PreferencesPage() {
         preferredDaysOfWeek: Array.isArray(prefs.preferredDaysOfWeek)
           ? prefs.preferredDaysOfWeek
           : [],
-        scheduleEmailNotificationsEnabled:
-          prefs.scheduleEmailNotificationsEnabled ?? true,
-        scheduleSmsNotificationsEnabled:
-          prefs.scheduleSmsNotificationsEnabled ?? true,
-        timeOffEmailNotificationsEnabled:
-          prefs.timeOffEmailNotificationsEnabled ?? true,
-        timeOffSmsNotificationsEnabled:
-          prefs.timeOffSmsNotificationsEnabled ?? true,
+        emailNotificationsEnabled: prefs.emailNotificationsEnabled ?? true,
+        smsNotificationsEnabled: prefs.smsNotificationsEnabled ?? true,
       };
 
       await api.post("/preferences/me", payload);
@@ -223,10 +217,10 @@ export default function PreferencesPage() {
                 sx={{ m: 0, width: "100%" }}
                 control={
                   <Switch
-                    checked={prefs.scheduleEmailNotificationsEnabled ?? true}
+                    checked={prefs.emailNotificationsEnabled ?? true}
                     onChange={(e) =>
                       handleChange(
-                        "scheduleEmailNotificationsEnabled",
+                        "emailNotificationsEnabled",
                         e.target.checked,
                       )
                     }
@@ -234,9 +228,9 @@ export default function PreferencesPage() {
                 }
                 label={
                   <Box>
-                    <Typography>Schedule Email Notifications</Typography>
+                    <Typography>Email Notifications</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Receive email alerts for schedule updates
+                      Receive email alerts for important updates
                     </Typography>
                   </Box>
                 }
@@ -256,86 +250,17 @@ export default function PreferencesPage() {
                 sx={{ m: 0, width: "100%" }}
                 control={
                   <Switch
-                    checked={prefs.scheduleSmsNotificationsEnabled ?? true}
+                    checked={prefs.smsNotificationsEnabled ?? true}
                     onChange={(e) =>
-                      handleChange(
-                        "scheduleSmsNotificationsEnabled",
-                        e.target.checked,
-                      )
+                      handleChange("smsNotificationsEnabled", e.target.checked)
                     }
                   />
                 }
                 label={
                   <Box>
-                    <Typography>Schedule SMS Notifications</Typography>
+                    <Typography>SMS Notifications</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Receive text alerts for schedule updates
-                    </Typography>
-                  </Box>
-                }
-              />
-            </Box>
-
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: 2,
-                bgcolor: "grey.50",
-                border: "1px solid",
-                borderColor: "divider",
-              }}
-            >
-              <FormControlLabel
-                sx={{ m: 0, width: "100%" }}
-                control={
-                  <Switch
-                    checked={prefs.timeOffEmailNotificationsEnabled ?? true}
-                    onChange={(e) =>
-                      handleChange(
-                        "timeOffEmailNotificationsEnabled",
-                        e.target.checked,
-                      )
-                    }
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography>Time-Off Email Notifications</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Receive email alerts for time-off decisions
-                    </Typography>
-                  </Box>
-                }
-              />
-            </Box>
-
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: 2,
-                bgcolor: "grey.50",
-                border: "1px solid",
-                borderColor: "divider",
-              }}
-            >
-              <FormControlLabel
-                sx={{ m: 0, width: "100%" }}
-                control={
-                  <Switch
-                    checked={prefs.timeOffSmsNotificationsEnabled ?? true}
-                    onChange={(e) =>
-                      handleChange(
-                        "timeOffSmsNotificationsEnabled",
-                        e.target.checked,
-                      )
-                    }
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography>Time-Off SMS Notifications</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Receive text alerts for time-off decisions
+                      Receive text alerts for important updates
                     </Typography>
                   </Box>
                 }

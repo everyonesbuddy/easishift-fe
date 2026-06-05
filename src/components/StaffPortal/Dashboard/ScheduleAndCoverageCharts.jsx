@@ -388,7 +388,9 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
         }).length;
 
         return {
-          id: c._id || `${c.dayKey}-${c.role}-${idx}`,
+          // Split coverage rows can share the same _id across multiple days.
+          // Include day/time to guarantee a stable unique key per rendered row.
+          id: `${c._id || "coverage"}-${c.dayKey}-${new Date(c.startTime).getTime()}-${new Date(c.endTime).getTime()}-${idx}`,
           role: c.role,
           dayKey: c.dayKey,
           shiftStart: c.startTime,
@@ -457,7 +459,8 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
     )
     .slice(0, 8)
     .map((s) => ({
-      id: s._id || `${s.dayKey}-${s.start.getTime()}`,
+      // Split shift rows can share a source _id when one shift crosses midnight.
+      id: `${s._id || "shift"}-${s.dayKey}-${s.start.getTime()}-${s.end.getTime()}`,
       date: s.dayKey,
       role: s.staffRole || s.role,
       shiftStart: s.start,

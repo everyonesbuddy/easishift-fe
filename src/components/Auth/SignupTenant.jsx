@@ -8,9 +8,15 @@ import {
   Alert,
   Paper,
   MenuItem,
+  Checkbox,
+  FormControlLabel,
+  FormHelperText,
+  Link,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import api from "../../config/api";
+
+const TERMS_VERSION = "1.0";
 
 const validateEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -37,6 +43,8 @@ export default function SignupTenant() {
   const [industryError, setIndustryError] = useState("");
   const [tenantPhoneError, setTenantPhoneError] = useState("");
   const [adminPhoneError, setAdminPhoneError] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsError, setTermsError] = useState("");
   const navigate = useNavigate();
 
   const phoneCountryCodes = [
@@ -67,6 +75,23 @@ export default function SignupTenant() {
     "Other",
   ];
 
+  const hasTenantPhoneCountryCode = Boolean(tenantPhoneCountryCode.trim());
+  const hasTenantPhone = Boolean(tenantPhone.trim());
+  const hasAdminPhoneCountryCode = Boolean(userPhoneCountryCode.trim());
+  const hasAdminPhone = Boolean(userPhone.trim());
+
+  const isFormValid =
+    Boolean(hospitalName.trim()) &&
+    Boolean(address.trim()) &&
+    Boolean(adminName.trim()) &&
+    Boolean(adminPassword.trim()) &&
+    adminPassword.length >= 8 &&
+    validateEmail(adminEmail) &&
+    Boolean(industry) &&
+    hasTenantPhoneCountryCode === hasTenantPhone &&
+    hasAdminPhoneCountryCode === hasAdminPhone &&
+    termsAccepted;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -78,6 +103,7 @@ export default function SignupTenant() {
     setIndustryError("");
     setTenantPhoneError("");
     setAdminPhoneError("");
+    setTermsError("");
 
     if (!hospitalName.trim()) {
       setHospitalNameError("Facility name is required");
@@ -104,8 +130,6 @@ export default function SignupTenant() {
       return;
     }
 
-    const hasTenantPhoneCountryCode = Boolean(tenantPhoneCountryCode.trim());
-    const hasTenantPhone = Boolean(tenantPhone.trim());
     if (hasTenantPhoneCountryCode !== hasTenantPhone) {
       setTenantPhoneError(
         "Facility phone and country code must be provided together",
@@ -113,8 +137,6 @@ export default function SignupTenant() {
       return;
     }
 
-    const hasAdminPhoneCountryCode = Boolean(userPhoneCountryCode.trim());
-    const hasAdminPhone = Boolean(userPhone.trim());
     if (hasAdminPhoneCountryCode !== hasAdminPhone) {
       setAdminPhoneError(
         "Admin phone and country code must be provided together",
@@ -132,6 +154,11 @@ export default function SignupTenant() {
       return;
     }
 
+    if (!termsAccepted) {
+      setTermsError("You must accept the Terms and Conditions to continue");
+      return;
+    }
+
     try {
       const res = await api.post("/auth/signup/tenant", {
         name: hospitalName,
@@ -144,6 +171,9 @@ export default function SignupTenant() {
         address,
         industry,
         adminName,
+        termsAccepted: true,
+        termsVersion: TERMS_VERSION,
+        termsAcceptedAt: new Date().toISOString(),
       });
 
       console.log("Tenant created:", res.data);
@@ -367,9 +397,61 @@ export default function SignupTenant() {
             required
           />
 
+          <Box>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={termsAccepted}
+                  onChange={(e) => {
+                    setTermsAccepted(e.target.checked);
+                    setTermsError("");
+                  }}
+                  sx={{ color: "black", "&.Mui-checked": { color: "black" } }}
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ color: "black" }}>
+                  I agree to the{" "}
+                  <Link
+                    component={RouterLink}
+                    to="/terms-and-conditions"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Terms and Conditions
+                  </Link>
+                  ,{" "}
+                  <Link
+                    component={RouterLink}
+                    to="/privacy-policy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Privacy Policy
+                  </Link>
+                  , and{" "}
+                  <Link
+                    component={RouterLink}
+                    to="/eula"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    End User License Agreement
+                  </Link>
+                </Typography>
+              }
+            />
+            {termsError && (
+              <FormHelperText error sx={{ ml: 1.75 }}>
+                {termsError}
+              </FormHelperText>
+            )}
+          </Box>
+
           <Button
             variant="contained"
             onClick={handleSubmit}
+            disabled={!isFormValid}
             sx={{
               mt: 2,
               py: 1.5,

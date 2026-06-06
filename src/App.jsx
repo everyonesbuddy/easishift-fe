@@ -6,6 +6,9 @@ import StaffDashboard from "./components/StaffPortal/Dashboard/StaffDashboard";
 import SignupTenant from "./components/Auth/SignupTenant";
 import Home from "./components/Home/Home";
 import TurnoverRoiCalculator from "./components/Home/TurnoverRoiCalculator";
+import TermsAndConditions from "./components/Home/TermsAndConditions";
+import PrivacyPolicy from "./components/Home/PrivacyPolicy";
+import EndUserLicenseAgreement from "./components/Home/EndUserLicenseAgreement";
 import Navbar from "./components/Shared/Navbar";
 import Sidebar from "./components/Shared/Sidebar";
 import Paywall from "./components/StaffPortal/Dashboard/Paywall";
@@ -73,6 +76,12 @@ export default function App() {
             path="/turnover-roi-calculator"
             element={<TurnoverRoiCalculator />}
           />
+          <Route
+            path="/terms-and-conditions"
+            element={<TermsAndConditions />}
+          />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/eula" element={<EndUserLicenseAgreement />} />
           <Route path="/login" element={<Login />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/signup-tenant" element={<SignupTenant />} />

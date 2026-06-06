@@ -23,6 +23,7 @@ import {
 } from "react-icons/fi";
 
 import clinicImage from "../../assets/images/pexels-cottonbro-7579831.jpg";
+import Footer from "../Shared/Footer";
 
 const NAVBAR_HEIGHT = 80;
 
@@ -166,449 +167,454 @@ export default function Home() {
   }, [scrollIndustryRow]);
 
   return (
-    <Box
-      sx={{
-        minHeight: `calc(100vh - ${NAVBAR_HEIGHT}px)`,
-        bgcolor: "#f8f9fb",
-        pt: { xs: 3, md: 5 },
-        pb: { xs: 10, md: 6 },
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
+    <>
       <Box
         sx={{
-          position: "absolute",
-          top: 0,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: "100vw",
-          height: { xs: 430, md: 700 },
+          minHeight: `calc(100vh - ${NAVBAR_HEIGHT}px)`,
+          bgcolor: "#f8f9fb",
+          pt: { xs: 3, md: 5 },
+          pb: { xs: 10, md: 6 },
+          position: "relative",
           overflow: "hidden",
-          pointerEvents: "none",
-          zIndex: 0,
-          "&::before": {
-            content: '""',
-            position: "absolute",
-            width: { xs: 560, md: 1400 },
-            height: { xs: 560, md: 1400 },
-            borderRadius: "50%",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            background:
-              "repeating-radial-gradient(circle at center, rgba(0,113,227,0.17) 0px, rgba(0,113,227,0.17) 3px, rgba(0,113,227,0.09) 34px, rgba(0,113,227,0.04) 74px, rgba(29,29,31,0.02) 112px, rgba(0,113,227,0) 156px)",
-            filter: "blur(1px)",
-            animation:
-              "heroRipplePulse 10s cubic-bezier(0.22, 1, 0.36, 1) infinite",
-          },
-          "@keyframes heroRipplePulse": {
-            "0%": {
-              transform: "translate(-50%, -50%) scale(0.94)",
-              opacity: 0.72,
-            },
-            "50%": {
-              transform: "translate(-50%, -50%) scale(1.08)",
-              opacity: 0.38,
-            },
-            "100%": {
-              transform: "translate(-50%, -50%) scale(0.94)",
-              opacity: 0.72,
-            },
-          },
         }}
-      />
-
-      <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
-        {/* HERO */}
+      >
         <Box
           sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "1.1fr 0.9fr" },
-            gap: { xs: 4, md: 6 },
-            alignItems: { xs: "center", md: "flex-start" },
-            py: { xs: 4, md: 7 },
-            position: "relative",
-            width: "100%",
-            maxWidth: "100%",
-            overflowX: "clip",
+            position: "absolute",
+            top: 0,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "100vw",
+            height: { xs: 430, md: 700 },
+            overflow: "hidden",
+            pointerEvents: "none",
+            zIndex: 0,
+            "&::before": {
+              content: '""',
+              position: "absolute",
+              width: { xs: 560, md: 1400 },
+              height: { xs: 560, md: 1400 },
+              borderRadius: "50%",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              background:
+                "repeating-radial-gradient(circle at center, rgba(0,113,227,0.17) 0px, rgba(0,113,227,0.17) 3px, rgba(0,113,227,0.09) 34px, rgba(0,113,227,0.04) 74px, rgba(29,29,31,0.02) 112px, rgba(0,113,227,0) 156px)",
+              filter: "blur(1px)",
+              animation:
+                "heroRipplePulse 10s cubic-bezier(0.22, 1, 0.36, 1) infinite",
+            },
+            "@keyframes heroRipplePulse": {
+              "0%": {
+                transform: "translate(-50%, -50%) scale(0.94)",
+                opacity: 0.72,
+              },
+              "50%": {
+                transform: "translate(-50%, -50%) scale(1.08)",
+                opacity: 0.38,
+              },
+              "100%": {
+                transform: "translate(-50%, -50%) scale(0.94)",
+                opacity: 0.72,
+              },
+            },
           }}
-        >
-          {/* LEFT */}
-          <Box sx={{ minWidth: 0 }}>
-            <Typography
-              variant="h3"
-              sx={{
-                fontWeight: 950,
-                letterSpacing: "-0.035em",
-                lineHeight: 1.02,
-                fontSize: { xs: "2rem", md: "3rem" },
-              }}
-            >
-              Workforce Scheduling
-              <br />
-              Made For You
-            </Typography>
+        />
 
-            <Typography
-              variant="h6"
-              sx={{
-                color: "text.secondary",
-                mt: { xs: 2, md: 5 },
-                maxWidth: 680,
-              }}
-            >
-              We support various industries like:
-            </Typography>
-
-            <Box
-              sx={{
-                mt: 1.25,
-                mb: { xs: 2.5, md: 5 },
-                px: { xs: 0.75, md: 1 },
-                py: { xs: 0.75, md: 1 },
-                width: "100%",
-                maxWidth: "100%",
-                border: "1px solid #e5e5ea",
-                borderRadius: 3,
-                bgcolor: "#fafafc",
-                boxSizing: "border-box",
-              }}
-            >
-              <Stack direction="row" alignItems="center" spacing={0.25}>
-                <Stack
-                  ref={industryRowRef}
-                  direction="row"
-                  spacing={1}
-                  justifyContent="flex-start"
-                  sx={{
-                    width: "100%",
-                    minWidth: 0,
-                    overflowX: "auto",
-                    scrollbarWidth: "none",
-                    "&::-webkit-scrollbar": { display: "none" },
-                    scrollBehavior: "smooth",
-                    pr: 0.5,
-                  }}
-                >
-                  {INDUSTRIES.map((industry) => (
-                    <Chip
-                      data-industry-item="true"
-                      key={industry}
-                      label={industry}
-                      size="small"
-                      sx={{
-                        fontWeight: 500,
-                        color: "#1d1d1f",
-                        bgcolor: "transparent",
-                        border: "none",
-                        borderRadius: 1,
-                        height: { xs: 30, md: 34 },
-                        flex: { xs: "0 0 auto", md: "0 0 calc(25% - 6px)" },
-                        maxWidth: { xs: "none", md: "calc(25% - 6px)" },
-                        "& .MuiChip-label": {
-                          px: { xs: 0.25, md: 0.5 },
-                          fontSize: { xs: "0.78rem", md: "0.86rem" },
-                        },
-                      }}
-                    />
-                  ))}
-                </Stack>
-              </Stack>
-            </Box>
-
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={1.5}
-              mt={{ xs: 2.25, md: 3.5 }}
-              sx={{
-                width: "100%",
-                alignItems: { xs: "stretch", sm: "center" },
-              }}
-            >
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={<FiUser />}
-                onClick={() => navigate("/signup-tenant")}
-                sx={{
-                  width: { xs: "100%", sm: "auto" },
-                  fontWeight: 600,
-                  textTransform: "none",
-                  borderRadius: 999,
-                  // bgcolor: "#1d1d1f",
-                  color: "#fff",
-                  px: { xs: 2.25, sm: 3 },
-                  py: 1.2,
-                  // boxShadow:
-                  //   "0 1px 2px rgba(0,0,0,0.08), 0 6px 18px rgba(0,0,0,0.16)",
-                  // "&:hover": {
-                  //   bgcolor: "#000",
-                  //   boxShadow:
-                  //     "0 2px 6px rgba(0,0,0,0.12), 0 10px 24px rgba(0,0,0,0.2)",
-                  // },
-                }}
-              >
-                Sign Up
-              </Button>
-              <Button
-                variant="outlined"
-                size="large"
-                startIcon={<FiUser />}
-                onClick={() => navigate("/login")}
-                sx={{
-                  width: { xs: "100%", sm: "auto" },
-                  fontWeight: 600,
-                  textTransform: "none",
-                  borderRadius: 999,
-                  px: { xs: 2.5, sm: 3.5 },
-                  py: 1.2,
-                  color: "#1d1d1f",
-                  borderColor: "#d2d2d7",
-                  bgcolor: "#fff",
-                  "&:hover": {
-                    borderColor: "#b9b9be",
-                    bgcolor: "#f5f5f7",
-                  },
-                }}
-              >
-                Log in
-              </Button>
-            </Stack>
-
-            <Divider sx={{ my: 3 }} />
-
-            <Stack spacing={1.25}>
-              <Box display="flex" gap={1.25}>
-                <FiShuffle />
-                <Typography>
-                  Resolve call-outs and coverage gaps quickly
-                </Typography>
-              </Box>
-              <Box display="flex" gap={1.25}>
-                <FiTrendingDown />
-                <Typography>Overtime risk visible before publishing</Typography>
-              </Box>
-              <Box display="flex" gap={1.25}>
-                <FiUsers />
-                <Typography>Clean handling of rotating staff</Typography>
-              </Box>
-            </Stack>
-          </Box>
-
-          {/* RIGHT */}
-          <Box
-            display="flex"
-            flexDirection="column"
-            gap={2}
-            sx={{ minWidth: 0 }}
-          >
-            {/* IMAGE */}
-            <Box
-              sx={{
-                height: { xs: 180, md: 230 },
-                borderRadius: 5,
-                backgroundImage: `url("${clinicImageUrl}")`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-            />
-
-            {/* CARD */}
-            <Card variant="outlined" sx={{ borderRadius: 4 }}>
-              <CardContent>
-                <Typography sx={{ fontWeight: 900, mb: 2 }}>
-                  Today’s schedule health
-                </Typography>
-
-                <Stack spacing={1.25}>
-                  <Box display="flex" justifyContent="space-between">
-                    <Typography>Coverage gaps</Typography>
-                    <Chip label="2" />
-                  </Box>
-                  <Box display="flex" justifyContent="space-between">
-                    <Typography>Overtime risk</Typography>
-                    <Chip label="Medium" color="warning" />
-                  </Box>
-                  <Box display="flex" justifyContent="space-between">
-                    <Typography>Last-minute change</Typography>
-                    <Chip label="Resolved" color="success" />
-                  </Box>
-                </Stack>
-
-                <Divider sx={{ my: 2 }} />
-
-                <Stack direction="row" justifyContent="space-between">
-                  <Stat value="↓" label="Fewer gaps" />
-                  <Stat value="⚡" label="Faster changes" />
-                  <Stat value="✔" label="Clear handoffs" />
-                </Stack>
-              </CardContent>
-            </Card>
-          </Box>
-        </Box>
-
-        {/* ROI STRIP */}
-        <Card
-          variant="outlined"
-          sx={{
-            borderRadius: 4,
-            mt: { xs: 1, md: 0 },
-            background:
-              "linear-gradient(140deg, rgba(25,118,210,0.1) 0%, rgba(25,118,210,0.02) 45%, #fff 100%)",
-          }}
-        >
-          <CardContent sx={{ p: { xs: 2.25, md: 2.75 } }}>
-            <Box
-              display="grid"
-              gridTemplateColumns={{ xs: "1fr", md: "1fr auto" }}
-              gap={2}
-              alignItems="center"
-            >
-              <Box>
-                <Typography variant="overline" sx={{ letterSpacing: 1 }}>
-                  New for operators
-                </Typography>
-                <Typography variant="h5" sx={{ fontWeight: 900 }}>
-                  See your annual turnover cost in dollars
-                </Typography>
-                <Typography sx={{ color: "text.secondary", mt: 0.5 }}>
-                  Use the ROI Calculator to estimate turnover impact and
-                  projected WiserShifts savings in under 2 minutes.
-                </Typography>
-              </Box>
-
-              <Button
-                variant="contained"
-                size="large"
-                onClick={() => navigate("/turnover-roi-calculator")}
-                sx={{
-                  fontWeight: 900,
-                  px: 3.5,
-                  whiteSpace: "nowrap",
-                  borderRadius: 999,
-                }}
-              >
-                Open ROI Calculator
-              </Button>
-            </Box>
-          </CardContent>
-        </Card>
-
-        {/* BENEFITS */}
-        <Section>
-          <SectionTitle
-            eyebrow="Why it works"
-            title="Workforce Scheduling built for real business conditions"
-            subtitle="Designed around constant change, not ideal scenarios."
-          />
-
+        <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
+          {/* HERO */}
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-              gap: 3,
+              gridTemplateColumns: { xs: "1fr", md: "1.1fr 0.9fr" },
+              gap: { xs: 4, md: 6 },
+              alignItems: { xs: "center", md: "flex-start" },
+              py: { xs: 4, md: 7 },
+              position: "relative",
+              width: "100%",
+              maxWidth: "100%",
+              overflowX: "clip",
             }}
           >
-            <IconBullet
-              icon={<FiShuffle />}
-              title="Handle call-outs calmly"
-              text="Fill gaps without cascading changes or guesswork."
-            />
-            <IconBullet
-              icon={<FiClock />}
-              title="See risk early"
-              text="Understand overtime impact before schedules go live."
-            />
-            <IconBullet
-              icon={<FiUsers />}
-              title="Rotating staff made manageable"
-              text="Keep part-time, float, and rotating roles organized."
-            />
-            <IconBullet
-              icon={<FiCheckCircle />}
-              title="Clear communication"
-              text="One publish updates everyone at once."
-            />
-          </Box>
-        </Section>
+            {/* LEFT */}
+            <Box sx={{ minWidth: 0 }}>
+              <Typography
+                variant="h3"
+                sx={{
+                  fontWeight: 950,
+                  letterSpacing: "-0.035em",
+                  lineHeight: 1.02,
+                  fontSize: { xs: "2rem", md: "3rem" },
+                }}
+              >
+                Workforce Scheduling
+                <br />
+                Made For You
+              </Typography>
 
-        {/* TESTIMONIALS */}
-        <Section>
-          <SectionTitle
-            eyebrow="What teams experience"
-            title="Less chaos. More predictability."
-          />
+              <Typography
+                variant="h6"
+                sx={{
+                  color: "text.secondary",
+                  mt: { xs: 2, md: 5 },
+                  maxWidth: 680,
+                }}
+              >
+                We support various industries like:
+              </Typography>
 
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "repeat(3,1fr)" },
-              gap: 2.5,
-            }}
-          >
-            <Testimonial
-              quote="Call-outs used to derail the entire day. Now they’re manageable."
-              name="Nursing Home Operations Lead"
-              role="Outpatient services"
-            />
-            <Testimonial
-              quote="We finally see overtime before it becomes a payroll problem."
-              name="Practice Manager"
-              role="Specialty clinic"
-            />
-            <Testimonial
-              quote="Rotating staff no longer means spreadsheet chaos."
-              name="Scheduler"
-              role="Multi-site clinic"
-            />
-          </Box>
-        </Section>
-
-        {/* CTA */}
-        <Section>
-          <Card sx={{ p: { xs: 3, md: 4 }, borderRadius: 5 }}>
-            <Box
-              display="grid"
-              gridTemplateColumns={{ xs: "1fr", md: "1fr auto" }}
-              gap={2.5}
-              alignItems="center"
-            >
-              <Box>
-                <Typography variant="h4" sx={{ fontWeight: 950 }}>
-                  Start Scheduling The Smart Way
-                </Typography>
-                <Typography sx={{ color: "text.secondary", mt: 1 }}>
-                  Walk through your staffing patterns in a short demo.
-                </Typography>
+              <Box
+                sx={{
+                  mt: 1.25,
+                  mb: { xs: 2.5, md: 5 },
+                  px: { xs: 0.75, md: 1 },
+                  py: { xs: 0.75, md: 1 },
+                  width: "100%",
+                  maxWidth: "100%",
+                  border: "1px solid #e5e5ea",
+                  borderRadius: 3,
+                  bgcolor: "#fafafc",
+                  boxSizing: "border-box",
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={0.25}>
+                  <Stack
+                    ref={industryRowRef}
+                    direction="row"
+                    spacing={1}
+                    justifyContent="flex-start"
+                    sx={{
+                      width: "100%",
+                      minWidth: 0,
+                      overflowX: "auto",
+                      scrollbarWidth: "none",
+                      "&::-webkit-scrollbar": { display: "none" },
+                      scrollBehavior: "smooth",
+                      pr: 0.5,
+                    }}
+                  >
+                    {INDUSTRIES.map((industry) => (
+                      <Chip
+                        data-industry-item="true"
+                        key={industry}
+                        label={industry}
+                        size="small"
+                        sx={{
+                          fontWeight: 500,
+                          color: "#1d1d1f",
+                          bgcolor: "transparent",
+                          border: "none",
+                          borderRadius: 1,
+                          height: { xs: 30, md: 34 },
+                          flex: { xs: "0 0 auto", md: "0 0 calc(25% - 6px)" },
+                          maxWidth: { xs: "none", md: "calc(25% - 6px)" },
+                          "& .MuiChip-label": {
+                            px: { xs: 0.25, md: 0.5 },
+                            fontSize: { xs: "0.78rem", md: "0.86rem" },
+                          },
+                        }}
+                      />
+                    ))}
+                  </Stack>
+                </Stack>
               </Box>
 
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1.5}
+                mt={{ xs: 2.25, md: 3.5 }}
+                sx={{
+                  width: "100%",
+                  alignItems: { xs: "stretch", sm: "center" },
+                }}
+              >
                 <Button
                   variant="contained"
                   size="large"
-                  startIcon={<FiPhoneCall />}
-                  component="a"
-                  href="https://calendly.com/easishift-info/30min?month=2026-01"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  sx={{ fontWeight: 900, borderRadius: 999 }}
+                  startIcon={<FiUser />}
+                  onClick={() => navigate("/signup-tenant")}
+                  sx={{
+                    width: { xs: "100%", sm: "auto" },
+                    fontWeight: 600,
+                    textTransform: "none",
+                    borderRadius: 999,
+                    // bgcolor: "#1d1d1f",
+                    color: "#fff",
+                    px: { xs: 2.25, sm: 3 },
+                    py: 1.2,
+                    // boxShadow:
+                    //   "0 1px 2px rgba(0,0,0,0.08), 0 6px 18px rgba(0,0,0,0.16)",
+                    // "&:hover": {
+                    //   bgcolor: "#000",
+                    //   boxShadow:
+                    //     "0 2px 6px rgba(0,0,0,0.12), 0 10px 24px rgba(0,0,0,0.2)",
+                    // },
+                  }}
                 >
-                  Request a demo
+                  Sign Up
                 </Button>
                 <Button
                   variant="outlined"
                   size="large"
-                  onClick={() => navigate("/signup-tenant")}
-                  sx={{ fontWeight: 900, borderRadius: 999 }}
+                  startIcon={<FiUser />}
+                  onClick={() => navigate("/login")}
+                  sx={{
+                    width: { xs: "100%", sm: "auto" },
+                    fontWeight: 600,
+                    textTransform: "none",
+                    borderRadius: 999,
+                    px: { xs: 2.5, sm: 3.5 },
+                    py: 1.2,
+                    color: "#1d1d1f",
+                    borderColor: "#d2d2d7",
+                    bgcolor: "#fff",
+                    "&:hover": {
+                      borderColor: "#b9b9be",
+                      bgcolor: "#f5f5f7",
+                    },
+                  }}
                 >
-                  Sign Up
+                  Log in
                 </Button>
               </Stack>
+
+              <Divider sx={{ my: 3 }} />
+
+              <Stack spacing={1.25}>
+                <Box display="flex" gap={1.25}>
+                  <FiShuffle />
+                  <Typography>
+                    Resolve call-outs and coverage gaps quickly
+                  </Typography>
+                </Box>
+                <Box display="flex" gap={1.25}>
+                  <FiTrendingDown />
+                  <Typography>
+                    Overtime risk visible before publishing
+                  </Typography>
+                </Box>
+                <Box display="flex" gap={1.25}>
+                  <FiUsers />
+                  <Typography>Clean handling of rotating staff</Typography>
+                </Box>
+              </Stack>
             </Box>
+
+            {/* RIGHT */}
+            <Box
+              display="flex"
+              flexDirection="column"
+              gap={2}
+              sx={{ minWidth: 0 }}
+            >
+              {/* IMAGE */}
+              <Box
+                sx={{
+                  height: { xs: 180, md: 230 },
+                  borderRadius: 5,
+                  backgroundImage: `url("${clinicImageUrl}")`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }}
+              />
+
+              {/* CARD */}
+              <Card variant="outlined" sx={{ borderRadius: 4 }}>
+                <CardContent>
+                  <Typography sx={{ fontWeight: 900, mb: 2 }}>
+                    Today’s schedule health
+                  </Typography>
+
+                  <Stack spacing={1.25}>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography>Coverage gaps</Typography>
+                      <Chip label="2" />
+                    </Box>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography>Overtime risk</Typography>
+                      <Chip label="Medium" color="warning" />
+                    </Box>
+                    <Box display="flex" justifyContent="space-between">
+                      <Typography>Last-minute change</Typography>
+                      <Chip label="Resolved" color="success" />
+                    </Box>
+                  </Stack>
+
+                  <Divider sx={{ my: 2 }} />
+
+                  <Stack direction="row" justifyContent="space-between">
+                    <Stat value="↓" label="Fewer gaps" />
+                    <Stat value="⚡" label="Faster changes" />
+                    <Stat value="✔" label="Clear handoffs" />
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Box>
+          </Box>
+
+          {/* ROI STRIP */}
+          <Card
+            variant="outlined"
+            sx={{
+              borderRadius: 4,
+              mt: { xs: 1, md: 0 },
+              background:
+                "linear-gradient(140deg, rgba(25,118,210,0.1) 0%, rgba(25,118,210,0.02) 45%, #fff 100%)",
+            }}
+          >
+            <CardContent sx={{ p: { xs: 2.25, md: 2.75 } }}>
+              <Box
+                display="grid"
+                gridTemplateColumns={{ xs: "1fr", md: "1fr auto" }}
+                gap={2}
+                alignItems="center"
+              >
+                <Box>
+                  <Typography variant="overline" sx={{ letterSpacing: 1 }}>
+                    New for operators
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 900 }}>
+                    See your annual turnover cost in dollars
+                  </Typography>
+                  <Typography sx={{ color: "text.secondary", mt: 0.5 }}>
+                    Use the ROI Calculator to estimate turnover impact and
+                    projected WiserShifts savings in under 2 minutes.
+                  </Typography>
+                </Box>
+
+                <Button
+                  variant="contained"
+                  size="large"
+                  onClick={() => navigate("/turnover-roi-calculator")}
+                  sx={{
+                    fontWeight: 900,
+                    px: 3.5,
+                    whiteSpace: "nowrap",
+                    borderRadius: 999,
+                  }}
+                >
+                  Open ROI Calculator
+                </Button>
+              </Box>
+            </CardContent>
           </Card>
-        </Section>
-      </Container>
-    </Box>
+
+          {/* BENEFITS */}
+          <Section>
+            <SectionTitle
+              eyebrow="Why it works"
+              title="Workforce Scheduling built for real business conditions"
+              subtitle="Designed around constant change, not ideal scenarios."
+            />
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                gap: 3,
+              }}
+            >
+              <IconBullet
+                icon={<FiShuffle />}
+                title="Handle call-outs calmly"
+                text="Fill gaps without cascading changes or guesswork."
+              />
+              <IconBullet
+                icon={<FiClock />}
+                title="See risk early"
+                text="Understand overtime impact before schedules go live."
+              />
+              <IconBullet
+                icon={<FiUsers />}
+                title="Rotating staff made manageable"
+                text="Keep part-time, float, and rotating roles organized."
+              />
+              <IconBullet
+                icon={<FiCheckCircle />}
+                title="Clear communication"
+                text="One publish updates everyone at once."
+              />
+            </Box>
+          </Section>
+
+          {/* TESTIMONIALS */}
+          <Section>
+            <SectionTitle
+              eyebrow="What teams experience"
+              title="Less chaos. More predictability."
+            />
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", md: "repeat(3,1fr)" },
+                gap: 2.5,
+              }}
+            >
+              <Testimonial
+                quote="Call-outs used to derail the entire day. Now they’re manageable."
+                name="Nursing Home Operations Lead"
+                role="Outpatient services"
+              />
+              <Testimonial
+                quote="We finally see overtime before it becomes a payroll problem."
+                name="Practice Manager"
+                role="Specialty clinic"
+              />
+              <Testimonial
+                quote="Rotating staff no longer means spreadsheet chaos."
+                name="Scheduler"
+                role="Multi-site clinic"
+              />
+            </Box>
+          </Section>
+
+          {/* CTA */}
+          <Section>
+            <Card sx={{ p: { xs: 3, md: 4 }, borderRadius: 5 }}>
+              <Box
+                display="grid"
+                gridTemplateColumns={{ xs: "1fr", md: "1fr auto" }}
+                gap={2.5}
+                alignItems="center"
+              >
+                <Box>
+                  <Typography variant="h4" sx={{ fontWeight: 950 }}>
+                    Start Scheduling The Smart Way
+                  </Typography>
+                  <Typography sx={{ color: "text.secondary", mt: 1 }}>
+                    Walk through your staffing patterns in a short demo.
+                  </Typography>
+                </Box>
+
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={<FiPhoneCall />}
+                    component="a"
+                    href="https://calendly.com/easishift-info/30min?month=2026-01"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{ fontWeight: 900, borderRadius: 999 }}
+                  >
+                    Request a demo
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    onClick={() => navigate("/signup-tenant")}
+                    sx={{ fontWeight: 900, borderRadius: 999 }}
+                  >
+                    Sign Up
+                  </Button>
+                </Stack>
+              </Box>
+            </Card>
+          </Section>
+        </Container>
+      </Box>
+      <Footer />
+    </>
   );
 }

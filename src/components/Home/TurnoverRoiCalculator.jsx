@@ -15,6 +15,7 @@ import {
 import { FiMail, FiPhoneCall } from "react-icons/fi";
 import { toast } from "react-toastify";
 import api from "../../config/api";
+import Footer from "../Shared/Footer";
 
 const NAVBAR_HEIGHT = 80;
 const DEFAULTS = {
@@ -303,221 +304,246 @@ export default function TurnoverRoiCalculator() {
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: `calc(100vh - ${NAVBAR_HEIGHT}px)`,
-        background:
-          "radial-gradient(circle at 8% 8%, rgba(25,118,210,0.08) 0%, rgba(25,118,210,0.01) 28%, #fff 70%)",
-        py: { xs: 3, md: 4 },
-      }}
-    >
-      <Container maxWidth="lg">
-        <Box sx={{ mb: 2.5, textAlign: { xs: "left", md: "center" } }}>
-          <Typography
-            variant="h4"
-            sx={{ fontWeight: 950, letterSpacing: "-0.02em", lineHeight: 1.1 }}
-          >
-            Turnover To ROI Calculator
-          </Typography>
-          <Typography
-            sx={{ color: "text.secondary", mt: 0.8, fontSize: "1rem" }}
-          >
-            Estimate your annual turnover burden and see what Easishift can
-            save.
-          </Typography>
-        </Box>
+    <>
+      <Box
+        sx={{
+          minHeight: `calc(100vh - ${NAVBAR_HEIGHT}px)`,
+          background:
+            "radial-gradient(circle at 8% 8%, rgba(25,118,210,0.08) 0%, rgba(25,118,210,0.01) 28%, #fff 70%)",
+          py: { xs: 3, md: 4 },
+        }}
+      >
+        <Container maxWidth="lg">
+          <Box sx={{ mb: 2.5, textAlign: { xs: "left", md: "center" } }}>
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 950,
+                letterSpacing: "-0.02em",
+                lineHeight: 1.1,
+              }}
+            >
+              Turnover To ROI Calculator
+            </Typography>
+            <Typography
+              sx={{ color: "text.secondary", mt: 0.8, fontSize: "1rem" }}
+            >
+              Estimate your annual turnover burden and see what Easishift can
+              save.
+            </Typography>
+          </Box>
 
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
-            gap: 2,
-            alignItems: "start",
-          }}
-        >
-          <Card
-            variant="outlined"
+          <Box
             sx={{
-              borderRadius: 4,
-              boxShadow: "0 12px 32px rgba(15,23,42,0.08)",
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
+              gap: 2,
+              alignItems: "start",
             }}
           >
-            <CardContent sx={{ p: { xs: 2, md: 2.2 } }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 900, mb: 1.2 }}>
-                Facility Inputs
-              </Typography>
-              <Stack spacing={1.25}>
-                <InputWithSlider
-                  label="Number of employees"
-                  value={employees}
-                  onChange={setEmployees}
-                  min={10}
-                  max={500}
-                />
-                <InputWithSlider
-                  label="Average hourly wage"
-                  value={hourlyWage}
-                  onChange={setHourlyWage}
-                  min={12}
-                  max={60}
-                  step={0.5}
-                  adornment="$"
-                />
-                <InputWithSlider
-                  label="Average hours per week"
-                  value={weeklyHours}
-                  onChange={setWeeklyHours}
-                  min={20}
-                  max={50}
-                />
-                <InputWithSlider
-                  label="Annual turnover rate"
-                  value={turnoverRate}
-                  onChange={setTurnoverRate}
-                  min={10}
-                  max={100}
-                  helper="Default: 65%"
-                />
-                <InputWithSlider
-                  label="Average time to fill vacancy"
-                  value={vacancyDays}
-                  onChange={setVacancyDays}
-                  min={7}
-                  max={90}
-                  helper="Default: 30 days"
-                />
-              </Stack>
-            </CardContent>
-          </Card>
+            <Card
+              variant="outlined"
+              sx={{
+                borderRadius: 4,
+                boxShadow: "0 12px 32px rgba(15,23,42,0.08)",
+              }}
+            >
+              <CardContent sx={{ p: { xs: 2, md: 2.2 } }}>
+                <Typography
+                  variant="subtitle1"
+                  sx={{ fontWeight: 900, mb: 1.2 }}
+                >
+                  Facility Inputs
+                </Typography>
+                <Stack spacing={1.25}>
+                  <InputWithSlider
+                    label="Number of employees"
+                    value={employees}
+                    onChange={setEmployees}
+                    min={10}
+                    max={500}
+                  />
+                  <InputWithSlider
+                    label="Average hourly wage"
+                    value={hourlyWage}
+                    onChange={setHourlyWage}
+                    min={12}
+                    max={60}
+                    step={0.5}
+                    adornment="$"
+                  />
+                  <InputWithSlider
+                    label="Average hours per week"
+                    value={weeklyHours}
+                    onChange={setWeeklyHours}
+                    min={20}
+                    max={50}
+                  />
+                  <InputWithSlider
+                    label="Annual turnover rate"
+                    value={turnoverRate}
+                    onChange={setTurnoverRate}
+                    min={10}
+                    max={100}
+                    helper="Default: 65%"
+                  />
+                  <InputWithSlider
+                    label="Average time to fill vacancy"
+                    value={vacancyDays}
+                    onChange={setVacancyDays}
+                    min={7}
+                    max={90}
+                    helper="Default: 30 days"
+                  />
+                </Stack>
+              </CardContent>
+            </Card>
 
-          <Card
-            sx={{
-              borderRadius: 4,
-              background:
-                "linear-gradient(155deg, rgba(25,118,210,0.07) 0%, rgba(25,118,210,0.01) 50%, #fff 100%)",
-            }}
-          >
-            <CardContent sx={{ p: { xs: 2.5, md: 3 } }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
-                Live Annual Impact
-              </Typography>
+            <Card
+              sx={{
+                borderRadius: 4,
+                background:
+                  "linear-gradient(155deg, rgba(25,118,210,0.07) 0%, rgba(25,118,210,0.01) 50%, #fff 100%)",
+              }}
+            >
+              <CardContent sx={{ p: { xs: 2.5, md: 3 } }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
+                  Live Annual Impact
+                </Typography>
 
-              <Stack spacing={0.95} sx={{ mt: 1.2 }}>
-                <Box>
-                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                    Cost per turnover event
-                  </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 950 }}>
-                    {formatMoney(metrics.costPerTurnoverEvent)}
-                  </Typography>
-                </Box>
-
-                <Box>
-                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                    Annual turnover cost
-                  </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 950 }}>
-                    {formatMoney(metrics.annualTurnoverCost)}
-                  </Typography>
-                </Box>
-
-                <Box>
-                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                    Scheduling admin cost
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 900 }}>
-                    {formatMoney(metrics.schedulingAdminCost)}
-                  </Typography>
-                </Box>
-
-                <Divider />
-
-                <Box>
-                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                    Total annual cost
-                  </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 950 }}>
-                    {formatMoney(metrics.totalCost)}
-                  </Typography>
-                </Box>
-
-                <Box>
-                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                    Projected savings with Easishift (28%)
-                  </Typography>
-                  <Typography
-                    variant="h5"
-                    sx={{ fontWeight: 950, color: "success.main" }}
-                  >
-                    {formatMoney(metrics.projectedSavings)}/yr
-                  </Typography>
-                </Box>
-              </Stack>
-
-              <Divider sx={{ my: 1.5 }} />
-
-              <Box sx={{ display: "grid", gap: 0.55 }}>
-                {metrics.drivers.map((driver) => (
-                  <Box
-                    key={driver.label}
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 2,
-                    }}
-                  >
+                <Stack spacing={0.95} sx={{ mt: 1.2 }}>
+                  <Box>
                     <Typography
                       variant="body2"
                       sx={{ color: "text.secondary" }}
                     >
-                      {driver.label}
+                      Cost per turnover event
                     </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                      {formatMoney(driver.value)}
+                    <Typography variant="h5" sx={{ fontWeight: 950 }}>
+                      {formatMoney(metrics.costPerTurnoverEvent)}
                     </Typography>
                   </Box>
-                ))}
-              </Box>
 
-              <Stack spacing={0.8} sx={{ mt: 1.5 }}>
-                <TextField
-                  label="Email these results"
-                  placeholder="you@facility.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  size="small"
-                  sx={{
-                    "& .MuiInputBase-input": {
-                      fontWeight: 600,
-                    },
-                  }}
-                />
-                <Button
-                  onClick={handleSendSummary}
-                  disabled={sendingEmail}
-                  variant="outlined"
-                  startIcon={<FiMail />}
-                  sx={{ fontWeight: 800, textTransform: "none", py: 0.1 }}
-                >
-                  {sendingEmail ? "Sending..." : "Email me this summary"}
-                </Button>
-                <Button
-                  variant="contained"
-                  size="medium"
-                  startIcon={<FiPhoneCall />}
-                  component="a"
-                  href="https://calendly.com/easishift-info/30min"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  sx={{ fontWeight: 900, textTransform: "none", py: 0.8 }}
-                >
-                  See how WiserShifts reduces this - book a 30 min call
-                </Button>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Box>
-      </Container>
-    </Box>
+                  <Box>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "text.secondary" }}
+                    >
+                      Annual turnover cost
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 950 }}>
+                      {formatMoney(metrics.annualTurnoverCost)}
+                    </Typography>
+                  </Box>
+
+                  <Box>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "text.secondary" }}
+                    >
+                      Scheduling admin cost
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 900 }}>
+                      {formatMoney(metrics.schedulingAdminCost)}
+                    </Typography>
+                  </Box>
+
+                  <Divider />
+
+                  <Box>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "text.secondary" }}
+                    >
+                      Total annual cost
+                    </Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 950 }}>
+                      {formatMoney(metrics.totalCost)}
+                    </Typography>
+                  </Box>
+
+                  <Box>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "text.secondary" }}
+                    >
+                      Projected savings with Easishift (28%)
+                    </Typography>
+                    <Typography
+                      variant="h5"
+                      sx={{ fontWeight: 950, color: "success.main" }}
+                    >
+                      {formatMoney(metrics.projectedSavings)}/yr
+                    </Typography>
+                  </Box>
+                </Stack>
+
+                <Divider sx={{ my: 1.5 }} />
+
+                <Box sx={{ display: "grid", gap: 0.55 }}>
+                  {metrics.drivers.map((driver) => (
+                    <Box
+                      key={driver.label}
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 2,
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ color: "text.secondary" }}
+                      >
+                        {driver.label}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                        {formatMoney(driver.value)}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+
+                <Stack spacing={0.8} sx={{ mt: 1.5 }}>
+                  <TextField
+                    label="Email these results"
+                    placeholder="you@facility.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    size="small"
+                    sx={{
+                      "& .MuiInputBase-input": {
+                        fontWeight: 600,
+                      },
+                    }}
+                  />
+                  <Button
+                    onClick={handleSendSummary}
+                    disabled={sendingEmail}
+                    variant="outlined"
+                    startIcon={<FiMail />}
+                    sx={{ fontWeight: 800, textTransform: "none", py: 0.1 }}
+                  >
+                    {sendingEmail ? "Sending..." : "Email me this summary"}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    size="medium"
+                    startIcon={<FiPhoneCall />}
+                    component="a"
+                    href="https://calendly.com/easishift-info/30min"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{ fontWeight: 900, textTransform: "none", py: 0.8 }}
+                  >
+                    See how WiserShifts reduces this - book a 30 min call
+                  </Button>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Box>
+        </Container>
+      </Box>
+      <Footer />
+    </>
   );
 }

@@ -16,7 +16,9 @@ const sections = [
   },
   {
     title: "2. Restrictions",
-    paragraphs: ["Except as expressly permitted under applicable law, you may not:"],
+    paragraphs: [
+      "Except as expressly permitted under applicable law, you may not:",
+    ],
     bullets: [
       "Reverse engineer, decompile, disassemble, or otherwise attempt to derive source code",
       "Modify, adapt, translate, or create derivative works of the Service",
@@ -72,7 +74,7 @@ const sections = [
   {
     title: "6. Customer Data",
     paragraphs: [
-      "As between the parties, you retain ownership of data you submit to the Service (\"Customer Data\"). You grant WiserShifts a limited license to host, process, transmit, and display Customer Data solely to provide, maintain, secure, and improve the Service in accordance with applicable agreements and law.",
+      'As between the parties, you retain ownership of data you submit to the Service ("Customer Data"). You grant WiserShifts a limited license to host, process, transmit, and display Customer Data solely to provide, maintain, secure, and improve the Service in accordance with applicable agreements and law.',
     ],
   },
   {
@@ -92,7 +94,7 @@ const sections = [
   {
     title: "9. Disclaimer of Warranties",
     paragraphs: [
-      "TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE SERVICE IS PROVIDED \"AS IS\" AND \"AS AVAILABLE\" WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE.",
+      'TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE.',
       "WISERSHIFTS DISCLAIMS ALL IMPLIED WARRANTIES, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, AND ANY WARRANTIES ARISING FROM COURSE OF DEALING OR USAGE OF TRADE.",
     ],
   },
@@ -166,7 +168,11 @@ const sections = [
   {
     title: "16. Contact Information",
     paragraphs: ["For questions about this EULA, contact:"],
-    contactLines: ["WiserShifts", "Email: info@wisershifts.com", "Website: https://wisershifts.com"],
+    contactLines: [
+      "WiserShifts",
+      "Email: info@wisershifts.com",
+      "Website: https://wisershifts.com",
+    ],
   },
 ];
 
@@ -226,7 +232,10 @@ export default function EndUserLicenseAgreement() {
                   >
                     {section.bullets.map((bullet) => (
                       <Box component="li" key={bullet} sx={{ mb: 0.75 }}>
-                        <Typography variant="body1" sx={{ color: "text.secondary" }}>
+                        <Typography
+                          variant="body1"
+                          sx={{ color: "text.secondary" }}
+                        >
                           {bullet}
                         </Typography>
                       </Box>
@@ -236,7 +245,10 @@ export default function EndUserLicenseAgreement() {
 
                 {section.subSections?.map((subSection) => (
                   <Box key={subSection.title} sx={{ mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{ fontWeight: 700, mb: 1 }}
+                    >
                       {subSection.title}
                     </Typography>
                     {subSection.paragraphs?.map((paragraph) => (
@@ -252,7 +264,11 @@ export default function EndUserLicenseAgreement() {
                 ))}
 
                 {section.contactLines?.map((line) => (
-                  <Typography key={line} variant="body1" sx={{ color: "text.secondary" }}>
+                  <Typography
+                    key={line}
+                    variant="body1"
+                    sx={{ color: "text.secondary" }}
+                  >
                     {line}
                   </Typography>
                 ))}

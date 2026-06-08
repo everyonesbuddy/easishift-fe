@@ -131,8 +131,14 @@ const sections = [
   },
   {
     title: "12. Contact Information",
-    paragraphs: ["If you have questions or requests regarding this Privacy Policy, please contact us:"],
-    contactLines: ["WiserShifts", "Email: info@wisershifts.com", "Website: https://wisershifts.com"],
+    paragraphs: [
+      "If you have questions or requests regarding this Privacy Policy, please contact us:",
+    ],
+    contactLines: [
+      "WiserShifts",
+      "Email: info@wisershifts.com",
+      "Website: https://wisershifts.com",
+    ],
   },
 ];
 
@@ -192,7 +198,10 @@ export default function PrivacyPolicy() {
                   >
                     {section.bullets.map((bullet) => (
                       <Box component="li" key={bullet} sx={{ mb: 0.75 }}>
-                        <Typography variant="body1" sx={{ color: "text.secondary" }}>
+                        <Typography
+                          variant="body1"
+                          sx={{ color: "text.secondary" }}
+                        >
                           {bullet}
                         </Typography>
                       </Box>
@@ -212,7 +221,10 @@ export default function PrivacyPolicy() {
 
                 {section.subSections?.map((subSection) => (
                   <Box key={subSection.title} sx={{ mb: 2 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{ fontWeight: 700, mb: 1 }}
+                    >
                       {subSection.title}
                     </Typography>
                     {subSection.paragraphs?.map((paragraph) => (
@@ -228,7 +240,11 @@ export default function PrivacyPolicy() {
                 ))}
 
                 {section.contactLines?.map((line) => (
-                  <Typography key={line} variant="body1" sx={{ color: "text.secondary" }}>
+                  <Typography
+                    key={line}
+                    variant="body1"
+                    sx={{ color: "text.secondary" }}
+                  >
                     {line}
                   </Typography>
                 ))}

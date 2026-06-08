@@ -41,12 +41,13 @@ import { Stack } from "@mui/material";
 import {
   getRoleDisplayName,
   getRoleColor,
+  getUnitAreaDisplayName,
+  getCertificationTagDisplayName,
   getRoleOptionsFromFacilityPreferences,
-  getRolesForIndustry,
 } from "../../../constants/industryRoles";
 
 export default function StaffList() {
-  const { role, tenant, facilityPreferences } = useAuth();
+  const { role, facilityPreferences } = useAuth();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -112,21 +113,28 @@ export default function StaffList() {
   const roles = useMemo(() => {
     const facilityRoleValues = getRoleOptionsFromFacilityPreferences(
       facilityPreferences,
-      { includeAdmin: true },
     ).map((option) => option.value);
-
-    const industryRoles = facilityRoleValues.length
-      ? facilityRoleValues
-      : getRolesForIndustry(tenant?.industry, {
-          includeAdmin: true,
-        });
     const existingRoles = staff.map((u) => u.role).filter(Boolean);
 
     return [
       "all",
-      ...Array.from(new Set([...industryRoles, ...existingRoles])),
+      ...Array.from(new Set([...facilityRoleValues, ...existingRoles])),
     ];
-  }, [staff, tenant?.industry, facilityPreferences]);
+  }, [staff, facilityPreferences]);
+
+  const getRoleChipStyles = (roleValue) => {
+    const roleColor = getRoleColor(roleValue);
+    return {
+      px: 1,
+      py: 0.35,
+      borderRadius: 1,
+      backgroundColor: `${roleColor}22`,
+      color: roleColor,
+      fontWeight: 700,
+      fontSize: "0.72rem",
+      whiteSpace: "nowrap",
+    };
+  };
 
   const filteredUsers = useMemo(() => {
     return staff.filter((u) => {
@@ -149,10 +157,16 @@ export default function StaffList() {
       .slice(0, 2)
       .toUpperCase();
 
-  const formatStringArray = (values) => {
+  const formatStringArray = (values, formatter) => {
     if (!Array.isArray(values)) return "-";
     const normalized = values
-      .map((value) => String(value || "").trim())
+      .map((value) =>
+        formatter
+          ? formatter(value)
+          : String(value || "")
+              .trim()
+              .replace(/[_-]+/g, " "),
+      )
       .filter(Boolean);
     return normalized.length ? normalized.join(", ") : "-";
   };
@@ -290,13 +304,21 @@ export default function StaffList() {
                         sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
                         noWrap
                       >
-                        Areas: {formatStringArray(u.allowedAreas)}
+                        Areas:{" "}
+                        {formatStringArray(
+                          u.allowedAreas,
+                          getUnitAreaDisplayName,
+                        )}
                       </Typography>
                       <Typography
                         sx={{ fontSize: 12, color: "text.secondary" }}
                         noWrap
                       >
-                        Certs: {formatStringArray(u.certificationTags)}
+                        Certs:{" "}
+                        {formatStringArray(
+                          u.certificationTags,
+                          getCertificationTagDisplayName,
+                        )}
                       </Typography>
                     </Box>
 
@@ -428,19 +450,7 @@ export default function StaffList() {
                       </TableCell>
 
                       <TableCell sx={{ py: 1 }}>
-                        <Box
-                          component="span"
-                          sx={{
-                            px: 1,
-                            py: 0.35,
-                            borderRadius: 1,
-                            backgroundColor: "#EEF2FF",
-                            color: "#1E3A8A",
-                            fontWeight: 700,
-                            fontSize: "0.72rem",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
+                        <Box component="span" sx={getRoleChipStyles(u.role)}>
                           {getRoleDisplayName(u.role)}
                         </Box>
                       </TableCell>
@@ -481,14 +491,22 @@ export default function StaffList() {
                           color="text.secondary"
                           sx={{ fontSize: "0.72rem" }}
                         >
-                          Areas: {formatStringArray(u.allowedAreas)}
+                          Areas:{" "}
+                          {formatStringArray(
+                            u.allowedAreas,
+                            getUnitAreaDisplayName,
+                          )}
                         </Typography>
                         <Typography
                           variant="body2"
                           color="text.secondary"
                           sx={{ fontSize: "0.72rem" }}
                         >
-                          Certs: {formatStringArray(u.certificationTags)}
+                          Certs:{" "}
+                          {formatStringArray(
+                            u.certificationTags,
+                            getCertificationTagDisplayName,
+                          )}
                         </Typography>
                       </TableCell>
 

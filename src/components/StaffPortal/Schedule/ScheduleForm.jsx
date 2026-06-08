@@ -18,6 +18,9 @@ import api from "../../../config/api";
 import { toast } from "react-toastify";
 import {
   getRoleDisplayName,
+  getUnitAreaDisplayName,
+  getShiftTypeDisplayName,
+  getShiftTagDisplayName,
   isRoleCompatible,
 } from "../../../constants/industryRoles";
 
@@ -316,7 +319,7 @@ export default function ScheduleForm({
           >
             {staffList.map((s) => (
               <MenuItem key={s._id} value={s._id}>
-                {s.name} ({s.role})
+                {s.name} ({getRoleDisplayName(s.role)})
               </MenuItem>
             ))}
           </Select>
@@ -358,8 +361,15 @@ export default function ScheduleForm({
                     disabled={c.spotsRemaining <= 0}
                   >
                     {getRoleDisplayName(c.role)} • {formatShiftLabel(c)}
-                    {c.unitArea ? ` • ${c.unitArea}` : ""}
-                    {c.shiftType ? ` • ${c.shiftType}` : ""}
+                    {c.unitArea
+                      ? ` • ${getUnitAreaDisplayName(c.unitArea)}`
+                      : ""}
+                    {c.shiftType
+                      ? ` • ${getShiftTypeDisplayName(c.shiftType)}`
+                      : ""}
+                    {c.shiftTag
+                      ? ` • ${getShiftTagDisplayName(c.shiftTag)}`
+                      : ""}
                     {"  "}({c.spotsRemaining} spots left
                     {c.spotsRemaining <= 0 ? " • Full" : ""})
                   </MenuItem>

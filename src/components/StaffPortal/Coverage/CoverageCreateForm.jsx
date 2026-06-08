@@ -22,8 +22,8 @@ import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 import {
   getRoleDisplayName,
-  getRoleOptionsForIndustry,
   getRoleOptionsFromFacilityPreferences,
+  getUnitAreaDisplayName,
 } from "../../../constants/industryRoles";
 
 const weekdayOptions = [
@@ -178,7 +178,7 @@ const buildDatesFromPattern = (startDateStr, horizonDays, mode, weekdays) => {
 };
 
 export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
-  const { tenant, facilityPreferences } = useAuth();
+  const { facilityPreferences } = useAuth();
 
   const shiftTypeDefinitions = useMemo(() => {
     const defs = Array.isArray(facilityPreferences?.shiftTypeDefinitions)
@@ -227,11 +227,8 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   }, [shiftTypeDefinitions]);
 
   const roleOptions = useMemo(() => {
-    const facilityOptions =
-      getRoleOptionsFromFacilityPreferences(facilityPreferences);
-    if (facilityOptions.length) return facilityOptions;
-    return getRoleOptionsForIndustry(tenant?.industry);
-  }, [facilityPreferences, tenant?.industry]);
+    return getRoleOptionsFromFacilityPreferences(facilityPreferences);
+  }, [facilityPreferences]);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -510,7 +507,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
       }
 
       const message = autoGenerate
-        ? "Coverage created and auto-scheduling completed."
+        ? "Coverage created and AI draft generated. Review and publish it from the schedule planner."
         : "Coverage requirements added successfully.";
 
       setSuccess(message);
@@ -940,7 +937,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                     <MenuItem value="">Any Area</MenuItem>
                     {(facilityPreferences?.unitAreas || []).map((area) => (
                       <MenuItem key={area} value={area}>
-                        {area}
+                        {getUnitAreaDisplayName(area)}
                       </MenuItem>
                     ))}
                   </TextField>
@@ -1114,7 +1111,9 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                         sx={{ flex: 1 }}
                       >
                         {row.timeLabel}
-                        {row.unitArea ? ` • ${row.unitArea}` : ""}
+                        {row.unitArea
+                          ? ` • ${getUnitAreaDisplayName(row.unitArea)}`
+                          : ""}
                         {row.shiftType ? ` • ${row.shiftType}` : ""}
                         {row.shiftTag ? ` • ${row.shiftTag}` : ""}
                       </Typography>
@@ -1176,8 +1175,8 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
             }}
           >
             {loading && loadingMode === "ai"
-              ? "Creating + AI Scheduling..."
-              : "Save + AI Generate Schedule"}
+              ? "Creating + AI Draft..."
+              : "Save + AI Create Draft"}
           </Button>
         </Stack>
       </Stack>

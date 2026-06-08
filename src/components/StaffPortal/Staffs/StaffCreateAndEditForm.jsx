@@ -16,7 +16,6 @@ import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 import {
   getRoleOptionsFromFacilityPreferences,
-  getRoleOptionsForIndustry,
   getRoleDisplayName,
 } from "../../../constants/industryRoles";
 
@@ -86,7 +85,7 @@ export default function StaffCreateAndEditForm({
   onClose,
   staffList = [],
 }) {
-  const { user, role: loggedInRole, tenant, facilityPreferences } = useAuth();
+  const { user, role: loggedInRole, facilityPreferences } = useAuth();
 
   const canAssignAdminRole = loggedInRole === "admin";
 
@@ -96,9 +95,8 @@ export default function StaffCreateAndEditForm({
   );
 
   const roleOptions = useMemo(() => {
-    if (facilityRoleOptions.length) return facilityRoleOptions;
-    return getRoleOptionsForIndustry(tenant?.industry);
-  }, [facilityRoleOptions, tenant?.industry]);
+    return facilityRoleOptions;
+  }, [facilityRoleOptions]);
 
   const selectableRoleOptions = useMemo(() => {
     const options = canAssignAdminRole

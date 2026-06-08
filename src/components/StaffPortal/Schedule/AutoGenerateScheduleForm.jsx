@@ -1,45 +1,104 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Box,
-  Typography,
   Button,
-  CircularProgress,
   Checkbox,
-  FormControlLabel,
+  Chip,
+  CircularProgress,
+  Divider,
   FormControl,
+  FormControlLabel,
+  IconButton,
   InputLabel,
-  Select,
   MenuItem,
   Paper,
+  Select,
   Stack,
-  IconButton,
+  Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import api from "../../../config/api";
 import { toast } from "react-toastify";
+
+import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 import {
   getRoleDisplayName,
   getRoleOptionsFromFacilityPreferences,
-  getRoleOptionsForIndustry,
+  getShiftTagDisplayName,
+  getShiftTypeDisplayName,
+  getUnitAreaDisplayName,
   isRoleCompatible,
 } from "../../../constants/industryRoles";
 
+const toastOptions = {
+  position: "top-right",
+  autoClose: 3500,
+  hideProgressBar: false,
+  closeOnClick: true,
+  pauseOnHover: true,
+  draggable: true,
+};
+
+const formatDatePart = (value) => {
+  if (!value) return "Unknown date";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Unknown date";
+  return parsed.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const formatTimePart = (value) => {
+  if (!value) return "--:--";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "--:--";
+  return parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+};
+
+const formatDateTimeWindow = (startTime, endTime) =>
+  `${formatDatePart(startTime)} | ${formatTimePart(startTime)} - ${formatTimePart(endTime)}`;
+
+const getWarningChips = (warnings) => {
+  if (!warnings) return [];
+  const chips = [];
+
+  if (Number(warnings.overtimeMinutes) > 0) {
+    chips.push({ key: "overtime", label: "Overtime risk", color: "warning" });
+  }
+  if (Number(warnings.consecutiveDaysIfAssigned) >= 5) {
+    chips.push({ key: "streak", label: "Consecutive days", color: "warning" });
+  }
+  if (Number(warnings.weekendShiftCount) > 0) {
+    chips.push({ key: "weekend", label: "Weekend load", color: "default" });
+  }
+
+  return chips;
+};
+
 export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
-  const { tenant, facilityPreferences } = useAuth();
+  const { facilityPreferences } = useAuth();
+
   const [coverages, setCoverages] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [selectedRole, setSelectedRole] = useState("");
+  const [fetching, setFetching] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [selectedRole, setSelectedRole] = useState(""); // optional role filter
-  const [fetching, setFetching] = useState(false);
 
-  const roleOptions = useMemo(() => {
-    const facilityOptions =
-      getRoleOptionsFromFacilityPreferences(facilityPreferences);
-    if (facilityOptions.length) return facilityOptions;
-    return getRoleOptionsForIndustry(tenant?.industry);
-  }, [facilityPreferences, tenant?.industry]);
+  const [draftRuns, setDraftRuns] = useState([]);
+  const [activeRunId, setActiveRunId] = useState("");
+  const [activeRunDetail, setActiveRunDetail] = useState(null);
+  const [loadingDraftRuns, setLoadingDraftRuns] = useState(false);
+  const [loadingDraftDetail, setLoadingDraftDetail] = useState(false);
+  const [actionLoading, setActionLoading] = useState("");
+
+  const roleOptions = useMemo(
+    () => getRoleOptionsFromFacilityPreferences(facilityPreferences),
+    [facilityPreferences],
+  );
 
   const selectableCoverageIds = useMemo(
     () =>
@@ -57,83 +116,112 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
   const allSelectableSelected =
     selectableCoverageIds.length > 0 &&
     selectedSelectableCount === selectableCoverageIds.length;
-
   const hasSomeSelectableSelected =
     selectedSelectableCount > 0 && !allSelectableSelected;
 
-  const toastOptions = {
-    position: "top-right",
-    autoClose: 3500,
-    hideProgressBar: false,
-    closeOnClick: true,
-    pauseOnHover: true,
-    draggable: true,
-  };
+  const activeAssignments = activeRunDetail?.assignments || [];
 
-  // Fetch unfilled coverages when component mounts or role changes
-  useEffect(() => {
-    async function loadCoverages() {
-      setFetching(true);
-      try {
-        const res = await api.get("/coverage/unfilled-auto", {
-          params: {},
+  const loadCoverages = async () => {
+    setFetching(true);
+    try {
+      const res = await api.get("/coverage/unfilled-auto");
+      const now = new Date();
+      const upcoming = (Array.isArray(res.data) ? res.data : [])
+        .filter(
+          (cov) =>
+            new Date(cov.endTime) >= now &&
+            (!selectedRole || isRoleCompatible(selectedRole, cov.role)),
+        )
+        .map((cov) => {
+          const requiredCount = Number(cov.requiredCount) || 0;
+          const assignedCount = Number(cov.assignedCount);
+          const directRemaining = Number(cov.remaining);
+          const computedRemaining = Number.isFinite(assignedCount)
+            ? Math.max(0, requiredCount - assignedCount)
+            : Math.max(0, requiredCount);
+
+          return {
+            ...cov,
+            spotsRemaining: Number.isFinite(directRemaining)
+              ? Math.max(0, directRemaining)
+              : computedRemaining,
+          };
         });
 
-        // Filter out past coverages
-        const now = new Date();
-        const upcoming = (Array.isArray(res.data) ? res.data : [])
-          .filter(
-            (cov) =>
-              new Date(cov.endTime) >= now &&
-              (!selectedRole || isRoleCompatible(selectedRole, cov.role)),
-          )
-          .map((cov) => {
-            const requiredCount = Number(cov.requiredCount) || 0;
-            const assignedCount = Number(cov.assignedCount);
-            const directRemaining = Number(cov.remaining);
-
-            const computedRemaining = Number.isFinite(assignedCount)
-              ? Math.max(0, requiredCount - assignedCount)
-              : Math.max(0, requiredCount);
-
-            const spotsRemaining = Number.isFinite(directRemaining)
-              ? Math.max(0, directRemaining)
-              : computedRemaining;
-
-            return {
-              ...cov,
-              spotsRemaining,
-            };
-          });
-
-        setCoverages(upcoming);
-        setSelectedIds([]);
-      } catch (err) {
-        console.error(err);
-        setCoverages([]);
-      } finally {
-        setFetching(false);
-      }
+      setCoverages(upcoming);
+      setSelectedIds([]);
+    } catch (err) {
+      console.error(err);
+      setCoverages([]);
+    } finally {
+      setFetching(false);
     }
+  };
 
+  const loadDraftRuns = async () => {
+    setLoadingDraftRuns(true);
+    try {
+      const res = await api.get("/schedules/draft-runs", {
+        params: { status: "draft", limit: 25 },
+      });
+      const runs = Array.isArray(res.data) ? res.data : [];
+      setDraftRuns(runs);
+      if (!activeRunId && runs[0]?._id) setActiveRunId(runs[0]._id);
+      if (activeRunId && !runs.some((run) => run._id === activeRunId)) {
+        setActiveRunId(runs[0]?._id || "");
+      }
+    } catch (err) {
+      console.error(err);
+      setDraftRuns([]);
+      setActiveRunId("");
+      setActiveRunDetail(null);
+    } finally {
+      setLoadingDraftRuns(false);
+    }
+  };
+
+  const loadDraftDetail = async (runId) => {
+    if (!runId) {
+      setActiveRunDetail(null);
+      return;
+    }
+    setLoadingDraftDetail(true);
+    try {
+      const res = await api.get(`/schedules/draft-runs/${runId}`);
+      setActiveRunDetail(res.data || null);
+    } catch (err) {
+      console.error(err);
+      setActiveRunDetail(null);
+    } finally {
+      setLoadingDraftDetail(false);
+    }
+  };
+
+  useEffect(() => {
     loadCoverages();
   }, [selectedRole]);
 
+  useEffect(() => {
+    loadDraftRuns();
+  }, []);
+
+  useEffect(() => {
+    loadDraftDetail(activeRunId);
+  }, [activeRunId]);
+
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
   const handleToggleSelectAll = (checked) => {
     if (checked) {
-      setSelectedIds((prev) => {
-        const merged = new Set([...prev, ...selectableCoverageIds]);
-        return Array.from(merged);
-      });
+      setSelectedIds((prev) =>
+        Array.from(new Set([...prev, ...selectableCoverageIds])),
+      );
       return;
     }
-
     setSelectedIds((prev) =>
       prev.filter((id) => !selectableCoverageIds.includes(id)),
     );
@@ -142,194 +230,67 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
   const handleSubmit = async () => {
     if (!selectedIds.length) {
       setErrorMsg("Select at least one coverage.");
-      toast.info("Select at least one coverage and try AI-generate again.", {
-        ...toastOptions,
-        autoClose: 3000,
-      });
       return;
     }
 
     setErrorMsg("");
     setLoading(true);
-
     try {
-      const res = await api.post("/schedules/auto-generate", {
-        coverageIds: selectedIds,
-      });
-
-      const data = res.data || {};
-      const generatedCount = data.generatedCount ?? 0;
-      const coverageResults = Array.isArray(data.coverageResults)
-        ? data.coverageResults
-        : [];
-
-      const selectedCoverageMap = new Map(
-        coverages
-          .filter((cov) => selectedIds.includes(cov._id))
-          .map((cov) => [cov._id, cov]),
-      );
-
-      const toNumberOrNull = (value) => {
-        const n = Number(value);
-        return Number.isFinite(n) ? n : null;
-      };
-
-      const findSourceCoverage = (item) => {
-        const resultId = item?.coverageId || item?._id || item?.id;
-        if (resultId && selectedCoverageMap.has(resultId)) {
-          return selectedCoverageMap.get(resultId);
-        }
-
-        const resultStart = new Date(item?.startTime || "").getTime();
-        const resultEnd = new Date(item?.endTime || "").getTime();
-        if (!Number.isFinite(resultStart) || !Number.isFinite(resultEnd)) {
-          return null;
-        }
-
-        return (
-          coverages.find((cov) => {
-            const sameRole = isRoleCompatible(cov?.role, item?.role);
-            const covStart = new Date(cov?.startTime || "").getTime();
-            const covEnd = new Date(cov?.endTime || "").getTime();
-            return sameRole && covStart === resultStart && covEnd === resultEnd;
-          }) || null
-        );
-      };
-
-      const statusLabelMap = {
-        filled: "Scheduled",
-        partially_filled: "Partially Scheduled",
-        already_filled: "Already Full",
-        skipped: "Skipped",
-      };
-
-      const formatDatePart = (value) => {
-        if (!value) return "Unknown date";
-        const parsed = new Date(value);
-        if (Number.isNaN(parsed.getTime())) return "Unknown date";
-        return parsed.toLocaleDateString();
-      };
-
-      const formatTimePart = (value) => {
-        if (!value) return "--:--";
-        const parsed = new Date(value);
-        if (Number.isNaN(parsed.getTime())) return "--:--";
-        return parsed.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      };
-
-      const coverageLines = coverageResults.slice(0, 3).map((item) => {
-        const sourceCoverage = findSourceCoverage(item);
-        const role = getRoleDisplayName(item?.role);
-        const dateValue =
-          item?.startTime ||
-          sourceCoverage?.startTime ||
-          item?.date ||
-          sourceCoverage?.date;
-        const dateText = formatDatePart(dateValue);
-        const startText = formatTimePart(item?.startTime);
-        const endText = formatTimePart(item?.endTime);
-        const status = statusLabelMap[item?.status] || "Processed";
-        const reason = item?.message;
-
-        const requiredFromResult = toNumberOrNull(item?.requiredCount);
-        const requiredFromSource = toNumberOrNull(
-          sourceCoverage?.requiredCount,
-        );
-        const required = requiredFromResult ?? requiredFromSource;
-
-        const startFilledFromResult = toNumberOrNull(
-          item?.alreadyAssignedCount,
-        );
-        const startFilledFromSource = toNumberOrNull(
-          sourceCoverage?.assignedCount,
-        );
-        const startFilled = startFilledFromResult ?? startFilledFromSource;
-
-        const startRemainingFromSource = toNumberOrNull(
-          sourceCoverage?.remaining,
-        );
-        const startRemaining =
-          startRemainingFromSource ??
-          (required != null && startFilled != null
-            ? Math.max(0, required - startFilled)
-            : null);
-
-        const assignedNow = toNumberOrNull(item?.assignedCount) ?? 0;
-
-        const endFilled =
-          startFilled != null ? startFilled + assignedNow : null;
-
-        const endRemainingFromResult = toNumberOrNull(item?.unfilledCount);
-        const endRemaining =
-          endRemainingFromResult ??
-          (required != null && endFilled != null
-            ? Math.max(0, required - endFilled)
-            : null);
-
-        const startState =
-          required != null && startFilled != null && startRemaining != null
-            ? `Started: required ${required}, filled ${startFilled}, remaining ${startRemaining}`
-            : "Started: state unavailable";
-
-        const endState =
-          required != null && endFilled != null && endRemaining != null
-            ? `Ended: required ${required}, filled ${endFilled}, remaining ${endRemaining}`
-            : "Ended: state unavailable";
-
-        return `• ${role} — ${status}\n  ${dateText} | ${startText}-${endText}\n  ${startState}\n  ${endState}${reason ? `\n  ${reason}` : ""}`;
-      });
-
-      if (coverageResults.length > 3) {
-        coverageLines.push(`• +${coverageResults.length - 3} more item(s)`);
-      }
-
-      const consolidatedMessage = coverageLines.length
-        ? coverageLines.join("\n\n")
-        : "Auto-scheduling completed.";
-
-      const toastMethod = generatedCount > 0 ? toast.success : toast.info;
-      toastMethod(consolidatedMessage, {
-        ...toastOptions,
-        autoClose: 8500,
-        style: {
-          whiteSpace: "pre-line",
-          width: "min(92vw, 760px)",
-          maxWidth: "760px",
-          lineHeight: 1.5,
-        },
-      });
-
-      onSuccess?.();
+      await api.post("/schedules/auto-generate", { coverageIds: selectedIds });
+      toast.success("Draft created successfully.", toastOptions);
+      await Promise.all([loadCoverages(), loadDraftRuns()]);
       setSelectedIds([]);
     } catch (err) {
       console.error(err);
-      const backend = err.response?.data;
-      const message = backend?.message || "Failed to auto-generate.";
-      const hint = backend?.hint;
-      const errorCode = backend?.errorCode;
-
-      const fullMessage = [errorCode ? `[${errorCode}]` : null, message, hint]
-        .filter(Boolean)
-        .join(" ");
-
-      setErrorMsg(fullMessage);
-      toast.error(fullMessage, { ...toastOptions, autoClose: 5500 });
+      const message =
+        err.response?.data?.message || "Failed to create AI draft.";
+      setErrorMsg(message);
+      toast.error(message, toastOptions);
     } finally {
       setLoading(false);
     }
   };
 
+  const handlePublishDraft = async () => {
+    if (!activeRunId) return;
+    setActionLoading("publish");
+    try {
+      await api.post(`/schedules/draft-runs/${activeRunId}/publish`);
+      toast.success("Draft published.", toastOptions);
+      await Promise.all([loadDraftRuns(), loadCoverages()]);
+      onSuccess?.();
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err.response?.data?.message || "Failed to publish draft.",
+        toastOptions,
+      );
+    } finally {
+      setActionLoading("");
+    }
+  };
+
+  const handleDiscardDraft = async () => {
+    if (!activeRunId) return;
+    setActionLoading("discard");
+    try {
+      await api.post(`/schedules/draft-runs/${activeRunId}/discard`);
+      toast.info("Draft discarded.", toastOptions);
+      await loadDraftRuns();
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err.response?.data?.message || "Failed to discard draft run.",
+        toastOptions,
+      );
+    } finally {
+      setActionLoading("");
+    }
+  };
+
   return (
     <Paper
-      sx={{
-        p: { xs: 1.5, md: 3 },
-        borderRadius: 2,
-        backgroundColor: "rgba(255,255,255,0.02)",
-        position: "relative",
-      }}
+      sx={{ p: { xs: 1.5, md: 3 }, borderRadius: 2, position: "relative" }}
       elevation={0}
     >
       {onClose && (
@@ -341,38 +302,19 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
           <CloseIcon />
         </IconButton>
       )}
-      <Typography
-        variant="h6"
-        sx={{ mb: 1.5, fontSize: { xs: "1rem", md: "1.25rem" } }}
-      >
-        AI Generated Schedule
+
+      <Typography variant="h6" sx={{ mb: 1.5 }}>
+        AI Draft Planner
       </Typography>
 
-      <Typography
-        variant="body2"
-        sx={{
-          mb: 1.5,
-          color: "gray",
-          fontSize: { xs: "0.8rem", md: "0.95rem" },
-        }}
-      >
-        Use AI to automatically assign staff to selected coverage windows.
-      </Typography>
+      <Stack spacing={2}>
+        {errorMsg && <Alert severity="error">{errorMsg}</Alert>}
 
-      {/* <Typography
-        variant="caption"
-        sx={{ color: "text.secondary", display: "block", mb: 0.5 }}
-      >
-        AI scheduling assigns staff based on your selected unfilled coverages
-        and availability.
-      </Typography> */}
-
-      <Stack spacing={1.25}>
-        {/* Role selection */}
         <FormControl fullWidth>
           <InputLabel>Role (optional)</InputLabel>
           <Select
             value={selectedRole}
+            label="Role (optional)"
             onChange={(e) => setSelectedRole(e.target.value)}
           >
             <MenuItem value="">All Roles</MenuItem>
@@ -385,208 +327,200 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
         </FormControl>
 
         {fetching ? (
-          <Typography sx={{ color: "gray" }}>Loading coverages...</Typography>
-        ) : coverages.length === 0 ? (
-          <Typography sx={{ mb: 1.5, color: "gray" }}>
-            No unfilled coverages available.
-          </Typography>
+          <Typography>Loading coverages...</Typography>
         ) : (
           <>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={allSelectableSelected}
+                  indeterminate={hasSomeSelectableSelected}
+                  onChange={(e) => handleToggleSelectAll(e.target.checked)}
+                />
+              }
+              label={`Select all (${selectedSelectableCount}/${selectableCoverageIds.length})`}
+            />
+
+            <Box sx={{ maxHeight: 260, overflowY: "auto" }}>
+              {coverages.map((cov) => {
+                const selected = selectedIds.includes(cov._id);
+                const isZero = Number(cov.spotsRemaining) <= 0;
+                return (
+                  <Paper
+                    key={cov._id}
+                    variant="outlined"
+                    sx={{
+                      p: 1,
+                      mb: 0.75,
+                      opacity: isZero ? 0.65 : 1,
+                      cursor: isZero ? "default" : "pointer",
+                    }}
+                    onClick={() => !isZero && toggleSelect(cov._id)}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Checkbox
+                        checked={selected}
+                        onChange={() => toggleSelect(cov._id)}
+                        disabled={isZero}
+                      />
+                      <Typography sx={{ fontSize: 13 }}>
+                        {formatDatePart(cov.date || cov.startTime)} ·{" "}
+                        {getRoleDisplayName(cov.role)} ·{" "}
+                        {formatTimePart(cov.startTime)}-
+                        {formatTimePart(cov.endTime)}
+                        {cov.unitArea
+                          ? ` · ${getUnitAreaDisplayName(cov.unitArea)}`
+                          : ""}
+                        {cov.shiftType
+                          ? ` · ${getShiftTypeDisplayName(cov.shiftType)}`
+                          : ""}
+                        {cov.shiftTag
+                          ? ` · ${getShiftTagDisplayName(cov.shiftTag)}`
+                          : ""}
+                      </Typography>
+                    </Box>
+                  </Paper>
+                );
+              })}
+            </Box>
+
+            <Button
+              variant="contained"
+              color="warning"
+              onClick={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? (
+                <CircularProgress size={20} />
+              ) : (
+                "Create Draft with AI"
+              )}
+            </Button>
+          </>
+        )}
+
+        <Divider />
+
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Typography variant="subtitle2">Open Draft Runs</Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={loadDraftRuns}
+            disabled={loadingDraftRuns}
+          >
+            Refresh
+          </Button>
+        </Box>
+
+        {draftRuns.map((run) => (
+          <Paper
+            key={run._id}
+            variant="outlined"
+            sx={{ p: 1 }}
+            onClick={() => setActiveRunId(run._id)}
+          >
             <Box
               sx={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                px: 0.5,
               }}
             >
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={allSelectableSelected}
-                    indeterminate={hasSomeSelectableSelected}
-                    onChange={(e) => handleToggleSelectAll(e.target.checked)}
-                    disabled={selectableCoverageIds.length === 0}
-                  />
-                }
-                label={`Select all (${selectedSelectableCount}/${selectableCoverageIds.length})`}
-                sx={{ m: 0 }}
+              <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
+                Draft created {formatDatePart(run.createdAt)}
+              </Typography>
+              <Chip
+                size="small"
+                label={String(run.status || "draft").toUpperCase()}
+                color="warning"
               />
             </Box>
+          </Paper>
+        ))}
 
-            <Box
-              sx={{
-                maxHeight: { xs: "60vh", md: 320 },
-                overflowY: "auto",
-                pr: 0.5,
-              }}
-            >
-              {coverages
-                .slice()
-                .sort((a, b) => {
-                  // Move items with remaining === 0 to the bottom
-                  const aZero = Number(a.spotsRemaining) <= 0;
-                  const bZero = Number(b.spotsRemaining) <= 0;
-                  if (aZero === bZero) return 0;
-                  return aZero ? 1 : -1;
-                })
-                .map((cov) => {
-                  const dateStr = new Date(cov.date).toLocaleDateString(
-                    "en-US",
-                    {
-                      timeZone: "UTC",
-                    },
-                  );
-                  const startStr = new Date(cov.startTime).toLocaleTimeString(
-                    [],
-                    {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    },
-                  );
-                  const endStr = new Date(cov.endTime).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  });
+        {activeRunId && (
+          <Paper variant="outlined" sx={{ p: 1.25 }}>
+            {loadingDraftDetail ? (
+              <CircularProgress size={18} />
+            ) : (
+              <Stack spacing={1}>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    onClick={handleDiscardDraft}
+                    disabled={Boolean(actionLoading)}
+                  >
+                    {actionLoading === "discard"
+                      ? "Discarding..."
+                      : "Discard Draft"}
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={handlePublishDraft}
+                    disabled={
+                      Boolean(actionLoading) || !activeAssignments.length
+                    }
+                  >
+                    {actionLoading === "publish"
+                      ? "Publishing..."
+                      : "Publish to Schedule"}
+                  </Button>
+                </Stack>
 
-                  const selected = selectedIds.includes(cov._id);
-                  const isZero = Number(cov.spotsRemaining) <= 0;
-
+                {activeAssignments.map((assignment) => {
+                  const warningChips = getWarningChips(assignment.warnings);
                   return (
                     <Paper
-                      key={cov._id}
-                      onClick={() => !isZero && toggleSelect(cov._id)}
-                      elevation={selected ? 6 : 0}
-                      sx={{
-                        p: { xs: 0.75, md: 1 },
-                        my: 0.5,
-                        display: "flex",
-                        flexDirection: { xs: "column", sm: "row" },
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        cursor: isZero ? "default" : "pointer",
-                        borderRadius: 1,
-                        backgroundColor: selected
-                          ? "rgba(25,118,210,0.06)"
-                          : isZero
-                            ? "rgba(255,255,255,0.01)"
-                            : "transparent",
-                        border: "1px solid rgba(255,255,255,0.03)",
-                        opacity: isZero ? 0.65 : 1,
-                      }}
+                      key={assignment._id}
+                      variant="outlined"
+                      sx={{ p: 1 }}
                     >
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1,
-                          width: "100%",
-                        }}
-                      >
-                        <Checkbox
-                          size="small"
-                          checked={selected}
-                          onChange={() => toggleSelect(cov._id)}
-                          onClick={(e) => e.stopPropagation()}
-                          disabled={isZero}
-                        />
-
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            minWidth: 0,
-                            mr: 1,
-                          }}
+                      <Typography sx={{ fontWeight: 700, fontSize: 13 }}>
+                        {assignment.staffId?.name || "Unassigned"} ·{" "}
+                        {getRoleDisplayName(assignment.role)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {formatDateTimeWindow(
+                          assignment.startTime,
+                          assignment.endTime,
+                        )}
+                      </Typography>
+                      {warningChips.length > 0 && (
+                        <Stack
+                          direction="row"
+                          spacing={0.5}
+                          flexWrap="wrap"
+                          useFlexGap
+                          sx={{ mt: 0.75 }}
                         >
-                          <Typography
-                            sx={{
-                              fontWeight: 600,
-                              fontSize: { xs: 12, md: 13 },
-                              lineHeight: 1,
-                            }}
-                            noWrap
-                          >
-                            {dateStr} · {getRoleDisplayName(cov.role)}
-                          </Typography>
-                          <Typography
-                            sx={{ fontSize: { xs: 12, md: 13 }, color: "gray" }}
-                            noWrap
-                          >
-                            {startStr} — {endStr}
-                            {cov.shiftType ? ` · ${cov.shiftType}` : ""}
-                            {cov.shiftTag ? ` · ${cov.shiftTag}` : ""}
-                            {cov.location ? ` · ${cov.location}` : ""}
-                          </Typography>
-                        </Box>
-                      </Box>
-
-                      <Box
-                        sx={{
-                          display: "flex",
-                          gap: 2,
-                          alignItems: "center",
-                          mt: { xs: 1, sm: 0 },
-                        }}
-                      >
-                        <Box sx={{ textAlign: "right" }}>
-                          <Typography
-                            variant="caption"
-                            sx={{ color: "gray", display: "block" }}
-                          >
-                            Required
-                          </Typography>
-                          <Typography
-                            sx={{
-                              fontWeight: 700,
-                              fontSize: { xs: 13, md: 14 },
-                            }}
-                          >
-                            {cov.requiredCount}
-                          </Typography>
-                        </Box>
-
-                        <Box sx={{ textAlign: "right" }}>
-                          <Typography
-                            variant="caption"
-                            sx={{ color: "gray", display: "block" }}
-                          >
-                            Remaining
-                          </Typography>
-                          <Typography
-                            sx={{
-                              fontWeight: 700,
-                              fontSize: { xs: 13, md: 14 },
-                              color: isZero
-                                ? "text.secondary"
-                                : cov.spotsRemaining <= 0
-                                  ? "error.main"
-                                  : "success.main",
-                            }}
-                          >
-                            {cov.spotsRemaining}
-                          </Typography>
-                        </Box>
-                      </Box>
+                          {warningChips.map((chip) => (
+                            <Chip
+                              key={`${assignment._id}-${chip.key}`}
+                              size="small"
+                              label={chip.label}
+                              color={chip.color}
+                              variant="outlined"
+                            />
+                          ))}
+                        </Stack>
+                      )}
                     </Paper>
                   );
                 })}
-            </Box>
-          </>
+              </Stack>
+            )}
+          </Paper>
         )}
-
-        {errorMsg && <Typography color="error">{errorMsg}</Typography>}
-
-        <Button
-          variant="contained"
-          color="warning"
-          fullWidth
-          onClick={handleSubmit}
-          disabled={loading || fetching}
-        >
-          {loading ? <CircularProgress size={22} /> : "Generate with AI"}
-        </Button>
       </Stack>
     </Paper>
   );

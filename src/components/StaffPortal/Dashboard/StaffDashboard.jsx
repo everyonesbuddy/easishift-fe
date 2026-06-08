@@ -461,7 +461,7 @@ export default function StaffDashboard() {
                 "&:hover": { bgcolor: "#0369A1" },
               }}
             >
-              AI Generated Schedule
+              AI Draft Planner
             </Button>
           </>
         ) : (

@@ -51,12 +51,15 @@ import Stack from "@mui/material/Stack";
 import {
   getRoleColor,
   getRoleDisplayName,
+  getUnitAreaDisplayName,
+  getShiftTypeDisplayName,
+  getShiftTagDisplayName,
+  getCertificationTagDisplayName,
   getRoleOptionsFromFacilityPreferences,
-  getRolesForIndustry,
 } from "../../../constants/industryRoles";
 
 export default function ScheduleList() {
-  const { user, isAdmin, tenant, facilityPreferences } = useAuth();
+  const { user, isAdmin, facilityPreferences } = useAuth();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -85,19 +88,29 @@ export default function ScheduleList() {
     const facilityRoleValues = getRoleOptionsFromFacilityPreferences(
       facilityPreferences,
     ).map((option) => option.value);
-
-    const industryRoles = facilityRoleValues.length
-      ? facilityRoleValues
-      : getRolesForIndustry(tenant?.industry);
     const scheduleRoles = schedules.map((s) => s.role).filter(Boolean);
     const staffRoles = staff.map((s) => s.role).filter(Boolean);
     return [
       "all",
       ...Array.from(
-        new Set([...industryRoles, ...scheduleRoles, ...staffRoles]),
+        new Set([...facilityRoleValues, ...scheduleRoles, ...staffRoles]),
       ),
     ];
-  }, [schedules, staff, tenant?.industry, facilityPreferences]);
+  }, [schedules, staff, facilityPreferences]);
+
+  const getRoleChipStyles = (role) => {
+    const roleColor = getRoleColor(role);
+    return {
+      px: 1,
+      py: 0.35,
+      borderRadius: 1,
+      backgroundColor: `${roleColor}22`,
+      color: roleColor,
+      fontWeight: 700,
+      fontSize: "0.72rem",
+      whiteSpace: "nowrap",
+    };
+  };
 
   const legendRoles = useMemo(
     () => roleFilterOptions.filter((role) => role !== "all").slice(0, 8),
@@ -229,7 +242,7 @@ export default function ScheduleList() {
   const formatCertificationTags = (schedule) => {
     if (!Array.isArray(schedule?.certificationTags)) return "-";
     const tags = schedule.certificationTags
-      .map((tag) => String(tag || "").trim())
+      .map((tag) => getCertificationTagDisplayName(tag))
       .filter(Boolean);
     return tags.length ? tags.join(", ") : "-";
   };
@@ -622,7 +635,7 @@ export default function ScheduleList() {
                 "&:hover": { bgcolor: "#1146b1" },
               }}
             >
-              AI Generated Schedule
+              AI Draft Planner
             </Button>
           )}
 
@@ -811,13 +824,13 @@ export default function ScheduleList() {
                       {formatScheduleTimeRange(s)}
                     </Typography>
                     <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                      Unit Area: {s.unitArea || "-"}
+                      Unit Area: {getUnitAreaDisplayName(s.unitArea)}
                     </Typography>
                     <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                      Shift Type: {s.shiftType || "-"}
+                      Shift Type: {getShiftTypeDisplayName(s.shiftType)}
                     </Typography>
                     <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                      Shift Slot: {s.shiftTag || "-"}
+                      Shift Slot: {getShiftTagDisplayName(s.shiftTag)}
                     </Typography>
                     <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
                       Cert Tags: {formatCertificationTags(s)}
@@ -1040,19 +1053,7 @@ export default function ScheduleList() {
                       </Box>
                     </TableCell>
                     <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
-                      <Box
-                        component="span"
-                        sx={{
-                          px: 1,
-                          py: 0.35,
-                          borderRadius: 1,
-                          backgroundColor: "#EEF2FF",
-                          color: "#1E3A8A",
-                          fontWeight: 700,
-                          fontSize: "0.72rem",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
+                      <Box component="span" sx={getRoleChipStyles(s.role)}>
                         {getRoleDisplayName(s.role)}
                       </Box>
                     </TableCell>
@@ -1079,13 +1080,13 @@ export default function ScheduleList() {
                       </Typography>
                     </TableCell>
                     <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
-                      {s.unitArea || "-"}
+                      {getUnitAreaDisplayName(s.unitArea)}
                     </TableCell>
                     <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
-                      {s.shiftType || "-"}
+                      {getShiftTypeDisplayName(s.shiftType)}
                     </TableCell>
                     <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
-                      {s.shiftTag || "-"}
+                      {getShiftTagDisplayName(s.shiftTag)}
                     </TableCell>
                     <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
                       {formatCertificationTags(s)}

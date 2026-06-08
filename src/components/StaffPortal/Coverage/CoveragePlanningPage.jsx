@@ -41,8 +41,12 @@ import CoverageCreateForm from "./CoverageCreateForm";
 import CoverageEditCountForm from "./CoverageEditCountForm";
 import {
   getRoleDisplayName,
+  getRoleColor,
+  getUnitAreaDisplayName,
+  getShiftTypeDisplayName,
+  getShiftTagDisplayName,
+  getCertificationTagDisplayName,
   getRoleOptionsFromFacilityPreferences,
-  getRoleOptionsForIndustry,
   isRoleCompatible,
 } from "../../../constants/industryRoles";
 
@@ -53,7 +57,7 @@ const statusColors = {
 };
 
 export default function CoveragePlanningPage() {
-  const { isAdmin, tenant, facilityPreferences } = useAuth();
+  const { isAdmin, facilityPreferences } = useAuth();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -74,17 +78,28 @@ export default function CoveragePlanningPage() {
   const [error, setError] = useState("");
 
   const roleOptions = useMemo(() => {
-    const facilityOptions =
-      getRoleOptionsFromFacilityPreferences(facilityPreferences);
-    if (facilityOptions.length) return facilityOptions;
-    return getRoleOptionsForIndustry(tenant?.industry);
-  }, [facilityPreferences, tenant?.industry]);
+    return getRoleOptionsFromFacilityPreferences(facilityPreferences);
+  }, [facilityPreferences]);
 
   const filterRoleOptions = useMemo(() => {
     const existingRoles = coverages.map((c) => c.role).filter(Boolean);
     const industryRoles = roleOptions.map((item) => item.value);
     return Array.from(new Set([...industryRoles, ...existingRoles]));
   }, [coverages, roleOptions]);
+
+  const getRoleChipStyles = (role) => {
+    const roleColor = getRoleColor(role);
+    return {
+      px: 1,
+      py: 0.4,
+      borderRadius: 1,
+      backgroundColor: `${roleColor}22`,
+      color: roleColor,
+      fontWeight: 600,
+      fontSize: "0.72rem",
+      whiteSpace: "nowrap",
+    };
+  };
 
   const getCoverageDayKey = (coverageDate) => {
     if (!coverageDate) return "";
@@ -276,7 +291,7 @@ export default function CoveragePlanningPage() {
   function formatRequiredCertTags(coverage) {
     if (!Array.isArray(coverage?.requiredCertificationTags)) return "—";
     const tags = coverage.requiredCertificationTags
-      .map((tag) => String(tag || "").trim())
+      .map((tag) => getCertificationTagDisplayName(tag))
       .filter(Boolean);
     return tags.length ? tags.join(", ") : "—";
   }
@@ -289,8 +304,8 @@ export default function CoveragePlanningPage() {
       .map((c) => ({
         id: c._id,
         title: `${getRoleDisplayName(c.role)} (${c.requiredCount || 1})${
-          c.unitArea ? ` • ${c.unitArea}` : ""
-        }${c.shiftType ? ` • ${c.shiftType}` : ""}${c.shiftTag ? ` • ${c.shiftTag}` : ""}`,
+          c.unitArea ? ` • ${getUnitAreaDisplayName(c.unitArea)}` : ""
+        }${c.shiftType ? ` • ${getShiftTypeDisplayName(c.shiftType)}` : ""}${c.shiftTag ? ` • ${getShiftTagDisplayName(c.shiftTag)}` : ""}`,
         start: c.startTime,
         end: c.endTime,
         backgroundColor:
@@ -547,13 +562,13 @@ export default function CoveragePlanningPage() {
                     <Typography
                       sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
                     >
-                      Unit Area: {c.unitArea || "—"}
+                      Unit Area: {getUnitAreaDisplayName(c.unitArea)}
                     </Typography>
                     <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                      Shift Type: {c.shiftType || "—"}
+                      Shift Type: {getShiftTypeDisplayName(c.shiftType)}
                     </Typography>
                     <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                      Shift Slot: {c.shiftTag || "—"}
+                      Shift Slot: {getShiftTagDisplayName(c.shiftTag)}
                     </Typography>
                     <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
                       Cert Tags: {formatRequiredCertTags(c)}
@@ -753,19 +768,7 @@ export default function CoveragePlanningPage() {
                       </TableCell>
                     )}
                     <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
-                      <Box
-                        component="span"
-                        sx={{
-                          px: 1,
-                          py: 0.4,
-                          borderRadius: 1,
-                          backgroundColor: "#EEF2FF",
-                          color: "#1E3A8A",
-                          fontWeight: 600,
-                          fontSize: "0.72rem",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
+                      <Box component="span" sx={getRoleChipStyles(c.role)}>
                         {getRoleDisplayName(c.role)}
                       </Box>
                     </TableCell>
@@ -821,13 +824,13 @@ export default function CoveragePlanningPage() {
                       </Typography>
                     </TableCell>
                     <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
-                      {c.unitArea || "—"}
+                      {getUnitAreaDisplayName(c.unitArea)}
                     </TableCell>
                     <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
-                      {c.shiftType || "—"}
+                      {getShiftTypeDisplayName(c.shiftType)}
                     </TableCell>
                     <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
-                      {c.shiftTag || "—"}
+                      {getShiftTagDisplayName(c.shiftTag)}
                     </TableCell>
                     <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
                       {formatRequiredCertTags(c)}

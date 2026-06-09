@@ -17,6 +17,7 @@ import {
   ToggleButtonGroup,
   Select,
   MenuItem,
+  Menu,
   FormControl,
   InputLabel,
   GlobalStyles,
@@ -39,7 +40,13 @@ import {
   FiDelete,
   FiRepeat,
   FiPrinter,
+  FiDownload,
+  FiFileText,
+  FiChevronDown,
 } from "react-icons/fi";
+import ExcelJS from "exceljs";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import ScheduleForm from "./ScheduleForm";
 import AutoGenerateScheduleForm from "./AutoGenerateScheduleForm";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
@@ -83,6 +90,7 @@ export default function ScheduleList() {
   const [monthDate, setMonthDate] = useState(new Date());
   const [staffVisibility, setStaffVisibility] = useState("mine");
   const [shiftTimeFilter, setShiftTimeFilter] = useState("");
+  const [rosterExportAnchorEl, setRosterExportAnchorEl] = useState(null);
 
   const roleFilterOptions = useMemo(() => {
     const facilityRoleValues = getRoleOptionsFromFacilityPreferences(
@@ -511,6 +519,202 @@ export default function ScheduleList() {
     call_out: "#ef5350",
   };
 
+  const monthRosterRows = useMemo(() => {
+    return monthDays.map((day) => {
+      const date = parseLocalDateKey(day);
+      const dayLabel = date.toLocaleDateString("default", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+      const shifts = filteredSchedules
+        .filter((schedule) => getLocalDateKey(schedule.startTime) === day)
+        .sort(
+          (a, b) =>
+            new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+        );
+
+      return {
+        day,
+        dayLabel,
+        shifts,
+      };
+    });
+  }, [monthDays, filteredSchedules]);
+
+  const triggerDownload = (blob, fileName) => {
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(href);
+  };
+
+  const getMonthFileStamp = () => {
+    const month = String(monthDate.getMonth() + 1).padStart(2, "0");
+    const year = monthDate.getFullYear();
+    return `${year}-${month}`;
+  };
+
+  const openRosterExportMenu = (event) => {
+    setRosterExportAnchorEl(event.currentTarget);
+  };
+
+  const closeRosterExportMenu = () => {
+    setRosterExportAnchorEl(null);
+  };
+
+  const handlePrintRoster = () => {
+    closeRosterExportMenu();
+    document.body.classList.add("printing-roster");
+    window.print();
+    document.body.classList.remove("printing-roster");
+  };
+
+  const exportRosterToExcel = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Roster");
+
+      worksheet.columns = [
+        { header: "Date", key: "date", width: 15 },
+        { header: "Staff", key: "staff", width: 24 },
+        { header: "Role", key: "role", width: 16 },
+        { header: "Unit", key: "unit", width: 18 },
+        { header: "Shift Type", key: "shiftType", width: 16 },
+        { header: "Time", key: "time", width: 20 },
+      ];
+
+      worksheet.getRow(1).font = { bold: true, color: { argb: "FF0F172A" } };
+      worksheet.views = [{ state: "frozen", ySplit: 1 }];
+
+      monthRosterRows.forEach(({ dayLabel, shifts }) => {
+        if (shifts.length === 0) {
+          const row = worksheet.addRow({
+            date: dayLabel,
+            staff: "No shifts",
+            role: "-",
+            unit: "-",
+            shiftType: "-",
+            time: "-",
+          });
+          row.getCell("staff").font = {
+            italic: true,
+            color: { argb: "FF6B7280" },
+          };
+          return;
+        }
+
+        shifts.forEach((shift, index) => {
+          const row = worksheet.addRow({
+            date: index === 0 ? dayLabel : "",
+            staff: shift.staffId?.name || "Unknown",
+            role: getRoleDisplayName(shift.role),
+            unit: getUnitAreaDisplayName(shift.unitArea) || "-",
+            shiftType: getShiftTypeDisplayName(shift.shiftType) || "-",
+            time: `${formatScheduleTimeRange(shift, {
+              withNextDayHint: false,
+            })}${isOvernightShift(shift) ? " (+1 day)" : ""}`,
+          });
+
+          row.getCell("role").font = {
+            bold: true,
+            color: { argb: "FF111827" },
+          };
+          row.getCell("shiftType").font = {
+            bold: true,
+            color: { argb: "FF111827" },
+          };
+        });
+      });
+
+      worksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          cell.alignment = { vertical: "middle", wrapText: true };
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFE5E7EB" } },
+            left: { style: "thin", color: { argb: "FFE5E7EB" } },
+            bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+            right: { style: "thin", color: { argb: "FFE5E7EB" } },
+          };
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      triggerDownload(
+        new Blob([buffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        `roster-${getMonthFileStamp()}.xlsx`,
+      );
+    } catch (error) {
+      console.error("Failed to export roster to Excel", error);
+      window.alert("Unable to export roster to Excel. Please try again.");
+    }
+  };
+
+  const exportRosterToPdf = () => {
+    try {
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm" });
+      const body = [];
+
+      monthRosterRows.forEach(({ dayLabel, shifts }) => {
+        if (shifts.length === 0) {
+          body.push([dayLabel, "No shifts", "-", "-", "-"]);
+          return;
+        }
+
+        shifts.forEach((shift, index) => {
+          body.push([
+            index === 0 ? dayLabel : "",
+            shift.staffId?.name || "Unknown",
+            getRoleDisplayName(shift.role),
+            getUnitAreaDisplayName(shift.unitArea) || "-",
+            getShiftTypeDisplayName(shift.shiftType) || "-",
+            `${formatScheduleTimeRange(shift, {
+              withNextDayHint: false,
+            })}${isOvernightShift(shift) ? " (+1 day)" : ""}`,
+          ]);
+        });
+      });
+
+      pdf.setFontSize(14);
+      pdf.text(`Staff Roster - ${monthYear}`, 14, 14);
+
+      autoTable(pdf, {
+        startY: 18,
+        head: [["Date", "Staff", "Role", "Unit", "Shift Type", "Time"]],
+        body,
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+          lineColor: [229, 231, 235],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          textColor: [15, 23, 42],
+          fontStyle: "bold",
+        },
+        columnStyles: {
+          0: { cellWidth: 25 },
+          1: { cellWidth: 54 },
+          2: { cellWidth: 24 },
+          3: { cellWidth: 28 },
+          4: { cellWidth: 28 },
+          5: { cellWidth: 36 },
+        },
+      });
+
+      pdf.save(`roster-${getMonthFileStamp()}.pdf`);
+    } catch (error) {
+      console.error("Failed to export roster to PDF", error);
+      window.alert("Unable to export roster to PDF. Please try again.");
+    }
+  };
+
   return (
     <Container sx={{ mt: 4, px: { xs: 2, sm: 3 } }}>
       <GlobalStyles
@@ -801,6 +1005,7 @@ export default function ScheduleList() {
                   display="flex"
                   alignItems="center"
                   justifyContent="space-between"
+                  gap={1.5}
                 >
                   <Box>
                     {isAdmin && (
@@ -811,41 +1016,51 @@ export default function ScheduleList() {
                         sx={{ p: 0, mb: 0.5 }}
                       />
                     )}
-                    <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                    <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
                       {s.staffId?.name || "Unknown"}
                     </Typography>
-                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                    <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
                       {getRoleDisplayName(s.role)} •{" "}
                       {formatScheduleDateRange(s)}
                     </Typography>
-                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                    <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
                       {formatScheduleTimeRange(s)}
                     </Typography>
-                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                    <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
                       Unit Area: {getUnitAreaDisplayName(s.unitArea)}
                     </Typography>
-                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                    <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
                       Shift Type: {getShiftTypeDisplayName(s.shiftType)}
                     </Typography>
-                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                    <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
                       Shift Slot: {getShiftTagDisplayName(s.shiftTag)}
-                    </Typography>
-                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                      Cert Tags: {formatCertificationTags(s)}
                     </Typography>
                     {isOvernightShift(s) && (
                       <Typography
-                        sx={{ fontSize: 12, color: "info.main", mt: 0.5 }}
+                        sx={{ fontSize: 11, color: "info.main", mt: 0.5 }}
                       >
                         Overnight shift
                       </Typography>
                     )}
-                    <Typography
-                      sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
-                      noWrap
-                    >
-                      {s.notes || "—"}
-                    </Typography>
+                    <Box mt={0.75}>
+                      <Box
+                        component="span"
+                        sx={{
+                          display: "inline-block",
+                          px: 1,
+                          py: 0.3,
+                          borderRadius: 1,
+                          border: `1px solid ${statusColors[s.status] || "#9e9e9e"}`,
+                          color: statusColors[s.status] || "#000",
+                          fontWeight: 700,
+                          fontSize: "0.64rem",
+                          background: "#fff",
+                          letterSpacing: 0.2,
+                        }}
+                      >
+                        {s.status.replace("_", " ").toUpperCase()}
+                      </Box>
+                    </Box>
                   </Box>
                   <Stack spacing={1}>
                     {canManageSchedule(s) && (
@@ -988,25 +1203,7 @@ export default function ScheduleList() {
                       fontSize: "0.72rem",
                     }}
                   >
-                    Cert Tags
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 700,
-                      color: "#0F172A",
-                      fontSize: "0.72rem",
-                    }}
-                  >
                     Status
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 700,
-                      color: "#0F172A",
-                      fontSize: "0.72rem",
-                    }}
-                  >
-                    Notes
                   </TableCell>
                   <TableCell
                     sx={{
@@ -1035,7 +1232,9 @@ export default function ScheduleList() {
                         />
                       </TableCell>
                     )}
-                    <TableCell sx={{ color: "black", fontSize: "0.74rem" }}>
+                    <TableCell
+                      sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}
+                    >
                       <Box display="flex" alignItems="center" gap={1}>
                         <Box
                           sx={{
@@ -1045,86 +1244,105 @@ export default function ScheduleList() {
                             backgroundColor: getRoleColor(s.role),
                           }}
                         />
-                        <Box sx={{ fontSize: "0.72rem", fontWeight: 600 }}>
+                        <Box
+                          sx={{
+                            fontSize: "0.7rem",
+                            fontWeight: 600,
+                            lineHeight: 1.2,
+                          }}
+                        >
                           {s.staffId?.name || "Unknown"}
                         </Box>
                       </Box>
                     </TableCell>
-                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                    <TableCell
+                      sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}
+                    >
                       <Box component="span" sx={getRoleChipStyles(s.role)}>
                         {getRoleDisplayName(s.role)}
                       </Box>
                     </TableCell>
-                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
-                      <Typography sx={{ fontSize: "0.76rem", fontWeight: 600 }}>
+                    <TableCell
+                      sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: "0.72rem",
+                          fontWeight: 600,
+                          lineHeight: 1.2,
+                        }}
+                      >
                         {formatCompactDateTime(s.startTime).date}
                       </Typography>
                       <Typography
                         variant="caption"
-                        sx={{ fontSize: "0.7rem", color: "text.secondary" }}
+                        sx={{
+                          fontSize: "0.66rem",
+                          color: "text.secondary",
+                          lineHeight: 1.1,
+                        }}
                       >
                         {formatCompactDateTime(s.startTime).time}
                       </Typography>
                     </TableCell>
-                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
-                      <Typography sx={{ fontSize: "0.76rem", fontWeight: 600 }}>
+                    <TableCell
+                      sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: "0.72rem",
+                          fontWeight: 600,
+                          lineHeight: 1.2,
+                        }}
+                      >
                         {formatCompactDateTime(s.endTime).date}
                       </Typography>
                       <Typography
                         variant="caption"
-                        sx={{ fontSize: "0.7rem", color: "text.secondary" }}
+                        sx={{
+                          fontSize: "0.66rem",
+                          color: "text.secondary",
+                          lineHeight: 1.1,
+                        }}
                       >
                         {formatCompactDateTime(s.endTime).time}
                       </Typography>
                     </TableCell>
-                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                    <TableCell
+                      sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}
+                    >
                       {getUnitAreaDisplayName(s.unitArea)}
                     </TableCell>
-                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                    <TableCell
+                      sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}
+                    >
                       {getShiftTypeDisplayName(s.shiftType)}
                     </TableCell>
-                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
+                    <TableCell
+                      sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}
+                    >
                       {getShiftTagDisplayName(s.shiftTag)}
                     </TableCell>
-                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
-                      {formatCertificationTags(s)}
-                    </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ py: 0.75 }}>
                       <Box
                         component="span"
                         sx={{
                           display: "inline-block",
                           px: 1,
-                          py: 0.4,
+                          py: 0.3,
                           borderRadius: 1,
                           border: `1px solid ${statusColors[s.status] || "#9e9e9e"}`,
                           color: statusColors[s.status] || "#000",
-                          fontWeight: 600,
-                          fontSize: "0.7rem",
+                          fontWeight: 700,
+                          fontSize: "0.64rem",
                           background: "#fff",
+                          letterSpacing: 0.2,
                         }}
                       >
                         {s.status.replace("_", " ").toUpperCase()}
                       </Box>
                     </TableCell>
-                    <TableCell
-                      sx={{
-                        color: "black",
-                        fontSize: "0.78rem",
-                        maxWidth: 180,
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {s.notes || "—"}
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                    <TableCell sx={{ whiteSpace: "nowrap", py: 0.75 }}>
                       {canManageSchedule(s) && (
                         <Tooltip title="Edit schedule">
                           <IconButton
@@ -1229,17 +1447,39 @@ export default function ScheduleList() {
               </Button>
               <Button
                 size="small"
-                variant="contained"
-                startIcon={<FiPrinter />}
-                onClick={() => {
-                  document.body.classList.add("printing-roster");
-                  window.print();
-                  document.body.classList.remove("printing-roster");
-                }}
+                variant="outlined"
+                startIcon={<FiDownload />}
+                endIcon={<FiChevronDown />}
+                onClick={openRosterExportMenu}
                 sx={{ textTransform: "none" }}
               >
-                Print
+                Export / Print
               </Button>
+              <Menu
+                anchorEl={rosterExportAnchorEl}
+                open={Boolean(rosterExportAnchorEl)}
+                onClose={closeRosterExportMenu}
+              >
+                <MenuItem onClick={handlePrintRoster}>
+                  <FiPrinter style={{ marginRight: 8 }} /> Print roster
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    closeRosterExportMenu();
+                    exportRosterToExcel();
+                  }}
+                >
+                  <FiDownload style={{ marginRight: 8 }} /> Export Excel
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    closeRosterExportMenu();
+                    exportRosterToPdf();
+                  }}
+                >
+                  <FiFileText style={{ marginRight: 8 }} /> Export PDF
+                </MenuItem>
+              </Menu>
             </Stack>
           </Box>
 

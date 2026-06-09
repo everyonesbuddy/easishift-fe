@@ -23,6 +23,7 @@ import {
 import {
   getRoleColor as getMappedRoleColor,
   getRoleDisplayName as getMappedRoleDisplayName,
+  getUnitAreaDisplayName,
   isRoleCompatible,
 } from "../../../constants/industryRoles";
 
@@ -96,6 +97,12 @@ function formatTime(d) {
     .replace(/\s?/g, "");
 }
 
+function normalizeText(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
 const CARD_MAX_HEIGHT = { xs: "52vh", sm: "56vh", md: "60vh" };
 
 const CARD_SCROLL_SX = {
@@ -134,7 +141,7 @@ const CARD_SX = {
 const CARD_INNER_SCROLL_SX = {
   flex: 1,
   minHeight: 0,
-  overflowY: "auto",
+  overflow: "auto",
   ...CARD_SCROLL_SX,
 };
 
@@ -379,10 +386,19 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
       .map((c, idx) => {
         const assignedCount = schedulesNormalized.filter((s) => {
           const scheduleRole = s.staffRole || s.role;
+          const coverageStartMs = new Date(c.startTime).getTime();
+          const coverageEndMs = new Date(c.endTime).getTime();
+          const hasCoverageUnitArea = Boolean(c.unitArea);
+          const unitAreaMatches = hasCoverageUnitArea
+            ? normalizeText(s.unitArea) === normalizeText(c.unitArea)
+            : true;
+
           return (
             s.dayKey === c.dayKey &&
-            s.start.getTime() === new Date(c.startTime).getTime() &&
+            s.start.getTime() === coverageStartMs &&
+            s.end.getTime() === coverageEndMs &&
             s.status !== "call_out" &&
+            unitAreaMatches &&
             isRoleCompatible(scheduleRole, c.role)
           );
         }).length;
@@ -392,6 +408,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
           // Include day/time to guarantee a stable unique key per rendered row.
           id: `${c._id || "coverage"}-${c.dayKey}-${new Date(c.startTime).getTime()}-${new Date(c.endTime).getTime()}-${idx}`,
           role: c.role,
+          unitArea: c.unitArea || "",
           dayKey: c.dayKey,
           shiftStart: c.startTime,
           shiftEnd: c.endTime,
@@ -457,7 +474,6 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
         ? a.start - b.start
         : a.dayKey.localeCompare(b.dayKey),
     )
-    .slice(0, 8)
     .map((s) => ({
       // Split shift rows can share a source _id when one shift crosses midnight.
       id: `${s._id || "shift"}-${s.dayKey}-${s.start.getTime()}-${s.end.getTime()}`,
@@ -696,6 +712,14 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                             {formatTime(cov.shiftStart)} -{" "}
                             {formatTime(cov.shiftEnd)}
                           </Typography>
+                          {cov.unitArea ? (
+                            <Typography
+                              variant="caption"
+                              sx={{ color: "#64748B", display: "block" }}
+                            >
+                              Unit Area: {getUnitAreaDisplayName(cov.unitArea)}
+                            </Typography>
+                          ) : null}
                         </Box>
 
                         <Chip
@@ -1017,7 +1041,28 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                 </Typography>
               </Box>
             </Box>
-            <Box p={2}>
+            <Box
+              p={2}
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                flex: 1,
+                minHeight: 0,
+                ...CARD_INNER_SCROLL_SX,
+              }}
+            >
+              <Typography
+                variant="caption"
+                sx={{
+                  display: { xs: "block", sm: "none" },
+                  color: "#78909c",
+                  fontWeight: 600,
+                }}
+              >
+                Swipe up to view more
+              </Typography>
+
               {upcomingShifts.length === 0 ? (
                 <Box textAlign="center" py={6} sx={{ color: "#9e9e9e" }}>
                   <FiCalendar size={48} />

@@ -9,6 +9,10 @@ import {
   Stack,
   IconButton,
   Chip,
+  ToggleButton,
+  ToggleButtonGroup,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import api from "../../../config/api";
@@ -37,6 +41,8 @@ const PHONE_COUNTRY_CODES = [
   { code: "+33", label: "France (+33)" },
 ];
 
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 const normalizeStringArray = (values) =>
   Array.from(
     new Set(
@@ -45,6 +51,15 @@ const normalizeStringArray = (values) =>
         .filter(Boolean),
     ),
   );
+
+const normalizeNumberArray = (values) =>
+  Array.from(
+    new Set(
+      (Array.isArray(values) ? values : [])
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value >= 0 && value <= 6),
+    ),
+  ).sort((a, b) => a - b);
 
 const toDisplayLabel = (value) => {
   const normalized = String(value || "")
@@ -79,13 +94,22 @@ const buildTimeSlotLabel = (slot) => {
   return displayName;
 };
 
+const extractStaffIdFromResponse = (data) =>
+  data?.user?._id ||
+  data?.user?.id ||
+  data?.staff?._id ||
+  data?.staff?.id ||
+  data?._id ||
+  data?.id ||
+  null;
+
 export default function StaffCreateAndEditForm({
   staff,
   onSuccess,
   onClose,
   staffList = [],
 }) {
-  const { user, role: loggedInRole, facilityPreferences } = useAuth();
+  const { user, role: loggedInRole, facilityPreferences, tenant } = useAuth();
 
   const canAssignAdminRole = loggedInRole === "admin";
 
@@ -129,6 +153,9 @@ export default function StaffCreateAndEditForm({
     allowedShiftTags: [],
     allowedShiftTypes: [],
     certificationTags: [],
+    preferredDaysOfWeek: [],
+    emailNotificationsEnabled: true,
+    smsNotificationsEnabled: true,
     role: "",
   });
   const [emailError, setEmailError] = useState("");
@@ -243,6 +270,29 @@ export default function StaffCreateAndEditForm({
   const isEditingSelf = staff && staff._id === user._id;
   const disableRoleChange = isEditingSelf && loggedInRole === "admin";
 
+  const fetchStaffPreferences = async (staffId) => {
+    if (!staffId) return;
+
+    try {
+      const res = await api.get(`/preferences/${staffId}`);
+      const data = res.data || {};
+
+      setForm((prev) => ({
+        ...prev,
+        preferredDaysOfWeek: normalizeNumberArray(data.preferredDaysOfWeek),
+        emailNotificationsEnabled: data.emailNotificationsEnabled ?? true,
+        smsNotificationsEnabled: data.smsNotificationsEnabled ?? true,
+      }));
+    } catch (err) {
+      console.error("Failed to fetch staff preferences", err);
+    }
+  };
+
+  const saveStaffPreferences = async (staffId, preferencesPayload) => {
+    if (!staffId) return;
+    await api.post(`/preferences/${staffId}`, preferencesPayload);
+  };
+
   useEffect(() => {
     if (staff) {
       const savedShiftTags = normalizeStringArray(staff.allowedShiftTags);
@@ -266,8 +316,13 @@ export default function StaffCreateAndEditForm({
         allowedShiftTags: derivedShiftTags,
         allowedShiftTypes: normalizeStringArray(staff.allowedShiftTypes),
         certificationTags: normalizeStringArray(staff.certificationTags),
+        preferredDaysOfWeek: [],
+        emailNotificationsEnabled: true,
+        smsNotificationsEnabled: true,
         role: staff.role,
       });
+
+      fetchStaffPreferences(staff._id || staff.id);
     }
   }, [staff]);
 
@@ -328,6 +383,16 @@ export default function StaffCreateAndEditForm({
             normalizeToken(value),
           );
 
+      const normalizedPreferredDays = normalizeNumberArray(
+        form.preferredDaysOfWeek,
+      );
+
+      const preferencesPayload = {
+        preferredDaysOfWeek: normalizedPreferredDays,
+        emailNotificationsEnabled: !!form.emailNotificationsEnabled,
+        smsNotificationsEnabled: !!form.smsNotificationsEnabled,
+      };
+
       if (staff) {
         // Prevent self-role modification
         const payload = {
@@ -348,6 +413,7 @@ export default function StaffCreateAndEditForm({
         }
 
         await api.put(`/auth/${staff._id}`, payload);
+        await saveStaffPreferences(staff._id || staff.id, preferencesPayload);
         toast.success("Staff updated", {
           position: "top-right",
           autoClose: 2500,
@@ -367,7 +433,7 @@ export default function StaffCreateAndEditForm({
           return;
         }
 
-        await api.post("/auth/signup/staff", {
+        const res = await api.post("/auth/signup/staff", {
           name: form.name,
           email: form.email,
           role: form.role,
@@ -384,6 +450,13 @@ export default function StaffCreateAndEditForm({
               }
             : {}),
         });
+
+        const createdStaffId = extractStaffIdFromResponse(res?.data);
+
+        if (createdStaffId) {
+          await saveStaffPreferences(createdStaffId, preferencesPayload);
+        }
+
         toast.success("Staff created", {
           position: "top-right",
           autoClose: 2500,
@@ -610,6 +683,108 @@ export default function StaffCreateAndEditForm({
             certificationLabelLookup.get(option) || toDisplayLabel(option)
           }
         />
+
+        <Box>
+          <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+            Preferred Work Days
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: "block", mb: 1 }}
+          >
+            Select days this staff member prefers to work.
+          </Typography>
+          <ToggleButtonGroup
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7, minmax(42px, 1fr))",
+              gap: 1,
+            }}
+          >
+            {DAYS.map((day, index) => {
+              const isPreferred = form.preferredDaysOfWeek.includes(index);
+              return (
+                <ToggleButton
+                  key={day}
+                  value={day}
+                  selected={isPreferred}
+                  onClick={() => {
+                    const nextValues = isPreferred
+                      ? form.preferredDaysOfWeek.filter(
+                          (item) => item !== index,
+                        )
+                      : [...form.preferredDaysOfWeek, index];
+
+                    setForm({
+                      ...form,
+                      preferredDaysOfWeek: normalizeNumberArray(nextValues),
+                    });
+                  }}
+                  sx={{
+                    borderRadius: 2,
+                    minHeight: 40,
+                    fontWeight: 600,
+                    bgcolor: isPreferred
+                      ? "success.lighter"
+                      : "background.paper",
+                    color: isPreferred ? "success.dark" : "text.primary",
+                    border: isPreferred ? "2px solid" : "1px solid",
+                    borderColor: isPreferred ? "success.main" : "divider",
+                    "&:hover": {
+                      borderColor: "success.light",
+                    },
+                  }}
+                >
+                  {day}
+                </ToggleButton>
+              );
+            })}
+          </ToggleButtonGroup>
+        </Box>
+
+        <Box>
+          <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+            Notification Preferences
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: "block", mb: 1 }}
+          >
+            Configure email and SMS alerts for this staff member
+          </Typography>
+          <Stack spacing={1}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={!!form.emailNotificationsEnabled}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      emailNotificationsEnabled: e.target.checked,
+                    })
+                  }
+                />
+              }
+              label="Email Notifications"
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={!!form.smsNotificationsEnabled}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      smsNotificationsEnabled: e.target.checked,
+                    })
+                  }
+                />
+              }
+              label="SMS Notifications"
+            />
+          </Stack>
+        </Box>
 
         <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
           <Button variant="contained" fullWidth onClick={handleSubmit}>

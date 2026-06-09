@@ -618,7 +618,6 @@ export default function ScheduleList() {
             </ToggleButton>
           </ToggleButtonGroup>
 
-          {/* Bulk scheduling only for admins; Individual scheduling available to admins and non-admins (preselects current user for non-admins) */}
           {isAdmin && (
             <Button
               size="small"
@@ -657,7 +656,6 @@ export default function ScheduleList() {
             </Button>
           )}
 
-          {/* Individual schedule: show to everyone. Non-admins will schedule themselves. */}
           <Button
             size="small"
             variant="contained"
@@ -1600,24 +1598,23 @@ export default function ScheduleList() {
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Scheduling Modal */}
       <Dialog
         open={openAutoModal}
         onClose={() => setOpenAutoModal(false)}
         fullWidth
-        maxWidth="md"
+        maxWidth="lg"
         scroll="paper"
         PaperProps={{
           sx: {
             borderRadius: { xs: 3, md: 4 },
+            overflow: "hidden",
           },
         }}
       >
-        <DialogContent dividers>
+        <DialogContent dividers sx={{ p: { xs: 1.25, md: 2 } }}>
           <AutoGenerateScheduleForm
             onClose={() => setOpenAutoModal(false)}
             onSuccess={() => {
-              setOpenAutoModal(false);
               fetchSchedules();
             }}
           />

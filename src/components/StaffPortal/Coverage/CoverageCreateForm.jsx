@@ -38,28 +38,6 @@ const weekdayOptions = [
 
 const horizonOptions = [1, 2, 3, 7, 14, 28, 42, 56];
 
-const requirementTemplates = [
-  {
-    id: "morning",
-    label: "Morning 07-15",
-    startTime: "07:00",
-    endTime: "15:00",
-  },
-  {
-    id: "business",
-    label: "Business 09-17",
-    startTime: "09:00",
-    endTime: "17:00",
-  },
-  {
-    id: "evening",
-    label: "Evening 15-23",
-    startTime: "15:00",
-    endTime: "23:00",
-  },
-  { id: "night", label: "Night 23-07", startTime: "23:00", endTime: "07:00" },
-];
-
 const defaultRequirement = {
   role: "",
   requiredCount: 1,
@@ -372,17 +350,6 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
     setRequirements((prev) => [...prev, { ...defaultRequirement }]);
   };
 
-  const handleAddTemplateRequirement = (template) => {
-    setRequirements((prev) => [
-      ...prev,
-      {
-        ...defaultRequirement,
-        startTime: template.startTime,
-        endTime: template.endTime,
-      },
-    ]);
-  };
-
   const handleRemoveRequirement = (index) => {
     setRequirements((prev) =>
       prev.length === 1 ? prev : prev.filter((_, i) => i !== index),
@@ -560,7 +527,8 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
           Coverage Planner
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          Set a horizon and repeat pattern, then fill role requirements once.
+          Set your date horizon, then define shift requirements. Shift
+          definitions are recommended and manual time is a fallback.
         </Typography>
       </Box>
 
@@ -751,35 +719,16 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
             variant="outlined"
             onClick={handleAddRequirement}
             startIcon={<MdAdd size={18} />}
-            sx={{ textTransform: "none", width: { xs: "100", sm: "auto" } }}
+            sx={{ textTransform: "none", width: { xs: "100%", sm: "auto" } }}
           >
             Add Requirement
           </Button>
         </Box>
 
-        <Box>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "block", mb: 1 }}
-          >
-            Shift templates
-          </Typography>
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            {requirementTemplates.map((template) => (
-              <Button
-                key={template.id}
-                type="button"
-                size="small"
-                variant="outlined"
-                onClick={() => handleAddTemplateRequirement(template)}
-                sx={{ textTransform: "none" }}
-              >
-                {template.label}
-              </Button>
-            ))}
-          </Stack>
-        </Box>
+        <Alert severity="info" sx={{ py: 0.5 }}>
+          Recommended workflow: select a Shift Definition first. Use manual
+          start/end time only when no slot matches.
+        </Alert>
 
         <Stack spacing={2}>
           {requirements.map((req, index) => (
@@ -817,7 +766,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                   </IconButton>
                 </Box>
 
-                <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
                   <TextField
                     select
                     fullWidth
@@ -859,62 +808,30 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                   />
                 </Stack>
 
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
                   <TextField
+                    select
                     fullWidth
-                    label="Start"
-                    type="time"
-                    value={
-                      getSelectedSlot(req)?.startLocalTime || req.startTime
-                    }
+                    label="Shift Definition (Recommended)"
+                    value={getShiftDefinitionValue(req)}
                     onChange={(e) =>
-                      handleRequirementChange(
-                        index,
-                        "startTime",
-                        e.target.value,
-                      )
+                      handleShiftDefinitionSelect(index, e.target.value)
                     }
-                    disabled={Boolean(getSelectedSlot(req))}
-                    InputLabelProps={{ shrink: true }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <MdAccessTime size={18} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    required
-                  />
-
-                  <TextField
-                    fullWidth
-                    label="End"
-                    type="time"
-                    value={getSelectedSlot(req)?.endLocalTime || req.endTime}
-                    onChange={(e) =>
-                      handleRequirementChange(index, "endTime", e.target.value)
+                    disabled={shiftDefinitionOptions.length === 0}
+                    helperText={
+                      shiftDefinitionOptions.length > 0
+                        ? "Choosing a definition auto-fills start/end."
+                        : "No shift definitions configured yet. Configure shift type time slots in Facility Preferences."
                     }
-                    disabled={Boolean(getSelectedSlot(req))}
-                    InputLabelProps={{ shrink: true }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <MdAccessTime size={18} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    required
-                  />
-                </Stack>
+                  >
+                    <MenuItem value="">Use Custom Manual Time</MenuItem>
+                    {shiftDefinitionOptions.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
 
-                {isOvernightTimeRange(req.startTime, req.endTime) && (
-                  <Alert severity="info" sx={{ py: 0 }}>
-                    This shift will be treated as overnight and end the next
-                    day.
-                  </Alert>
-                )}
-
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
                   <TextField
                     select
                     fullWidth
@@ -941,30 +858,14 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                       </MenuItem>
                     ))}
                   </TextField>
-
-                  <TextField
-                    select
-                    fullWidth
-                    label="Shift Definition (Optional)"
-                    value={getShiftDefinitionValue(req)}
-                    onChange={(e) =>
-                      handleShiftDefinitionSelect(index, e.target.value)
-                    }
-                    disabled={shiftDefinitionOptions.length === 0}
-                    helperText={
-                      shiftDefinitionOptions.length > 0
-                        ? "Selecting one definition auto-populates start/end and saves shift type + slot tag."
-                        : "No shift definitions configured yet. Configure shift type time slots in Facility Preferences."
-                    }
-                  >
-                    <MenuItem value="">Manual Time Entry</MenuItem>
-                    {shiftDefinitionOptions.map((option) => (
-                      <MenuItem key={option.value} value={option.value}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </TextField>
                 </Stack>
+
+                {isOvernightTimeRange(req.startTime, req.endTime) && (
+                  <Alert severity="info" sx={{ py: 0 }}>
+                    This shift will be treated as overnight and end the next
+                    day.
+                  </Alert>
+                )}
 
                 <Box>
                   <Typography
@@ -1014,6 +915,64 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                     )}
                   </TextField>
                 </Box>
+
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                  <TextField
+                    fullWidth
+                    label="Start"
+                    type="time"
+                    value={
+                      getSelectedSlot(req)?.startLocalTime || req.startTime
+                    }
+                    onChange={(e) =>
+                      handleRequirementChange(
+                        index,
+                        "startTime",
+                        e.target.value,
+                      )
+                    }
+                    disabled={Boolean(getSelectedSlot(req))}
+                    InputLabelProps={{ shrink: true }}
+                    helperText={
+                      getSelectedSlot(req)
+                        ? "From selected shift definition"
+                        : "Manual fallback"
+                    }
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <MdAccessTime size={18} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    required
+                  />
+
+                  <TextField
+                    fullWidth
+                    label="End"
+                    type="time"
+                    value={getSelectedSlot(req)?.endLocalTime || req.endTime}
+                    onChange={(e) =>
+                      handleRequirementChange(index, "endTime", e.target.value)
+                    }
+                    disabled={Boolean(getSelectedSlot(req))}
+                    InputLabelProps={{ shrink: true }}
+                    helperText={
+                      getSelectedSlot(req)
+                        ? "From selected shift definition"
+                        : "Manual fallback"
+                    }
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <MdAccessTime size={18} />
+                        </InputAdornment>
+                      ),
+                    }}
+                    required
+                  />
+                </Stack>
               </Stack>
             </Paper>
           ))}
@@ -1114,8 +1073,12 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                         {row.unitArea
                           ? ` • ${getUnitAreaDisplayName(row.unitArea)}`
                           : ""}
-                        {row.shiftType ? ` • ${row.shiftType}` : ""}
-                        {row.shiftTag ? ` • ${row.shiftTag}` : ""}
+                        {row.shiftType
+                          ? ` • ${toDisplayLabel(row.shiftType)}`
+                          : ""}
+                        {row.shiftTag
+                          ? ` • ${toDisplayLabel(row.shiftTag)}`
+                          : ""}
                       </Typography>
                       {row.spansOvernight && (
                         <Chip

@@ -34,7 +34,14 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
 import api from "../../../config/api";
-import { FiCalendar, FiList, FiPlus, FiDelete, FiEdit2 } from "react-icons/fi";
+import {
+  FiCalendar,
+  FiList,
+  FiPlus,
+  FiDelete,
+  FiEdit2,
+  FiEye,
+} from "react-icons/fi";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import { useAuth } from "../../../context/AuthContext";
 import CoverageCreateForm from "./CoverageCreateForm";
@@ -68,6 +75,8 @@ export default function CoveragePlanningPage() {
 
   const [openAdd, setOpenAdd] = useState(false);
   const [editingCoverage, setEditingCoverage] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedCoverage, setSelectedCoverage] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
@@ -157,6 +166,17 @@ export default function CoveragePlanningPage() {
   const openEdit = (coverage) => {
     if (!isAdmin || !coverage) return;
     setEditingCoverage(coverage);
+  };
+
+  const openDetails = (coverage) => {
+    if (!coverage) return;
+    setSelectedCoverage(coverage);
+    setDetailsOpen(true);
+  };
+
+  const closeDetails = () => {
+    setDetailsOpen(false);
+    setSelectedCoverage(null);
   };
 
   const confirmDelete = async () => {
@@ -570,9 +590,6 @@ export default function CoveragePlanningPage() {
                     <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
                       Shift Slot: {getShiftTagDisplayName(c.shiftTag)}
                     </Typography>
-                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                      Cert Tags: {formatRequiredCertTags(c)}
-                    </Typography>
                     {spansOvernight(c) && (
                       <Typography
                         sx={{ fontSize: 12, color: "info.main", mt: 0.5 }}
@@ -580,12 +597,6 @@ export default function CoveragePlanningPage() {
                         Overnight shift
                       </Typography>
                     )}
-                    <Typography
-                      sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
-                      noWrap
-                    >
-                      {c.note || "—"}
-                    </Typography>
                   </Box>
                   <Stack spacing={1}>
                     <Typography
@@ -597,6 +608,15 @@ export default function CoveragePlanningPage() {
                     >
                       {c.requiredCount} needed
                     </Typography>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<FiEye />}
+                      onClick={() => openDetails(c)}
+                      sx={{ textTransform: "none", borderRadius: 2 }}
+                    >
+                      View
+                    </Button>
                     {isAdmin && (
                       <Stack direction="row" spacing={1}>
                         <Button
@@ -728,28 +748,8 @@ export default function CoveragePlanningPage() {
                       fontSize: "0.72rem",
                     }}
                   >
-                    Cert Tags
+                    Actions
                   </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 700,
-                      color: "#0F172A",
-                      fontSize: "0.72rem",
-                    }}
-                  >
-                    Notes
-                  </TableCell>
-                  {isAdmin && (
-                    <TableCell
-                      sx={{
-                        fontWeight: 700,
-                        color: "#0F172A",
-                        fontSize: "0.72rem",
-                      }}
-                    >
-                      Actions
-                    </TableCell>
-                  )}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -832,23 +832,18 @@ export default function CoveragePlanningPage() {
                     <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
                       {getShiftTagDisplayName(c.shiftTag)}
                     </TableCell>
-                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
-                      {formatRequiredCertTags(c)}
-                    </TableCell>
-                    <TableCell sx={{ fontSize: "0.78rem", maxWidth: 220 }}>
-                      <Box
-                        sx={{
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {c.note || "—"}
-                      </Box>
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell sx={{ whiteSpace: "nowrap" }}>
-                        <Stack direction="row" spacing={1}>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                      <Stack direction="row" spacing={1}>
+                        <Tooltip title="View details">
+                          <IconButton
+                            size="small"
+                            onClick={() => openDetails(c)}
+                            sx={{ color: "#475569" }}
+                          >
+                            <FiEye />
+                          </IconButton>
+                        </Tooltip>
+                        {isAdmin && (
                           <Tooltip title="Edit coverage">
                             <IconButton
                               size="small"
@@ -858,6 +853,8 @@ export default function CoveragePlanningPage() {
                               <FiEdit2 />
                             </IconButton>
                           </Tooltip>
+                        )}
+                        {isAdmin && (
                           <Tooltip title="Delete coverage">
                             <IconButton
                               size="small"
@@ -867,9 +864,9 @@ export default function CoveragePlanningPage() {
                               <FiDelete />
                             </IconButton>
                           </Tooltip>
-                        </Stack>
-                      </TableCell>
-                    )}
+                        )}
+                      </Stack>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -1029,6 +1026,116 @@ export default function CoveragePlanningPage() {
               fetchCoverages();
             }}
           />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={detailsOpen}
+        onClose={closeDetails}
+        fullWidth
+        maxWidth="sm"
+        scroll="paper"
+        PaperProps={{
+          sx: {
+            borderRadius: { xs: 3, md: 4 },
+          },
+        }}
+      >
+        <DialogContent dividers>
+          {selectedCoverage ? (
+            <Box display="flex" flexDirection="column" gap={1.4}>
+              <Typography variant="h6" sx={{ mb: 0.5 }}>
+                Coverage Details
+              </Typography>
+
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Role
+                </Typography>
+                <Typography>{getRoleDisplayName(selectedCoverage.role)}</Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Date
+                </Typography>
+                <Typography>{formatCoverageDateLabel(selectedCoverage)}</Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Time
+                </Typography>
+                <Typography>{formatCoverageTimeLabel(selectedCoverage)}</Typography>
+              </Box>
+
+              <Box display="grid" gridTemplateColumns={{ xs: "1fr", sm: "1fr 1fr" }} gap={1.2}>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Required Staff
+                  </Typography>
+                  <Typography>{selectedCoverage.requiredCount ?? "-"}</Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Remaining
+                  </Typography>
+                  <Typography>{selectedCoverage.remaining ?? "-"}</Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Unit Area
+                  </Typography>
+                  <Typography>
+                    {getUnitAreaDisplayName(selectedCoverage.unitArea) || "-"}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Shift Type
+                  </Typography>
+                  <Typography>
+                    {getShiftTypeDisplayName(selectedCoverage.shiftType) || "-"}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Shift Slot
+                  </Typography>
+                  <Typography>
+                    {getShiftTagDisplayName(selectedCoverage.shiftTag) || "-"}
+                  </Typography>
+                </Box>
+
+              </Box>
+
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Required Certification Tags
+                </Typography>
+                <Typography>{formatRequiredCertTags(selectedCoverage)}</Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Notes
+                </Typography>
+                <Typography sx={{ whiteSpace: "pre-wrap", color: "#334155" }}>
+                  {selectedCoverage.note || "—"}
+                </Typography>
+              </Box>
+
+              {spansOvernight(selectedCoverage) && (
+                <Typography variant="caption" sx={{ color: "info.main", mt: 0.5 }}>
+                  Overnight shift
+                </Typography>
+              )}
+            </Box>
+          ) : null}
         </DialogContent>
       </Dialog>
 

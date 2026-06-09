@@ -36,6 +36,7 @@ import {
   FiCalendar,
   FiList,
   FiPlus,
+  FiEye,
   FiEdit,
   FiDelete,
   FiRepeat,
@@ -85,6 +86,8 @@ export default function ScheduleList() {
   const [selectedScheduleIds, setSelectedScheduleIds] = useState([]);
   const [swapModalOpen, setSwapModalOpen] = useState(false);
   const [swapSchedule, setSwapSchedule] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedSchedule, setSelectedSchedule] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [monthDate, setMonthDate] = useState(new Date());
@@ -377,6 +380,16 @@ export default function ScheduleList() {
   const closeSwapRequestModal = () => {
     setSwapModalOpen(false);
     setSwapSchedule(null);
+  };
+
+  const openDetailsModal = (sched) => {
+    setSelectedSchedule(sched);
+    setDetailsOpen(true);
+  };
+
+  const closeDetailsModal = () => {
+    setDetailsOpen(false);
+    setSelectedSchedule(null);
   };
 
   const canManageSchedule = (schedule) => {
@@ -838,7 +851,7 @@ export default function ScheduleList() {
                 "&:hover": { bgcolor: "#1146b1" },
               }}
             >
-              AI Draft Planner
+              AI Scheduler
             </Button>
           )}
 
@@ -884,7 +897,7 @@ export default function ScheduleList() {
               "&:hover": { bgcolor: "#0f172a" },
             }}
           >
-            {isAdmin ? "Manual Schedule" : "Pick Up Shift"}
+            {isAdmin ? "Manual Scheduler" : "Pick Up Shift"}
           </Button>
         </Box>
       </Box>
@@ -1063,6 +1076,14 @@ export default function ScheduleList() {
                     </Box>
                   </Box>
                   <Stack spacing={1}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<FiEye />}
+                      onClick={() => openDetailsModal(s)}
+                    >
+                      View
+                    </Button>
                     {canManageSchedule(s) && (
                       <Button
                         size="small"
@@ -1343,6 +1364,15 @@ export default function ScheduleList() {
                       </Box>
                     </TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap", py: 0.75 }}>
+                      <Tooltip title="View details">
+                        <IconButton
+                          size="small"
+                          onClick={() => openDetailsModal(s)}
+                          sx={{ mr: 0.5, color: "#475569" }}
+                        >
+                          <FiEye />
+                        </IconButton>
+                      </Tooltip>
                       {canManageSchedule(s) && (
                         <Tooltip title="Edit schedule">
                           <IconButton
@@ -1835,6 +1865,136 @@ export default function ScheduleList() {
             initialStaffId={!isAdmin && !editingSchedule ? user._id : ""}
             disableStaffSelect={!isAdmin && !editingSchedule}
           />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={detailsOpen}
+        onClose={closeDetailsModal}
+        fullWidth
+        maxWidth="sm"
+        scroll="paper"
+        PaperProps={{
+          sx: {
+            borderRadius: { xs: 3, md: 4 },
+          },
+        }}
+      >
+        <DialogContent dividers>
+          {selectedSchedule ? (
+            <Box display="flex" flexDirection="column" gap={1.4}>
+              <Typography variant="h6" sx={{ mb: 0.5 }}>
+                Schedule Details
+              </Typography>
+
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Staff
+                </Typography>
+                <Typography sx={{ fontWeight: 600 }}>
+                  {selectedSchedule.staffId?.name || "Unknown"}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Role
+                </Typography>
+                <Typography>
+                  {getRoleDisplayName(selectedSchedule.role)}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Date
+                </Typography>
+                <Typography>
+                  {formatScheduleDateRange(selectedSchedule)}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Time
+                </Typography>
+                <Typography>
+                  {formatScheduleTimeRange(selectedSchedule)}
+                </Typography>
+              </Box>
+
+              <Box
+                display="grid"
+                gridTemplateColumns={{ xs: "1fr", sm: "1fr 1fr" }}
+                gap={1.2}
+              >
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Unit Area
+                  </Typography>
+                  <Typography>
+                    {getUnitAreaDisplayName(selectedSchedule.unitArea) || "-"}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Shift Type
+                  </Typography>
+                  <Typography>
+                    {getShiftTypeDisplayName(selectedSchedule.shiftType) || "-"}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Shift Slot
+                  </Typography>
+                  <Typography>
+                    {getShiftTagDisplayName(selectedSchedule.shiftTag) || "-"}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Status
+                  </Typography>
+                  <Typography>
+                    {(selectedSchedule.status || "-")
+                      .replace("_", " ")
+                      .toUpperCase()}
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Certification Tags
+                </Typography>
+                <Typography>
+                  {formatCertificationTags(selectedSchedule)}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Notes
+                </Typography>
+                <Typography sx={{ whiteSpace: "pre-wrap", color: "#334155" }}>
+                  {selectedSchedule.notes || "-"}
+                </Typography>
+              </Box>
+
+              {isOvernightShift(selectedSchedule) && (
+                <Typography
+                  variant="caption"
+                  sx={{ color: "info.main", mt: 0.5 }}
+                >
+                  Overnight shift
+                </Typography>
+              )}
+            </Box>
+          ) : null}
         </DialogContent>
       </Dialog>
 

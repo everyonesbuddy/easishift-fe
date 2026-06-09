@@ -394,8 +394,28 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
         coverageIds: selectedCoverageIds,
       });
 
-      const newDraftId = res?.data?.draftSchedule?.draftId;
-      toast.success("Draft created successfully.", toastOptions);
+      const responseData = res?.data || {};
+      const newDraftId =
+        responseData?.draftSchedule?.draftId ||
+        responseData?.draftSchedule?._id;
+      const didCreateDraft = Boolean(
+        responseData?.draftCreated ?? Boolean(newDraftId),
+      );
+
+      if (responseData?.message) {
+        if (didCreateDraft) {
+          toast.success(responseData.message, toastOptions);
+        } else {
+          toast.info(responseData.message, toastOptions);
+        }
+      } else {
+        toast.success("Draft created successfully.", toastOptions);
+      }
+
+      if (responseData?.warning) {
+        toast.warning(responseData.warning, toastOptions);
+      }
+
       await Promise.all([loadCoverages(), loadDrafts()]);
       setSelectedCoverageIds([]);
       if (newDraftId) {

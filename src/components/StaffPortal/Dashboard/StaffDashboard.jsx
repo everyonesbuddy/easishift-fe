@@ -443,7 +443,7 @@ export default function StaffDashboard() {
                 "&:hover": { bgcolor: "#0F172A" },
               }}
             >
-              Manual Schedule
+              Manual Scheduler
             </Button>
 
             <Button
@@ -461,7 +461,7 @@ export default function StaffDashboard() {
                 "&:hover": { bgcolor: "#0369A1" },
               }}
             >
-              AI Draft Planner
+              AI Scheduler
             </Button>
           </>
         ) : (

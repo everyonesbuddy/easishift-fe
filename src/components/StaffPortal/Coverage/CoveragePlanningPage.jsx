@@ -1052,29 +1052,41 @@ export default function CoveragePlanningPage() {
                 <Typography variant="caption" color="text.secondary">
                   Role
                 </Typography>
-                <Typography>{getRoleDisplayName(selectedCoverage.role)}</Typography>
+                <Typography>
+                  {getRoleDisplayName(selectedCoverage.role)}
+                </Typography>
               </Box>
 
               <Box>
                 <Typography variant="caption" color="text.secondary">
                   Date
                 </Typography>
-                <Typography>{formatCoverageDateLabel(selectedCoverage)}</Typography>
+                <Typography>
+                  {formatCoverageDateLabel(selectedCoverage)}
+                </Typography>
               </Box>
 
               <Box>
                 <Typography variant="caption" color="text.secondary">
                   Time
                 </Typography>
-                <Typography>{formatCoverageTimeLabel(selectedCoverage)}</Typography>
+                <Typography>
+                  {formatCoverageTimeLabel(selectedCoverage)}
+                </Typography>
               </Box>
 
-              <Box display="grid" gridTemplateColumns={{ xs: "1fr", sm: "1fr 1fr" }} gap={1.2}>
+              <Box
+                display="grid"
+                gridTemplateColumns={{ xs: "1fr", sm: "1fr 1fr" }}
+                gap={1.2}
+              >
                 <Box>
                   <Typography variant="caption" color="text.secondary">
                     Required Staff
                   </Typography>
-                  <Typography>{selectedCoverage.requiredCount ?? "-"}</Typography>
+                  <Typography>
+                    {selectedCoverage.requiredCount ?? "-"}
+                  </Typography>
                 </Box>
 
                 <Box>
@@ -1110,14 +1122,15 @@ export default function CoveragePlanningPage() {
                     {getShiftTagDisplayName(selectedCoverage.shiftTag) || "-"}
                   </Typography>
                 </Box>
-
               </Box>
 
               <Box>
                 <Typography variant="caption" color="text.secondary">
                   Required Certification Tags
                 </Typography>
-                <Typography>{formatRequiredCertTags(selectedCoverage)}</Typography>
+                <Typography>
+                  {formatRequiredCertTags(selectedCoverage)}
+                </Typography>
               </Box>
 
               <Box>
@@ -1130,7 +1143,10 @@ export default function CoveragePlanningPage() {
               </Box>
 
               {spansOvernight(selectedCoverage) && (
-                <Typography variant="caption" sx={{ color: "info.main", mt: 0.5 }}>
+                <Typography
+                  variant="caption"
+                  sx={{ color: "info.main", mt: 0.5 }}
+                >
                   Overnight shift
                 </Typography>
               )}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import {
+  Alert,
   TextField,
   Button,
   Typography,
@@ -269,6 +270,10 @@ export default function StaffCreateAndEditForm({
 
   const isEditingSelf = staff && staff._id === user._id;
   const disableRoleChange = isEditingSelf && loggedInRole === "admin";
+  const hasTagRestrictions =
+    form.allowedAreas.length > 0 ||
+    form.allowedShiftTags.length > 0 ||
+    form.certificationTags.length > 0;
 
   const fetchStaffPreferences = async (staffId) => {
     if (!staffId) return;
@@ -377,11 +382,17 @@ export default function StaffCreateAndEditForm({
         ),
       );
 
-      const normalizedShiftTypes = slotSpecificShiftValues.length
-        ? slotSpecificShiftValues
-        : normalizeStringArray(form.allowedShiftTypes).map((value) =>
-            normalizeToken(value),
-          );
+      // If the user cleared all shift tags, send an empty array so the backend
+      // removes the restrictions. Only fall back to the raw allowedShiftTypes
+      // field when the facility has no time-slot definitions at all (legacy path).
+      const normalizedShiftTypes =
+        slotSpecificShiftValues.length > 0
+          ? slotSpecificShiftValues
+          : normalizedShiftTags.length === 0 && shiftSlotOptions.length > 0
+            ? []
+            : normalizeStringArray(form.allowedShiftTypes).map((value) =>
+                normalizeToken(value),
+              );
 
       const normalizedPreferredDays = normalizeNumberArray(
         form.preferredDaysOfWeek,
@@ -534,6 +545,36 @@ export default function StaffCreateAndEditForm({
     );
   };
 
+  const SectionCard = ({ eyebrow, title, description, children }) => (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: { xs: 1.5, sm: 2 },
+        borderRadius: 2.5,
+        borderColor: "#dbeafe",
+        backgroundColor: "#f8fbff",
+      }}
+    >
+      <Stack spacing={1.5}>
+        <Box>
+          <Typography
+            variant="overline"
+            sx={{ color: "primary.main", fontWeight: 700, letterSpacing: 0.8 }}
+          >
+            {eyebrow}
+          </Typography>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+            {title}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {description}
+          </Typography>
+        </Box>
+        {children}
+      </Stack>
+    </Paper>
+  );
+
   return (
     <Paper
       component="form"
@@ -563,228 +604,274 @@ export default function StaffCreateAndEditForm({
       </Typography>
 
       <Stack spacing={2}>
-        <TextField
-          fullWidth
-          label="Name"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-        />
+        <SectionCard
+          eyebrow="Staff Info"
+          title="Basic Information"
+          description="Core details used to identify the staff member and assign their role."
+        >
+          <TextField
+            fullWidth
+            label="Name"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
 
-        <TextField
-          fullWidth
-          label="Email"
-          type="email"
-          value={form.email}
-          onChange={(e) => {
-            setForm({ ...form, email: e.target.value });
-            setEmailError("");
-          }}
-          error={!!emailError}
-          helperText={emailError}
-        />
+          <TextField
+            fullWidth
+            label="Email"
+            type="email"
+            value={form.email}
+            onChange={(e) => {
+              setForm({ ...form, email: e.target.value });
+              setEmailError("");
+            }}
+            error={!!emailError}
+            helperText={emailError}
+          />
 
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+            <TextField
+              select
+              fullWidth
+              label="Country Code"
+              value={form.phoneCountryCode}
+              onChange={(e) => {
+                setForm({ ...form, phoneCountryCode: e.target.value });
+                setPhoneError("");
+              }}
+            >
+              <MenuItem value="">Select code</MenuItem>
+              {PHONE_COUNTRY_CODES.map((item) => (
+                <MenuItem key={item.code} value={item.code}>
+                  {item.label}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              fullWidth
+              label="Phone Number"
+              value={form.phone}
+              onChange={(e) => {
+                setForm({ ...form, phone: e.target.value });
+                setPhoneError("");
+              }}
+              error={!!phoneError}
+              helperText={phoneError}
+              inputProps={{ inputMode: "tel" }}
+            />
+          </Stack>
+
           <TextField
             select
             fullWidth
-            label="Country Code"
-            value={form.phoneCountryCode}
-            onChange={(e) => {
-              setForm({ ...form, phoneCountryCode: e.target.value });
-              setPhoneError("");
+            label="Role"
+            value={form.role}
+            disabled={disableRoleChange}
+            onChange={(e) => setForm({ ...form, role: e.target.value })}
+            SelectProps={{
+              MenuProps: {
+                PaperProps: {
+                  sx: { maxHeight: 480 },
+                },
+              },
             }}
           >
-            <MenuItem value="">Select code</MenuItem>
-            {PHONE_COUNTRY_CODES.map((item) => (
-              <MenuItem key={item.code} value={item.code}>
+            {selectableRoleOptions.map((item) => (
+              <MenuItem key={item.value} value={item.value}>
                 {item.label}
               </MenuItem>
             ))}
           </TextField>
+        </SectionCard>
 
-          <TextField
-            fullWidth
-            label="Phone Number"
-            value={form.phone}
-            onChange={(e) => {
-              setForm({ ...form, phone: e.target.value });
-              setPhoneError("");
-            }}
-            error={!!phoneError}
-            helperText={phoneError}
-            inputProps={{ inputMode: "tel" }}
-          />
-        </Stack>
-
-        <TextField
-          select
-          fullWidth
-          label="Role"
-          value={form.role}
-          disabled={disableRoleChange}
-          onChange={(e) => setForm({ ...form, role: e.target.value })}
-          SelectProps={{
-            MenuProps: {
-              PaperProps: {
-                sx: { maxHeight: 480 },
-              },
-            },
-          }}
+        <SectionCard
+          eyebrow="Coverage Rules"
+          title="Tagging and Restrictions"
+          description="Use tags only when this staff member should be limited to specific areas, time slots, or certifications."
         >
-          {selectableRoleOptions.map((item) => (
-            <MenuItem key={item.value} value={item.value}>
-              {item.label}
-            </MenuItem>
-          ))}
-        </TextField>
-
-        {allowedAreaOptions.length > 0 && (
-          <MultiChipSelector
-            label="Allowed Unit Areas"
-            helperText="Click chips to select or remove areas"
-            options={allowedAreaOptions}
-            values={form.allowedAreas}
-            onChange={(value) => setForm({ ...form, allowedAreas: value })}
-            getOptionValue={(option) => option}
-            getOptionLabel={(option) =>
-              areaLabelLookup.get(option) || toDisplayLabel(option)
-            }
-          />
-        )}
-
-        <MultiChipSelector
-          label="Allowed Shift Time Slots"
-          helperText={
-            shiftSlotOptions.length
-              ? "Select exact slots, e.g. Day - Day 1 or Day - Day 2"
-              : "No shift definitions configured yet. Define shift type time slots in Facility Preferences to use this."
-          }
-          options={shiftSlotOptions}
-          values={form.allowedShiftTags}
-          onChange={(value) => setForm({ ...form, allowedShiftTags: value })}
-          getOptionValue={(option) => option.value}
-          getOptionLabel={(option) =>
-            shiftSlotLabelLookup.get(option.value) || option.label
-          }
-        />
-
-        <MultiChipSelector
-          label="Certification Tags"
-          helperText={
-            certificationTagOptions.length
-              ? "Click chips to select or remove certifications"
-              : "No certification tags configured yet — add them in Facility Preferences"
-          }
-          options={certificationTagOptions}
-          values={form.certificationTags}
-          onChange={(value) => setForm({ ...form, certificationTags: value })}
-          getOptionValue={(option) => option}
-          getOptionLabel={(option) =>
-            certificationLabelLookup.get(option) || toDisplayLabel(option)
-          }
-        />
-
-        <Box>
-          <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-            Preferred Work Days
-          </Typography>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "block", mb: 1 }}
-          >
-            Select days this staff member prefers to work.
-          </Typography>
-          <ToggleButtonGroup
-            sx={{
-              display: "grid",
-              gridTemplateColumns: "repeat(7, minmax(42px, 1fr))",
-              gap: 1,
-            }}
-          >
-            {DAYS.map((day, index) => {
-              const isPreferred = form.preferredDaysOfWeek.includes(index);
-              return (
-                <ToggleButton
-                  key={day}
-                  value={day}
-                  selected={isPreferred}
-                  onClick={() => {
-                    const nextValues = isPreferred
-                      ? form.preferredDaysOfWeek.filter(
-                          (item) => item !== index,
-                        )
-                      : [...form.preferredDaysOfWeek, index];
-
-                    setForm({
-                      ...form,
-                      preferredDaysOfWeek: normalizeNumberArray(nextValues),
-                    });
-                  }}
-                  sx={{
-                    borderRadius: 2,
-                    minHeight: 40,
-                    fontWeight: 600,
-                    bgcolor: isPreferred
-                      ? "success.lighter"
-                      : "background.paper",
-                    color: isPreferred ? "success.dark" : "text.primary",
-                    border: isPreferred ? "2px solid" : "1px solid",
-                    borderColor: isPreferred ? "success.main" : "divider",
-                    "&:hover": {
-                      borderColor: "success.light",
-                    },
-                  }}
-                >
-                  {day}
-                </ToggleButton>
-              );
-            })}
-          </ToggleButtonGroup>
-        </Box>
-
-        <Box>
-          <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-            Notification Preferences
-          </Typography>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "block", mb: 1 }}
-          >
-            Configure email and SMS alerts for this staff member
-          </Typography>
-          <Stack spacing={1}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={!!form.emailNotificationsEnabled}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      emailNotificationsEnabled: e.target.checked,
-                    })
-                  }
-                />
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Chip
+              color={hasTagRestrictions ? "warning" : "success"}
+              variant={hasTagRestrictions ? "filled" : "outlined"}
+              label={
+                hasTagRestrictions ? "Restricted by tags" : "Floating staff"
               }
-              label="Email Notifications"
             />
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={!!form.smsNotificationsEnabled}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      smsNotificationsEnabled: e.target.checked,
-                    })
-                  }
-                />
-              }
-              label="SMS Notifications"
+            <Chip
+              variant="outlined"
+              label={`${form.allowedAreas.length} area tag${form.allowedAreas.length === 1 ? "" : "s"}`}
+            />
+            <Chip
+              variant="outlined"
+              label={`${form.allowedShiftTags.length} shift tag${form.allowedShiftTags.length === 1 ? "" : "s"}`}
+            />
+            <Chip
+              variant="outlined"
+              label={`${form.certificationTags.length} certification tag${form.certificationTags.length === 1 ? "" : "s"}`}
             />
           </Stack>
-        </Box>
+
+          <Alert severity={hasTagRestrictions ? "warning" : "info"}>
+            {hasTagRestrictions
+              ? "This staff member is restricted to coverages that match the selected tags. Leaving a tag group empty means no restriction from that group, but any selected tags will limit matching shifts."
+              : "This staff member is currently untagged, which means they are treated as floating and can work any role-compatible coverage across areas and time slots."}
+          </Alert>
+
+          {allowedAreaOptions.length > 0 && (
+            <MultiChipSelector
+              label="Allowed Unit Areas"
+              helperText="Leave empty to allow any area. Once areas are selected, this staff member is limited to those areas."
+              options={allowedAreaOptions}
+              values={form.allowedAreas}
+              onChange={(value) => setForm({ ...form, allowedAreas: value })}
+              getOptionValue={(option) => option}
+              getOptionLabel={(option) =>
+                areaLabelLookup.get(option) || toDisplayLabel(option)
+              }
+            />
+          )}
+
+          <MultiChipSelector
+            label="Allowed Shift Time Slots"
+            helperText={
+              shiftSlotOptions.length
+                ? "Leave empty to allow any time slot. Selecting chips restricts this staff member to those exact shift slots."
+                : "No shift definitions configured yet. Define shift type time slots in Facility Preferences to use this."
+            }
+            options={shiftSlotOptions}
+            values={form.allowedShiftTags}
+            onChange={(value) => setForm({ ...form, allowedShiftTags: value })}
+            getOptionValue={(option) => option.value}
+            getOptionLabel={(option) =>
+              shiftSlotLabelLookup.get(option.value) || option.label
+            }
+          />
+
+          <MultiChipSelector
+            label="Certification Tags"
+            helperText={
+              certificationTagOptions.length
+                ? "Leave empty if no certification restriction is needed. Selecting certifications limits staff to coverages requiring those tags."
+                : "No certification tags configured yet — add them in Facility Preferences"
+            }
+            options={certificationTagOptions}
+            values={form.certificationTags}
+            onChange={(value) => setForm({ ...form, certificationTags: value })}
+            getOptionValue={(option) => option}
+            getOptionLabel={(option) =>
+              certificationLabelLookup.get(option) || toDisplayLabel(option)
+            }
+          />
+        </SectionCard>
+
+        <SectionCard
+          eyebrow="Staff Preferences"
+          title="Availability and Notifications"
+          description="These preferences help guide scheduling and how this staff member receives updates."
+        >
+          <Box>
+            <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+              Preferred Work Days
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block", mb: 1 }}
+            >
+              Select days this staff member prefers to work.
+            </Typography>
+            <ToggleButtonGroup
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(7, minmax(42px, 1fr))",
+                gap: 1,
+              }}
+            >
+              {DAYS.map((day, index) => {
+                const isPreferred = form.preferredDaysOfWeek.includes(index);
+                return (
+                  <ToggleButton
+                    key={day}
+                    value={day}
+                    selected={isPreferred}
+                    onClick={() => {
+                      const nextValues = isPreferred
+                        ? form.preferredDaysOfWeek.filter(
+                            (item) => item !== index,
+                          )
+                        : [...form.preferredDaysOfWeek, index];
+
+                      setForm({
+                        ...form,
+                        preferredDaysOfWeek: normalizeNumberArray(nextValues),
+                      });
+                    }}
+                    sx={{
+                      borderRadius: 2,
+                      minHeight: 40,
+                      fontWeight: 600,
+                      bgcolor: isPreferred
+                        ? "success.lighter"
+                        : "background.paper",
+                      color: isPreferred ? "success.dark" : "text.primary",
+                      border: isPreferred ? "2px solid" : "1px solid",
+                      borderColor: isPreferred ? "success.main" : "divider",
+                      "&:hover": {
+                        borderColor: "success.light",
+                      },
+                    }}
+                  >
+                    {day}
+                  </ToggleButton>
+                );
+              })}
+            </ToggleButtonGroup>
+          </Box>
+
+          <Box>
+            <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+              Notification Preferences
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block", mb: 1 }}
+            >
+              Configure email and SMS alerts for this staff member.
+            </Typography>
+            <Stack spacing={1}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={!!form.emailNotificationsEnabled}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        emailNotificationsEnabled: e.target.checked,
+                      })
+                    }
+                  />
+                }
+                label="Email Notifications"
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={!!form.smsNotificationsEnabled}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        smsNotificationsEnabled: e.target.checked,
+                      })
+                    }
+                  />
+                }
+                label="SMS Notifications"
+              />
+            </Stack>
+          </Box>
+        </SectionCard>
 
         <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
           <Button variant="contained" fullWidth onClick={handleSubmit}>

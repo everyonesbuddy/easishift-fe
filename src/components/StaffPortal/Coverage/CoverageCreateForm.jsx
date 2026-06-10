@@ -1123,24 +1123,6 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
               ? "Saving..."
               : "Save Requirements"}
           </Button>
-
-          <Button
-            type="button"
-            variant="contained"
-            disabled={loading}
-            onClick={(e) => handleSubmit(e, true)}
-            fullWidth
-            sx={{
-              textTransform: "none",
-              fontWeight: 600,
-              backgroundColor: "#111827",
-              "&:hover": { backgroundColor: "#1f2937" },
-            }}
-          >
-            {loading && loadingMode === "ai"
-              ? "Creating + AI Draft..."
-              : "Save + AI Create Draft"}
-          </Button>
         </Stack>
       </Stack>
     </Paper>

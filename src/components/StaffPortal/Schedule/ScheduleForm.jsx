@@ -63,6 +63,77 @@ function formatShiftLabel(coverage) {
   return `${dateLabel} — ${startLabel} - ${endLabel}`;
 }
 
+const normalizeTag = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase();
+
+const toNormalizedSet = (values) =>
+  new Set(
+    (Array.isArray(values) ? values : [])
+      .map((value) => normalizeTag(value))
+      .filter(Boolean),
+  );
+
+function doesCoverageMatchStaffTags(staff, coverage) {
+  const allowedAreas = toNormalizedSet(staff?.allowedAreas);
+  const allowedShiftTypes = toNormalizedSet(staff?.allowedShiftTypes);
+  const certificationTags = toNormalizedSet(staff?.certificationTags);
+
+  const hasTagRestrictions =
+    allowedAreas.size > 0 ||
+    allowedShiftTypes.size > 0 ||
+    certificationTags.size > 0;
+
+  // Untagged staff are treated as float and can take any role-compatible shift.
+  if (!hasTagRestrictions) return true;
+
+  if (allowedAreas.size > 0) {
+    const coverageArea = normalizeTag(coverage?.unitArea);
+    if (!coverageArea || !allowedAreas.has(coverageArea)) return false;
+  }
+
+  if (allowedShiftTypes.size > 0) {
+    const coverageShiftType = normalizeTag(coverage?.shiftType);
+    const coverageShiftTag = normalizeTag(coverage?.shiftTag);
+
+    if (!coverageShiftType) return false;
+
+    const exactShiftSlot = coverageShiftTag
+      ? `${coverageShiftType}:${coverageShiftTag}`
+      : "";
+
+    const matchesByType = Array.from(allowedShiftTypes).some((allowed) =>
+      allowed.startsWith(`${coverageShiftType}:`),
+    );
+
+    const isShiftMatch =
+      (exactShiftSlot && allowedShiftTypes.has(exactShiftSlot)) ||
+      allowedShiftTypes.has(coverageShiftType) ||
+      (!coverageShiftTag && matchesByType);
+
+    if (!isShiftMatch) return false;
+  }
+
+  if (certificationTags.size > 0) {
+    const coverageCertTags = (
+      Array.isArray(coverage?.requiredCertificationTags)
+        ? coverage.requiredCertificationTags
+        : []
+    )
+      .map((tag) => normalizeTag(tag))
+      .filter(Boolean);
+
+    const hasRequiredCerts = coverageCertTags.every((tag) =>
+      certificationTags.has(tag),
+    );
+
+    if (!hasRequiredCerts) return false;
+  }
+
+  return true;
+}
+
 export default function ScheduleForm({
   onSuccess,
   onClose,
@@ -173,7 +244,8 @@ export default function ScheduleForm({
           .filter(
             (c) =>
               new Date(c.startTime) > now &&
-              isRoleCompatible(selectedStaff.role, c.role),
+              isRoleCompatible(selectedStaff.role, c.role) &&
+              doesCoverageMatchStaffTags(selectedStaff, c),
           )
           .map((c) => {
             const requiredCount = Number(c.requiredCount) || 0;

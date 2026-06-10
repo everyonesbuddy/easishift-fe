@@ -263,6 +263,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
 
           return {
             ...coverage,
+            requiredCount,
             spotsRemaining: Number.isFinite(directRemaining)
               ? Math.max(0, directRemaining)
               : computedRemaining,
@@ -737,6 +738,15 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                 {coverages.map((coverage) => {
                   const selected = selectedCoverageIds.includes(coverage._id);
                   const disabled = Number(coverage.spotsRemaining) <= 0;
+                  const scheduledCount = Number.isFinite(
+                    Number(coverage.assignedCount),
+                  )
+                    ? Math.max(0, Number(coverage.assignedCount))
+                    : Math.max(
+                        0,
+                        Number(coverage.requiredCount) -
+                          Number(coverage.spotsRemaining || 0),
+                      );
                   return (
                     <Paper
                       key={coverage._id}
@@ -787,6 +797,14 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                             : ""}
                         </Typography>
                       </Box>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: "block", ml: 4.5, mt: 0.25 }}
+                      >
+                        {coverage.requiredCount} required / {scheduledCount}{" "}
+                        scheduled
+                      </Typography>
                     </Paper>
                   );
                 })}

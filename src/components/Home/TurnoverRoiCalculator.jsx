@@ -33,7 +33,7 @@ const WEEKS_PER_YEAR = 52;
 const PRODUCTIVITY_FACTOR = 0.5;
 const WISERSHIFTS_SAVINGS_RATE = 0.28;
 const BEEHIIV_MAGIC_LINK_TEMPLATE =
-  "https://magic.beehiiv.com/v1/861bd1b1-f350-4ecc-a6fc-ab3e0eca93f6?email=<email>";
+  "https://magic.beehiiv.com/v1/d46e492b-b716-407d-80d5-80ad8b9b4512?email=<email>";
 
 const formatMoney = (value) =>
   new Intl.NumberFormat("en-US", {
@@ -530,7 +530,7 @@ export default function TurnoverRoiCalculator() {
                     size="medium"
                     startIcon={<FiPhoneCall />}
                     component="a"
-                    href="https://calendly.com/easishift-info/30min"
+                    href="https://calendly.com/wisershifts-info/30min"
                     target="_blank"
                     rel="noopener noreferrer"
                     sx={{ fontWeight: 900, textTransform: "none", py: 0.8 }}

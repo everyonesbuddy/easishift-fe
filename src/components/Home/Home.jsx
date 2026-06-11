@@ -593,7 +593,7 @@ export default function Home() {
                     size="large"
                     startIcon={<FiPhoneCall />}
                     component="a"
-                    href="https://calendly.com/easishift-info/30min?month=2026-01"
+                    href="https://calendly.com/wisershifts-info/30min"
                     target="_blank"
                     rel="noopener noreferrer"
                     sx={{ fontWeight: 900, borderRadius: 999 }}

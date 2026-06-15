@@ -343,7 +343,18 @@ Schedule rows now include:
 **Creating / editing shifts:**
 
 - `ScheduleForm` — single shift create/edit dialog.
-- `AutoGenerateScheduleForm` — AI-assisted bulk generation; admin picks a date range and the backend fills gaps against the coverage plan.
+- `AutoGenerateScheduleForm` — draft-first AI scheduling board with controlled review and publish workflow.
+
+Draft scheduling workflow now includes:
+
+- Open-coverage intake from `GET /api/v1/coverage/unfilled-auto` with role filtering and multi-select.
+- Coverage cards that show taxonomy metadata and headcount context (`required / scheduled`).
+- Draft creation from selected coverage IDs via `POST /api/v1/schedules/auto-generate`.
+- Active draft list and detail loading from draft schedule endpoints.
+- Assignment-level editing in draft (staff, start/end time, notes, state, force override).
+- Quick state transitions (`proposed`, `locked`, `removed`) and overtime/consecutive-day warning chips.
+- Selective publish or publish-all actions from draft.
+- Draft discard action and refresh behavior that re-syncs coverage + draft state.
 
 **Shift swaps (staff):** Any staff member can open `ShiftSwapRequestModal` on a shift they are scheduled for to request a swap with a colleague. The swap request then appears in `ShiftSwapRequestsPage`.
 
@@ -516,19 +527,25 @@ Highlights:
 
 - Schedule form/list now include `unitArea`, `shiftType`, `shiftTag`, and `certificationTags`.
 
-4. Staff capability model
+4. Draft schedule board expansion
+
+- Auto-generation now follows a draft lifecycle (create, review, edit, publish/discard) instead of immediate schedule finalization.
+- Draft workspace supports assignment-level controls, warning visibility, selective publish, and bulk publish.
+- Draft sourcing and publish operations are wired to dedicated draft schedule endpoints.
+
+5. Staff capability model
 
 - Staff create/edit and list support `allowedAreas`, `allowedShiftTags`, `allowedShiftTypes`, and `certificationTags`.
 
-5. Profile picture responsibility
+6. Profile picture responsibility
 
 - Profile image upload moved to self-service dashboard flow; removed from admin staff create/edit form.
 
-6. Facility taxonomy normalization
+7. Facility taxonomy normalization
 
 - Facility taxonomy entries are normalized to `snake_case` for storage and shown as readable labels in UI.
 
-7. Staff preferences simplification
+8. Staff preferences simplification
 
 - Preferences now submit only backend-supported fields to prevent schema mismatch.
 

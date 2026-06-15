@@ -104,6 +104,99 @@ const extractStaffIdFromResponse = (data) =>
   data?.id ||
   null;
 
+const MultiChipSelector = ({
+  label,
+  helperText,
+  options,
+  values,
+  onChange,
+  getOptionValue,
+  getOptionLabel,
+}) => {
+  const selectedValues = normalizeStringArray(values);
+
+  const toggleValue = (option) => {
+    const value = getOptionValue(option);
+    if (!value) return;
+
+    const isSelected = selectedValues.includes(value);
+    const nextValues = isSelected
+      ? selectedValues.filter((item) => item !== value)
+      : [...selectedValues, value];
+
+    onChange(normalizeStringArray(nextValues));
+  };
+
+  return (
+    <Box>
+      <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+        {label}
+      </Typography>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ display: "block", mb: 1 }}
+      >
+        {helperText}
+      </Typography>
+
+      {!options.length ? (
+        <Typography variant="caption" color="text.secondary">
+          No options configured yet
+        </Typography>
+      ) : (
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          {options.map((option) => {
+            const value = getOptionValue(option);
+            const selected = selectedValues.includes(value);
+
+            return (
+              <Chip
+                key={value}
+                label={getOptionLabel(option)}
+                clickable
+                color={selected ? "primary" : "default"}
+                variant={selected ? "filled" : "outlined"}
+                onClick={() => toggleValue(option)}
+              />
+            );
+          })}
+        </Stack>
+      )}
+    </Box>
+  );
+};
+
+const SectionCard = ({ eyebrow, title, description, children }) => (
+  <Paper
+    variant="outlined"
+    sx={{
+      p: { xs: 1.5, sm: 2 },
+      borderRadius: 2.5,
+      borderColor: "#dbeafe",
+      backgroundColor: "#f8fbff",
+    }}
+  >
+    <Stack spacing={1.5}>
+      <Box>
+        <Typography
+          variant="overline"
+          sx={{ color: "primary.main", fontWeight: 700, letterSpacing: 0.8 }}
+        >
+          {eyebrow}
+        </Typography>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+          {title}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {description}
+        </Typography>
+      </Box>
+      {children}
+    </Stack>
+  </Paper>
+);
+
 export default function StaffCreateAndEditForm({
   staff,
   onSuccess,
@@ -481,99 +574,6 @@ export default function StaffCreateAndEditForm({
       toast.error(msg, { position: "top-right", autoClose: 4000 });
     }
   };
-
-  const MultiChipSelector = ({
-    label,
-    helperText,
-    options,
-    values,
-    onChange,
-    getOptionValue,
-    getOptionLabel,
-  }) => {
-    const selectedValues = normalizeStringArray(values);
-
-    const toggleValue = (option) => {
-      const value = getOptionValue(option);
-      if (!value) return;
-
-      const isSelected = selectedValues.includes(value);
-      const nextValues = isSelected
-        ? selectedValues.filter((item) => item !== value)
-        : [...selectedValues, value];
-
-      onChange(normalizeStringArray(nextValues));
-    };
-
-    return (
-      <Box>
-        <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-          {label}
-        </Typography>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: "block", mb: 1 }}
-        >
-          {helperText}
-        </Typography>
-
-        {!options.length ? (
-          <Typography variant="caption" color="text.secondary">
-            No options configured yet
-          </Typography>
-        ) : (
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            {options.map((option) => {
-              const value = getOptionValue(option);
-              const selected = selectedValues.includes(value);
-
-              return (
-                <Chip
-                  key={value}
-                  label={getOptionLabel(option)}
-                  clickable
-                  color={selected ? "primary" : "default"}
-                  variant={selected ? "filled" : "outlined"}
-                  onClick={() => toggleValue(option)}
-                />
-              );
-            })}
-          </Stack>
-        )}
-      </Box>
-    );
-  };
-
-  const SectionCard = ({ eyebrow, title, description, children }) => (
-    <Paper
-      variant="outlined"
-      sx={{
-        p: { xs: 1.5, sm: 2 },
-        borderRadius: 2.5,
-        borderColor: "#dbeafe",
-        backgroundColor: "#f8fbff",
-      }}
-    >
-      <Stack spacing={1.5}>
-        <Box>
-          <Typography
-            variant="overline"
-            sx={{ color: "primary.main", fontWeight: 700, letterSpacing: 0.8 }}
-          >
-            {eyebrow}
-          </Typography>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-            {title}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {description}
-          </Typography>
-        </Box>
-        {children}
-      </Stack>
-    </Paper>
-  );
 
   return (
     <Paper

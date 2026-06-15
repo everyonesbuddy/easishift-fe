@@ -99,6 +99,21 @@ const toDisplayLabel = (value) => {
     .join(" ");
 };
 
+const to12HourTime = (value) => {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/);
+
+  if (!match) return raw;
+
+  let hours = Number(match[1]);
+  const minutes = match[2];
+  const meridiem = hours >= 12 ? "PM" : "AM";
+
+  hours = hours % 12 || 12;
+
+  return `${hours}:${minutes} ${meridiem}`;
+};
+
 const isOvernightTimeRange = (startTime, endTime) => {
   if (!startTime || !endTime) return false;
   return endTime <= startTime;
@@ -199,7 +214,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
         value: `${def.key}:${slot.tag}`,
         shiftType: def.key,
         shiftTag: slot.tag,
-        label: `${def.label || toDisplayLabel(def.key)} - ${slot.label || toDisplayLabel(slot.tag)} (${slot.startLocalTime} - ${slot.endLocalTime})`,
+        label: `${def.label || toDisplayLabel(def.key)} - ${slot.label || toDisplayLabel(slot.tag)} (${to12HourTime(slot.startLocalTime)} - ${to12HourTime(slot.endLocalTime)})`,
       })),
     );
   }, [shiftTypeDefinitions]);

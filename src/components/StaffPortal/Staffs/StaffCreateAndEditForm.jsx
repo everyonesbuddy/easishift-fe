@@ -81,6 +81,21 @@ const normalizeToken = (value) =>
     .trim()
     .toLowerCase();
 
+const to12HourTime = (value) => {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/);
+
+  if (!match) return raw;
+
+  let hours = Number(match[1]);
+  const minutes = match[2];
+  const meridiem = hours >= 12 ? "PM" : "AM";
+
+  hours = hours % 12 || 12;
+
+  return `${hours}:${minutes} ${meridiem}`;
+};
+
 const buildTimeSlotLabel = (slot) => {
   const tag = normalizeToken(slot?.tag);
   const label = String(slot?.label || "").trim();
@@ -89,7 +104,7 @@ const buildTimeSlotLabel = (slot) => {
 
   const displayName = label || toDisplayLabel(tag);
   if (start && end) {
-    return `${displayName} (${start}-${end})`;
+    return `${displayName} (${to12HourTime(start)}-${to12HourTime(end)})`;
   }
 
   return displayName;

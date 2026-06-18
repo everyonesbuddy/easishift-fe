@@ -37,6 +37,7 @@ export default function ManageSubscription() {
       priceLabel: "$4,000/yr",
       price: 4000,
       seats: 50,
+      supportTier: "standard",
       highlight: false,
     },
     {
@@ -45,6 +46,7 @@ export default function ManageSubscription() {
       priceLabel: "$7,000/yr",
       price: 7000,
       seats: 100,
+      supportTier: "standard",
       highlight: true,
     },
     {
@@ -53,7 +55,18 @@ export default function ManageSubscription() {
       priceLabel: "$9,000/yr",
       price: 9000,
       seats: 150,
+      supportTier: "priority",
       highlight: false,
+    },
+    {
+      key: "enterpriseYearly",
+      name: "Enterprise",
+      priceLabel: "Custom pricing",
+      price: null,
+      seats: "150+",
+      supportTier: "priority",
+      highlight: false,
+      isEnterprise: true,
     },
   ];
 
@@ -64,6 +77,7 @@ export default function ManageSubscription() {
       priceLabel: "$400/mo",
       price: 400,
       seats: 50,
+      supportTier: "standard",
       highlight: false,
     },
     {
@@ -72,6 +86,7 @@ export default function ManageSubscription() {
       priceLabel: "$700/mo",
       price: 700,
       seats: 100,
+      supportTier: "standard",
       highlight: true,
     },
     {
@@ -80,15 +95,29 @@ export default function ManageSubscription() {
       priceLabel: "$900/mo",
       price: 900,
       seats: 150,
+      supportTier: "priority",
       highlight: false,
+    },
+    {
+      key: "enterpriseMonthly",
+      name: "Enterprise",
+      priceLabel: "Custom pricing",
+      price: null,
+      seats: "150+",
+      supportTier: "priority",
+      highlight: false,
+      isEnterprise: true,
     },
   ];
 
   const plans = billingPeriod === "yearly" ? yearlyPlans : monthlyPlans;
-  const featureList = [
-    "Priority support",
-    "Advanced reporting",
-    "Automated scheduling tools",
+  const sharedFeatureList = [
+    "Automated scheduling",
+    "Shift swaps",
+    "Time-off management",
+    "Internal messaging",
+    "Coverage planning",
+    "Staff directory",
   ];
 
   const getYearlySavingsPercent = () => {
@@ -103,6 +132,12 @@ export default function ManageSubscription() {
   };
 
   const yearlySavingsPercent = getYearlySavingsPercent();
+  const getCapacityLabel = (plan) =>
+    plan.isEnterprise
+      ? `${plan.seats} active employees`
+      : `Up to ${plan.seats} active employees`;
+  const getSupportLabel = (plan) =>
+    plan.supportTier === "priority" ? "Priority support" : "Standard support";
 
   const handleChoosePlan = async (planKey) => {
     setError(null);
@@ -154,6 +189,14 @@ export default function ManageSubscription() {
     } finally {
       setLoadingPlan(null);
     }
+  };
+
+  const handleGetQuote = () => {
+    window.open(
+      "https://calendly.com/wisershifts-info/30min",
+      "_blank",
+      "noopener,noreferrer",
+    );
   };
 
   return (
@@ -306,7 +349,7 @@ export default function ManageSubscription() {
               gridTemplateColumns: {
                 xs: "1fr",
                 lg: "repeat(2, minmax(0, 280px))",
-                xl: "repeat(3, minmax(0, 270px))",
+                xl: "repeat(4, minmax(0, 250px))",
               },
               justifyContent: "center",
               rowGap: { xs: 3.25, sm: 3.75, md: 4, lg: 4.25 },
@@ -402,11 +445,13 @@ export default function ManageSubscription() {
                         lineHeight: 1.3,
                       }}
                     >
-                      {billingPeriod === "yearly"
-                        ? `Equivalent to $${Math.round(
-                            p.price / 12,
-                          )}/mo billed yearly`
-                        : "Billed monthly, cancel anytime"}
+                      {p.isEnterprise
+                        ? "Talk to sales for a custom package"
+                        : billingPeriod === "yearly"
+                          ? `Equivalent to $${Math.round(
+                              p.price / 12,
+                            )}/mo billed yearly`
+                          : "Billed monthly, cancel anytime"}
                     </Typography>
                     <Typography
                       variant="body2"
@@ -418,37 +463,39 @@ export default function ManageSubscription() {
                         fontWeight: 700,
                       }}
                     >
-                      {p.seats} seats
+                      {getCapacityLabel(p)}
                     </Typography>
                     <Divider sx={{ my: 1.5 }} />
                     <Stack
                       spacing={0.8}
                       sx={{ color: "text.secondary", alignItems: "flex-start" }}
                     >
-                      {featureList.map((feature) => (
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          alignItems="center"
-                          key={feature}
-                          sx={{ justifyContent: "flex-start" }}
-                        >
-                          <CheckCircleRoundedIcon
-                            fontSize="small"
-                            sx={{ color: theme.palette.primary.main }}
-                          />
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              lineHeight: 1.3,
-                              color: "text.primary",
-                              fontSize: { xs: "0.82rem", md: "0.84rem" },
-                            }}
+                      {[getSupportLabel(p), ...sharedFeatureList].map(
+                        (feature) => (
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                            key={feature}
+                            sx={{ justifyContent: "flex-start" }}
                           >
-                            {feature}
-                          </Typography>
-                        </Stack>
-                      ))}
+                            <CheckCircleRoundedIcon
+                              fontSize="small"
+                              sx={{ color: theme.palette.primary.main }}
+                            />
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                lineHeight: 1.3,
+                                color: "text.primary",
+                                fontSize: { xs: "0.82rem", md: "0.84rem" },
+                              }}
+                            >
+                              {feature}
+                            </Typography>
+                          </Stack>
+                        ),
+                      )}
                     </Stack>
                   </Box>
 
@@ -458,29 +505,49 @@ export default function ManageSubscription() {
                         Current plan
                       </Button>
                     ) : (
-                      <Button
-                        variant={p.highlight ? "contained" : "outlined"}
-                        onClick={() => handleChoosePlan(p.key)}
-                        startIcon={
-                          loadingPlan === p.key ? (
-                            <CircularProgress size={16} />
-                          ) : (
-                            <ArrowOutwardRoundedIcon fontSize="small" />
-                          )
-                        }
-                        fullWidth
-                        sx={{
-                          mt: 2.25,
-                          py: 1,
-                          textTransform: "none",
-                          fontWeight: 800,
-                          fontSize: { xs: "0.9rem", md: "0.92rem" },
-                        }}
-                      >
-                        {loadingPlan === p.key
-                          ? "Redirecting..."
-                          : "Get started"}
-                      </Button>
+                      <>
+                        {!p.isEnterprise && (
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              display: "block",
+                              mb: 1,
+                              color: "text.secondary",
+                            }}
+                          >
+                            Includes a free 1-month trial
+                          </Typography>
+                        )}
+                        <Button
+                          variant={p.highlight ? "contained" : "outlined"}
+                          onClick={() =>
+                            p.isEnterprise
+                              ? handleGetQuote()
+                              : handleChoosePlan(p.key)
+                          }
+                          startIcon={
+                            loadingPlan === p.key ? (
+                              <CircularProgress size={16} />
+                            ) : (
+                              <ArrowOutwardRoundedIcon fontSize="small" />
+                            )
+                          }
+                          fullWidth
+                          sx={{
+                            mt: 0.5,
+                            py: 1,
+                            textTransform: "none",
+                            fontWeight: 800,
+                            fontSize: { xs: "0.9rem", md: "0.92rem" },
+                          }}
+                        >
+                          {loadingPlan === p.key
+                            ? "Redirecting..."
+                            : p.isEnterprise
+                              ? "Get quote"
+                              : "Start trial"}
+                        </Button>
+                      </>
                     )}
                   </Box>
                 </Paper>

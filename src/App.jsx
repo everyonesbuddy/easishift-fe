@@ -31,12 +31,13 @@ import { useState } from "react";
 
 export default function App() {
   const { user, tenant, isAdmin } = useAuth();
+  const hasPaywallExemptStatus =
+    tenant && ["active", "trialing"].includes(tenant.subscriptionStatus);
 
   const showPaywall =
     isAdmin &&
     tenant &&
-    (tenant.subscriptionStatus !== "active" ||
-      (tenant.seatLimit && tenant.seatLimit <= 1));
+    (!hasPaywallExemptStatus || (tenant.seatLimit && tenant.seatLimit <= 1));
 
   // Billing-only mode for admins with inactive/limited tenant
   if (user && showPaywall) {

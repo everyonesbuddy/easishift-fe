@@ -249,7 +249,7 @@ export default function Home() {
               >
                 Workforce Scheduling
                 <br />
-                Made For You
+                That Works For Your People and Your Profits.
               </Typography>
 
               <Typography

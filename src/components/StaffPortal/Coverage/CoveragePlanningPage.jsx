@@ -30,7 +30,7 @@ import {
 } from "@mui/material";
 
 import FullCalendar from "@fullcalendar/react";
-import timeGridPlugin from "@fullcalendar/timegrid";
+import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
 import api from "../../../config/api";
@@ -57,10 +57,24 @@ import {
   isRoleCompatible,
 } from "../../../constants/industryRoles";
 
-const statusColors = {
-  open: "#f59e0b",
-  partial: "#f97316",
-  filled: "#10b981",
+const formatShortTime = (dateValue) => {
+  if (!dateValue) return "";
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+const formatShortDate = (dateValue) => {
+  if (!dateValue) return "";
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  });
 };
 
 export default function CoveragePlanningPage() {
@@ -321,37 +335,33 @@ export default function CoveragePlanningPage() {
       .filter(
         (c) => selectedRole === "all" || isRoleCompatible(c.role, selectedRole),
       )
-      .map((c) => ({
-        id: c._id,
-        title: `${getRoleDisplayName(c.role)} (${c.requiredCount || 1})${
-          c.unitArea ? ` • ${getUnitAreaDisplayName(c.unitArea)}` : ""
-        }${c.shiftType ? ` • ${getShiftTypeDisplayName(c.shiftType)}` : ""}${c.shiftTag ? ` • ${getShiftTagDisplayName(c.shiftTag)}` : ""}`,
-        start: c.startTime,
-        end: c.endTime,
-        backgroundColor:
-          statusColors[
-            c.remaining > 0
-              ? c.remaining < c.requiredCount
-                ? "partial"
-                : "open"
-              : "filled"
-          ] || "#6b7280",
-        borderColor:
-          statusColors[
-            c.remaining > 0
-              ? c.remaining < c.requiredCount
-                ? "partial"
-                : "open"
-              : "filled"
-          ] || "#6b7280",
-        textColor: "#fff",
-        extendedProps: {
-          note: c.note,
-          date: c.date || c.startTime,
-          remaining: c.remaining,
-          spansOvernight: spansOvernight(c),
-        },
-      }));
+      .map((c) => {
+        const roleColor = getRoleColor(c.role) || "#2563EB";
+
+        return {
+          id: c._id,
+          title: `${getRoleDisplayName(c.role)} (${c.requiredCount || 1})${
+            c.unitArea ? ` • ${getUnitAreaDisplayName(c.unitArea)}` : ""
+          }${c.shiftType ? ` • ${getShiftTypeDisplayName(c.shiftType)}` : ""}${c.shiftTag ? ` • ${getShiftTagDisplayName(c.shiftTag)}` : ""}`,
+          start: c.startTime,
+          end: c.endTime,
+          backgroundColor: roleColor,
+          borderColor: roleColor,
+          textColor: "#fff",
+          extendedProps: {
+            id: c._id,
+            role: c.role,
+            unitArea: c.unitArea,
+            shiftType: c.shiftType,
+            shiftTag: c.shiftTag,
+            requiredCount: c.requiredCount,
+            note: c.note,
+            date: c.date || c.startTime,
+            remaining: c.remaining,
+            spansOvernight: spansOvernight(c),
+          },
+        };
+      });
   }, [coverages, selectedRole]);
 
   const displayedCoverages = useMemo(() => {
@@ -888,92 +898,137 @@ export default function CoveragePlanningPage() {
           </>
         )
       ) : (
-        <Box mt={3} sx={{ background: "white", borderRadius: 2, p: 2 }}>
+        <Box
+          mt={3}
+          sx={{
+            background:
+              "linear-gradient(135deg, rgba(248,250,252,0.96) 0%, rgba(239,246,255,0.92) 100%)",
+            borderRadius: 3,
+            p: { xs: 1.5, md: 2 },
+            border: "1px solid #DBEAFE",
+          }}
+        >
           <GlobalStyles
             styles={{
               ".fc": {
-                "--fc-border-color": "#E2E8F0",
+                "--fc-border-color": "#D6E4FF",
+                "--fc-page-bg-color": "transparent",
               },
               ".fc .fc-toolbar": {
-                marginBottom: "0.85rem",
+                marginBottom: "0.9rem",
+                gap: "0.5rem",
               },
               ".fc .fc-toolbar-title": {
                 color: "#0F172A",
-                fontWeight: 700,
-                fontSize: "1rem",
+                fontWeight: 800,
+                fontSize: "1.05rem",
                 letterSpacing: "0.01em",
               },
               ".fc .fc-button": {
                 background: "#FFFFFF",
-                border: "1px solid #CBD5E1",
-                color: "#0F172A",
+                border: "1px solid #BFDBFE",
+                color: "#1E3A8A",
                 boxShadow: "none",
                 textTransform: "capitalize",
                 borderRadius: "8px",
+                fontWeight: 600,
               },
               ".fc .fc-button:hover": {
-                background: "#F8FAFC",
-                borderColor: "#94A3B8",
+                background: "#EFF6FF",
+                borderColor: "#93C5FD",
               },
               ".fc .fc-button-primary:not(:disabled).fc-button-active, .fc .fc-button-primary:not(:disabled):active":
                 {
-                  background: "#2563EB",
-                  borderColor: "#2563EB",
+                  background: "#1D4ED8",
+                  borderColor: "#1D4ED8",
                   color: "#FFFFFF",
                 },
               ".fc .fc-scrollgrid": {
-                border: "1px solid #E2E8F0",
-                borderRadius: "12px",
+                border: "1px solid #BFDBFE",
+                borderRadius: "14px",
                 overflow: "hidden",
+                background: "#fff",
               },
               ".fc .fc-col-header-cell-cushion": {
-                color: "#334155",
+                color: "#1E3A8A",
                 fontWeight: 700,
-                fontSize: "0.75rem",
-                padding: "0.55rem 0.35rem",
+                fontSize: "0.74rem",
+                padding: "0.6rem 0.35rem",
               },
-              ".fc-timegrid-slot-label": {
-                color: "#475569 !important",
-                fontSize: "12px !important",
+              ".fc .fc-col-header-cell": {
+                backgroundColor: "#EFF6FF",
               },
-              ".fc .fc-timegrid-slot": {
-                height: "2.6rem",
+              ".fc .fc-daygrid-day-number": {
+                color: "#0F172A",
+                fontWeight: 700,
+                fontSize: "0.74rem",
               },
-              ".fc .fc-timegrid-col.fc-day-today": {
-                background: "#EFF6FF",
+              ".fc .fc-daygrid-day": {
+                backgroundColor: "#FFFFFF",
               },
-              ".fc .fc-timegrid-now-indicator-line": {
-                borderColor: "#DC2626",
-                borderWidth: "2px",
+              ".fc .fc-daygrid-day.fc-day-today": {
+                backgroundColor: "#EFF6FF",
               },
-              ".fc .fc-timegrid-now-indicator-arrow": {
-                borderColor: "#DC2626",
+              ".fc .fc-day-other .fc-daygrid-day-top": {
+                opacity: 0.5,
               },
-              ".fc-daygrid-day-number": { color: "#374151 !important" },
-              ".fc-daygrid-event": {
-                color: "#fff !important",
-                borderRadius: "10px !important",
-                padding: "2px 6px",
+              ".fc .fc-daygrid-day-frame": {
+                minHeight: "108px",
+                padding: "4px 4px 6px",
               },
-              ".fc-event-main": {
-                color: "#fff !important",
-                fontWeight: 600,
-                fontSize: "0.72rem",
+              ".fc .fc-daygrid-day-events": {
+                marginTop: "4px",
               },
-              ".fc .fc-event": {
+              ".fc .fc-daygrid-event": {
                 border: "none",
-                boxShadow: "0 1px 2px rgba(15, 23, 42, 0.2)",
+                borderRadius: "9px",
+                boxShadow: "0 4px 10px rgba(15, 23, 42, 0.14)",
+                padding: "0",
+                marginTop: "3px",
               },
-              ".fc-daygrid-day.fc-day-today, .fc-timegrid-now": {
-                background: "#EFF6FF",
+              ".fc .fc-daygrid-event .fc-event-main": {
+                padding: "0",
+              },
+              ".fc .fc-daygrid-more-link": {
+                color: "#1D4ED8",
+                fontWeight: 700,
+                fontSize: "0.7rem",
+                borderRadius: "8px",
+                padding: "1px 6px",
+                backgroundColor: "#EFF6FF",
+              },
+              ".fc .fc-popover": {
+                backgroundColor: "#FFFFFF",
+                border: "1px solid #BFDBFE",
+                borderRadius: "12px",
+                boxShadow: "0 16px 36px rgba(15, 23, 42, 0.2)",
+                overflow: "hidden",
+                zIndex: 30,
+              },
+              ".fc .fc-popover-header": {
+                backgroundColor: "#EFF6FF",
+                borderBottom: "1px solid #DBEAFE",
+                padding: "6px 10px",
+              },
+              ".fc .fc-popover-title": {
+                color: "#0F172A",
+                fontWeight: 700,
+                fontSize: "0.78rem",
+              },
+              ".fc .fc-popover-close": {
+                color: "#1E3A8A",
+                opacity: 0.8,
+              },
+              ".fc .fc-popover-body": {
+                backgroundColor: "#FFFFFF",
+                padding: "4px",
               },
             }}
           />
 
           <FullCalendar
-            plugins={[timeGridPlugin, interactionPlugin]}
-            initialView="timeGridWeek"
-            allDaySlot={false}
+            plugins={[dayGridPlugin, interactionPlugin]}
+            initialView="dayGridMonth"
             editable={isAdmin}
             selectable={isAdmin}
             headerToolbar={{
@@ -981,14 +1036,117 @@ export default function CoveragePlanningPage() {
               center: "title",
               right: "",
             }}
-            slotMinTime="00:00:00"
-            slotMaxTime="24:00:00"
-            slotLabelInterval="01:00:00"
-            slotDuration="00:30:00"
+            fixedWeekCount={false}
+            showNonCurrentDates={true}
+            dayMaxEvents={2}
+            eventDisplay="block"
+            displayEventTime={false}
             dayHeaderFormat={{
               weekday: "short",
-              month: "numeric",
-              day: "numeric",
+            }}
+            dayCellContent={(arg) => {
+              return (
+                <Box sx={{ px: 0.35, pt: 0.2 }}>
+                  <Typography
+                    sx={{
+                      fontSize: "0.74rem",
+                      fontWeight: 700,
+                      color: arg.isOther ? "#94A3B8" : "#0F172A",
+                    }}
+                  >
+                    {arg.dayNumberText}
+                  </Typography>
+                </Box>
+              );
+            }}
+            moreLinkContent={(args) => `+${args.num} more`}
+            eventContent={(arg) => {
+              const role = getRoleDisplayName(arg.event.extendedProps?.role);
+              const required = arg.event.extendedProps?.requiredCount ?? 0;
+              const start = toLocal(arg.event.start);
+              const end = toLocal(arg.event.end);
+
+              const startLabel = formatShortTime(start);
+              const endLabel = formatShortTime(end);
+              const spansMultipleDays =
+                start && end && start.toDateString() !== end.toDateString();
+
+              const dateMarker = spansMultipleDays
+                ? `${formatShortDate(start)} - ${formatShortDate(end)} • Overnight`
+                : "";
+
+              const timeLabel = `${startLabel || "--"} - ${endLabel || "--"}`;
+
+              return (
+                <Box
+                  sx={{
+                    px: 0.62,
+                    py: 0.48,
+                    borderRadius: 1.1,
+                    height: "100%",
+                    display: "grid",
+                    gridTemplateColumns: "1fr",
+                    gap: 0.08,
+                    background:
+                      "linear-gradient(140deg, rgba(15,23,42,0.18) 0%, rgba(15,23,42,0.3) 100%)",
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      color: "#F8FAFC",
+                      fontWeight: 700,
+                      fontSize: "0.65rem",
+                      lineHeight: 1.1,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {role}
+                  </Typography>
+
+                  <Typography
+                    sx={{
+                      color: "#DBEAFE",
+                      fontWeight: 600,
+                      fontSize: "0.6rem",
+                      lineHeight: 1.1,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {timeLabel}
+                  </Typography>
+
+                  {spansMultipleDays ? (
+                    <Typography
+                      sx={{
+                        color: "#E2E8F0",
+                        fontWeight: 600,
+                        fontSize: "0.57rem",
+                        lineHeight: 1.1,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {dateMarker}
+                    </Typography>
+                  ) : null}
+
+                  <Typography
+                    sx={{
+                      color: "#BFDBFE",
+                      fontWeight: 500,
+                      fontSize: "0.58rem",
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    Need {required}
+                  </Typography>
+                </Box>
+              );
             }}
             events={calendarEvents.map((e) => ({
               ...e,
@@ -996,13 +1154,29 @@ export default function CoveragePlanningPage() {
               end: toLocal(e.end),
             }))}
             eventClick={(info) => {
-              if (!isAdmin) return;
               const matched = coverages.find((c) => c._id === info.event.id);
-              if (matched) openEdit(matched);
+              if (!matched) return;
+              if (isAdmin) {
+                openEdit(matched);
+                return;
+              }
+              openDetails(matched);
             }}
+            expandRows={true}
             height="72vh"
-            nowIndicator={true}
           />
+
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            sx={{ mt: 1.3, justifyContent: "flex-start", px: 0.4 }}
+          >
+            <Typography sx={{ fontSize: "0.75rem", color: "#475569" }}>
+              Click a coverage to{" "}
+              {isAdmin ? "edit requirement" : "view details"}. Times always show
+              start and end; overnight shifts show date range.
+            </Typography>
+          </Stack>
         </Box>
       )}
 

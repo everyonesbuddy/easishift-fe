@@ -471,21 +471,21 @@ export default function Home() {
               >
                 <Box>
                   <Typography variant="overline" sx={{ letterSpacing: 1 }}>
-                    New for operators
+                    Workforce calculators
                   </Typography>
                   <Typography variant="h5" sx={{ fontWeight: 900 }}>
-                    See your annual turnover cost in dollars
+                    Estimate labor impact with practical calculators
                   </Typography>
                   <Typography sx={{ color: "text.secondary", mt: 0.5 }}>
-                    Use the ROI Calculator to estimate turnover impact and
-                    projected WiserShifts savings in under 2 minutes.
+                    Compare turnover and labor cost leakage in one place, with
+                    projected Easishift savings.
                   </Typography>
                 </Box>
 
                 <Button
                   variant="contained"
                   size="large"
-                  onClick={() => navigate("/turnover-roi-calculator")}
+                  onClick={() => navigate("/calculators")}
                   sx={{
                     fontWeight: 900,
                     px: 3.5,
@@ -493,7 +493,7 @@ export default function Home() {
                     borderRadius: 999,
                   }}
                 >
-                  Open ROI Calculator
+                  Open Calculators
                 </Button>
               </Box>
             </CardContent>

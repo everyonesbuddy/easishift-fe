@@ -5,7 +5,9 @@ import ResetPassword from "./components/Auth/ResetPassword";
 import StaffDashboard from "./components/StaffPortal/Dashboard/StaffDashboard";
 import SignupTenant from "./components/Auth/SignupTenant";
 import Home from "./components/Home/Home";
+import Calculators from "./components/Home/Calculators";
 import TurnoverRoiCalculator from "./components/Home/TurnoverRoiCalculator";
+import CostLeakCalculator from "./components/Home/CostLeakCalculator";
 import TermsAndConditions from "./components/Home/TermsAndConditions";
 import PrivacyPolicy from "./components/Home/PrivacyPolicy";
 import EndUserLicenseAgreement from "./components/Home/EndUserLicenseAgreement";
@@ -73,9 +75,14 @@ export default function App() {
         <Navbar onMobileOpen={() => setMobileOpen(true)} />
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/calculators" element={<Calculators />} />
           <Route
             path="/turnover-roi-calculator"
             element={<TurnoverRoiCalculator />}
+          />
+          <Route
+            path="/cost-leak-calculator"
+            element={<CostLeakCalculator />}
           />
           <Route
             path="/terms-and-conditions"

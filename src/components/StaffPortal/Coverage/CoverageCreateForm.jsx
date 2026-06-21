@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Chip,
+  Collapse,
   Divider,
   IconButton,
   InputAdornment,
@@ -16,7 +17,17 @@ import {
   Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
-import { MdAccessTime, MdAdd, MdDelete, MdGroups2 } from "react-icons/md";
+import {
+  MdAccessTime,
+  MdAdd,
+  MdDelete,
+  MdGroups2,
+  MdExpandMore,
+  MdExpandLess,
+  MdCalendarMonth,
+  MdRepeat,
+  MdSummarize,
+} from "react-icons/md";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
@@ -236,6 +247,9 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   const [loadingMode, setLoadingMode] = useState("create");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [repeatOpen, setRepeatOpen] = useState(false);
+  const [datesOpen, setDatesOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const generatedDates = useMemo(
     () =>
@@ -513,6 +527,81 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
     }
   };
 
+  // ── reusable accordion header ──────────────────────────────────────────────
+  const AccordionHeader = ({
+    icon,
+    title,
+    subtitle,
+    open,
+    onToggle,
+    accentColor = "#2563EB",
+    badgeText,
+  }) => (
+    <Box
+      onClick={onToggle}
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        px: { xs: 1.5, sm: 2 },
+        py: 1.1,
+        cursor: "pointer",
+        userSelect: "none",
+        borderBottom: open ? "1px solid" : "none",
+        borderColor: "divider",
+        "&:hover": { backgroundColor: "action.hover" },
+        borderRadius: open ? 0 : "inherit",
+      }}
+    >
+      <Box
+        sx={{ display: "flex", alignItems: "center", gap: 1.1, minWidth: 0 }}
+      >
+        <Box
+          sx={{
+            width: 30,
+            height: 30,
+            borderRadius: 1.5,
+            backgroundColor: `${accentColor}18`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            color: accentColor,
+          }}
+        >
+          {icon}
+        </Box>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+            {title}
+          </Typography>
+          {subtitle && (
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {subtitle}
+            </Typography>
+          )}
+        </Box>
+        {badgeText && (
+          <Chip
+            label={badgeText}
+            size="small"
+            sx={{
+              height: 20,
+              fontSize: "0.65rem",
+              fontWeight: 700,
+              backgroundColor: `${accentColor}18`,
+              color: accentColor,
+              ml: 0.5,
+            }}
+          />
+        )}
+      </Box>
+      <Box sx={{ color: "text.secondary", flexShrink: 0, ml: 1 }}>
+        {open ? <MdExpandLess size={20} /> : <MdExpandMore size={20} />}
+      </Box>
+    </Box>
+  );
+
   return (
     <Paper
       component="form"
@@ -537,39 +626,73 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
         </IconButton>
       )}
 
-      <Box sx={{ mb: { xs: 2, sm: 2.5 }, pr: onClose ? 5 : 0 }}>
+      <Box sx={{ mb: 2, pr: onClose ? 5 : 0 }}>
         <Typography variant="h6" sx={{ fontWeight: 700 }}>
           Coverage Planner
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          Set your date horizon, then define shift requirements. Shift
-          definitions are recommended and manual time is a fallback.
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.3 }}>
+          Define your date pattern and shift requirements, then review before
+          saving.
         </Typography>
       </Box>
 
-      <Stack spacing={{ xs: 1.5, sm: 2 }}>
+      <Stack spacing={1.75}>
         {error && <Alert severity="error">{error}</Alert>}
         {success && <Alert severity="success">{success}</Alert>}
 
-        <Box
-          sx={{
-            border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 3,
-            p: { xs: 1.25, sm: 2 },
-            backgroundColor: "background.default",
-          }}
+        {/* ── SECTION 1: Date Pattern ─────────────────────────────────── */}
+        <Paper
+          variant="outlined"
+          sx={{ borderRadius: 2.5, overflow: "hidden", borderColor: "#BFDBFE" }}
         >
-          <Typography variant="body1" sx={{ fontWeight: 700 }}>
-            Quick Planner
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Dates generate automatically from start date, horizon, and repeat
-            mode.
-          </Typography>
+          {/* Always-visible core: start date + horizon */}
+          <Box
+            sx={{
+              px: { xs: 1.5, sm: 2 },
+              pt: 1.5,
+              pb: 1.25,
+              background: "linear-gradient(135deg, #EFF6FF 0%, #F8FAFC 100%)",
+            }}
+          >
+            <Box
+              sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.2 }}
+            >
+              <Box
+                sx={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 1.5,
+                  backgroundColor: "#DBEAFE",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#1D4ED8",
+                }}
+              >
+                <MdCalendarMonth size={17} />
+              </Box>
+              <Typography
+                variant="body2"
+                sx={{ fontWeight: 700, color: "#1E3A8A" }}
+              >
+                Date Pattern
+              </Typography>
+              {activeDates.length > 0 && (
+                <Chip
+                  label={`${activeDates.length} dates`}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: "0.65rem",
+                    fontWeight: 700,
+                    backgroundColor: "#DBEAFE",
+                    color: "#1D4ED8",
+                  }}
+                />
+              )}
+            </Box>
 
-          <Stack spacing={1.5} sx={{ mt: 1.5 }}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
               <TextField
                 fullWidth
                 label="Start Date"
@@ -577,14 +700,15 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                 value={plannerStartDate}
                 onChange={(e) => setPlannerStartDate(e.target.value)}
                 InputLabelProps={{ shrink: true }}
+                size="small"
               />
-
               <TextField
                 fullWidth
                 select
                 label="Horizon"
                 value={horizonDays}
                 onChange={(e) => setHorizonDays(Number(e.target.value))}
+                size="small"
               >
                 {horizonOptions.map((value) => (
                   <MenuItem key={value} value={value}>
@@ -593,16 +717,19 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                 ))}
               </TextField>
             </Stack>
+          </Box>
 
-            <Box>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: "block", mb: 0.75 }}
-              >
-                Repeat mode
-              </Typography>
-
+          {/* Repeat mode accordion */}
+          <AccordionHeader
+            icon={<MdRepeat size={17} />}
+            title="Repeat Mode"
+            subtitle={`${repeatMode.charAt(0).toUpperCase() + repeatMode.slice(1)} · ${generatedDates.length} generated`}
+            open={repeatOpen}
+            onToggle={() => setRepeatOpen((v) => !v)}
+            accentColor="#2563EB"
+          />
+          <Collapse in={repeatOpen}>
+            <Box sx={{ px: { xs: 1.5, sm: 2 }, py: 1.5 }}>
               <ToggleButtonGroup
                 value={repeatMode}
                 exclusive
@@ -612,14 +739,20 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                   display: "flex",
                   flexWrap: "wrap",
                   gap: 0.75,
+                  mb: 1.25,
                   "& .MuiToggleButton-root": {
                     textTransform: "none",
                     borderRadius: "20px !important",
-                    border: "1px solid",
-                    borderColor: "divider",
-                    px: 1.75,
-                    py: 0.5,
-                    fontSize: "0.8125rem",
+                    border: "1px solid #BFDBFE",
+                    px: 1.5,
+                    py: 0.4,
+                    fontSize: "0.78rem",
+                    color: "#374151",
+                    "&.Mui-selected": {
+                      backgroundColor: "#2563EB",
+                      color: "#fff",
+                      borderColor: "#2563EB",
+                    },
                   },
                 }}
               >
@@ -628,517 +761,590 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                 <ToggleButton value="weekends">Weekends</ToggleButton>
                 <ToggleButton value="custom">Custom</ToggleButton>
               </ToggleButtonGroup>
+
+              <Stack direction="row" spacing={0.6} flexWrap="wrap" useFlexGap>
+                {weekdayOptions.map((day) => (
+                  <Chip
+                    key={day.value}
+                    label={day.label}
+                    color={
+                      selectedWeekdays.includes(day.value)
+                        ? "primary"
+                        : "default"
+                    }
+                    variant={
+                      selectedWeekdays.includes(day.value)
+                        ? "filled"
+                        : "outlined"
+                    }
+                    onClick={() => handleToggleWeekday(day.value)}
+                    size="small"
+                  />
+                ))}
+              </Stack>
             </Box>
+          </Collapse>
 
-            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-              {weekdayOptions.map((day) => (
-                <Chip
-                  key={day.value}
-                  label={day.label}
-                  color={
-                    selectedWeekdays.includes(day.value) ? "primary" : "default"
-                  }
-                  variant={
-                    selectedWeekdays.includes(day.value) ? "filled" : "outlined"
-                  }
-                  onClick={() => handleToggleWeekday(day.value)}
+          {/* Generated dates accordion */}
+          <AccordionHeader
+            icon={<MdCalendarMonth size={17} />}
+            title="Generated Dates"
+            subtitle={`${activeDates.length} active${excludedDates.length ? ` · ${excludedDates.length} excluded` : ""}`}
+            open={datesOpen}
+            onToggle={() => setDatesOpen((v) => !v)}
+            accentColor="#0369A1"
+            badgeText={
+              excludedDates.length ? `${excludedDates.length} excluded` : null
+            }
+          />
+          <Collapse in={datesOpen}>
+            <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 1, pb: 1.5 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  mb: 0.75,
+                }}
+              >
+                <Button
                   size="small"
-                />
-              ))}
-            </Stack>
+                  onClick={clearExcludedDates}
+                  disabled={!excludedDates.length}
+                  sx={{ textTransform: "none", px: 0, fontSize: "0.75rem" }}
+                >
+                  Re-include all
+                </Button>
+              </Box>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 0.7,
+                  maxHeight: { xs: 155, sm: 190 },
+                  overflowY: "auto",
+                }}
+              >
+                {generatedDates.map((date) => (
+                  <Chip
+                    key={date}
+                    label={new Date(`${date}T00:00:00`).toLocaleDateString()}
+                    onClick={() => handleToggleDate(date)}
+                    color={includedDateSet.has(date) ? "primary" : "default"}
+                    variant={includedDateSet.has(date) ? "filled" : "outlined"}
+                    size="small"
+                    sx={{
+                      textDecoration: includedDateSet.has(date)
+                        ? "none"
+                        : "line-through",
+                    }}
+                  />
+                ))}
+              </Box>
+            </Box>
+          </Collapse>
+        </Paper>
 
-            <Typography variant="caption" color="text.secondary">
-              Generated {generatedDates.length} dates, using{" "}
-              {activeDates.length} active dates.
-            </Typography>
-          </Stack>
-        </Box>
-
-        <Box
-          sx={{
-            border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 3,
-            p: { xs: 1.25, sm: 2 },
-            backgroundColor: "background.default",
-          }}
+        {/* ── SECTION 2: Coverage Requirements ───────────────────────── */}
+        <Paper
+          variant="outlined"
+          sx={{ borderRadius: 2.5, overflow: "hidden", borderColor: "#C4B5FD" }}
         >
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1}
-            justifyContent="space-between"
-            alignItems={{ xs: "flex-start", sm: "center" }}
-          >
-            <Typography variant="body1" sx={{ fontWeight: 700 }}>
-              Generated Dates
-            </Typography>
-            <Button
-              size="small"
-              onClick={clearExcludedDates}
-              sx={{ textTransform: "none", px: 0 }}
-              disabled={!excludedDates.length}
-            >
-              Re-include all
-            </Button>
-          </Stack>
-
           <Box
             sx={{
-              mt: 1,
+              px: { xs: 1.5, sm: 2 },
+              py: 1.1,
+              background: "linear-gradient(135deg, #F5F3FF 0%, #F8FAFC 100%)",
               display: "flex",
-              flexWrap: "wrap",
-              gap: 1,
-              maxHeight: { xs: 170, sm: 220 },
-              overflowY: "auto",
-              pr: 0.5,
+              alignItems: "center",
+              justifyContent: "space-between",
+              borderBottom: "1px solid #E8E3FF",
             }}
           >
-            {generatedDates.map((date) => (
-              <Chip
-                key={date}
-                label={new Date(`${date}T00:00:00`).toLocaleDateString()}
-                onClick={() => handleToggleDate(date)}
-                color={includedDateSet.has(date) ? "primary" : "default"}
-                variant={includedDateSet.has(date) ? "filled" : "outlined"}
-                size="small"
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Box
                 sx={{
-                  textDecoration: includedDateSet.has(date)
-                    ? "none"
-                    : "line-through",
+                  width: 30,
+                  height: 30,
+                  borderRadius: 1.5,
+                  backgroundColor: "#EDE9FE",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#7C3AED",
                 }}
-              />
-            ))}
-          </Box>
-        </Box>
-
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: { xs: "stretch", sm: "center" },
-            justifyContent: "space-between",
-            gap: 1,
-            flexDirection: { xs: "column", sm: "row" },
-          }}
-        >
-          <Box>
-            <Typography variant="body1" sx={{ fontWeight: 700 }}>
-              Coverage Requirements
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {requirements.length}{" "}
-              {requirements.length === 1 ? "entry" : "entries"}
-            </Typography>
-          </Box>
-
-          <Button
-            variant="outlined"
-            onClick={handleAddRequirement}
-            startIcon={<MdAdd size={18} />}
-            sx={{ textTransform: "none", width: { xs: "100%", sm: "auto" } }}
-          >
-            Add Requirement
-          </Button>
-        </Box>
-
-        <Alert severity="info" sx={{ py: 0.5 }}>
-          Recommended workflow: select a Shift Definition first. Use manual
-          start/end time only when no slot matches.
-        </Alert>
-
-        <Stack spacing={2}>
-          {requirements.map((req, index) => (
-            <Paper
-              key={`req-${index}`}
+              >
+                <MdGroups2 size={17} />
+              </Box>
+              <Box>
+                <Typography
+                  variant="body2"
+                  sx={{ fontWeight: 700, color: "#4C1D95" }}
+                >
+                  Coverage Requirements
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {requirements.length} template
+                  {requirements.length !== 1 ? "s" : ""} · applied across all
+                  active dates
+                </Typography>
+              </Box>
+            </Box>
+            <Button
               variant="outlined"
+              onClick={handleAddRequirement}
+              startIcon={<MdAdd size={16} />}
+              size="small"
               sx={{
-                p: { xs: 1.5, sm: 2 },
-                borderRadius: 2.5,
-                borderColor: "divider",
-                backgroundColor: "background.default",
+                textTransform: "none",
+                borderColor: "#C4B5FD",
+                color: "#7C3AED",
+                "&:hover": {
+                  borderColor: "#7C3AED",
+                  backgroundColor: "#F5F3FF",
+                },
               }}
             >
-              <Stack spacing={1.5}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    mb: 0.5,
-                  }}
-                >
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    Requirement {index + 1}
-                  </Typography>
+              Add
+            </Button>
+          </Box>
 
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => handleRemoveRequirement(index)}
-                    disabled={requirements.length === 1}
-                    aria-label={`Remove requirement ${index + 1}`}
-                  >
-                    <MdDelete size={18} />
-                  </IconButton>
-                </Box>
+          <Stack spacing={0} divider={<Divider />}>
+            {requirements.map((req, index) => {
+              const selectedSlot = getSelectedSlot(req);
 
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                  <TextField
-                    select
-                    fullWidth
-                    label="Role"
-                    value={req.role}
-                    onChange={(e) =>
-                      handleRequirementChange(index, "role", e.target.value)
-                    }
-                    required
-                  >
-                    {roleOptions.map((item) => (
-                      <MenuItem key={item.value} value={item.value}>
-                        {item.label}
+              return (
+                <Box key={`req-${index}`} sx={{ p: { xs: 1, sm: 1.25 } }}>
+                  <Stack spacing={0.9}>
+                    {/* Row header */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.75,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: 1,
+                            backgroundColor: "#EDE9FE",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Typography
+                            sx={{
+                              fontSize: "0.62rem",
+                              fontWeight: 800,
+                              color: "#7C3AED",
+                            }}
+                          >
+                            {index + 1}
+                          </Typography>
+                        </Box>
+                        <Typography
+                          variant="caption"
+                          sx={{ fontWeight: 700, color: "#4C1D95" }}
+                        >
+                          Template {index + 1}
+                        </Typography>
+                        {req.role && (
+                          <Chip
+                            label={getRoleDisplayName(req.role)}
+                            size="small"
+                            sx={{
+                              height: 16,
+                              fontSize: "0.6rem",
+                              fontWeight: 700,
+                              backgroundColor: "#EDE9FE",
+                              color: "#7C3AED",
+                            }}
+                          />
+                        )}
+                      </Box>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => handleRemoveRequirement(index)}
+                        disabled={requirements.length === 1}
+                      >
+                        <MdDelete size={15} />
+                      </IconButton>
+                    </Box>
+
+                    {/* Row 1: Role + Count */}
+                    <Stack direction="row" spacing={0.9}>
+                      <TextField
+                        select
+                        fullWidth
+                        label="Role"
+                        value={req.role}
+                        onChange={(e) =>
+                          handleRequirementChange(index, "role", e.target.value)
+                        }
+                        required
+                        size="small"
+                        inputProps={{ sx: { fontSize: "0.78rem" } }}
+                        InputLabelProps={{ sx: { fontSize: "0.78rem" } }}
+                      >
+                        {roleOptions.map((item) => (
+                          <MenuItem
+                            key={item.value}
+                            value={item.value}
+                            sx={{ fontSize: "0.78rem" }}
+                          >
+                            {item.label}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+
+                      <TextField
+                        label="Count"
+                        type="number"
+                        value={req.requiredCount}
+                        onChange={(e) =>
+                          handleRequirementChange(
+                            index,
+                            "requiredCount",
+                            Math.max(0, Number(e.target.value) || 0),
+                          )
+                        }
+                        inputProps={{ min: 0, sx: { fontSize: "0.78rem" } }}
+                        InputLabelProps={{ sx: { fontSize: "0.78rem" } }}
+                        required
+                        size="small"
+                        sx={{ width: 100, flexShrink: 0 }}
+                      />
+                    </Stack>
+
+                    {/* Row 2: Shift Definition */}
+                    <TextField
+                      select
+                      fullWidth
+                      label="Time Slot"
+                      value={getShiftDefinitionValue(req)}
+                      onChange={(e) =>
+                        handleShiftDefinitionSelect(index, e.target.value)
+                      }
+                      disabled={shiftDefinitionOptions.length === 0}
+                      size="small"
+                      inputProps={{ sx: { fontSize: "0.78rem" } }}
+                      InputLabelProps={{ sx: { fontSize: "0.78rem" } }}
+                      helperText={
+                        shiftDefinitionOptions.length === 0
+                          ? "No time slots configured yet."
+                          : undefined
+                      }
+                      FormHelperTextProps={{
+                        sx: { fontSize: "0.68rem", mt: 0.3 },
+                      }}
+                    >
+                      <MenuItem value="" sx={{ fontSize: "0.78rem" }}>
+                        Use Custom Manual Time
                       </MenuItem>
-                    ))}
-                  </TextField>
-
-                  <TextField
-                    label="Count"
-                    type="number"
-                    value={req.requiredCount}
-                    onChange={(e) =>
-                      handleRequirementChange(
-                        index,
-                        "requiredCount",
-                        Math.max(0, Number(e.target.value) || 0),
-                      )
-                    }
-                    inputProps={{ min: 0 }}
-                    required
-                    sx={{ minWidth: { md: 130 } }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <MdGroups2 size={18} />
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-                </Stack>
-
-                <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
-                  <TextField
-                    select
-                    fullWidth
-                    label="Shift Definition (Recommended)"
-                    value={getShiftDefinitionValue(req)}
-                    onChange={(e) =>
-                      handleShiftDefinitionSelect(index, e.target.value)
-                    }
-                    disabled={shiftDefinitionOptions.length === 0}
-                    helperText={
-                      shiftDefinitionOptions.length > 0
-                        ? "Choosing a definition auto-fills start/end."
-                        : "No shift definitions configured yet. Configure shift type time slots in Facility Preferences."
-                    }
-                  >
-                    <MenuItem value="">Use Custom Manual Time</MenuItem>
-                    {shiftDefinitionOptions.map((option) => (
-                      <MenuItem key={option.value} value={option.value}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-
-                  <TextField
-                    select
-                    fullWidth
-                    label="Unit Area (Optional)"
-                    value={req.unitArea || ""}
-                    onChange={(e) =>
-                      handleRequirementChange(
-                        index,
-                        "unitArea",
-                        e.target.value || "",
-                      )
-                    }
-                    disabled={!facilityPreferences?.unitAreas?.length}
-                    helperText={
-                      facilityPreferences?.unitAreas?.length
-                        ? ""
-                        : "Admin has not configured unit areas yet."
-                    }
-                  >
-                    <MenuItem value="">Any Area</MenuItem>
-                    {(facilityPreferences?.unitAreas || []).map((area) => (
-                      <MenuItem key={area} value={area}>
-                        {getUnitAreaDisplayName(area)}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Stack>
-
-                {isOvernightTimeRange(req.startTime, req.endTime) && (
-                  <Alert severity="info" sx={{ py: 0 }}>
-                    This shift will be treated as overnight and end the next
-                    day.
-                  </Alert>
-                )}
-
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block", mb: 0.75 }}
-                  >
-                    Required Certifications (Optional)
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    select
-                    label="Cert Tags (Optional)"
-                    value={req.requiredCertificationTags || []}
-                    onChange={(e) => {
-                      const selectedValues =
-                        typeof e.target.value === "string"
-                          ? e.target.value.split(",")
-                          : e.target.value;
-
-                      handleRequirementChange(
-                        index,
-                        "requiredCertificationTags",
-                        dedupeStrings(selectedValues),
-                      );
-                    }}
-                    SelectProps={{
-                      multiple: true,
-                      renderValue: (selected) =>
-                        selected?.length
-                          ? selected.join(", ")
-                          : "None required",
-                    }}
-                    disabled={!facilityPreferences?.certificationTags?.length}
-                    helperText={
-                      facilityPreferences?.certificationTags?.length
-                        ? ""
-                        : "Admin has not configured certification tags yet."
-                    }
-                  >
-                    {(facilityPreferences?.certificationTags || []).map(
-                      (cert) => (
-                        <MenuItem key={cert} value={cert}>
-                          {cert}
+                      {shiftDefinitionOptions.map((option) => (
+                        <MenuItem
+                          key={option.value}
+                          value={option.value}
+                          sx={{ fontSize: "0.78rem" }}
+                        >
+                          {option.label}
                         </MenuItem>
-                      ),
+                      ))}
+                    </TextField>
+
+                    {/* Row 3: Unit Area + Cert Tags */}
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={0.9}
+                    >
+                      <TextField
+                        select
+                        fullWidth
+                        label="Unit Area"
+                        value={req.unitArea || ""}
+                        onChange={(e) =>
+                          handleRequirementChange(
+                            index,
+                            "unitArea",
+                            e.target.value || "",
+                          )
+                        }
+                        disabled={!facilityPreferences?.unitAreas?.length}
+                        size="small"
+                        inputProps={{ sx: { fontSize: "0.78rem" } }}
+                        InputLabelProps={{ sx: { fontSize: "0.78rem" } }}
+                      >
+                        <MenuItem value="" sx={{ fontSize: "0.78rem" }}>
+                          Any Area
+                        </MenuItem>
+                        {(facilityPreferences?.unitAreas || []).map((area) => (
+                          <MenuItem
+                            key={area}
+                            value={area}
+                            sx={{ fontSize: "0.78rem" }}
+                          >
+                            {getUnitAreaDisplayName(area)}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+
+                      <TextField
+                        fullWidth
+                        select
+                        label="Cert Tags"
+                        value={req.requiredCertificationTags || []}
+                        onChange={(e) => {
+                          const vals =
+                            typeof e.target.value === "string"
+                              ? e.target.value.split(",")
+                              : e.target.value;
+                          handleRequirementChange(
+                            index,
+                            "requiredCertificationTags",
+                            dedupeStrings(vals),
+                          );
+                        }}
+                        SelectProps={{
+                          multiple: true,
+                          renderValue: (selected) =>
+                            selected?.length ? selected.join(", ") : "None",
+                        }}
+                        disabled={
+                          !facilityPreferences?.certificationTags?.length
+                        }
+                        size="small"
+                        inputProps={{ sx: { fontSize: "0.78rem" } }}
+                        InputLabelProps={{ sx: { fontSize: "0.78rem" } }}
+                      >
+                        {(facilityPreferences?.certificationTags || []).map(
+                          (cert) => (
+                            <MenuItem
+                              key={cert}
+                              value={cert}
+                              sx={{ fontSize: "0.78rem" }}
+                            >
+                              {cert}
+                            </MenuItem>
+                          ),
+                        )}
+                      </TextField>
+                    </Stack>
+
+                    {/* Row 4: Start + End time (only shown when no slot locked) */}
+                    <Stack direction="row" spacing={0.9}>
+                      <TextField
+                        fullWidth
+                        label="Start"
+                        type="time"
+                        value={selectedSlot?.startLocalTime || req.startTime}
+                        onChange={(e) =>
+                          handleRequirementChange(
+                            index,
+                            "startTime",
+                            e.target.value,
+                          )
+                        }
+                        disabled={Boolean(selectedSlot)}
+                        InputLabelProps={{
+                          shrink: true,
+                          sx: { fontSize: "0.78rem" },
+                        }}
+                        inputProps={{ sx: { fontSize: "0.78rem" } }}
+                        size="small"
+                        required
+                      />
+                      <TextField
+                        fullWidth
+                        label="End"
+                        type="time"
+                        value={selectedSlot?.endLocalTime || req.endTime}
+                        onChange={(e) =>
+                          handleRequirementChange(
+                            index,
+                            "endTime",
+                            e.target.value,
+                          )
+                        }
+                        disabled={Boolean(selectedSlot)}
+                        InputLabelProps={{
+                          shrink: true,
+                          sx: { fontSize: "0.78rem" },
+                        }}
+                        inputProps={{ sx: { fontSize: "0.78rem" } }}
+                        size="small"
+                        required
+                      />
+                    </Stack>
+
+                    {isOvernightTimeRange(
+                      selectedSlot?.startLocalTime || req.startTime,
+                      selectedSlot?.endLocalTime || req.endTime,
+                    ) && (
+                      <Alert
+                        severity="info"
+                        sx={{ py: 0, fontSize: "0.72rem" }}
+                      >
+                        Overnight — ends on the next calendar day.
+                      </Alert>
                     )}
-                  </TextField>
+                  </Stack>
                 </Box>
-
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                  <TextField
-                    fullWidth
-                    label="Start"
-                    type="time"
-                    value={
-                      getSelectedSlot(req)?.startLocalTime || req.startTime
-                    }
-                    onChange={(e) =>
-                      handleRequirementChange(
-                        index,
-                        "startTime",
-                        e.target.value,
-                      )
-                    }
-                    disabled={Boolean(getSelectedSlot(req))}
-                    InputLabelProps={{ shrink: true }}
-                    helperText={
-                      getSelectedSlot(req)
-                        ? "From selected shift definition"
-                        : "Manual fallback"
-                    }
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <MdAccessTime size={18} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    required
-                  />
-
-                  <TextField
-                    fullWidth
-                    label="End"
-                    type="time"
-                    value={getSelectedSlot(req)?.endLocalTime || req.endTime}
-                    onChange={(e) =>
-                      handleRequirementChange(index, "endTime", e.target.value)
-                    }
-                    disabled={Boolean(getSelectedSlot(req))}
-                    InputLabelProps={{ shrink: true }}
-                    helperText={
-                      getSelectedSlot(req)
-                        ? "From selected shift definition"
-                        : "Manual fallback"
-                    }
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <MdAccessTime size={18} />
-                        </InputAdornment>
-                      ),
-                    }}
-                    required
-                  />
-                </Stack>
-              </Stack>
-            </Paper>
-          ))}
-        </Stack>
-
-        <Divider />
-
-        <Box
-          sx={{
-            border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 2.5,
-            overflow: "hidden",
-            backgroundColor: "background.default",
-          }}
-        >
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1}
-            justifyContent="space-between"
-            alignItems={{ xs: "flex-start", sm: "center" }}
-            sx={{ px: { xs: 1.5, sm: 2 }, pt: { xs: 1.25, sm: 1.5 }, pb: 1 }}
-          >
-            <Box>
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                Plan Summary
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {totalShiftBlocks} coverage entries • {totalRequestedStaff}{" "}
-                staff positions • {activeDates.length} active dates
-              </Typography>
-            </Box>
+              );
+            })}
           </Stack>
+        </Paper>
 
-          {previewByDate.length === 0 ? (
-            <Box sx={{ px: 2, pb: 1.5 }}>
-              <Typography variant="caption" color="text.secondary">
-                Add active dates and at least one requirement to see the plan.
-              </Typography>
-            </Box>
-          ) : (
-            <Box
-              sx={{
-                maxHeight: 320,
-                overflowY: "auto",
-                borderTop: "1px solid",
-                borderColor: "divider",
-              }}
-            >
-              {previewByDate.map((group, gi) => (
-                <Box
-                  key={group.dateValue}
-                  sx={{
-                    borderBottom:
-                      gi < previewByDate.length - 1 ? "1px solid" : "none",
-                    borderColor: "divider",
-                  }}
-                >
+        {/* ── SECTION 3: Plan Summary accordion ──────────────────────── */}
+        <Paper
+          variant="outlined"
+          sx={{ borderRadius: 2.5, overflow: "hidden", borderColor: "#6EE7B7" }}
+        >
+          <AccordionHeader
+            icon={<MdSummarize size={17} />}
+            title="Plan Summary"
+            subtitle={`${totalShiftBlocks} entries · ${totalRequestedStaff} staff positions · ${activeDates.length} dates`}
+            open={summaryOpen}
+            onToggle={() => setSummaryOpen((v) => !v)}
+            accentColor="#059669"
+          />
+          <Collapse in={summaryOpen}>
+            {previewByDate.length === 0 ? (
+              <Box sx={{ px: 2, py: 1.5 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Add active dates and at least one requirement to preview your
+                  plan.
+                </Typography>
+              </Box>
+            ) : (
+              <Box sx={{ maxHeight: 320, overflowY: "auto" }}>
+                {previewByDate.map((group, gi) => (
                   <Box
+                    key={group.dateValue}
                     sx={{
-                      px: { xs: 1.5, sm: 2 },
-                      py: 0.75,
-                      backgroundColor: "action.hover",
+                      borderBottom:
+                        gi < previewByDate.length - 1 ? "1px solid" : "none",
+                      borderColor: "divider",
                     }}
                   >
-                    <Typography variant="caption" sx={{ fontWeight: 700 }}>
-                      {group.dateLabel}
-                    </Typography>
-                  </Box>
-
-                  {group.rows.map((row) => (
-                    <Stack
-                      key={row.id}
-                      direction="row"
-                      alignItems="center"
-                      spacing={1}
+                    <Box
                       sx={{
                         px: { xs: 1.5, sm: 2 },
                         py: 0.6,
-                        "&:not(:last-child)": {
-                          borderBottom: "1px solid",
-                          borderColor: "divider",
-                        },
+                        backgroundColor: "#F0FDF4",
                       }}
                     >
-                      <Chip
-                        label={row.role}
-                        size="small"
-                        variant="outlined"
-                        sx={{ fontWeight: 600, fontSize: "0.72rem" }}
-                      />
                       <Typography
                         variant="caption"
-                        color="text.secondary"
-                        sx={{ flex: 1 }}
+                        sx={{ fontWeight: 700, color: "#065F46" }}
                       >
-                        {row.timeLabel}
-                        {row.unitArea
-                          ? ` • ${getUnitAreaDisplayName(row.unitArea)}`
-                          : ""}
-                        {row.shiftType
-                          ? ` • ${toDisplayLabel(row.shiftType)}`
-                          : ""}
-                        {row.shiftTag
-                          ? ` • ${toDisplayLabel(row.shiftTag)}`
-                          : ""}
+                        {group.dateLabel}
                       </Typography>
-                      {row.spansOvernight && (
+                    </Box>
+                    {group.rows.map((row) => (
+                      <Stack
+                        key={row.id}
+                        direction="row"
+                        alignItems="center"
+                        spacing={1}
+                        sx={{
+                          px: { xs: 1.5, sm: 2 },
+                          py: 0.55,
+                          "&:not(:last-child)": {
+                            borderBottom: "1px solid",
+                            borderColor: "divider",
+                          },
+                        }}
+                      >
                         <Chip
-                          label="Overnight"
+                          label={row.role}
                           size="small"
-                          color="info"
                           variant="outlined"
+                          sx={{ fontWeight: 600, fontSize: "0.7rem" }}
                         />
-                      )}
-                      <Typography
-                        variant="caption"
-                        sx={{ fontWeight: 600, whiteSpace: "nowrap" }}
-                      >
-                        ×{row.count}
-                      </Typography>
-                    </Stack>
-                  ))}
-                </Box>
-              ))}
-            </Box>
-          )}
-        </Box>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ flex: 1 }}
+                          noWrap
+                        >
+                          {row.timeLabel}
+                          {row.unitArea
+                            ? ` · ${getUnitAreaDisplayName(row.unitArea)}`
+                            : ""}
+                          {row.shiftType
+                            ? ` · ${toDisplayLabel(row.shiftType)}`
+                            : ""}
+                          {row.shiftTag
+                            ? ` · ${toDisplayLabel(row.shiftTag)}`
+                            : ""}
+                        </Typography>
+                        {row.spansOvernight && (
+                          <Chip
+                            label="Overnight"
+                            size="small"
+                            color="info"
+                            variant="outlined"
+                          />
+                        )}
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                            color: "#059669",
+                          }}
+                        >
+                          ×{row.count}
+                        </Typography>
+                      </Stack>
+                    ))}
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </Collapse>
+        </Paper>
 
+        {/* Notes */}
         <TextField
           label="Notes (Optional)"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           multiline
-          rows={3}
-          placeholder="Add any additional notes about these coverage requirements..."
+          rows={2}
+          placeholder="Any additional notes about these coverage requirements..."
+          size="small"
         />
 
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={loading}
-            fullWidth
-            sx={{ textTransform: "none", fontWeight: 600 }}
-          >
-            {loading && loadingMode === "create"
-              ? "Saving..."
-              : "Save Requirements"}
-          </Button>
-        </Stack>
+        {/* Submit */}
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={loading}
+          fullWidth
+          sx={{
+            textTransform: "none",
+            fontWeight: 700,
+            py: 1.1,
+            borderRadius: 2,
+            background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
+            boxShadow: "0 4px 12px rgba(37,99,235,0.3)",
+          }}
+        >
+          {loading && loadingMode === "create"
+            ? "Saving…"
+            : "Save Requirements"}
+        </Button>
       </Stack>
     </Paper>
   );

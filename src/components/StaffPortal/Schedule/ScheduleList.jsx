@@ -1661,12 +1661,19 @@ export default function ScheduleList() {
             display="flex"
             justifyContent="space-between"
             alignItems="center"
-            sx={{ mb: 2, gap: 2, flexDirection: { xs: "column", sm: "row" } }}
+            sx={{
+              mb: 1.25,
+              gap: 1.25,
+              flexDirection: { xs: "column", sm: "row" },
+            }}
           >
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            <Typography
+              variant="h6"
+              sx={{ fontWeight: 700, fontSize: "0.95rem" }}
+            >
               {monthYear}
             </Typography>
-            <Stack direction="row" spacing={1} className="no-print">
+            <Stack direction="row" spacing={0.5} className="no-print">
               <Button
                 size="small"
                 variant="outlined"
@@ -1716,7 +1723,7 @@ export default function ScheduleList() {
             <Table
               size="small"
               sx={{
-                minWidth: Math.max(980, 240 + monthDays.length * 170),
+                minWidth: Math.max(880, 210 + monthDays.length * 140),
               }}
             >
               <TableHead>
@@ -1724,13 +1731,14 @@ export default function ScheduleList() {
                   <TableCell
                     sx={{
                       fontWeight: 700,
-                      width: 220,
-                      minWidth: 220,
+                      width: 175,
+                      minWidth: 175,
                       borderRight: "1px solid #e5e7eb",
                       position: "sticky",
                       left: 0,
                       zIndex: 3,
                       background: "#f3f4f6",
+                      py: 0.7,
                     }}
                   >
                     Employee
@@ -1744,13 +1752,14 @@ export default function ScheduleList() {
                         key={day}
                         sx={{
                           fontWeight: 700,
-                          minWidth: 170,
+                          minWidth: 140,
                           borderLeft: "1px solid #eef2f7",
                           background: isWeekend ? "#eef2ff" : "#f8fafc",
+                          py: 0.7,
                         }}
                       >
                         <Typography
-                          sx={{ fontSize: "0.72rem", fontWeight: 700 }}
+                          sx={{ fontSize: "0.64rem", fontWeight: 700 }}
                         >
                           {date.toLocaleDateString("default", {
                             month: "short",
@@ -1793,19 +1802,20 @@ export default function ScheduleList() {
                           left: 0,
                           zIndex: 2,
                           background: "#fff",
-                          minWidth: 220,
+                          minWidth: 175,
+                          py: 0.65,
                         }}
                       >
                         <Typography
-                          sx={{ fontSize: "0.78rem", fontWeight: 700 }}
+                          sx={{ fontSize: "0.68rem", fontWeight: 700 }}
                         >
                           {member.name}
                         </Typography>
                         <Typography
                           sx={{
-                            fontSize: "0.68rem",
+                            fontSize: "0.58rem",
                             color: "text.secondary",
-                            mt: 0.2,
+                            mt: 0,
                           }}
                         >
                           {getRoleDisplayName(member.role) || "Role"}
@@ -1822,10 +1832,11 @@ export default function ScheduleList() {
                           <TableCell
                             key={`${member.staffId}-${day}`}
                             sx={{
-                              minWidth: 170,
+                              minWidth: 140,
                               verticalAlign: "top",
                               borderLeft: "1px solid #eef2f7",
                               background: isWeekend ? "#fbfdff" : "#fff",
+                              py: 0.35,
                             }}
                           >
                             {shifts.length === 0 ? (
@@ -1834,35 +1845,35 @@ export default function ScheduleList() {
                                 sx={{
                                   color: "text.disabled",
                                   fontStyle: "italic",
-                                  fontSize: "0.68rem",
+                                  fontSize: "0.58rem",
                                 }}
                               >
                                 -
                               </Typography>
                             ) : (
-                              <Stack spacing={0.75}>
+                              <Stack spacing={0.35}>
                                 {shifts.map((shift) => (
                                   <Box
                                     key={shift._id}
                                     sx={{
                                       border: "1px solid #dbeafe",
                                       borderLeft: `3px solid ${getRoleColor(shift.role)}`,
-                                      borderRadius: 1.2,
-                                      px: 0.8,
-                                      py: 0.55,
+                                      borderRadius: 1,
+                                      px: 0.5,
+                                      py: 0.32,
                                       background: "#f8fbff",
                                       "@media print": {
-                                        px: 0.45,
-                                        py: 0.35,
+                                        px: 0.35,
+                                        py: 0.22,
                                       },
                                     }}
                                   >
                                     <Typography
                                       sx={{
-                                        fontSize: "0.66rem",
+                                        fontSize: "0.57rem",
                                         fontWeight: 700,
                                         color: "#111827",
-                                        lineHeight: 1.2,
+                                        lineHeight: 1.1,
                                       }}
                                     >
                                       {formatScheduleTimeRange(shift, {
@@ -1874,10 +1885,10 @@ export default function ScheduleList() {
                                     </Typography>
                                     <Typography
                                       sx={{
-                                        fontSize: "0.62rem",
+                                        fontSize: "0.54rem",
                                         color: "#475569",
-                                        lineHeight: 1.2,
-                                        mt: 0.2,
+                                        lineHeight: 1.1,
+                                        mt: 0,
                                       }}
                                     >
                                       {getUnitAreaDisplayName(shift.unitArea) ||

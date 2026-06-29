@@ -42,10 +42,8 @@ import {
   FiRepeat,
   FiPrinter,
   FiDownload,
-  FiFileText,
   FiChevronDown,
 } from "react-icons/fi";
-import ExcelJS from "exceljs";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import ScheduleForm from "./ScheduleForm";
@@ -91,9 +89,14 @@ export default function ScheduleList() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [monthDate, setMonthDate] = useState(new Date());
+  const [calendarRange, setCalendarRange] = useState({
+    start: null,
+    end: null,
+    title: "",
+  });
   const [staffVisibility, setStaffVisibility] = useState("mine");
   const [shiftTimeFilter, setShiftTimeFilter] = useState("");
-  const [rosterExportAnchorEl, setRosterExportAnchorEl] = useState(null);
+  const [exportMenuAnchorEl, setExportMenuAnchorEl] = useState(null);
 
   const roleFilterOptions = useMemo(() => {
     const facilityRoleValues = getRoleOptionsFromFacilityPreferences(
@@ -532,28 +535,61 @@ export default function ScheduleList() {
     call_out: "#ef5350",
   };
 
-  const monthRosterRows = useMemo(() => {
-    return monthDays.map((day) => {
-      const date = parseLocalDateKey(day);
-      const dayLabel = date.toLocaleDateString("default", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      });
-      const shifts = filteredSchedules
-        .filter((schedule) => getLocalDateKey(schedule.startTime) === day)
-        .sort(
+  const monthRosterStaffRows = useMemo(() => {
+    const inMonthSchedules = filteredSchedules.filter((schedule) => {
+      const start = new Date(schedule.startTime);
+      return (
+        !Number.isNaN(start.getTime()) &&
+        start.getFullYear() === monthDate.getFullYear() &&
+        start.getMonth() === monthDate.getMonth()
+      );
+    });
+
+    const staffMap = new Map();
+    inMonthSchedules.forEach((schedule) => {
+      const staffId = String(schedule?.staffId?._id || "");
+      if (!staffId) return;
+      if (!staffMap.has(staffId)) {
+        staffMap.set(staffId, {
+          staffId,
+          name: schedule?.staffId?.name || "Unknown",
+          role: schedule?.staffId?.role || schedule?.role || "",
+        });
+      }
+    });
+
+    const shiftsByStaffAndDay = new Map();
+    inMonthSchedules.forEach((schedule) => {
+      const staffId = String(schedule?.staffId?._id || "");
+      if (!staffId) return;
+      const dayKey = getLocalDateKey(schedule.startTime);
+      const key = `${staffId}|${dayKey}`;
+      if (!shiftsByStaffAndDay.has(key)) {
+        shiftsByStaffAndDay.set(key, []);
+      }
+      shiftsByStaffAndDay.get(key).push(schedule);
+    });
+
+    const sortedStaff = Array.from(staffMap.values()).sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || "")),
+    );
+
+    return sortedStaff.map((member) => {
+      const shiftsByDay = monthDays.reduce((acc, dayKey) => {
+        const key = `${member.staffId}|${dayKey}`;
+        acc[dayKey] = (shiftsByStaffAndDay.get(key) || []).sort(
           (a, b) =>
             new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
         );
+        return acc;
+      }, {});
 
       return {
-        day,
-        dayLabel,
-        shifts,
+        ...member,
+        shiftsByDay,
       };
     });
-  }, [monthDays, filteredSchedules]);
+  }, [filteredSchedules, monthDate, monthDays]);
 
   const triggerDownload = (blob, fileName) => {
     const href = URL.createObjectURL(blob);
@@ -572,159 +608,298 @@ export default function ScheduleList() {
     return `${year}-${month}`;
   };
 
-  const openRosterExportMenu = (event) => {
-    setRosterExportAnchorEl(event.currentTarget);
+  const getCalendarFileStamp = () => {
+    const baseDate =
+      calendarRange.start &&
+      !Number.isNaN(new Date(calendarRange.start).getTime())
+        ? new Date(calendarRange.start)
+        : new Date();
+    const year = baseDate.getFullYear();
+    const month = String(baseDate.getMonth() + 1).padStart(2, "0");
+    const day = String(baseDate.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   };
 
-  const closeRosterExportMenu = () => {
-    setRosterExportAnchorEl(null);
+  const calendarWeekdayLabels = [
+    "Sun",
+    "Mon",
+    "Tue",
+    "Wed",
+    "Thu",
+    "Fri",
+    "Sat",
+  ];
+
+  const visibleCalendarDays = useMemo(() => {
+    if (!calendarRange.start || !calendarRange.end) {
+      return [];
+    }
+
+    const start = new Date(calendarRange.start);
+    const end = new Date(calendarRange.end);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return [];
+    }
+
+    const days = [];
+    const cursor = new Date(start);
+    while (cursor < end) {
+      days.push(new Date(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return days;
+  }, [calendarRange]);
+
+  const calendarGridWeeks = useMemo(() => {
+    if (visibleCalendarDays.length === 0) return [];
+
+    const schedulesByDay = new Map();
+    filteredSchedules.forEach((schedule) => {
+      const dayKey = getLocalDateKey(schedule.startTime);
+      if (!schedulesByDay.has(dayKey)) {
+        schedulesByDay.set(dayKey, []);
+      }
+      schedulesByDay.get(dayKey).push(schedule);
+    });
+
+    const cells = visibleCalendarDays.map((date) => {
+      const dayKey = getLocalDateKey(date);
+      const shifts = (schedulesByDay.get(dayKey) || []).sort(
+        (a, b) =>
+          new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+      );
+
+      const lines = shifts.map((shift) => {
+        const start = new Date(shift.startTime);
+        const end = new Date(shift.endTime);
+        const startTime = Number.isNaN(start.getTime())
+          ? ""
+          : start.toLocaleTimeString(undefined, {
+              hour: "numeric",
+              minute: "2-digit",
+              hour12: true,
+            });
+        const endTime = Number.isNaN(end.getTime())
+          ? ""
+          : end.toLocaleTimeString(undefined, {
+              hour: "numeric",
+              minute: "2-digit",
+              hour12: true,
+            });
+        const unit = getUnitAreaDisplayName(shift.unitArea) || "No unit";
+        return `${shift.staffId?.name || "Unknown"} (${startTime}-${endTime}, ${unit})`;
+      });
+
+      return {
+        dayNumber: date.getDate(),
+        text: [`${date.getDate()}`, ...lines].join("\n"),
+      };
+    });
+
+    const weeks = [];
+    for (let i = 0; i < cells.length; i += 7) {
+      weeks.push(cells.slice(i, i + 7));
+    }
+    return weeks;
+  }, [filteredSchedules, visibleCalendarDays]);
+
+  const openExportMenu = (event) => {
+    setExportMenuAnchorEl(event.currentTarget);
   };
 
-  const handlePrintRoster = () => {
-    closeRosterExportMenu();
-    document.body.classList.add("printing-roster");
-    window.print();
-    document.body.classList.remove("printing-roster");
+  const closeExportMenu = () => {
+    setExportMenuAnchorEl(null);
   };
 
-  const exportRosterToExcel = async () => {
+  const csvEscape = (value) => {
+    const stringValue = String(value ?? "");
+    if (/[,"\n]/.test(stringValue)) {
+      return `"${stringValue.replace(/"/g, '""')}"`;
+    }
+    return stringValue;
+  };
+
+  const exportRosterToCsv = () => {
     try {
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet("Roster");
-
-      worksheet.columns = [
-        { header: "Date", key: "date", width: 15 },
-        { header: "Staff", key: "staff", width: 24 },
-        { header: "Role", key: "role", width: 16 },
-        { header: "Unit", key: "unit", width: 18 },
-        { header: "Shift Type", key: "shiftType", width: 16 },
-        { header: "Time", key: "time", width: 20 },
+      closeExportMenu();
+      const headers = [
+        "Employee",
+        "Role",
+        ...monthDays.map((day) => {
+          const date = parseLocalDateKey(day);
+          return date.toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+          });
+        }),
       ];
 
-      worksheet.getRow(1).font = { bold: true, color: { argb: "FF0F172A" } };
-      worksheet.views = [{ state: "frozen", ySplit: 1 }];
+      const rows = monthRosterStaffRows.map((member) => {
+        const dayCells = monthDays.map((day) => {
+          const shifts = member.shiftsByDay?.[day] || [];
+          if (shifts.length === 0) return "";
 
-      monthRosterRows.forEach(({ dayLabel, shifts }) => {
-        if (shifts.length === 0) {
-          const row = worksheet.addRow({
-            date: dayLabel,
-            staff: "No shifts",
-            role: "-",
-            unit: "-",
-            shiftType: "-",
-            time: "-",
-          });
-          row.getCell("staff").font = {
-            italic: true,
-            color: { argb: "FF6B7280" },
-          };
-          return;
-        }
+          return shifts
+            .map((shift) => {
+              const time = `${formatScheduleTimeRange(shift, {
+                withNextDayHint: false,
+              })}${isOvernightShift(shift) ? " (+1 day)" : ""}`;
+              const unit = getUnitAreaDisplayName(shift.unitArea) || "No unit";
 
-        shifts.forEach((shift, index) => {
-          const row = worksheet.addRow({
-            date: index === 0 ? dayLabel : "",
-            staff: shift.staffId?.name || "Unknown",
-            role: getRoleDisplayName(shift.role),
-            unit: getUnitAreaDisplayName(shift.unitArea) || "-",
-            shiftType: getShiftTypeDisplayName(shift.shiftType) || "-",
-            time: `${formatScheduleTimeRange(shift, {
-              withNextDayHint: false,
-            })}${isOvernightShift(shift) ? " (+1 day)" : ""}`,
-          });
-
-          row.getCell("role").font = {
-            bold: true,
-            color: { argb: "FF111827" },
-          };
-          row.getCell("shiftType").font = {
-            bold: true,
-            color: { argb: "FF111827" },
-          };
+              return `${time} | ${unit}`;
+            })
+            .join(" ; ");
         });
+
+        return [
+          member.name || "Unknown",
+          getRoleDisplayName(member.role) || "-",
+          ...dayCells,
+        ];
       });
 
-      worksheet.eachRow((row) => {
-        row.eachCell((cell) => {
-          cell.alignment = { vertical: "middle", wrapText: true };
-          cell.border = {
-            top: { style: "thin", color: { argb: "FFE5E7EB" } },
-            left: { style: "thin", color: { argb: "FFE5E7EB" } },
-            bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
-            right: { style: "thin", color: { argb: "FFE5E7EB" } },
-          };
-        });
-      });
+      const csv = [headers, ...rows]
+        .map((row) => row.map(csvEscape).join(","))
+        .join("\n");
 
-      const buffer = await workbook.xlsx.writeBuffer();
       triggerDownload(
-        new Blob([buffer], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        }),
-        `roster-${getMonthFileStamp()}.xlsx`,
+        new Blob([csv], { type: "text/csv;charset=utf-8;" }),
+        `roster-${getMonthFileStamp()}.csv`,
       );
     } catch (error) {
-      console.error("Failed to export roster to Excel", error);
-      window.alert("Unable to export roster to Excel. Please try again.");
+      console.error("Failed to export roster to CSV", error);
+      window.alert("Unable to export roster to CSV. Please try again.");
     }
   };
 
   const exportRosterToPdf = () => {
     try {
-      const pdf = new jsPDF({ orientation: "landscape", unit: "mm" });
-      const body = [];
-
-      monthRosterRows.forEach(({ dayLabel, shifts }) => {
-        if (shifts.length === 0) {
-          body.push([dayLabel, "No shifts", "-", "-", "-"]);
-          return;
-        }
-
-        shifts.forEach((shift, index) => {
-          body.push([
-            index === 0 ? dayLabel : "",
-            shift.staffId?.name || "Unknown",
-            getRoleDisplayName(shift.role),
-            getUnitAreaDisplayName(shift.unitArea) || "-",
-            getShiftTypeDisplayName(shift.shiftType) || "-",
-            `${formatScheduleTimeRange(shift, {
-              withNextDayHint: false,
-            })}${isOvernightShift(shift) ? " (+1 day)" : ""}`,
-          ]);
-        });
+      closeExportMenu();
+      const doc = new jsPDF({
+        orientation: "landscape",
+        unit: "pt",
+        format: "a4",
       });
 
-      pdf.setFontSize(14);
-      pdf.text(`Staff Roster - ${monthYear}`, 14, 14);
+      const headers = [
+        "Employee",
+        "Role",
+        ...monthDays.map((day) => {
+          const date = parseLocalDateKey(day);
+          return date.toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+          });
+        }),
+      ];
 
-      autoTable(pdf, {
-        startY: 18,
-        head: [["Date", "Staff", "Role", "Unit", "Shift Type", "Time"]],
+      const body = monthRosterStaffRows.map((member) => {
+        const dayCells = monthDays.map((day) => {
+          const shifts = member.shiftsByDay?.[day] || [];
+          if (shifts.length === 0) return "";
+
+          return shifts
+            .map((shift) => {
+              const time = `${formatScheduleTimeRange(shift, {
+                withNextDayHint: false,
+              })}${isOvernightShift(shift) ? " (+1 day)" : ""}`;
+              const unit = getUnitAreaDisplayName(shift.unitArea) || "No unit";
+              return `${time} | ${unit}`;
+            })
+            .join("\n");
+        });
+
+        return [
+          member.name || "Unknown",
+          getRoleDisplayName(member.role) || "-",
+          ...dayCells,
+        ];
+      });
+
+      doc.setFontSize(11);
+      doc.text(`Roster - ${monthYear}`, 40, 30);
+
+      autoTable(doc, {
+        startY: 40,
+        head: [headers],
         body,
         styles: {
-          fontSize: 8,
+          fontSize: 6,
           cellPadding: 2,
+          overflow: "linebreak",
+          valign: "top",
           lineColor: [229, 231, 235],
           lineWidth: 0.1,
         },
         headStyles: {
+          fillColor: [243, 244, 246],
           textColor: [15, 23, 42],
           fontStyle: "bold",
         },
         columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 54 },
-          2: { cellWidth: 24 },
-          3: { cellWidth: 28 },
-          4: { cellWidth: 28 },
-          5: { cellWidth: 36 },
+          0: { cellWidth: 80 },
+          1: { cellWidth: 56 },
         },
+        horizontalPageBreak: true,
+        horizontalPageBreakRepeat: [0, 1],
+        margin: { left: 18, right: 18, top: 28, bottom: 20 },
       });
 
-      pdf.save(`roster-${getMonthFileStamp()}.pdf`);
+      doc.save(`roster-${getMonthFileStamp()}.pdf`);
     } catch (error) {
       console.error("Failed to export roster to PDF", error);
       window.alert("Unable to export roster to PDF. Please try again.");
+    }
+  };
+
+  const exportCalendarToPdf = () => {
+    try {
+      closeExportMenu();
+
+      if (calendarGridWeeks.length === 0) {
+        window.alert("No calendar data to export for this view.");
+        return;
+      }
+
+      const doc = new jsPDF({
+        orientation: "landscape",
+        unit: "pt",
+        format: "a4",
+      });
+
+      doc.setFontSize(11);
+      doc.text(
+        `Calendar Export${calendarRange.title ? ` - ${calendarRange.title}` : ""}`,
+        40,
+        30,
+      );
+
+      autoTable(doc, {
+        startY: 40,
+        head: [calendarWeekdayLabels],
+        body: calendarGridWeeks.map((week) => week.map((cell) => cell.text)),
+        styles: {
+          fontSize: 6,
+          cellPadding: 2,
+          lineColor: [229, 231, 235],
+          lineWidth: 0.1,
+          overflow: "linebreak",
+          valign: "top",
+          minCellHeight: 80,
+        },
+        headStyles: {
+          fillColor: [243, 244, 246],
+          textColor: [15, 23, 42],
+          fontStyle: "bold",
+        },
+        theme: "grid",
+        margin: { left: 20, right: 20, top: 28, bottom: 20 },
+      });
+
+      doc.save(`calendar-${getCalendarFileStamp()}.pdf`);
+    } catch (error) {
+      console.error("Failed to export calendar to PDF", error);
+      window.alert("Unable to export calendar to PDF. Please try again.");
     }
   };
 
@@ -899,6 +1074,52 @@ export default function ScheduleList() {
           >
             {isAdmin ? "Manual Scheduler" : "Pick Up Shift"}
           </Button>
+
+          {(view === "calendar" || view === "month") && (
+            <>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<FiDownload />}
+                endIcon={<FiChevronDown />}
+                onClick={openExportMenu}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: 2,
+                  px: 2,
+                  width: { xs: "100%", md: "auto" },
+                }}
+              >
+                Export
+              </Button>
+              <Menu
+                anchorEl={exportMenuAnchorEl}
+                open={Boolean(exportMenuAnchorEl)}
+                onClose={closeExportMenu}
+              >
+                {view === "calendar" && (
+                  <>
+                    <MenuItem onClick={exportCalendarToPdf}>
+                      <FiPrinter style={{ marginRight: 8 }} /> Export Calendar
+                      PDF
+                    </MenuItem>
+                  </>
+                )}
+
+                {view === "month" && (
+                  <>
+                    <MenuItem onClick={exportRosterToCsv}>
+                      <FiDownload style={{ marginRight: 8 }} /> Export Roster
+                      CSV
+                    </MenuItem>
+                    <MenuItem onClick={exportRosterToPdf}>
+                      <FiPrinter style={{ marginRight: 8 }} /> Export Roster PDF
+                    </MenuItem>
+                  </>
+                )}
+              </Menu>
+            </>
+          )}
         </Box>
       </Box>
 
@@ -1475,41 +1696,6 @@ export default function ScheduleList() {
               >
                 Next
               </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<FiDownload />}
-                endIcon={<FiChevronDown />}
-                onClick={openRosterExportMenu}
-                sx={{ textTransform: "none" }}
-              >
-                Export / Print
-              </Button>
-              <Menu
-                anchorEl={rosterExportAnchorEl}
-                open={Boolean(rosterExportAnchorEl)}
-                onClose={closeRosterExportMenu}
-              >
-                <MenuItem onClick={handlePrintRoster}>
-                  <FiPrinter style={{ marginRight: 8 }} /> Print roster
-                </MenuItem>
-                <MenuItem
-                  onClick={() => {
-                    closeRosterExportMenu();
-                    exportRosterToExcel();
-                  }}
-                >
-                  <FiDownload style={{ marginRight: 8 }} /> Export Excel
-                </MenuItem>
-                <MenuItem
-                  onClick={() => {
-                    closeRosterExportMenu();
-                    exportRosterToPdf();
-                  }}
-                >
-                  <FiFileText style={{ marginRight: 8 }} /> Export PDF
-                </MenuItem>
-              </Menu>
             </Stack>
           </Box>
 
@@ -1519,147 +1705,194 @@ export default function ScheduleList() {
               background: "white",
               borderRadius: 2,
               border: "1px solid #e5e7eb",
+              overflowX: "auto",
               "@media print": {
                 border: "none",
                 borderRadius: 0,
+                overflowX: "visible",
               },
             }}
           >
-            <Table size="small">
+            <Table
+              size="small"
+              sx={{
+                minWidth: Math.max(980, 240 + monthDays.length * 170),
+              }}
+            >
               <TableHead>
                 <TableRow sx={{ background: "#f3f4f6" }}>
                   <TableCell
                     sx={{
                       fontWeight: 700,
-                      width: 130,
+                      width: 220,
+                      minWidth: 220,
                       borderRight: "1px solid #e5e7eb",
+                      position: "sticky",
+                      left: 0,
+                      zIndex: 3,
+                      background: "#f3f4f6",
                     }}
                   >
-                    Date
+                    Employee
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Staff on Shift</TableCell>
+                  {monthDays.map((day) => {
+                    const date = parseLocalDateKey(day);
+                    const isWeekend =
+                      date.getDay() === 0 || date.getDay() === 6;
+                    return (
+                      <TableCell
+                        key={day}
+                        sx={{
+                          fontWeight: 700,
+                          minWidth: 170,
+                          borderLeft: "1px solid #eef2f7",
+                          background: isWeekend ? "#eef2ff" : "#f8fafc",
+                        }}
+                      >
+                        <Typography
+                          sx={{ fontSize: "0.72rem", fontWeight: 700 }}
+                        >
+                          {date.toLocaleDateString("default", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </Typography>
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               </TableHead>
               <TableBody>
-                {monthDays.map((day) => {
-                  const date = parseLocalDateKey(day);
-                  const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                  const dayLabel = date.toLocaleDateString("default", {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  });
-                  const shiftsOnDay = filteredSchedules.filter(
-                    (s) => getLocalDateKey(s.startTime) === day,
-                  );
-
-                  return (
-                    <TableRow
-                      key={day}
+                {monthRosterStaffRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={monthDays.length + 1}
                       sx={{
-                        background: isWeekend ? "#f9fafb" : "#fff",
-                        "&:hover": { background: "#f0f4ff" },
+                        py: 3,
+                        textAlign: "center",
+                        color: "text.secondary",
+                      }}
+                    >
+                      No roster entries for this month with current filters.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  monthRosterStaffRows.map((member) => (
+                    <TableRow
+                      key={member.staffId}
+                      sx={{
+                        "&:hover": { background: "#f8fbff" },
                         "@media print": { pageBreakInside: "avoid" },
                       }}
                     >
                       <TableCell
                         sx={{
-                          fontWeight: 600,
-                          fontSize: "0.8rem",
                           borderRight: "1px solid #e5e7eb",
-                          color: isWeekend ? "#6b7280" : "#111827",
-                          whiteSpace: "nowrap",
                           verticalAlign: "top",
-                          pt: 1.5,
+                          position: "sticky",
+                          left: 0,
+                          zIndex: 2,
+                          background: "#fff",
+                          minWidth: 220,
                         }}
                       >
-                        {dayLabel}
+                        <Typography
+                          sx={{ fontSize: "0.78rem", fontWeight: 700 }}
+                        >
+                          {member.name}
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontSize: "0.68rem",
+                            color: "text.secondary",
+                            mt: 0.2,
+                          }}
+                        >
+                          {getRoleDisplayName(member.role) || "Role"}
+                        </Typography>
                       </TableCell>
-                      <TableCell sx={{ py: 1 }}>
-                        {shiftsOnDay.length === 0 ? (
-                          <Typography
-                            variant="caption"
-                            color="text.disabled"
-                            sx={{ fontStyle: "italic" }}
-                          >
-                            No shifts
-                          </Typography>
-                        ) : (
-                          <Box
+
+                      {monthDays.map((day) => {
+                        const shifts = member.shiftsByDay[day] || [];
+                        const date = parseLocalDateKey(day);
+                        const isWeekend =
+                          date.getDay() === 0 || date.getDay() === 6;
+
+                        return (
+                          <TableCell
+                            key={`${member.staffId}-${day}`}
                             sx={{
-                              display: "flex",
-                              flexWrap: "wrap",
-                              gap: 0.75,
+                              minWidth: 170,
+                              verticalAlign: "top",
+                              borderLeft: "1px solid #eef2f7",
+                              background: isWeekend ? "#fbfdff" : "#fff",
                             }}
                           >
-                            {shiftsOnDay.map((shift, idx) => (
-                              <Box
-                                key={idx}
+                            {shifts.length === 0 ? (
+                              <Typography
+                                variant="caption"
                                 sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 0.5,
-                                  border: "1px solid #e5e7eb",
-                                  borderRadius: 1.5,
-                                  px: 1,
-                                  py: 0.4,
-                                  background: "#f8faff",
-                                  "@media print": {
-                                    fontSize: "9px",
-                                    px: 0.5,
-                                  },
+                                  color: "text.disabled",
+                                  fontStyle: "italic",
+                                  fontSize: "0.68rem",
                                 }}
                               >
-                                <Box
-                                  sx={{
-                                    width: 8,
-                                    height: 8,
-                                    borderRadius: "50%",
-                                    background: getRoleColor(shift.role),
-                                    flexShrink: 0,
-                                  }}
-                                />
-                                <Typography
-                                  sx={{
-                                    fontSize: "0.78rem",
-                                    fontWeight: 600,
-                                    color: "#111827",
-                                  }}
-                                >
-                                  {shift.staffId?.name || "Unknown"}
-                                </Typography>
-                                <Box
-                                  sx={{
-                                    fontSize: "0.7rem",
-                                    background: getRoleColor(shift.role) + "22",
-                                    color: getRoleColor(shift.role),
-                                    px: 0.75,
-                                    py: 0.1,
-                                    borderRadius: 1,
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  {getRoleDisplayName(shift.role)}
-                                </Box>
-                                <Typography
-                                  sx={{
-                                    fontSize: "0.7rem",
-                                    color: "#6b7280",
-                                  }}
-                                >
-                                  {formatScheduleTimeRange(shift, {
-                                    withNextDayHint: false,
-                                  })}
-                                  {isOvernightShift(shift) ? " (+1 day)" : ""}
-                                </Typography>
-                              </Box>
-                            ))}
-                          </Box>
-                        )}
-                      </TableCell>
+                                -
+                              </Typography>
+                            ) : (
+                              <Stack spacing={0.75}>
+                                {shifts.map((shift) => (
+                                  <Box
+                                    key={shift._id}
+                                    sx={{
+                                      border: "1px solid #dbeafe",
+                                      borderLeft: `3px solid ${getRoleColor(shift.role)}`,
+                                      borderRadius: 1.2,
+                                      px: 0.8,
+                                      py: 0.55,
+                                      background: "#f8fbff",
+                                      "@media print": {
+                                        px: 0.45,
+                                        py: 0.35,
+                                      },
+                                    }}
+                                  >
+                                    <Typography
+                                      sx={{
+                                        fontSize: "0.66rem",
+                                        fontWeight: 700,
+                                        color: "#111827",
+                                        lineHeight: 1.2,
+                                      }}
+                                    >
+                                      {formatScheduleTimeRange(shift, {
+                                        withNextDayHint: false,
+                                      })}
+                                      {isOvernightShift(shift)
+                                        ? " (+1 day)"
+                                        : ""}
+                                    </Typography>
+                                    <Typography
+                                      sx={{
+                                        fontSize: "0.62rem",
+                                        color: "#475569",
+                                        lineHeight: 1.2,
+                                        mt: 0.2,
+                                      }}
+                                    >
+                                      {getUnitAreaDisplayName(shift.unitArea) ||
+                                        "No unit"}
+                                    </Typography>
+                                  </Box>
+                                ))}
+                              </Stack>
+                            )}
+                          </TableCell>
+                        );
+                      })}
                     </TableRow>
-                  );
-                })}
+                  ))
+                )}
               </TableBody>
             </Table>
           </Box>
@@ -1970,6 +2203,13 @@ export default function ScheduleList() {
                 return;
               }
               openDetailsModal(clicked);
+            }}
+            datesSet={(dateInfo) => {
+              setCalendarRange({
+                start: dateInfo.start,
+                end: dateInfo.end,
+                title: dateInfo.view?.title || "",
+              });
             }}
             expandRows={true}
             height="72vh"

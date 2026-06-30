@@ -133,8 +133,7 @@ const GUIDE_DATA = {
     sections: [
       {
         title: "1. Overview and Daily Readiness",
-        purpose:
-          "Start each shift day with a quick readiness check.",
+        purpose: "Start each shift day with a quick readiness check.",
         steps: [
           "Review upcoming shifts and any new alerts visible on your dashboard.",
           "Check for newly published schedule changes.",
@@ -144,8 +143,7 @@ const GUIDE_DATA = {
       },
       {
         title: "2. My Schedule",
-        purpose:
-          "Track assignments and stay aligned with published updates.",
+        purpose: "Track assignments and stay aligned with published updates.",
         steps: [
           "Review date, start and end times, and assigned role details.",
           "Use schedule views regularly so late changes do not get missed.",
@@ -155,8 +153,7 @@ const GUIDE_DATA = {
       },
       {
         title: "3. Shift Swaps",
-        purpose:
-          "Handle unavoidable conflicts without losing visibility.",
+        purpose: "Handle unavoidable conflicts without losing visibility.",
         steps: [
           "Open a swap request directly from your assigned shift.",
           "Choose a colleague and submit a clear, accurate request.",
@@ -234,10 +231,20 @@ function DetailedSection({ section, tone }) {
       </Typography>
       <List sx={{ p: 0 }}>
         {section.steps.map((step, index) => (
-          <ListItem key={step} sx={{ px: 0, py: 0.65, alignItems: "flex-start" }}>
+          <ListItem
+            key={step}
+            sx={{ px: 0, py: 0.65, alignItems: "flex-start" }}
+          >
             <ListItemText
               primary={
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    flexWrap: "wrap",
+                  }}
+                >
                   <Chip
                     size="small"
                     label={`Step ${index + 1}`}
@@ -248,7 +255,9 @@ function DetailedSection({ section, tone }) {
                       border: "1px solid #e5e7eb",
                     }}
                   />
-                  <Typography sx={{ color: "#1f2937", lineHeight: 1.6 }}>{step}</Typography>
+                  <Typography sx={{ color: "#1f2937", lineHeight: 1.6 }}>
+                    {step}
+                  </Typography>
                 </Box>
               }
             />
@@ -274,10 +283,15 @@ function SimpleListCard({ title, items }) {
       </Typography>
       <List sx={{ p: 0 }}>
         {items.map((item, index) => (
-          <ListItem key={item} sx={{ px: 0, py: 0.65, alignItems: "flex-start" }}>
+          <ListItem
+            key={item}
+            sx={{ px: 0, py: 0.65, alignItems: "flex-start" }}
+          >
             <ListItemText
               primary={`${index + 1}. ${item}`}
-              primaryTypographyProps={{ sx: { color: "#374151", lineHeight: 1.6 } }}
+              primaryTypographyProps={{
+                sx: { color: "#374151", lineHeight: 1.6 },
+              }}
             />
           </ListItem>
         ))}
@@ -309,13 +323,19 @@ export default function HowToUsePage() {
         How to Use WiserShifts
       </Typography>
       <Typography sx={{ color: "#4b5563", mb: 3, lineHeight: 1.7 }}>
-        Use this training page for detailed, role-based instructions. Switch between Admin and
-        Non-Admin Staff guides to see workflows, daily priorities, and common mistakes.
+        Use this training page for detailed, role-based instructions. Switch
+        between Admin and Non-Admin Staff guides to see workflows, daily
+        priorities, and common mistakes.
       </Typography>
 
       <Paper
         elevation={0}
-        sx={{ border: "1px solid #e5e7eb", borderRadius: 3, p: { xs: 2, md: 3 }, mb: 3 }}
+        sx={{
+          border: "1px solid #e5e7eb",
+          borderRadius: 3,
+          p: { xs: 2, md: 3 },
+          mb: 3,
+        }}
       >
         <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
           Select Your Role
@@ -336,7 +356,9 @@ export default function HowToUsePage() {
           }}
         >
           <ToggleButton value="admin">Admin Instructions</ToggleButton>
-          <ToggleButton value="staff">Non-Admin Staff Instructions</ToggleButton>
+          <ToggleButton value="staff">
+            Non-Admin Staff Instructions
+          </ToggleButton>
         </ToggleButtonGroup>
 
         <Alert
@@ -348,7 +370,9 @@ export default function HowToUsePage() {
             "& .MuiAlert-icon": { color: "#2563eb" },
           }}
         >
-          <Typography sx={{ fontWeight: 700, mb: 0.25 }}>{guide.label} Guide</Typography>
+          <Typography sx={{ fontWeight: 700, mb: 0.25 }}>
+            {guide.label} Guide
+          </Typography>
           <Typography sx={{ lineHeight: 1.6 }}>{guide.audience}</Typography>
         </Alert>
       </Paper>
@@ -371,7 +395,9 @@ export default function HowToUsePage() {
             <ListItem key={item} sx={{ px: 0, py: 0.65 }}>
               <ListItemText
                 primary={`${index + 1}. ${item}`}
-                primaryTypographyProps={{ sx: { color: "#374151", lineHeight: 1.6 } }}
+                primaryTypographyProps={{
+                  sx: { color: "#374151", lineHeight: 1.6 },
+                }}
               />
             </ListItem>
           ))}

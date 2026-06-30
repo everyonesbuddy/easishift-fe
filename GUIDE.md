@@ -1,6 +1,7 @@
 # WiserShifts User Guide + Video Script
 
 This document is written to work in two ways:
+
 - As a practical user guide for day-to-day platform use
 - As a ready-to-read script for a product walkthrough video
 
@@ -13,6 +14,7 @@ Use this for onboarding new tenants, training facility managers, and helping non
 Suggested video length: 12-18 minutes
 
 Suggested format:
+
 - Intro and login flow
 - Admin walkthrough
 - Non-admin staff walkthrough
@@ -27,6 +29,7 @@ Tip for recording: Keep browser zoom around 90-100% so dashboards, tables, and m
 Welcome to WiserShifts, a workforce scheduling and management platform built for care facilities.
 
 In this walkthrough, we will cover both experiences in the app:
+
 - Admin users, who manage staffing operations
 - Non-admin staff users, who manage their personal schedule and requests
 
@@ -37,17 +40,20 @@ By the end of this video, you will know how to log in, navigate key pages, creat
 ## Scene 2: Login and Navigation Basics (All Users)
 
 ### What to show on screen
+
 - Home page
 - Login page
 - Main app shell after login
 - Sidebar and top navigation bar
 
 ### Voiceover script
+
 Start by logging in with your account credentials.
 
 After login, you will enter the main app layout with a left sidebar and top navigation bar.
 
 Your sidebar links depend on your role:
+
 - Admins see organization-level operations such as staff, coverage, scheduling, time-off decisions, and billing
 - Non-admin staff see personal workflows such as my schedule, preferences, shift swaps, and my time-off requests
 
@@ -60,11 +66,13 @@ The dashboard is your main hub for snapshots, alerts, and quick actions.
 ## 3.1 Admin Dashboard
 
 ### What to show on screen
+
 - Dashboard KPI cards
 - Charts
 - Quick-action modals
 
 ### Voiceover script
+
 As an admin, your dashboard gives you an organization-level snapshot.
 
 Use stat cards and charts to track staffing load, coverage gaps, pending requests, and unread messages.
@@ -76,10 +84,12 @@ For speed, use dashboard quick actions to create staff records, coverage slots, 
 ## 3.2 Facility Preferences (Taxonomy Setup)
 
 ### What to show on screen
+
 - Facility Preferences page
 - Role families, unit areas, shift types, shift definitions, and certification tags
 
 ### Voiceover script
+
 Before heavy scheduling, configure your facility taxonomy in Facility Preferences.
 
 Set your role families, unit areas, shift types, shift definitions, and certification tags.
@@ -93,6 +103,7 @@ Best practice: complete this setup first, then build coverage and schedules.
 ## 3.3 Staff Management
 
 ### What to show on screen
+
 - Staff list page
 - Search and role filter
 - Create/edit modal
@@ -100,6 +111,7 @@ Best practice: complete this setup first, then build coverage and schedules.
 - Delete confirmation dialog
 
 ### Voiceover script
+
 Go to Staff Management to add and maintain team members.
 
 You can search by name or email, filter by role, and open create or edit forms in a modal.
@@ -113,12 +125,14 @@ When editing staff, define capability-related fields such as allowed areas, shif
 ## 3.4 Coverage Planning
 
 ### What to show on screen
+
 - Coverage list view
 - Calendar view
 - Create coverage form
 - Edit headcount form
 
 ### Voiceover script
+
 Coverage Planning defines how many people are required for each role and time window.
 
 Use list view for batch management and calendar view for time-based context.
@@ -132,17 +146,20 @@ Accurate coverage is the foundation for high-quality scheduling and auto-generat
 ## 3.5 Schedule Builder
 
 ### What to show on screen
+
 - Schedule table and calendar toggle
 - Create/edit single shift form
 - Auto-generate schedule workflow
 - Draft review and publish actions
 
 ### Voiceover script
+
 The Schedule page supports both table and calendar management.
 
 Use single-shift forms for manual scheduling and corrections.
 
 For larger periods, use Auto-Generate Schedule:
+
 - Select open coverage records
 - Generate a draft schedule
 - Review assignments and warnings
@@ -156,10 +173,12 @@ This draft-first workflow gives control and safety before finalizing schedules.
 ## 3.6 Time Off Decisions (Admin)
 
 ### What to show on screen
+
 - Time-off decisions page
 - Approve and deny actions
 
 ### Voiceover script
+
 On Time Off Decisions, admins see pending requests across the organization.
 
 Review each request in context and approve or deny promptly to keep scheduling predictable.
@@ -171,10 +190,12 @@ Admins can also view their own personal requests in My Time Off Requests.
 ## 3.7 Shift Swaps and Messages (Admin View)
 
 ### What to show on screen
+
 - Shift swap requests page with statuses
 - Message list and message composer
 
 ### Voiceover script
+
 Admins can monitor swap activity and message threads across the tenant.
 
 Use the swap request statuses to quickly identify pending actions.
@@ -186,10 +207,12 @@ Use Messages for internal communication and faster operational coordination.
 ## 3.8 Billing and Paywall (Admin)
 
 ### What to show on screen
+
 - Billing page
 - Success and cancel pages
 
 ### Voiceover script
+
 Billing is where admins manage subscription plans.
 
 If subscription status is inactive, access is limited to billing until plan requirements are met.
@@ -203,9 +226,11 @@ After successful checkout, the app refreshes tenant status and unlocks full oper
 ## 4.1 Staff Dashboard
 
 ### What to show on screen
+
 - Staff dashboard cards and personal summaries
 
 ### Voiceover script
+
 For non-admin staff, the dashboard is personalized.
 
 You can quickly see your upcoming shifts, personal request status, and unread communication.
@@ -215,9 +240,11 @@ You can quickly see your upcoming shifts, personal request status, and unread co
 ## 4.2 My Schedule
 
 ### What to show on screen
+
 - Schedule list or calendar entries assigned to the staff member
 
 ### Voiceover script
+
 Use My Schedule to review shift dates, times, and assignments.
 
 Check this page regularly for updates, swaps, and published changes.
@@ -227,14 +254,17 @@ Check this page regularly for updates, swaps, and published changes.
 ## 4.3 Shift Swaps
 
 ### What to show on screen
+
 - Open swap modal from a shift
 - Swap inbox and sent tabs
 - Accept, deny, cancel actions
 
 ### Voiceover script
+
 If you cannot work a shift, open a swap request from that shift and choose a colleague.
 
 In Shift Swap Requests:
+
 - Inbox shows requests sent to you
 - Sent shows requests you created
 
@@ -245,10 +275,12 @@ Take action based on status, and monitor outcomes in real time.
 ## 4.4 My Time Off Requests
 
 ### What to show on screen
+
 - Time-off request list grouped by status
 - Create request modal
 
 ### Voiceover script
+
 Use My Time Off Requests to submit and track personal time-off.
 
 Enter your start and end date-time, add an optional reason, and submit.
@@ -260,10 +292,12 @@ You can then monitor whether each request is pending, approved, or denied.
 ## 4.5 Messages and Preferences
 
 ### What to show on screen
+
 - Messages page and reply flow
 - Preferences page
 
 ### Voiceover script
+
 Use Messages to communicate with teammates and leadership in-app.
 
 On Preferences, set your preferred work days and notification settings.
@@ -275,6 +309,7 @@ Keeping preferences up to date helps improve schedule quality and fit.
 ## Scene 5: Recommended Daily Workflow
 
 ### Admin daily checklist
+
 1. Open Dashboard and review key alerts.
 2. Process pending Time Off Decisions.
 3. Review Coverage gaps.
@@ -282,6 +317,7 @@ Keeping preferences up to date helps improve schedule quality and fit.
 5. Respond to urgent messages and swap activity.
 
 ### Non-admin staff daily checklist
+
 1. Check Dashboard and My Schedule.
 2. Review shift updates and swap requests.
 3. Submit or track time-off requests as needed.
@@ -293,7 +329,9 @@ Keeping preferences up to date helps improve schedule quality and fit.
 ## Scene 6: Common Mistakes to Avoid
 
 ### Voiceover script
+
 Avoid these common issues:
+
 - Skipping Facility Preferences setup before scheduling
 - Leaving coverage incomplete before auto-generation
 - Delaying time-off decisions, which causes schedule churn
@@ -318,18 +356,18 @@ Thank you for watching.
 
 ## Quick Reference: Feature by Role
 
-| Feature | Admin | Non-Admin Staff |
-|---|---|---|
-| Dashboard | Yes (org-wide) | Yes (personalized) |
-| Staff Management | Yes | No |
-| Coverage Planning | Yes | No |
-| Schedule Builder | Yes | Limited personal view |
-| Shift Swaps | Yes (org visibility) | Yes (party-based visibility) |
-| Time Off Decisions | Yes | No |
-| My Time Off Requests | Yes | Yes |
-| Messages | Yes | Yes |
-| Preferences | No (staff page) | Yes |
-| Billing | Yes | No |
+| Feature              | Admin                | Non-Admin Staff              |
+| -------------------- | -------------------- | ---------------------------- |
+| Dashboard            | Yes (org-wide)       | Yes (personalized)           |
+| Staff Management     | Yes                  | No                           |
+| Coverage Planning    | Yes                  | No                           |
+| Schedule Builder     | Yes                  | Limited personal view        |
+| Shift Swaps          | Yes (org visibility) | Yes (party-based visibility) |
+| Time Off Decisions   | Yes                  | No                           |
+| My Time Off Requests | Yes                  | Yes                          |
+| Messages             | Yes                  | Yes                          |
+| Preferences          | No (staff page)      | Yes                          |
+| Billing              | Yes                  | No                           |
 
 ---
 

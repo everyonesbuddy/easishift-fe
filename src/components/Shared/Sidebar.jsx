@@ -235,8 +235,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
                   activePath === "/how-to-use" ? "#2563eb" : "transparent",
                 transition: "background-color 0.2s ease",
                 "&:hover": {
-                  bgcolor:
-                    activePath === "/how-to-use" ? "#1d4ed8" : "#1f2937",
+                  bgcolor: activePath === "/how-to-use" ? "#1d4ed8" : "#1f2937",
                 },
               }}
             >

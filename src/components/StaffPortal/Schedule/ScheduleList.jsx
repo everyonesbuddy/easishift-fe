@@ -46,6 +46,7 @@ import {
 } from "react-icons/fi";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import ExcelJS from "exceljs";
 import ScheduleForm from "./ScheduleForm";
 import AutoGenerateScheduleForm from "./AutoGenerateScheduleForm";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
@@ -112,55 +113,81 @@ export default function ScheduleList() {
     ];
   }, [schedules, staff, facilityPreferences]);
 
-  const getRoleChipStyles = (role) => {
-    const roleColor = getRoleColor(role);
-    return {
-      px: 1,
-      py: 0.35,
-      borderRadius: 1,
-      backgroundColor: `${roleColor}22`,
-      color: roleColor,
-      fontWeight: 700,
-      fontSize: "0.72rem",
-      whiteSpace: "nowrap",
-    };
-  };
-
   const legendRoles = useMemo(
-    () => roleFilterOptions.filter((role) => role !== "all").slice(0, 8),
+    () => roleFilterOptions.filter((role) => role !== "all"),
     [roleFilterOptions],
   );
 
-  useEffect(() => {
-    fetchSchedules();
-    fetchStaff();
-  }, []);
+  const getRoleChipStyles = (role) => ({
+    px: 1,
+    py: 0.35,
+    borderRadius: 1,
+    backgroundColor: getRoleColor(role),
+    color: "#fff",
+    fontSize: "0.72rem",
+    fontWeight: 700,
+    lineHeight: 1,
+    display: "inline-flex",
+    alignItems: "center",
+    whiteSpace: "nowrap",
+  });
 
-  // ---------------------------
-  // Helper: format UTC → local
-  // ---------------------------
-  const formatLocal = (date) =>
-    new Date(date).toLocaleString(undefined, {
-      year: "numeric",
-      month: "numeric",
-      day: "numeric",
+  const getTimeKey = (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  };
+
+  const isOvernightShift = (schedule) => {
+    if (!schedule?.startTime || !schedule?.endTime) return false;
+    const start = new Date(schedule.startTime);
+    const end = new Date(schedule.endTime);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return false;
+    }
+    return end.getTime() <= start.getTime();
+  };
+
+  const formatScheduleTimeRange = (schedule, options = {}) => {
+    const start = new Date(schedule?.startTime);
+    const end = new Date(schedule?.endTime);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return "";
+    }
+
+    const startTime = start.toLocaleTimeString(undefined, {
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
     });
+    const endTime = end.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    const overnightHint =
+      options.withNextDayHint && isOvernightShift(schedule) ? " (+1 day)" : "";
 
-  const formatCompactDateTime = (date) => {
-    const value = new Date(date);
-    if (Number.isNaN(value.getTime())) {
-      return { date: "-", time: "-" };
+    return `${startTime} - ${endTime}${overnightHint}`;
+  };
+
+  const formatCompactDateTime = (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return { date: "", time: "" };
     }
 
     return {
-      date: value.toLocaleDateString(undefined, {
+      date: date.toLocaleDateString(undefined, {
         month: "short",
         day: "numeric",
+        year: "numeric",
       }),
-      time: value.toLocaleTimeString(undefined, {
+      time: date.toLocaleTimeString(undefined, {
         hour: "numeric",
         minute: "2-digit",
         hour12: true,
@@ -168,121 +195,20 @@ export default function ScheduleList() {
     };
   };
 
-  const getTimeKey = (value) => {
-    const d = new Date(value);
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  };
-
-  const getLocalDateKey = (value) => {
+  const parseLocalDateKey = (value) => {
     const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
 
-  const parseLocalDateKey = (dateKey) => {
-    const [year, month, day] = dateKey.split("-").map(Number);
-    return new Date(year, month - 1, day);
-  };
-
-  const isOvernightShift = (schedule) => {
-    const start = new Date(schedule?.startTime);
-    const end = new Date(schedule?.endTime);
-
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      return false;
-    }
-
-    return start.toDateString() !== end.toDateString();
-  };
-
-  const formatScheduleDateRange = (schedule) => {
-    const start = new Date(schedule?.startTime);
-    const end = new Date(schedule?.endTime);
-
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      return "";
-    }
-
-    const startLabel = start.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-
-    if (!isOvernightShift(schedule)) {
-      return startLabel;
-    }
-
-    const endLabel = end.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-
-    return `${startLabel} - ${endLabel}`;
-  };
-
-  const formatScheduleTimeRange = (
-    schedule,
-    { withNextDayHint = true } = {},
-  ) => {
-    const start = new Date(schedule?.startTime);
-    const end = new Date(schedule?.endTime);
-
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      return "";
-    }
-
-    const startLabel = start.toLocaleTimeString("default", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-    const endLabel = end.toLocaleTimeString("default", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-
-    if (isOvernightShift(schedule) && withNextDayHint) {
-      return `${startLabel} - ${endLabel} next day`;
-    }
-
-    return `${startLabel} - ${endLabel}`;
-  };
-
-  const formatCertificationTags = (schedule) => {
-    if (!Array.isArray(schedule?.certificationTags)) return "-";
-    const tags = schedule.certificationTags
-      .map((tag) => getCertificationTagDisplayName(tag))
-      .filter(Boolean);
-    return tags.length ? tags.join(", ") : "-";
-  };
+  const getLocalDateKey = parseLocalDateKey;
 
   // ---------------------------
-  // Fetch schedules
+  // Fetch staff
   // ---------------------------
-  const fetchSchedules = async () => {
-    try {
-      const res = await api.get("/schedules");
-
-      // sort by startTime descending (newest first). fallback to createdAt when startTime missing
-      const data = res.data.sort((a, b) => {
-        const ta = new Date(a.startTime || a.createdAt).getTime();
-        const tb = new Date(b.startTime || b.createdAt).getTime();
-        return tb - ta;
-      });
-
-      setSchedules(data);
-      setSelectedScheduleIds((prev) =>
-        prev.filter((id) => data.some((schedule) => schedule._id === id)),
-      );
-    } catch (err) {
-      console.error("Failed to fetch schedules", err);
-    }
-  };
 
   // ---------------------------
   // Fetch staff
@@ -295,6 +221,20 @@ export default function ScheduleList() {
       console.error("Failed to fetch staff", err);
     }
   };
+
+  const fetchSchedules = async () => {
+    try {
+      const res = await api.get("/schedules");
+      setSchedules(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Failed to fetch schedules", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchStaff();
+    fetchSchedules();
+  }, []);
 
   // ---------------------------
   // Modals
@@ -719,14 +659,25 @@ export default function ScheduleList() {
     return stringValue;
   };
 
-  const exportRosterToCsv = () => {
+  const exportRosterToXlsx = async () => {
     try {
       closeExportMenu();
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "Easishift";
+      workbook.lastModifiedBy = "Easishift";
+      workbook.created = new Date();
+      workbook.modified = new Date();
+
+      const sheet = workbook.addWorksheet("Roster", {
+        properties: { defaultRowHeight: 20 },
+        views: [{ state: "frozen", xSplit: 2, ySplit: 3 }],
+      });
+
       const headers = [
         "Employee",
         "Role",
         ...monthDays.map((day) => {
-          const date = parseLocalDateKey(day);
+          const date = new Date(day);
           return date.toLocaleDateString(undefined, {
             month: "short",
             day: "numeric",
@@ -746,9 +697,9 @@ export default function ScheduleList() {
               })}${isOvernightShift(shift) ? " (+1 day)" : ""}`;
               const unit = getUnitAreaDisplayName(shift.unitArea) || "No unit";
 
-              return `${time} | ${unit}`;
+              return `${time}\n${unit}`;
             })
-            .join(" ; ");
+            .join("\n\n");
         });
 
         return [
@@ -758,23 +709,114 @@ export default function ScheduleList() {
         ];
       });
 
-      const csv = [headers, ...rows]
-        .map((row) => row.map(csvEscape).join(","))
-        .join("\n");
+      sheet.addRow([`Roster view - ${monthYear}`]);
+      sheet.mergeCells(1, 1, 1, headers.length);
+      sheet.getRow(1).height = 24;
+      sheet.getRow(1).font = {
+        bold: true,
+        size: 14,
+        color: { argb: "111827" },
+      };
+      sheet.getRow(1).alignment = { vertical: "middle", horizontal: "left" };
+
+      sheet.addRow(["", ""]);
+
+      const headerRow = sheet.addRow(headers);
+      headerRow.height = 22;
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: "FFFFFF" } };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "1F2937" },
+        };
+        cell.alignment = {
+          vertical: "middle",
+          horizontal: "center",
+          wrapText: true,
+        };
+        cell.border = {
+          top: { style: "thin", color: { argb: "CBD5E1" } },
+          left: { style: "thin", color: { argb: "CBD5E1" } },
+          bottom: { style: "thin", color: { argb: "CBD5E1" } },
+          right: { style: "thin", color: { argb: "CBD5E1" } },
+        };
+      });
+
+      rows.forEach((row) => {
+        const worksheetRow = sheet.addRow(row);
+        worksheetRow.height = 34;
+        worksheetRow.eachCell((cell, colNumber) => {
+          const isDayCell = colNumber > 2;
+          cell.alignment = {
+            vertical: isDayCell ? "top" : "middle",
+            horizontal: isDayCell ? "left" : "left",
+            wrapText: true,
+          };
+          cell.border = {
+            top: { style: "thin", color: { argb: "E5E7EB" } },
+            left: { style: "thin", color: { argb: "E5E7EB" } },
+            bottom: { style: "thin", color: { argb: "E5E7EB" } },
+            right: { style: "thin", color: { argb: "E5E7EB" } },
+          };
+          if (colNumber === 1) {
+            cell.font = { bold: true, color: { argb: "111827" } };
+          }
+          if (colNumber === 2) {
+            cell.font = { color: { argb: "475569" } };
+          }
+          if (isDayCell) {
+            cell.font = { color: { argb: "111827" } };
+            cell.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: "F8FAFC" },
+            };
+          }
+        });
+      });
+
+      sheet.columns = [
+        { width: 24 },
+        { width: 18 },
+        ...monthDays.map((day) => {
+          const date = new Date(day);
+          const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+          return {
+            width: 20,
+            style: {
+              alignment: { wrapText: true, vertical: "top" },
+            },
+            header: date.toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+            }),
+            key: day,
+            outlineLevel: isWeekend ? 1 : 0,
+          };
+        }),
+      ];
+
+      sheet.getRow(3).height = 22;
+
+      const buffer = await workbook.xlsx.writeBuffer();
 
       triggerDownload(
-        new Blob([csv], { type: "text/csv;charset=utf-8;" }),
-        `roster-${getMonthFileStamp()}.csv`,
+        new Blob([buffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        `roster-${getMonthFileStamp()}.xlsx`,
       );
     } catch (error) {
-      console.error("Failed to export roster to CSV", error);
-      window.alert("Unable to export roster to CSV. Please try again.");
+      console.error("Failed to export roster to Excel", error);
+      window.alert("Unable to export roster to Excel. Please try again.");
     }
   };
 
   const exportRosterToPdf = () => {
     try {
       closeExportMenu();
+      const generatedAt = new Date();
       const doc = new jsPDF({
         orientation: "landscape",
         unit: "pt",
@@ -785,7 +827,7 @@ export default function ScheduleList() {
         "Employee",
         "Role",
         ...monthDays.map((day) => {
-          const date = parseLocalDateKey(day);
+          const date = new Date(day);
           return date.toLocaleDateString(undefined, {
             month: "short",
             day: "numeric",
@@ -804,9 +846,9 @@ export default function ScheduleList() {
                 withNextDayHint: false,
               })}${isOvernightShift(shift) ? " (+1 day)" : ""}`;
               const unit = getUnitAreaDisplayName(shift.unitArea) || "No unit";
-              return `${time} | ${unit}`;
+              return `${time}\n${unit}`;
             })
-            .join("\n");
+            .join("\n\n");
         });
 
         return [
@@ -816,33 +858,75 @@ export default function ScheduleList() {
         ];
       });
 
-      doc.setFontSize(11);
-      doc.text(`Roster - ${monthYear}`, 40, 30);
+      const drawRosterHeader = () => {
+        doc.setFillColor(17, 24, 39);
+        doc.rect(18, 16, doc.internal.pageSize.getWidth() - 36, 34, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(14);
+        doc.setFont(undefined, "bold");
+        doc.text(`Roster - ${monthYear}`, 30, 37);
+        doc.setFontSize(8.5);
+        doc.setFont(undefined, "normal");
+        doc.text(
+          `Generated ${generatedAt.toLocaleString()}`,
+          doc.internal.pageSize.getWidth() - 30,
+          37,
+          { align: "right" },
+        );
+      };
+
+      drawRosterHeader();
 
       autoTable(doc, {
-        startY: 40,
+        startY: 58,
         head: [headers],
         body,
         styles: {
-          fontSize: 6,
-          cellPadding: 2,
+          fontSize: 6.4,
+          cellPadding: 3,
           overflow: "linebreak",
           valign: "top",
           lineColor: [229, 231, 235],
-          lineWidth: 0.1,
+          lineWidth: 0.15,
         },
         headStyles: {
-          fillColor: [243, 244, 246],
-          textColor: [15, 23, 42],
+          fillColor: [31, 41, 55],
+          textColor: [255, 255, 255],
           fontStyle: "bold",
+          halign: "center",
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
         },
         columnStyles: {
-          0: { cellWidth: 80 },
-          1: { cellWidth: 56 },
+          0: { cellWidth: 88, fontStyle: "bold", textColor: [17, 24, 39] },
+          1: { cellWidth: 64, textColor: [71, 85, 105] },
         },
         horizontalPageBreak: true,
         horizontalPageBreakRepeat: [0, 1],
-        margin: { left: 18, right: 18, top: 28, bottom: 20 },
+        margin: { left: 18, right: 18, top: 62, bottom: 24 },
+        didParseCell: (data) => {
+          if (data.section === "body" && data.column.index > 1) {
+            data.cell.styles.fillColor = [255, 255, 255];
+            data.cell.styles.textColor = [15, 23, 42];
+            data.cell.styles.minCellHeight = 24;
+          }
+
+          if (data.section === "body" && data.column.index === 0) {
+            data.cell.styles.fillColor = [239, 246, 255];
+            data.cell.styles.fontStyle = "bold";
+          }
+        },
+        didDrawPage: (data) => {
+          drawRosterHeader();
+          doc.setTextColor(100, 116, 139);
+          doc.setFontSize(8);
+          doc.text(
+            `Page ${doc.internal.getNumberOfPages()}`,
+            data.settings.margin.left,
+            doc.internal.pageSize.getHeight() - 14,
+          );
+        },
       });
 
       doc.save(`roster-${getMonthFileStamp()}.pdf`);
@@ -867,33 +951,80 @@ export default function ScheduleList() {
         format: "a4",
       });
 
-      doc.setFontSize(11);
-      doc.text(
-        `Calendar Export${calendarRange.title ? ` - ${calendarRange.title}` : ""}`,
-        40,
-        30,
-      );
+      const generatedAt = new Date();
+      const drawCalendarHeader = () => {
+        doc.setFillColor(15, 23, 42);
+        doc.rect(18, 16, doc.internal.pageSize.getWidth() - 36, 34, "F");
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(14);
+        doc.setFont(undefined, "bold");
+        doc.text(
+          `Calendar Export${calendarRange.title ? ` - ${calendarRange.title}` : ""}`,
+          30,
+          37,
+        );
+        doc.setFontSize(8.5);
+        doc.setFont(undefined, "normal");
+        doc.text(
+          `Generated ${generatedAt.toLocaleString()}`,
+          doc.internal.pageSize.getWidth() - 30,
+          37,
+          { align: "right" },
+        );
+      };
+
+      drawCalendarHeader();
 
       autoTable(doc, {
-        startY: 40,
+        startY: 58,
         head: [calendarWeekdayLabels],
         body: calendarGridWeeks.map((week) => week.map((cell) => cell.text)),
         styles: {
-          fontSize: 6,
-          cellPadding: 2,
+          fontSize: 6.2,
+          cellPadding: 3,
           lineColor: [229, 231, 235],
-          lineWidth: 0.1,
+          lineWidth: 0.15,
           overflow: "linebreak",
           valign: "top",
-          minCellHeight: 80,
+          minCellHeight: 88,
         },
         headStyles: {
-          fillColor: [243, 244, 246],
-          textColor: [15, 23, 42],
+          fillColor: [30, 41, 59],
+          textColor: [255, 255, 255],
           fontStyle: "bold",
+          halign: "center",
         },
         theme: "grid",
-        margin: { left: 20, right: 20, top: 28, bottom: 20 },
+        margin: { left: 20, right: 20, top: 62, bottom: 24 },
+        didParseCell: (data) => {
+          if (data.section === "head") {
+            return;
+          }
+
+          const columnIndex = data.column.index;
+          if (columnIndex === 0 || columnIndex === 6) {
+            data.cell.styles.fillColor = [239, 246, 255];
+          } else {
+            data.cell.styles.fillColor = [248, 250, 252];
+          }
+
+          if (typeof data.cell.raw === "string") {
+            const lines = data.cell.raw.split("\n");
+            if (lines.length > 0) {
+              data.cell.styles.fontStyle = lines.length > 1 ? "normal" : "bold";
+            }
+          }
+        },
+        didDrawPage: () => {
+          drawCalendarHeader();
+          doc.setTextColor(100, 116, 139);
+          doc.setFontSize(8);
+          doc.text(
+            `Page ${doc.internal.getNumberOfPages()}`,
+            20,
+            doc.internal.pageSize.getHeight() - 14,
+          );
+        },
       });
 
       doc.save(`calendar-${getCalendarFileStamp()}.pdf`);
@@ -1098,25 +1229,20 @@ export default function ScheduleList() {
                 onClose={closeExportMenu}
               >
                 {view === "calendar" && (
-                  <>
-                    <MenuItem onClick={exportCalendarToPdf}>
-                      <FiPrinter style={{ marginRight: 8 }} /> Export Calendar
-                      PDF
-                    </MenuItem>
-                  </>
+                  <MenuItem onClick={exportCalendarToPdf}>
+                    <FiPrinter style={{ marginRight: 8 }} /> Export Calendar PDF
+                  </MenuItem>
                 )}
 
-                {view === "month" && (
-                  <>
-                    <MenuItem onClick={exportRosterToCsv}>
-                      <FiDownload style={{ marginRight: 8 }} /> Export Roster
-                      CSV
-                    </MenuItem>
-                    <MenuItem onClick={exportRosterToPdf}>
-                      <FiPrinter style={{ marginRight: 8 }} /> Export Roster PDF
-                    </MenuItem>
-                  </>
-                )}
+                {view === "month" && [
+                  <MenuItem key="roster-excel" onClick={exportRosterToXlsx}>
+                    <FiDownload style={{ marginRight: 8 }} /> Export Roster
+                    Excel
+                  </MenuItem>,
+                  <MenuItem key="roster-pdf" onClick={exportRosterToPdf}>
+                    <FiPrinter style={{ marginRight: 8 }} /> Export Roster PDF
+                  </MenuItem>,
+                ]}
               </Menu>
             </>
           )}
@@ -1168,7 +1294,7 @@ export default function ScheduleList() {
               </ToggleButtonGroup>
             )}
 
-            {isAdmin && (
+            {(isAdmin || staffVisibility === "all") && (
               <FormControl
                 size="small"
                 sx={{ minWidth: { xs: "100%", sm: 220 } }}
@@ -1744,7 +1870,7 @@ export default function ScheduleList() {
                     Employee
                   </TableCell>
                   {monthDays.map((day) => {
-                    const date = parseLocalDateKey(day);
+                    const date = new Date(day);
                     const isWeekend =
                       date.getDay() === 0 || date.getDay() === 6;
                     return (
@@ -1824,7 +1950,7 @@ export default function ScheduleList() {
 
                       {monthDays.map((day) => {
                         const shifts = member.shiftsByDay[day] || [];
-                        const date = parseLocalDateKey(day);
+                        const date = new Date(day);
                         const isWeekend =
                           date.getDay() === 0 || date.getDay() === 6;
 

@@ -594,12 +594,6 @@ export default function CoveragePlanningPage() {
                     >
                       Unit Area: {getUnitAreaDisplayName(c.unitArea)}
                     </Typography>
-                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                      Shift Type: {getShiftTypeDisplayName(c.shiftType)}
-                    </Typography>
-                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                      Shift Slot: {getShiftTagDisplayName(c.shiftTag)}
-                    </Typography>
                     {spansOvernight(c) && (
                       <Typography
                         sx={{ fontSize: 12, color: "info.main", mt: 0.5 }}
@@ -740,24 +734,6 @@ export default function CoveragePlanningPage() {
                       fontSize: "0.72rem",
                     }}
                   >
-                    Shift Type
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 700,
-                      color: "#0F172A",
-                      fontSize: "0.72rem",
-                    }}
-                  >
-                    Shift Slot
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 700,
-                      color: "#0F172A",
-                      fontSize: "0.72rem",
-                    }}
-                  >
                     Actions
                   </TableCell>
                 </TableRow>
@@ -835,12 +811,6 @@ export default function CoveragePlanningPage() {
                     </TableCell>
                     <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
                       {getUnitAreaDisplayName(c.unitArea)}
-                    </TableCell>
-                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
-                      {getShiftTypeDisplayName(c.shiftType)}
-                    </TableCell>
-                    <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
-                      {getShiftTagDisplayName(c.shiftTag)}
                     </TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>
                       <Stack direction="row" spacing={1}>

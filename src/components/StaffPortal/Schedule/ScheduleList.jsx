@@ -195,6 +195,36 @@ export default function ScheduleList() {
     };
   };
 
+  const formatScheduleDateRange = (schedule) => {
+    const start = new Date(schedule?.startTime);
+    const end = new Date(schedule?.endTime);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return "-";
+    }
+
+    const startDate = start.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const endDate = end.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    return startDate === endDate ? startDate : `${startDate} - ${endDate}`;
+  };
+
+  const formatCertificationTags = (schedule) => {
+    const tags = schedule?.certificationTags;
+    if (!Array.isArray(tags) || tags.length === 0) return "-";
+
+    return tags
+      .map((tag) => getCertificationTagDisplayName(tag) || String(tag))
+      .join(", ");
+  };
+
   const parseLocalDateKey = (value) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "";
@@ -202,6 +232,14 @@ export default function ScheduleList() {
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
+  };
+
+  const parseDateKeyToLocalDate = (dateKey) => {
+    const [year, month, day] = String(dateKey)
+      .split("-")
+      .map((part) => Number(part));
+    if (!year || !month || !day) return new Date(NaN);
+    return new Date(year, month - 1, day);
   };
 
   const getLocalDateKey = parseLocalDateKey;
@@ -677,7 +715,7 @@ export default function ScheduleList() {
         "Employee",
         "Role",
         ...monthDays.map((day) => {
-          const date = new Date(day);
+          const date = parseDateKeyToLocalDate(day);
           return date.toLocaleDateString(undefined, {
             month: "short",
             day: "numeric",
@@ -709,7 +747,7 @@ export default function ScheduleList() {
         ];
       });
 
-      sheet.addRow([`Roster view - ${monthYear}`]);
+      sheet.addRow([`${monthYear} Roster`]);
       sheet.mergeCells(1, 1, 1, headers.length);
       sheet.getRow(1).height = 24;
       sheet.getRow(1).font = {
@@ -780,19 +818,11 @@ export default function ScheduleList() {
         { width: 24 },
         { width: 18 },
         ...monthDays.map((day) => {
-          const date = new Date(day);
-          const isWeekend = date.getDay() === 0 || date.getDay() === 6;
           return {
             width: 20,
             style: {
               alignment: { wrapText: true, vertical: "top" },
             },
-            header: date.toLocaleDateString(undefined, {
-              month: "short",
-              day: "numeric",
-            }),
-            key: day,
-            outlineLevel: isWeekend ? 1 : 0,
           };
         }),
       ];
@@ -827,7 +857,7 @@ export default function ScheduleList() {
         "Employee",
         "Role",
         ...monthDays.map((day) => {
-          const date = new Date(day);
+          const date = parseDateKeyToLocalDate(day);
           return date.toLocaleDateString(undefined, {
             month: "short",
             day: "numeric",
@@ -1389,12 +1419,6 @@ export default function ScheduleList() {
                     <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
                       Unit Area: {getUnitAreaDisplayName(s.unitArea)}
                     </Typography>
-                    <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
-                      Shift Type: {getShiftTypeDisplayName(s.shiftType)}
-                    </Typography>
-                    <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
-                      Shift Slot: {getShiftTagDisplayName(s.shiftTag)}
-                    </Typography>
                     {isOvernightShift(s) && (
                       <Typography
                         sx={{ fontSize: 11, color: "info.main", mt: 0.5 }}
@@ -1553,24 +1577,6 @@ export default function ScheduleList() {
                       fontSize: "0.72rem",
                     }}
                   >
-                    Shift Type
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 700,
-                      color: "#0F172A",
-                      fontSize: "0.72rem",
-                    }}
-                  >
-                    Shift Slot
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 700,
-                      color: "#0F172A",
-                      fontSize: "0.72rem",
-                    }}
-                  >
                     Status
                   </TableCell>
                   <TableCell
@@ -1680,16 +1686,6 @@ export default function ScheduleList() {
                       sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}
                     >
                       {getUnitAreaDisplayName(s.unitArea)}
-                    </TableCell>
-                    <TableCell
-                      sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}
-                    >
-                      {getShiftTypeDisplayName(s.shiftType)}
-                    </TableCell>
-                    <TableCell
-                      sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}
-                    >
-                      {getShiftTagDisplayName(s.shiftTag)}
                     </TableCell>
                     <TableCell sx={{ py: 0.75 }}>
                       <Box
@@ -1870,7 +1866,7 @@ export default function ScheduleList() {
                     Employee
                   </TableCell>
                   {monthDays.map((day) => {
-                    const date = new Date(day);
+                    const date = parseDateKeyToLocalDate(day);
                     const isWeekend =
                       date.getDay() === 0 || date.getDay() === 6;
                     return (
@@ -1950,7 +1946,7 @@ export default function ScheduleList() {
 
                       {monthDays.map((day) => {
                         const shifts = member.shiftsByDay[day] || [];
-                        const date = new Date(day);
+                        const date = parseDateKeyToLocalDate(day);
                         const isWeekend =
                           date.getDay() === 0 || date.getDay() === 6;
 

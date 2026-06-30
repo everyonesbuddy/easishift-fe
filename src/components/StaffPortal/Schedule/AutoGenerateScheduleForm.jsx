@@ -12,6 +12,7 @@ import {
   GlobalStyles,
   IconButton,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Paper,
   Select,
@@ -410,6 +411,96 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
     selectedSelectableCount === selectableCoverageIds.length;
   const hasSomeSelectableSelected =
     selectedSelectableCount > 0 && !allSelectableSelected;
+
+  const openCoverageInsights = useMemo(() => {
+    const dayMap = new Map();
+    const roleMap = new Map();
+    let totalOpenSpots = 0;
+    let totalRequired = 0;
+    let totalScheduled = 0;
+    let selectableShiftCount = 0;
+    let selectedOpenSpots = 0;
+
+    sortedCoverages.forEach((coverage) => {
+      const openSpots = Math.max(
+        0,
+        toFiniteNumber(coverage?.spotsRemaining ?? coverage?.remaining, 0),
+      );
+      const requiredCount = Math.max(
+        0,
+        toFiniteNumber(coverage?.requiredCount, 0),
+      );
+      const directAssigned = Number(coverage?.assignedCount);
+      const scheduledCount = Number.isFinite(directAssigned)
+        ? Math.max(0, directAssigned)
+        : Math.max(0, requiredCount - openSpots);
+      const coverageId = String(coverage?._id || "");
+      const isSelected = selectedCoverageIds.includes(coverageId);
+
+      if (openSpots > 0) selectableShiftCount += 1;
+      totalOpenSpots += openSpots;
+      totalRequired += requiredCount;
+      totalScheduled += scheduledCount;
+      if (isSelected) selectedOpenSpots += openSpots;
+
+      const dayValue = coverage?.startTime || coverage?.date;
+      const dayKey = getLocalDayKey(dayValue) || String(dayValue || "unknown");
+      const dayTime = new Date(dayValue || 0).getTime();
+      if (!dayMap.has(dayKey)) {
+        dayMap.set(dayKey, {
+          dayKey,
+          label: formatDatePart(dayValue),
+          time: Number.isFinite(dayTime) ? dayTime : Number.MAX_SAFE_INTEGER,
+          shiftCount: 0,
+          openSpots: 0,
+          selectedCount: 0,
+        });
+      }
+      const daySummary = dayMap.get(dayKey);
+      daySummary.shiftCount += 1;
+      daySummary.openSpots += openSpots;
+      if (isSelected) daySummary.selectedCount += 1;
+
+      const roleKey = String(coverage?.role || "unknown");
+      if (!roleMap.has(roleKey)) {
+        roleMap.set(roleKey, { role: roleKey, shiftCount: 0, openSpots: 0 });
+      }
+      const roleSummary = roleMap.get(roleKey);
+      roleSummary.shiftCount += 1;
+      roleSummary.openSpots += openSpots;
+    });
+
+    const dayRows = Array.from(dayMap.values()).sort(
+      (a, b) => a.time - b.time || b.openSpots - a.openSpots,
+    );
+
+    const roleRows = Array.from(roleMap.values())
+      .sort((a, b) => b.openSpots - a.openSpots || b.shiftCount - a.shiftCount)
+      .slice(0, 4)
+      .map((row) => ({
+        ...row,
+        roleLabel: getRoleDisplayName(row.role),
+      }));
+
+    const fillPct =
+      totalRequired > 0
+        ? Math.max(
+            0,
+            Math.min(100, Math.round((totalScheduled / totalRequired) * 100)),
+          )
+        : 0;
+
+    return {
+      totalOpenSpots,
+      totalRequired,
+      totalScheduled,
+      selectableShiftCount,
+      selectedOpenSpots,
+      fillPct,
+      dayRows,
+      roleRows,
+    };
+  }, [selectedCoverageIds, sortedCoverages]);
 
   const staffById = useMemo(() => {
     const map = new Map();
@@ -938,6 +1029,61 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
     );
   };
 
+  const handleSelectLargestCoverageGaps = () => {
+    const prioritizedIds = [...sortedCoverages]
+      .filter(
+        (coverage) =>
+          Math.max(
+            0,
+            toFiniteNumber(coverage?.spotsRemaining ?? coverage?.remaining, 0),
+          ) > 0,
+      )
+      .sort((a, b) => {
+        const aOpen = Math.max(
+          0,
+          toFiniteNumber(a?.spotsRemaining ?? a?.remaining, 0),
+        );
+        const bOpen = Math.max(
+          0,
+          toFiniteNumber(b?.spotsRemaining ?? b?.remaining, 0),
+        );
+        if (aOpen !== bOpen) return bOpen - aOpen;
+        return (
+          new Date(a?.startTime || a?.date || 0).getTime() -
+          new Date(b?.startTime || b?.date || 0).getTime()
+        );
+      })
+      .slice(0, 8)
+      .map((coverage) => String(coverage?._id || ""))
+      .filter(Boolean);
+
+    setSelectedCoverageIds((prev) =>
+      Array.from(new Set([...prev, ...prioritizedIds])),
+    );
+  };
+
+  const handleSelectCoverageDay = (dayKey) => {
+    if (!dayKey) return;
+
+    const dayCoverageIds = sortedCoverages
+      .filter((coverage) => {
+        const coverageDayKey =
+          getLocalDayKey(coverage?.startTime || coverage?.date) ||
+          String(coverage?.startTime || coverage?.date || "unknown");
+        const openSpots = Math.max(
+          0,
+          toFiniteNumber(coverage?.spotsRemaining ?? coverage?.remaining, 0),
+        );
+        return coverageDayKey === dayKey && openSpots > 0;
+      })
+      .map((coverage) => String(coverage?._id || ""))
+      .filter(Boolean);
+
+    setSelectedCoverageIds((prev) =>
+      Array.from(new Set([...prev, ...dayCoverageIds])),
+    );
+  };
+
   const handleToggleAllCoverageSelection = (checked) => {
     if (checked) {
       setSelectedCoverageIds((prev) =>
@@ -1388,170 +1534,446 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
         <Paper
           variant="outlined"
           sx={{
-            p: 1.5,
+            p: { xs: 1.25, md: 1.5 },
             borderRadius: 2.5,
-            borderColor: "#dbeafe",
-            backgroundColor: "#f8fbff",
+            borderColor: "#bfdbfe",
+            background:
+              "linear-gradient(150deg, #f0f9ff 0%, #f8fbff 45%, #ffffff 100%)",
           }}
         >
-          <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-            sx={{ mb: 1 }}
-          >
-            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-              Create Draft from Open Coverage
-            </Typography>
-            <Chip
-              size="small"
-              color="primary"
-              variant="outlined"
-              label={`${selectableCoverageIds.length} open`}
-            />
-          </Stack>
-
-          <FormControl fullWidth sx={{ mb: 1 }}>
-            <InputLabel>Role (optional)</InputLabel>
-            <Select
-              value={selectedRole}
-              label="Role (optional)"
-              onChange={(e) => setSelectedRole(e.target.value)}
+          <Stack spacing={1.25}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={0.75}
+              justifyContent="space-between"
+              alignItems={{ xs: "flex-start", sm: "center" }}
             >
-              <MenuItem value="">All Roles</MenuItem>
-              {roleOptions.map((item) => (
-                <MenuItem key={item.value} value={item.value}>
-                  {item.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          {fetchingCoverages ? (
-            <Typography variant="body2">Loading coverages...</Typography>
-          ) : (
-            <>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={allSelectableSelected}
-                    indeterminate={hasSomeSelectableSelected}
-                    onChange={(e) =>
-                      handleToggleAllCoverageSelection(e.target.checked)
-                    }
-                  />
-                }
-                label={`Select all (${selectedSelectableCount}/${selectableCoverageIds.length})`}
-              />
-
-              <Box sx={{ maxHeight: 260, overflowY: "auto", pr: 0.5 }}>
-                {sortedCoverages.map((coverage) => {
-                  const selected = selectedCoverageIds.includes(coverage._id);
-                  const disabled = Number(coverage.spotsRemaining) <= 0;
-                  const coverageId = String(coverage?._id || "");
-                  const draftCount =
-                    draftCountByCoverageId.get(coverageId) || 0;
-                  const scheduledCount = Number.isFinite(
-                    Number(coverage.assignedCount),
-                  )
-                    ? Math.max(0, Number(coverage.assignedCount))
-                    : Math.max(
-                        0,
-                        Number(coverage.requiredCount) -
-                          Number(coverage.spotsRemaining || 0),
-                      );
-                  return (
-                    <Paper
-                      key={coverage._id}
-                      variant="outlined"
-                      sx={{
-                        p: 1,
-                        mb: 0.75,
-                        borderRadius: 2,
-                        borderColor: selected ? "primary.main" : "divider",
-                        borderWidth: selected ? 2 : 1,
-                        backgroundColor: selected ? "#eff6ff" : "#fff",
-                        opacity: disabled ? 0.65 : 1,
-                        cursor: disabled ? "default" : "pointer",
-                        "&:hover": {
-                          borderColor: selected ? "primary.main" : "#93c5fd",
-                          backgroundColor: selected ? "#eff6ff" : "#f8fafc",
-                        },
-                      }}
-                      onClick={() =>
-                        !disabled && toggleCoverageSelection(coverage._id)
-                      }
-                    >
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Checkbox
-                          checked={selected}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            toggleCoverageSelection(coverage._id);
-                          }}
-                          disabled={disabled}
-                        />
-                        <Typography sx={{ fontSize: 13 }}>
-                          {formatDatePart(coverage.startTime || coverage.date)}{" "}
-                          · {getRoleDisplayName(coverage.role)} ·{" "}
-                          {formatTimePart(coverage.startTime)}-
-                          {formatTimePart(coverage.endTime)}
-                          {coverage.unitArea
-                            ? ` · ${getUnitAreaDisplayName(coverage.unitArea)}`
-                            : ""}
-                          {coverage.shiftType
-                            ? ` · ${getShiftTypeDisplayName(coverage.shiftType)}`
-                            : ""}
-                          {coverage.shiftTag
-                            ? ` · ${getShiftTagDisplayName(coverage.shiftTag)}`
-                            : ""}
-                        </Typography>
-                      </Box>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ display: "block", ml: 4.5, mt: 0.25 }}
-                      >
-                        {coverage.requiredCount} required / {scheduledCount}{" "}
-                        scheduled
-                      </Typography>
-                      {draftCount > 0 ? (
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            display: "block",
-                            ml: 4.5,
-                            mt: 0.15,
-                            color: "#1d4ed8",
-                            fontWeight: 700,
-                          }}
-                        >
-                          In {draftCount} draft{draftCount > 1 ? "s" : ""}
-                        </Typography>
-                      ) : null}
-                    </Paper>
-                  );
-                })}
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                  Create Draft from Open Coverage
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Spot shortage hotspots quickly, then draft only the shifts
+                  that matter most.
+                </Typography>
               </Box>
+              <Chip
+                size="small"
+                color="primary"
+                variant="outlined"
+                label={`${openCoverageInsights.selectableShiftCount} open shifts`}
+              />
+            </Stack>
 
-              <Button
-                sx={{ mt: 1 }}
-                variant="contained"
-                color="warning"
-                onClick={handleCreateDraft}
-                disabled={creatingDraft}
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+              <Paper
+                variant="outlined"
+                sx={{ p: 1, borderRadius: 2, flex: 1, borderColor: "#bfdbfe" }}
               >
-                {creatingDraft ? (
-                  <CircularProgress size={20} />
-                ) : (
-                  "Create Draft with AI"
-                )}
-              </Button>
-            </>
-          )}
+                <Typography variant="caption" color="text.secondary">
+                  Open shifts
+                </Typography>
+                <Typography
+                  sx={{ fontWeight: 800, fontSize: 20, lineHeight: 1.1 }}
+                >
+                  {openCoverageInsights.selectableShiftCount}
+                </Typography>
+              </Paper>
+              <Paper
+                variant="outlined"
+                sx={{ p: 1, borderRadius: 2, flex: 1, borderColor: "#fed7aa" }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  Open spots
+                </Typography>
+                <Typography
+                  sx={{ fontWeight: 800, fontSize: 20, lineHeight: 1.1 }}
+                >
+                  {openCoverageInsights.totalOpenSpots}
+                </Typography>
+              </Paper>
+              <Paper
+                variant="outlined"
+                sx={{ p: 1, borderRadius: 2, flex: 1, borderColor: "#bbf7d0" }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  Current fill level
+                </Typography>
+                <Typography
+                  sx={{ fontWeight: 800, fontSize: 20, lineHeight: 1.1 }}
+                >
+                  {openCoverageInsights.fillPct}%
+                </Typography>
+                <LinearProgress
+                  variant="determinate"
+                  value={openCoverageInsights.fillPct}
+                  sx={{
+                    mt: 0.7,
+                    height: 7,
+                    borderRadius: 999,
+                    backgroundColor: "#e2e8f0",
+                    "& .MuiLinearProgress-bar": { backgroundColor: "#15803d" },
+                  }}
+                />
+              </Paper>
+            </Stack>
+
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+              <FormControl fullWidth>
+                <InputLabel>Role (optional)</InputLabel>
+                <Select
+                  value={selectedRole}
+                  label="Role (optional)"
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                >
+                  <MenuItem value="">All Roles</MenuItem>
+                  {roleOptions.map((item) => (
+                    <MenuItem key={item.value} value={item.value}>
+                      {item.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <Stack
+                direction={{ xs: "row", md: "column" }}
+                spacing={0.75}
+                justifyContent="center"
+              >
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="warning"
+                  onClick={handleSelectLargestCoverageGaps}
+                  disabled={selectableCoverageIds.length <= 0}
+                >
+                  Prioritize Largest Gaps
+                </Button>
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={() => setSelectedCoverageIds([])}
+                  disabled={selectedCoverageIds.length <= 0}
+                >
+                  Clear Selection
+                </Button>
+              </Stack>
+            </Stack>
+
+            {fetchingCoverages ? (
+              <Typography variant="body2">Loading coverages...</Typography>
+            ) : (
+              <>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={allSelectableSelected}
+                      indeterminate={hasSomeSelectableSelected}
+                      onChange={(e) =>
+                        handleToggleAllCoverageSelection(e.target.checked)
+                      }
+                    />
+                  }
+                  label={`Select all (${selectedSelectableCount}/${selectableCoverageIds.length})`}
+                />
+
+                {openCoverageInsights.dayRows.length > 0 ? (
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: {
+                        xs: "repeat(2, minmax(0, 1fr))",
+                        sm: "repeat(4, minmax(0, 1fr))",
+                      },
+                      gap: 0.75,
+                    }}
+                  >
+                    {openCoverageInsights.dayRows.slice(0, 8).map((day) => {
+                      const severityTone =
+                        day.openSpots >= 6
+                          ? "#7f1d1d"
+                          : day.openSpots >= 3
+                            ? "#9a3412"
+                            : "#1d4ed8";
+                      const bgTone =
+                        day.openSpots >= 6
+                          ? "#fef2f2"
+                          : day.openSpots >= 3
+                            ? "#fff7ed"
+                            : "#eff6ff";
+
+                      return (
+                        <Paper
+                          key={day.dayKey}
+                          variant="outlined"
+                          sx={{
+                            p: 0.75,
+                            borderRadius: 1.75,
+                            borderColor: "#dbeafe",
+                            backgroundColor: bgTone,
+                            cursor: "pointer",
+                            "&:hover": { borderColor: "#60a5fa" },
+                          }}
+                          onClick={() => handleSelectCoverageDay(day.dayKey)}
+                        >
+                          <Typography
+                            sx={{
+                              fontSize: "0.68rem",
+                              fontWeight: 700,
+                              color: "#334155",
+                            }}
+                          >
+                            {day.label}
+                          </Typography>
+                          <Typography
+                            sx={{
+                              mt: 0.35,
+                              fontSize: "0.95rem",
+                              fontWeight: 800,
+                              lineHeight: 1,
+                              color: severityTone,
+                            }}
+                          >
+                            {day.openSpots} open
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontSize: "0.64rem",
+                              color: "text.secondary",
+                            }}
+                          >
+                            {day.shiftCount} shift
+                            {day.shiftCount > 1 ? "s" : ""} ·{" "}
+                            {day.selectedCount} selected
+                          </Typography>
+                        </Paper>
+                      );
+                    })}
+                  </Box>
+                ) : null}
+
+                {openCoverageInsights.roleRows.length > 0 ? (
+                  <Stack
+                    direction="row"
+                    spacing={0.75}
+                    flexWrap="wrap"
+                    useFlexGap
+                  >
+                    {openCoverageInsights.roleRows.map((roleRow) => (
+                      <Chip
+                        key={roleRow.role}
+                        size="small"
+                        variant="outlined"
+                        sx={{
+                          borderColor: "#bfdbfe",
+                          backgroundColor: "#ffffff",
+                        }}
+                        label={`${roleRow.roleLabel}: ${roleRow.openSpots} open`}
+                      />
+                    ))}
+                  </Stack>
+                ) : null}
+
+                <Box sx={{ maxHeight: 320, overflowY: "auto", pr: 0.5 }}>
+                  {sortedCoverages.map((coverage) => {
+                    const selected = selectedCoverageIds.includes(coverage._id);
+                    const openSpots = Math.max(
+                      0,
+                      toFiniteNumber(
+                        coverage?.spotsRemaining ?? coverage?.remaining,
+                        0,
+                      ),
+                    );
+                    const disabled = openSpots <= 0;
+                    const coverageId = String(coverage?._id || "");
+                    const draftCount =
+                      draftCountByCoverageId.get(coverageId) || 0;
+                    const requiredCount = Math.max(
+                      0,
+                      toFiniteNumber(coverage?.requiredCount, 0),
+                    );
+                    const directAssigned = Number(coverage?.assignedCount);
+                    const scheduledCount = Number.isFinite(directAssigned)
+                      ? Math.max(0, directAssigned)
+                      : Math.max(0, requiredCount - openSpots);
+                    const barTotal = Math.max(
+                      1,
+                      requiredCount,
+                      scheduledCount + openSpots,
+                    );
+                    const scheduledPct = Math.round(
+                      (scheduledCount / barTotal) * 100,
+                    );
+                    const openPct = Math.round((openSpots / barTotal) * 100);
+                    const gapColor =
+                      openSpots >= 3
+                        ? "#b45309"
+                        : openSpots > 0
+                          ? "#2563eb"
+                          : "#166534";
+
+                    return (
+                      <Paper
+                        key={coverage._id}
+                        variant="outlined"
+                        sx={{
+                          p: 1,
+                          mb: 0.75,
+                          borderRadius: 2,
+                          borderColor: selected ? "#2563eb" : "#dbeafe",
+                          borderWidth: selected ? 2 : 1,
+                          backgroundColor: selected ? "#eff6ff" : "#ffffff",
+                          opacity: disabled ? 0.68 : 1,
+                          cursor: disabled ? "default" : "pointer",
+                          "&:hover": {
+                            borderColor: selected ? "#2563eb" : "#93c5fd",
+                            backgroundColor: selected ? "#eff6ff" : "#f8fafc",
+                          },
+                        }}
+                        onClick={() =>
+                          !disabled && toggleCoverageSelection(coverage._id)
+                        }
+                      >
+                        <Stack spacing={0.55}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                              gap: 1,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: 1,
+                              }}
+                            >
+                              <Checkbox
+                                checked={selected}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  toggleCoverageSelection(coverage._id);
+                                }}
+                                disabled={disabled}
+                                sx={{ mt: -0.5, ml: -0.5 }}
+                              />
+
+                              <Box>
+                                <Typography
+                                  sx={{ fontSize: 13, fontWeight: 700 }}
+                                >
+                                  {formatDatePart(
+                                    coverage.startTime || coverage.date,
+                                  )}{" "}
+                                  · {formatTimePart(coverage.startTime)}-
+                                  {formatTimePart(coverage.endTime)}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{ display: "block", mt: 0.15 }}
+                                >
+                                  {getRoleDisplayName(coverage.role)}
+                                  {coverage.unitArea
+                                    ? ` · ${getUnitAreaDisplayName(coverage.unitArea)}`
+                                    : ""}
+                                  {coverage.shiftType
+                                    ? ` · ${getShiftTypeDisplayName(coverage.shiftType)}`
+                                    : ""}
+                                  {coverage.shiftTag
+                                    ? ` · ${getShiftTagDisplayName(coverage.shiftTag)}`
+                                    : ""}
+                                </Typography>
+                              </Box>
+                            </Box>
+
+                            <Stack
+                              direction="row"
+                              spacing={0.5}
+                              alignItems="center"
+                            >
+                              <Chip
+                                size="small"
+                                label={`${openSpots} open`}
+                                sx={{
+                                  height: 22,
+                                  color: gapColor,
+                                  backgroundColor: "#fff7ed",
+                                  border: "1px solid #fed7aa",
+                                  fontWeight: 700,
+                                }}
+                              />
+                              <Chip
+                                size="small"
+                                label={`${requiredCount} req`}
+                                sx={{
+                                  height: 22,
+                                  color: "#334155",
+                                  backgroundColor: "#f8fafc",
+                                  border: "1px solid #e2e8f0",
+                                  fontWeight: 700,
+                                }}
+                              />
+                            </Stack>
+                          </Box>
+
+                          <Box
+                            sx={{
+                              display: "flex",
+                              width: "100%",
+                              height: 8,
+                              borderRadius: 999,
+                              overflow: "hidden",
+                              border: "1px solid #e2e8f0",
+                              backgroundColor: "#f8fafc",
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                width: `${scheduledPct}%`,
+                                backgroundColor: "#22c55e",
+                              }}
+                            />
+                            <Box
+                              sx={{
+                                width: `${openPct}%`,
+                                backgroundColor: "#f59e0b",
+                              }}
+                            />
+                          </Box>
+
+                          <Typography variant="caption" color="text.secondary">
+                            {scheduledCount} scheduled / {openSpots} open
+                            {draftCount > 0
+                              ? ` · In ${draftCount} draft${draftCount > 1 ? "s" : ""}`
+                              : ""}
+                          </Typography>
+                        </Stack>
+                      </Paper>
+                    );
+                  })}
+                </Box>
+
+                <Button
+                  sx={{ mt: 0.35 }}
+                  fullWidth
+                  variant="contained"
+                  color="warning"
+                  onClick={handleCreateDraft}
+                  disabled={creatingDraft}
+                >
+                  {creatingDraft ? (
+                    <CircularProgress size={20} />
+                  ) : (
+                    "Create Draft with AI"
+                  )}
+                </Button>
+              </>
+            )}
+          </Stack>
         </Paper>
 
         <Divider />

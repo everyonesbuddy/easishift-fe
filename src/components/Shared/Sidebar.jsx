@@ -26,6 +26,7 @@ import {
   MdMoreVert,
   MdClose,
   MdTune,
+  MdHelpOutline,
 } from "react-icons/md";
 import logo from "../../assets/logos/wiserShifts-logo-dark.svg";
 import { useAuth } from "../../context/AuthContext";
@@ -215,6 +216,39 @@ function Sidebar({ mobileOpen, onMobileClose }) {
               </ListItem>
             );
           })}
+        </List>
+      </Box>
+
+      {/* Help Section */}
+      <Box sx={{ px: 2, pb: 1 }}>
+        <List sx={{ p: 0 }}>
+          <ListItem disablePadding>
+            <ListItemButton
+              onClick={() => navigate("/how-to-use")}
+              sx={{
+                borderRadius: 2,
+                px: 1.5,
+                py: 0.9,
+                gap: 1,
+                color: activePath === "/how-to-use" ? "white" : "#d1d5db",
+                bgcolor:
+                  activePath === "/how-to-use" ? "#2563eb" : "transparent",
+                transition: "background-color 0.2s ease",
+                "&:hover": {
+                  bgcolor:
+                    activePath === "/how-to-use" ? "#1d4ed8" : "#1f2937",
+                },
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 28, color: "inherit" }}>
+                <MdHelpOutline size={17} />
+              </ListItemIcon>
+              <ListItemText
+                primary="How to Use"
+                primaryTypographyProps={{ fontSize: "0.82rem" }}
+              />
+            </ListItemButton>
+          </ListItem>
         </List>
       </Box>
 

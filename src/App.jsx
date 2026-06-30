@@ -13,6 +13,7 @@ import PrivacyPolicy from "./components/Home/PrivacyPolicy";
 import EndUserLicenseAgreement from "./components/Home/EndUserLicenseAgreement";
 import Navbar from "./components/Shared/Navbar";
 import Sidebar from "./components/Shared/Sidebar";
+import HowToUsePage from "./components/Shared/HowToUsePage";
 import Paywall from "./components/StaffPortal/Dashboard/Paywall";
 import ManageSubscription from "./components/StaffPortal/Billing/ManageSubscription";
 import BillingSuccess from "./components/StaffPortal/Billing/BillingSuccess";
@@ -173,6 +174,14 @@ export default function App() {
             element={
               <PrivateRoute>
                 <FacilityPreferencesPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/how-to-use"
+            element={
+              <PrivateRoute>
+                <HowToUsePage />
               </PrivateRoute>
             }
           />

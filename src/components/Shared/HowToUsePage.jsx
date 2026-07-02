@@ -1,18 +1,24 @@
 import React, { useMemo, useState } from "react";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Alert,
   Box,
-  Paper,
-  Typography,
-  Grid,
+  Button,
+  Chip,
   Divider,
+  Grid,
   List,
   ListItem,
   ListItemText,
-  Chip,
+  Paper,
+  Stack,
   ToggleButton,
   ToggleButtonGroup,
-  Alert,
+  Typography,
 } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 const GUIDE_DATA = {
   admin: {
@@ -211,104 +217,165 @@ const GUIDE_DATA = {
   },
 };
 
-function DetailedSection({ section, tone }) {
+function HeroBanner({ activeRole, guide }) {
   return (
     <Paper
       elevation={0}
       sx={{
-        border: "1px solid #e5e7eb",
-        borderLeft: `5px solid ${tone}`,
-        borderRadius: 3,
-        p: { xs: 2, md: 2.5 },
-        height: "100%",
+        mb: 3,
+        p: { xs: 2.25, md: 3 },
+        borderRadius: 4,
+        border: "1px solid #dbeafe",
+        background:
+          activeRole === "admin"
+            ? "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)"
+            : "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)",
       }}
     >
-      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-        {section.title}
+      <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>
+        How to Use WiserShifts
       </Typography>
-      <Typography sx={{ color: "#4b5563", mb: 1.5, lineHeight: 1.65 }}>
-        {section.purpose}
+      <Typography sx={{ color: "#334155", lineHeight: 1.65, maxWidth: 900 }}>
+        This page is designed as an interactive training center. Pick your role,
+        follow the quick-start path, then work through each learning module.
+        Everything is organized for fast scanning on mobile and desktop.
       </Typography>
-      <List sx={{ p: 0 }}>
-        {section.steps.map((step, index) => (
-          <ListItem
-            key={step}
-            sx={{ px: 0, py: 0.65, alignItems: "flex-start" }}
-          >
-            <ListItemText
-              primary={
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <Chip
-                    size="small"
-                    label={`Step ${index + 1}`}
-                    sx={{
-                      bgcolor: "#f3f4f6",
-                      color: "#111827",
-                      fontWeight: 700,
-                      border: "1px solid #e5e7eb",
-                    }}
-                  />
-                  <Typography sx={{ color: "#1f2937", lineHeight: 1.6 }}>
-                    {step}
-                  </Typography>
-                </Box>
-              }
-            />
-          </ListItem>
-        ))}
-      </List>
+
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 2 }}>
+        <Chip
+          label={`${guide.sections.length} Training Modules`}
+          sx={{
+            fontWeight: 700,
+            bgcolor: "#ffffff",
+            border: "1px solid #bfdbfe",
+          }}
+        />
+        <Chip
+          label="Role-Specific Steps"
+          sx={{
+            fontWeight: 700,
+            bgcolor: "#ffffff",
+            border: "1px solid #bfdbfe",
+          }}
+        />
+        <Chip
+          label="Daily Checklist Included"
+          sx={{
+            fontWeight: 700,
+            bgcolor: "#ffffff",
+            border: "1px solid #bfdbfe",
+          }}
+        />
+      </Stack>
     </Paper>
   );
 }
 
-function SimpleListCard({ title, items }) {
+function LearningSidebar({ guide, expandedPanel, setExpandedPanel }) {
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        border: "1px solid #e5e7eb",
-        borderRadius: 3,
-        p: { xs: 2, md: 3 },
-      }}
-    >
-      <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
-        {title}
-      </Typography>
-      <List sx={{ p: 0 }}>
-        {items.map((item, index) => (
-          <ListItem
-            key={item}
-            sx={{ px: 0, py: 0.65, alignItems: "flex-start" }}
-          >
-            <ListItemText
-              primary={`${index + 1}. ${item}`}
-              primaryTypographyProps={{
-                sx: { color: "#374151", lineHeight: 1.6 },
+    <Stack spacing={2} sx={{ position: { md: "sticky" }, top: { md: 88 } }}>
+      <Paper
+        elevation={0}
+        sx={{ border: "1px solid #e5e7eb", borderRadius: 3, p: 2 }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.25 }}>
+          Learning Path
+        </Typography>
+        <Typography sx={{ color: "#475569", mb: 1.5, lineHeight: 1.6 }}>
+          Use these shortcuts to jump to a module.
+        </Typography>
+        <Stack spacing={1}>
+          {guide.sections.map((section, index) => (
+            <Button
+              key={section.title}
+              variant={
+                expandedPanel === `panel-${index}` ? "contained" : "outlined"
+              }
+              onClick={() => setExpandedPanel(`panel-${index}`)}
+              sx={{
+                justifyContent: "flex-start",
+                textTransform: "none",
+                borderRadius: 2,
+                fontWeight: 700,
+                px: 1.25,
+                py: 0.8,
+                ...(expandedPanel === `panel-${index}`
+                  ? { bgcolor: guide.tone, "&:hover": { bgcolor: guide.tone } }
+                  : { borderColor: "#cbd5e1", color: "#1f2937" }),
               }}
-            />
-          </ListItem>
-        ))}
-      </List>
-    </Paper>
+            >
+              {section.title}
+            </Button>
+          ))}
+        </Stack>
+      </Paper>
+
+      <Paper
+        elevation={0}
+        sx={{ border: "1px solid #e5e7eb", borderRadius: 3, p: 2 }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.25 }}>
+          {guide.label} Daily Checklist
+        </Typography>
+        <List sx={{ p: 0 }}>
+          {guide.dailyChecklist.map((item, index) => (
+            <ListItem
+              key={item}
+              sx={{ px: 0, py: 0.5, alignItems: "flex-start" }}
+            >
+              <ListItemText
+                primary={`${index + 1}. ${item}`}
+                primaryTypographyProps={{
+                  sx: { color: "#374151", lineHeight: 1.55 },
+                }}
+              />
+            </ListItem>
+          ))}
+        </List>
+      </Paper>
+
+      <Paper
+        elevation={0}
+        sx={{ border: "1px solid #e5e7eb", borderRadius: 3, p: 2 }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.25 }}>
+          Common Mistakes to Avoid
+        </Typography>
+        <List sx={{ p: 0 }}>
+          {guide.commonMistakes.map((item, index) => (
+            <ListItem
+              key={item}
+              sx={{ px: 0, py: 0.5, alignItems: "flex-start" }}
+            >
+              <ListItemText
+                primary={`${index + 1}. ${item}`}
+                primaryTypographyProps={{
+                  sx: { color: "#374151", lineHeight: 1.55 },
+                }}
+              />
+            </ListItem>
+          ))}
+        </List>
+      </Paper>
+    </Stack>
   );
 }
 
 export default function HowToUsePage() {
   const [activeRole, setActiveRole] = useState("admin");
+  const [expandedPanel, setExpandedPanel] = useState("panel-0");
 
   const guide = useMemo(() => GUIDE_DATA[activeRole], [activeRole]);
 
   const handleRoleChange = (_, nextRole) => {
     if (nextRole) {
       setActiveRole(nextRole);
+      setExpandedPanel("panel-0");
     }
+  };
+
+  const handleExpand = (panel) => (_, isExpanded) => {
+    setExpandedPanel(isExpanded ? panel : false);
   };
 
   return (
@@ -319,14 +386,7 @@ export default function HowToUsePage() {
         maxWidth: 1280,
       }}
     >
-      <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>
-        How to Use WiserShifts
-      </Typography>
-      <Typography sx={{ color: "#4b5563", mb: 3, lineHeight: 1.7 }}>
-        Use this training page for detailed, role-based instructions. Switch
-        between Admin and Non-Admin Staff guides to see workflows, daily
-        priorities, and common mistakes.
-      </Typography>
+      <HeroBanner activeRole={activeRole} guide={guide} />
 
       <Paper
         elevation={0}
@@ -390,45 +450,135 @@ export default function HowToUsePage() {
         <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.25 }}>
           First 10 Minutes: Quick Start
         </Typography>
-        <List sx={{ p: 0 }}>
+        <Stack spacing={1.25}>
           {guide.gettingStarted.map((item, index) => (
-            <ListItem key={item} sx={{ px: 0, py: 0.65 }}>
-              <ListItemText
-                primary={`${index + 1}. ${item}`}
-                primaryTypographyProps={{
-                  sx: { color: "#374151", lineHeight: 1.6 },
+            <Box
+              key={item}
+              sx={{ display: "flex", alignItems: "flex-start", gap: 1.25 }}
+            >
+              <Chip
+                label={index + 1}
+                size="small"
+                sx={{
+                  mt: 0.3,
+                  bgcolor: guide.tone,
+                  color: "#ffffff",
+                  fontWeight: 800,
+                  minWidth: 28,
                 }}
               />
-            </ListItem>
+              <Typography sx={{ color: "#374151", lineHeight: 1.65 }}>
+                {item}
+              </Typography>
+            </Box>
           ))}
-        </List>
+        </Stack>
       </Paper>
 
       <Grid container spacing={2.5}>
-        {guide.sections.map((section) => (
-          <Grid key={section.title} item xs={12} md={6}>
-            <DetailedSection section={section} tone={guide.tone} />
-          </Grid>
-        ))}
+        <Grid item xs={12} md={4}>
+          <LearningSidebar
+            guide={guide}
+            expandedPanel={expandedPanel}
+            setExpandedPanel={setExpandedPanel}
+          />
+        </Grid>
+
+        <Grid item xs={12} md={8}>
+          <Paper
+            elevation={0}
+            sx={{ border: "1px solid #e5e7eb", borderRadius: 3, p: 2 }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.25 }}>
+              Training Modules
+            </Typography>
+            <Typography sx={{ color: "#4b5563", mb: 1.5, lineHeight: 1.6 }}>
+              Expand each module for step-by-step instructions. The active
+              module is highlighted in the learning path panel.
+            </Typography>
+
+            {guide.sections.map((section, index) => (
+              <Accordion
+                key={section.title}
+                expanded={expandedPanel === `panel-${index}`}
+                onChange={handleExpand(`panel-${index}`)}
+                disableGutters
+                elevation={0}
+                sx={{
+                  mb: 1.25,
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "12px !important",
+                  overflow: "hidden",
+                  "&:before": { display: "none" },
+                }}
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Box>
+                    <Typography sx={{ fontWeight: 700, color: "#0f172a" }}>
+                      {section.title}
+                    </Typography>
+                    <Typography sx={{ color: "#64748b", mt: 0.25 }}>
+                      {section.purpose}
+                    </Typography>
+                  </Box>
+                </AccordionSummary>
+
+                <AccordionDetails sx={{ pt: 0.5 }}>
+                  <List sx={{ p: 0 }}>
+                    {section.steps.map((step, stepIndex) => (
+                      <ListItem
+                        key={step}
+                        sx={{
+                          px: 0,
+                          py: 0.7,
+                          alignItems: "flex-start",
+                          gap: 1,
+                        }}
+                      >
+                        <Chip
+                          label={`Step ${stepIndex + 1}`}
+                          size="small"
+                          sx={{
+                            bgcolor: "#f8fafc",
+                            border: "1px solid #cbd5e1",
+                            fontWeight: 700,
+                            mt: 0.2,
+                          }}
+                        />
+                        <ListItemText
+                          primary={step}
+                          primaryTypographyProps={{
+                            sx: { color: "#1f2937", lineHeight: 1.6 },
+                          }}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </AccordionDetails>
+              </Accordion>
+            ))}
+          </Paper>
+        </Grid>
       </Grid>
 
       <Divider sx={{ my: 3 }} />
 
-      <Grid container spacing={2.5}>
-        <Grid item xs={12} md={6}>
-          <SimpleListCard
-            title={`${guide.label} Daily Checklist`}
-            items={guide.dailyChecklist}
-          />
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <SimpleListCard
-            title="Common Mistakes to Avoid"
-            items={guide.commonMistakes}
-          />
-        </Grid>
-      </Grid>
+      <Alert
+        severity="success"
+        sx={{
+          border: "1px solid #86efac",
+          bgcolor: "#f0fdf4",
+          color: "#14532d",
+          "& .MuiAlert-icon": { color: "#16a34a" },
+        }}
+      >
+        <Typography sx={{ fontWeight: 700, mb: 0.25 }}>Training Tip</Typography>
+        <Typography sx={{ lineHeight: 1.6 }}>
+          For onboarding sessions, walk through Quick Start first, then complete
+          one module at a time using the Learning Path buttons. This improves
+          retention and reduces overwhelm.
+        </Typography>
+      </Alert>
     </Box>
   );
 }

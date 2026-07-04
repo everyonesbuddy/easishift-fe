@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   Box,
   Button,
   Checkbox,
@@ -12,7 +11,6 @@ import {
   GlobalStyles,
   IconButton,
   InputLabel,
-  LinearProgress,
   MenuItem,
   Paper,
   Select,
@@ -34,12 +32,12 @@ import { toast } from "react-toastify";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 import {
+  getCertificationTagDisplayName,
   getRoleDisplayName,
-  getRoleOptionsFromFacilityPreferences,
+  isRoleCompatible,
   getShiftTagDisplayName,
   getShiftTypeDisplayName,
   getUnitAreaDisplayName,
-  isRoleCompatible,
 } from "../../../constants/industryRoles";
 
 const toastOptions = {
@@ -216,6 +214,77 @@ const splitScopedAssignmentId = (scopedId) => {
   };
 };
 
+const normalizeTag = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase();
+
+const toNormalizedSet = (values) =>
+  new Set(
+    (Array.isArray(values) ? values : [])
+      .map((value) => normalizeTag(value))
+      .filter(Boolean),
+  );
+
+const doesCoverageMatchStaffTags = (staff, coverage) => {
+  const allowedAreas = toNormalizedSet(staff?.allowedAreas);
+  const allowedShiftTypes = toNormalizedSet(staff?.allowedShiftTypes);
+  const certificationTags = toNormalizedSet(staff?.certificationTags);
+
+  const hasTagRestrictions =
+    allowedAreas.size > 0 ||
+    allowedShiftTypes.size > 0 ||
+    certificationTags.size > 0;
+
+  // Untagged staff are considered float staff for role-compatible coverage.
+  if (!hasTagRestrictions) return true;
+
+  if (allowedAreas.size > 0) {
+    const coverageArea = normalizeTag(coverage?.unitArea);
+    if (!coverageArea || !allowedAreas.has(coverageArea)) return false;
+  }
+
+  if (allowedShiftTypes.size > 0) {
+    const coverageShiftType = normalizeTag(coverage?.shiftType);
+    const coverageShiftTag = normalizeTag(coverage?.shiftTag);
+
+    if (!coverageShiftType) return false;
+
+    const exactShiftSlot = coverageShiftTag
+      ? `${coverageShiftType}:${coverageShiftTag}`
+      : "";
+
+    const matchesByType = Array.from(allowedShiftTypes).some((allowed) =>
+      allowed.startsWith(`${coverageShiftType}:`),
+    );
+
+    const isShiftMatch =
+      (exactShiftSlot && allowedShiftTypes.has(exactShiftSlot)) ||
+      allowedShiftTypes.has(coverageShiftType) ||
+      (!coverageShiftTag && matchesByType);
+
+    if (!isShiftMatch) return false;
+  }
+
+  if (certificationTags.size > 0) {
+    const coverageCertTags = (
+      Array.isArray(coverage?.requiredCertificationTags)
+        ? coverage.requiredCertificationTags
+        : []
+    )
+      .map((tag) => normalizeTag(tag))
+      .filter(Boolean);
+
+    const hasRequiredCerts = coverageCertTags.every((tag) =>
+      certificationTags.has(tag),
+    );
+
+    if (!hasRequiredCerts) return false;
+  }
+
+  return true;
+};
+
 const isPublishableState = (state) => ["proposed", "locked"].includes(state);
 
 const getWarningChips = (assignment, thresholdHours) => {
@@ -243,14 +312,9 @@ const getWarningChips = (assignment, thresholdHours) => {
 };
 
 export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
-  const { facilityPreferences } = useAuth();
+  useAuth();
 
   const [coverages, setCoverages] = useState([]);
-  const [selectedCoverageIds, setSelectedCoverageIds] = useState([]);
-  const [selectedRole, setSelectedRole] = useState("");
-  const [fetchingCoverages, setFetchingCoverages] = useState(false);
-  const [creatingDraft, setCreatingDraft] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
 
   const [drafts, setDrafts] = useState([]);
   const [activeDraftId, setActiveDraftId] = useState("");
@@ -275,232 +339,6 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
     state: "proposed",
     force: false,
   });
-
-  const roleOptions = useMemo(
-    () => getRoleOptionsFromFacilityPreferences(facilityPreferences),
-    [facilityPreferences],
-  );
-
-  const selectableCoverageIds = useMemo(
-    () =>
-      coverages
-        .filter((coverage) => Number(coverage.spotsRemaining) > 0)
-        .map((coverage) => coverage._id),
-    [coverages],
-  );
-
-  const selectedSelectableCount = useMemo(
-    () =>
-      selectedCoverageIds.filter((id) => selectableCoverageIds.includes(id))
-        .length,
-    [selectedCoverageIds, selectableCoverageIds],
-  );
-
-  const draftCountByCoverageId = useMemo(() => {
-    const detailByDraftId = new Map();
-
-    selectedDraftDetails.forEach((item) => {
-      if (item?.draftId) {
-        detailByDraftId.set(String(item.draftId), item.draft || null);
-      }
-    });
-
-    if (activeDraft?._id) {
-      detailByDraftId.set(String(activeDraft._id), activeDraft);
-    }
-
-    const draftIdsByCoverage = new Map();
-
-    drafts.forEach((draft) => {
-      const draftId = String(draft?._id || "");
-      if (!draftId) return;
-
-      const detail = detailByDraftId.get(draftId) || draft;
-
-      const idCandidates = [
-        ...(Array.isArray(detail?.coverageIds) ? detail.coverageIds : []),
-        ...(Array.isArray(detail?.sourceCoverageIds)
-          ? detail.sourceCoverageIds
-          : []),
-        ...(Array.isArray(detail?.inputCoverageIds)
-          ? detail.inputCoverageIds
-          : []),
-      ]
-        .map((id) => String(id || ""))
-        .filter(Boolean);
-
-      const snapshotCandidates =
-        [
-          detail?.coverageSnapshot,
-          detail?.coverages,
-          detail?.sourceCoverages,
-          detail?.inputCoverages,
-          detail?.requestedCoverages,
-        ]
-          .find((item) => Array.isArray(item) && item.length > 0)
-          ?.map((coverage) => getCoverageId(coverage))
-          .filter(Boolean) || [];
-
-      const coverageIds = Array.from(
-        new Set([...idCandidates, ...snapshotCandidates]),
-      );
-
-      coverageIds.forEach((coverageId) => {
-        if (!draftIdsByCoverage.has(coverageId)) {
-          draftIdsByCoverage.set(coverageId, new Set());
-        }
-        draftIdsByCoverage.get(coverageId).add(draftId);
-      });
-    });
-
-    const countMap = new Map();
-    draftIdsByCoverage.forEach((draftIdSet, coverageId) => {
-      countMap.set(coverageId, draftIdSet.size);
-    });
-
-    return countMap;
-  }, [activeDraft, drafts, selectedDraftDetails]);
-
-  const sortedCoverages = useMemo(() => {
-    const getAssignedCount = (coverage) => {
-      const directAssigned = toFiniteNumber(
-        coverage?.assignedCount,
-        Number.NaN,
-      );
-      if (Number.isFinite(directAssigned)) {
-        return Math.max(0, directAssigned);
-      }
-
-      const required = toFiniteNumber(coverage?.requiredCount, 0);
-      const remaining = toFiniteNumber(
-        coverage?.spotsRemaining ?? coverage?.remaining,
-        Number.NaN,
-      );
-
-      if (Number.isFinite(remaining)) {
-        return Math.max(0, required - remaining);
-      }
-
-      return 0;
-    };
-
-    return [...coverages].sort((a, b) => {
-      const aAssigned = getAssignedCount(a);
-      const bAssigned = getAssignedCount(b);
-
-      const aUnfilledPriority = aAssigned <= 0 ? 0 : 1;
-      const bUnfilledPriority = bAssigned <= 0 ? 0 : 1;
-      if (aUnfilledPriority !== bUnfilledPriority) {
-        return aUnfilledPriority - bUnfilledPriority;
-      }
-
-      const aRemaining = toFiniteNumber(a?.spotsRemaining ?? a?.remaining, 0);
-      const bRemaining = toFiniteNumber(b?.spotsRemaining ?? b?.remaining, 0);
-      if (aRemaining !== bRemaining) {
-        return bRemaining - aRemaining;
-      }
-
-      const aTime = new Date(a?.startTime || a?.date || 0).getTime();
-      const bTime = new Date(b?.startTime || b?.date || 0).getTime();
-      return aTime - bTime;
-    });
-  }, [coverages]);
-
-  const allSelectableSelected =
-    selectableCoverageIds.length > 0 &&
-    selectedSelectableCount === selectableCoverageIds.length;
-  const hasSomeSelectableSelected =
-    selectedSelectableCount > 0 && !allSelectableSelected;
-
-  const openCoverageInsights = useMemo(() => {
-    const dayMap = new Map();
-    const roleMap = new Map();
-    let totalOpenSpots = 0;
-    let totalRequired = 0;
-    let totalScheduled = 0;
-    let selectableShiftCount = 0;
-    let selectedOpenSpots = 0;
-
-    sortedCoverages.forEach((coverage) => {
-      const openSpots = Math.max(
-        0,
-        toFiniteNumber(coverage?.spotsRemaining ?? coverage?.remaining, 0),
-      );
-      const requiredCount = Math.max(
-        0,
-        toFiniteNumber(coverage?.requiredCount, 0),
-      );
-      const directAssigned = Number(coverage?.assignedCount);
-      const scheduledCount = Number.isFinite(directAssigned)
-        ? Math.max(0, directAssigned)
-        : Math.max(0, requiredCount - openSpots);
-      const coverageId = String(coverage?._id || "");
-      const isSelected = selectedCoverageIds.includes(coverageId);
-
-      if (openSpots > 0) selectableShiftCount += 1;
-      totalOpenSpots += openSpots;
-      totalRequired += requiredCount;
-      totalScheduled += scheduledCount;
-      if (isSelected) selectedOpenSpots += openSpots;
-
-      const dayValue = coverage?.startTime || coverage?.date;
-      const dayKey = getLocalDayKey(dayValue) || String(dayValue || "unknown");
-      const dayTime = new Date(dayValue || 0).getTime();
-      if (!dayMap.has(dayKey)) {
-        dayMap.set(dayKey, {
-          dayKey,
-          label: formatDatePart(dayValue),
-          time: Number.isFinite(dayTime) ? dayTime : Number.MAX_SAFE_INTEGER,
-          shiftCount: 0,
-          openSpots: 0,
-          selectedCount: 0,
-        });
-      }
-      const daySummary = dayMap.get(dayKey);
-      daySummary.shiftCount += 1;
-      daySummary.openSpots += openSpots;
-      if (isSelected) daySummary.selectedCount += 1;
-
-      const roleKey = String(coverage?.role || "unknown");
-      if (!roleMap.has(roleKey)) {
-        roleMap.set(roleKey, { role: roleKey, shiftCount: 0, openSpots: 0 });
-      }
-      const roleSummary = roleMap.get(roleKey);
-      roleSummary.shiftCount += 1;
-      roleSummary.openSpots += openSpots;
-    });
-
-    const dayRows = Array.from(dayMap.values()).sort(
-      (a, b) => a.time - b.time || b.openSpots - a.openSpots,
-    );
-
-    const roleRows = Array.from(roleMap.values())
-      .sort((a, b) => b.openSpots - a.openSpots || b.shiftCount - a.shiftCount)
-      .slice(0, 4)
-      .map((row) => ({
-        ...row,
-        roleLabel: getRoleDisplayName(row.role),
-      }));
-
-    const fillPct =
-      totalRequired > 0
-        ? Math.max(
-            0,
-            Math.min(100, Math.round((totalScheduled / totalRequired) * 100)),
-          )
-        : 0;
-
-    return {
-      totalOpenSpots,
-      totalRequired,
-      totalScheduled,
-      selectableShiftCount,
-      selectedOpenSpots,
-      fillPct,
-      dayRows,
-      roleRows,
-    };
-  }, [selectedCoverageIds, sortedCoverages]);
 
   const staffById = useMemo(() => {
     const map = new Map();
@@ -555,12 +393,6 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
       drafts.filter((draft) => selectedDraftIds.includes(String(draft._id))),
     [drafts, selectedDraftIds],
   );
-
-  const selectedDraftSummaryLabel = useMemo(() => {
-    if (drafts.length === 0) return "0 selected";
-    if (selectedDraftIds.length === drafts.length) return "All drafts selected";
-    return `${selectedDraftIds.length}/${drafts.length} selected`;
-  }, [drafts.length, selectedDraftIds.length]);
 
   const calendarDraftDetails = useMemo(() => {
     if (selectedDraftDetails.length > 0) {
@@ -732,10 +564,17 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
           draftScope,
           start,
           end,
+          startTime,
+          endTime,
           role: coverage?.role,
           unitArea: coverage?.unitArea,
           shiftType: coverage?.shiftType,
           shiftTag: coverage?.shiftTag,
+          requiredCertificationTags: Array.isArray(
+            coverage?.requiredCertificationTags,
+          )
+            ? coverage.requiredCertificationTags
+            : [],
           requiredCount,
           spotsRemaining,
         };
@@ -811,6 +650,49 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
     return summaryByDay;
   }, [proposedCountByCoverageId, draftCoverageCandidates]);
 
+  const coverageDetailsByDay = useMemo(() => {
+    const detailsByDay = new Map();
+
+    draftCoverageCandidates.forEach((coverage) => {
+      const proposedCount = coverage.coverageKey
+        ? proposedCountByCoverageId.get(coverage.coverageKey) || 0
+        : 0;
+      const requiredCount = Math.max(
+        0,
+        toFiniteNumber(coverage.requiredCount, 0),
+      );
+      const openCount = Math.max(0, requiredCount - proposedCount);
+      const fillStatus =
+        openCount <= 0 ? "full" : proposedCount > 0 ? "partial" : "unfilled";
+
+      const matchingStaffCount = staffList.filter((staff) => {
+        if (!isRoleCompatible(staff?.role, coverage?.role)) return false;
+        return doesCoverageMatchStaffTags(staff, coverage);
+      }).length;
+
+      const dayKey = getLocalDayKey(coverage.start);
+      if (!dayKey) return;
+
+      if (!detailsByDay.has(dayKey)) {
+        detailsByDay.set(dayKey, []);
+      }
+
+      detailsByDay.get(dayKey).push({
+        ...coverage,
+        proposedCount,
+        openCount,
+        fillStatus,
+        matchingStaffCount,
+      });
+    });
+
+    detailsByDay.forEach((entries) => {
+      entries.sort((a, b) => a.start.getTime() - b.start.getTime());
+    });
+
+    return detailsByDay;
+  }, [draftCoverageCandidates, proposedCountByCoverageId, staffList]);
+
   const draftAssignmentEvents = useMemo(
     () =>
       calendarAssignments.map((assignment) => {
@@ -851,16 +733,11 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
   );
 
   const loadCoverages = async () => {
-    setFetchingCoverages(true);
     try {
       const res = await api.get("/coverage/unfilled-auto");
       const now = new Date();
       const upcoming = (Array.isArray(res.data) ? res.data : [])
-        .filter(
-          (coverage) =>
-            new Date(coverage.endTime) >= now &&
-            (!selectedRole || isRoleCompatible(selectedRole, coverage.role)),
-        )
+        .filter((coverage) => new Date(coverage.endTime) >= now)
         .map((coverage) => {
           const requiredCount = Number(coverage.requiredCount) || 0;
           const assignedCount = Number(coverage.assignedCount);
@@ -879,14 +756,9 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
         });
 
       setCoverages(upcoming);
-      setSelectedCoverageIds((prev) =>
-        prev.filter((id) => upcoming.some((coverage) => coverage._id === id)),
-      );
     } catch (err) {
       console.error(err);
       setCoverages([]);
-    } finally {
-      setFetchingCoverages(false);
     }
   };
 
@@ -912,12 +784,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
       setDrafts(list);
 
       const nextSelectedIds = list.map((draft) => String(draft._id));
-      setSelectedDraftIds((prev) => {
-        const filtered = prev.filter((id) =>
-          nextSelectedIds.includes(String(id)),
-        );
-        return filtered;
-      });
+      setSelectedDraftIds(nextSelectedIds);
 
       const stillExists = list.some((draft) => draft._id === activeDraftId);
       if (!activeDraftId && list[0]?._id) {
@@ -1008,7 +875,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
 
   useEffect(() => {
     loadCoverages();
-  }, [selectedRole]);
+  }, []);
 
   useEffect(() => {
     loadStaff();
@@ -1022,131 +889,6 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
   useEffect(() => {
     loadSelectedDraftDetails(selectedDraftIds);
   }, [selectedDraftIds]);
-
-  const toggleCoverageSelection = (id) => {
-    setSelectedCoverageIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
-    );
-  };
-
-  const handleSelectLargestCoverageGaps = () => {
-    const prioritizedIds = [...sortedCoverages]
-      .filter(
-        (coverage) =>
-          Math.max(
-            0,
-            toFiniteNumber(coverage?.spotsRemaining ?? coverage?.remaining, 0),
-          ) > 0,
-      )
-      .sort((a, b) => {
-        const aOpen = Math.max(
-          0,
-          toFiniteNumber(a?.spotsRemaining ?? a?.remaining, 0),
-        );
-        const bOpen = Math.max(
-          0,
-          toFiniteNumber(b?.spotsRemaining ?? b?.remaining, 0),
-        );
-        if (aOpen !== bOpen) return bOpen - aOpen;
-        return (
-          new Date(a?.startTime || a?.date || 0).getTime() -
-          new Date(b?.startTime || b?.date || 0).getTime()
-        );
-      })
-      .slice(0, 8)
-      .map((coverage) => String(coverage?._id || ""))
-      .filter(Boolean);
-
-    setSelectedCoverageIds((prev) =>
-      Array.from(new Set([...prev, ...prioritizedIds])),
-    );
-  };
-
-  const handleSelectCoverageDay = (dayKey) => {
-    if (!dayKey) return;
-
-    const dayCoverageIds = sortedCoverages
-      .filter((coverage) => {
-        const coverageDayKey =
-          getLocalDayKey(coverage?.startTime || coverage?.date) ||
-          String(coverage?.startTime || coverage?.date || "unknown");
-        const openSpots = Math.max(
-          0,
-          toFiniteNumber(coverage?.spotsRemaining ?? coverage?.remaining, 0),
-        );
-        return coverageDayKey === dayKey && openSpots > 0;
-      })
-      .map((coverage) => String(coverage?._id || ""))
-      .filter(Boolean);
-
-    setSelectedCoverageIds((prev) =>
-      Array.from(new Set([...prev, ...dayCoverageIds])),
-    );
-  };
-
-  const handleToggleAllCoverageSelection = (checked) => {
-    if (checked) {
-      setSelectedCoverageIds((prev) =>
-        Array.from(new Set([...prev, ...selectableCoverageIds])),
-      );
-      return;
-    }
-
-    setSelectedCoverageIds((prev) =>
-      prev.filter((id) => !selectableCoverageIds.includes(id)),
-    );
-  };
-
-  const handleCreateDraft = async () => {
-    if (!selectedCoverageIds.length) {
-      setErrorMsg("Select at least one coverage.");
-      return;
-    }
-
-    setErrorMsg("");
-    setCreatingDraft(true);
-    try {
-      const res = await api.post("/schedules/auto-generate", {
-        coverageIds: selectedCoverageIds,
-      });
-
-      const responseData = res?.data || {};
-      const newDraftId =
-        responseData?.draftSchedule?.draftId ||
-        responseData?.draftSchedule?._id;
-      const didCreateDraft = Boolean(
-        responseData?.draftCreated ?? Boolean(newDraftId),
-      );
-
-      if (responseData?.message) {
-        if (didCreateDraft) {
-          toast.success(responseData.message, toastOptions);
-        } else {
-          toast.info(responseData.message, toastOptions);
-        }
-      } else {
-        toast.success("Draft created successfully.", toastOptions);
-      }
-
-      if (responseData?.warning) {
-        toast.warning(responseData.warning, toastOptions);
-      }
-
-      await Promise.all([loadCoverages(), loadDrafts()]);
-      setSelectedCoverageIds([]);
-      if (newDraftId) {
-        setActiveDraftId(String(newDraftId));
-      }
-    } catch (err) {
-      console.error(err);
-      const message =
-        err.response?.data?.message || "Failed to create AI draft.";
-      setErrorMsg(message);
-      toast.error(message, toastOptions);
-    } finally {
-      setCreatingDraft(false);
-    }
-  };
 
   const beginEditAssignment = (assignment, draftIdOverride) => {
     const assignmentId = getAssignmentId(assignment);
@@ -1275,25 +1017,6 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
     );
   };
 
-  const toggleDraftSelection = (draftId) => {
-    setSelectedDraftIds((prev) =>
-      prev.includes(draftId)
-        ? prev.filter((id) => id !== draftId)
-        : [...prev, draftId],
-    );
-  };
-
-  const handleToggleAllDraftSelection = (checked) => {
-    const allIds = drafts.map((draft) => String(draft._id));
-
-    if (checked) {
-      setSelectedDraftIds(allIds);
-      return;
-    }
-
-    setSelectedDraftIds([]);
-  };
-
   const handleToggleAllPublishableSelection = (checked) => {
     const publishableIds = publishableAssignments.map((assignment) =>
       getScopedAssignmentId(
@@ -1410,18 +1133,45 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
     }
   };
 
-  const handleDiscardDraft = async () => {
-    if (!activeDraftId) return;
+  const handleDeleteSelected = async () => {
+    if (selectedPublishableCount <= 0) return;
 
-    setActionLoading("discard");
+    const idsToDelete = selectedAssignmentIds.filter((id) =>
+      publishableAssignmentIdSet.has(id),
+    );
+
+    if (idsToDelete.length === 0) return;
+
+    const parsedTargets = idsToDelete
+      .map((scopedId) => splitScopedAssignmentId(scopedId))
+      .filter((target) => target.draftId && target.assignmentId);
+
+    if (parsedTargets.length === 0) return;
+
+    setActionLoading("delete:selected");
     try {
-      await api.post(`/schedules/draft-schedules/${activeDraftId}/discard`);
-      toast.info("Draft discarded.", toastOptions);
-      await Promise.all([loadDrafts(), loadCoverages()]);
+      await Promise.all(
+        parsedTargets.map((target) =>
+          api.patch(
+            `/schedules/draft-schedules/${target.draftId}/assignments/${target.assignmentId}`,
+            { state: "removed" },
+          ),
+        ),
+      );
+      toast.info("Selected draft assignments removed.", toastOptions);
+      await Promise.all([
+        activeDraftId ? loadDraftDetail(activeDraftId) : Promise.resolve(),
+        loadSelectedDraftDetails(selectedDraftIds),
+        loadDrafts(),
+        loadCoverages(),
+      ]);
+      setSelectedAssignmentIds((prev) =>
+        prev.filter((id) => !idsToDelete.includes(id)),
+      );
     } catch (err) {
       console.error(err);
       toast.error(
-        err.response?.data?.message || "Failed to discard draft.",
+        err.response?.data?.message || "Failed to delete selected assignments.",
         toastOptions,
       );
     } finally {
@@ -1499,634 +1249,41 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
 
       <Box sx={{ mb: 1.5, pr: onClose ? 4 : 0 }}>
         <Typography variant="h6" sx={{ mb: 0.25, fontWeight: 800 }}>
-          Draft Schedule Board
+          Schedule Workspace
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Create drafts from open coverage, edit assignments, review overtime
-          risk, and publish selected or all.
+          Review generated schedules, adjust assignments, and publish approved
+          shifts.
+        </Typography>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", mt: 0.35 }}
+        >
+          Partially filled drafts usually mean there are not enough available,
+          qualified staff for some shifts after applying role, certification,
+          unit, shift, and overtime rules. Resolve by updating staffing or
+          requirements, then finish remaining assignments manually when needed.
         </Typography>
       </Box>
 
       <Stack spacing={2}>
-        {errorMsg && <Alert severity="error">{errorMsg}</Alert>}
-
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-          <Chip
-            size="small"
-            variant="outlined"
-            color="primary"
-            label={`${selectableCoverageIds.length} open coverage`}
-          />
-          <Chip
-            size="small"
-            variant="outlined"
-            color="info"
-            label={`${drafts.length} active drafts`}
-          />
+        <Stack direction="row" spacing={1} alignItems="center" useFlexGap>
           <Chip
             size="small"
             variant="outlined"
             color="success"
             label={`${publishableAssignments.length} publishable assignments`}
           />
-        </Stack>
-
-        <Paper
-          variant="outlined"
-          sx={{
-            p: { xs: 1.25, md: 1.5 },
-            borderRadius: 2.5,
-            borderColor: "#bfdbfe",
-            background:
-              "linear-gradient(150deg, #f0f9ff 0%, #f8fbff 45%, #ffffff 100%)",
-          }}
-        >
-          <Stack spacing={1.25}>
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={0.75}
-              justifyContent="space-between"
-              alignItems={{ xs: "flex-start", sm: "center" }}
-            >
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                  Create Draft from Open Coverage
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Spot shortage hotspots quickly, then draft only the shifts
-                  that matter most.
-                </Typography>
-              </Box>
-              <Chip
-                size="small"
-                color="primary"
-                variant="outlined"
-                label={`${openCoverageInsights.selectableShiftCount} open shifts`}
-              />
-            </Stack>
-
-            <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
-              <Paper
-                variant="outlined"
-                sx={{ p: 1, borderRadius: 2, flex: 1, borderColor: "#bfdbfe" }}
-              >
-                <Typography variant="caption" color="text.secondary">
-                  Open shifts
-                </Typography>
-                <Typography
-                  sx={{ fontWeight: 800, fontSize: 20, lineHeight: 1.1 }}
-                >
-                  {openCoverageInsights.selectableShiftCount}
-                </Typography>
-              </Paper>
-              <Paper
-                variant="outlined"
-                sx={{ p: 1, borderRadius: 2, flex: 1, borderColor: "#fed7aa" }}
-              >
-                <Typography variant="caption" color="text.secondary">
-                  Open spots
-                </Typography>
-                <Typography
-                  sx={{ fontWeight: 800, fontSize: 20, lineHeight: 1.1 }}
-                >
-                  {openCoverageInsights.totalOpenSpots}
-                </Typography>
-              </Paper>
-              <Paper
-                variant="outlined"
-                sx={{ p: 1, borderRadius: 2, flex: 1, borderColor: "#bbf7d0" }}
-              >
-                <Typography variant="caption" color="text.secondary">
-                  Current fill level
-                </Typography>
-                <Typography
-                  sx={{ fontWeight: 800, fontSize: 20, lineHeight: 1.1 }}
-                >
-                  {openCoverageInsights.fillPct}%
-                </Typography>
-                <LinearProgress
-                  variant="determinate"
-                  value={openCoverageInsights.fillPct}
-                  sx={{
-                    mt: 0.7,
-                    height: 7,
-                    borderRadius: 999,
-                    backgroundColor: "#e2e8f0",
-                    "& .MuiLinearProgress-bar": { backgroundColor: "#15803d" },
-                  }}
-                />
-              </Paper>
-            </Stack>
-
-            <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
-              <FormControl fullWidth>
-                <InputLabel>Role (optional)</InputLabel>
-                <Select
-                  value={selectedRole}
-                  label="Role (optional)"
-                  onChange={(e) => setSelectedRole(e.target.value)}
-                >
-                  <MenuItem value="">All Roles</MenuItem>
-                  {roleOptions.map((item) => (
-                    <MenuItem key={item.value} value={item.value}>
-                      {item.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <Stack
-                direction={{ xs: "row", md: "column" }}
-                spacing={0.75}
-                justifyContent="center"
-              >
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="warning"
-                  onClick={handleSelectLargestCoverageGaps}
-                  disabled={selectableCoverageIds.length <= 0}
-                >
-                  Prioritize Largest Gaps
-                </Button>
-                <Button
-                  size="small"
-                  variant="text"
-                  onClick={() => setSelectedCoverageIds([])}
-                  disabled={selectedCoverageIds.length <= 0}
-                >
-                  Clear Selection
-                </Button>
-              </Stack>
-            </Stack>
-
-            {fetchingCoverages ? (
-              <Typography variant="body2">Loading coverages...</Typography>
-            ) : (
-              <>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={allSelectableSelected}
-                      indeterminate={hasSomeSelectableSelected}
-                      onChange={(e) =>
-                        handleToggleAllCoverageSelection(e.target.checked)
-                      }
-                    />
-                  }
-                  label={`Select all (${selectedSelectableCount}/${selectableCoverageIds.length})`}
-                />
-
-                {openCoverageInsights.dayRows.length > 0 ? (
-                  <Box
-                    sx={{
-                      display: "grid",
-                      gridTemplateColumns: {
-                        xs: "repeat(2, minmax(0, 1fr))",
-                        sm: "repeat(4, minmax(0, 1fr))",
-                      },
-                      gap: 0.75,
-                    }}
-                  >
-                    {openCoverageInsights.dayRows.slice(0, 8).map((day) => {
-                      const severityTone =
-                        day.openSpots >= 6
-                          ? "#7f1d1d"
-                          : day.openSpots >= 3
-                            ? "#9a3412"
-                            : "#1d4ed8";
-                      const bgTone =
-                        day.openSpots >= 6
-                          ? "#fef2f2"
-                          : day.openSpots >= 3
-                            ? "#fff7ed"
-                            : "#eff6ff";
-
-                      return (
-                        <Paper
-                          key={day.dayKey}
-                          variant="outlined"
-                          sx={{
-                            p: 0.75,
-                            borderRadius: 1.75,
-                            borderColor: "#dbeafe",
-                            backgroundColor: bgTone,
-                            cursor: "pointer",
-                            "&:hover": { borderColor: "#60a5fa" },
-                          }}
-                          onClick={() => handleSelectCoverageDay(day.dayKey)}
-                        >
-                          <Typography
-                            sx={{
-                              fontSize: "0.68rem",
-                              fontWeight: 700,
-                              color: "#334155",
-                            }}
-                          >
-                            {day.label}
-                          </Typography>
-                          <Typography
-                            sx={{
-                              mt: 0.35,
-                              fontSize: "0.95rem",
-                              fontWeight: 800,
-                              lineHeight: 1,
-                              color: severityTone,
-                            }}
-                          >
-                            {day.openSpots} open
-                          </Typography>
-                          <Typography
-                            sx={{
-                              fontSize: "0.64rem",
-                              color: "text.secondary",
-                            }}
-                          >
-                            {day.shiftCount} shift
-                            {day.shiftCount > 1 ? "s" : ""} ·{" "}
-                            {day.selectedCount} selected
-                          </Typography>
-                        </Paper>
-                      );
-                    })}
-                  </Box>
-                ) : null}
-
-                {openCoverageInsights.roleRows.length > 0 ? (
-                  <Stack
-                    direction="row"
-                    spacing={0.75}
-                    flexWrap="wrap"
-                    useFlexGap
-                  >
-                    {openCoverageInsights.roleRows.map((roleRow) => (
-                      <Chip
-                        key={roleRow.role}
-                        size="small"
-                        variant="outlined"
-                        sx={{
-                          borderColor: "#bfdbfe",
-                          backgroundColor: "#ffffff",
-                        }}
-                        label={`${roleRow.roleLabel}: ${roleRow.openSpots} open`}
-                      />
-                    ))}
-                  </Stack>
-                ) : null}
-
-                <Box sx={{ maxHeight: 320, overflowY: "auto", pr: 0.5 }}>
-                  {sortedCoverages.map((coverage) => {
-                    const selected = selectedCoverageIds.includes(coverage._id);
-                    const openSpots = Math.max(
-                      0,
-                      toFiniteNumber(
-                        coverage?.spotsRemaining ?? coverage?.remaining,
-                        0,
-                      ),
-                    );
-                    const disabled = openSpots <= 0;
-                    const coverageId = String(coverage?._id || "");
-                    const draftCount =
-                      draftCountByCoverageId.get(coverageId) || 0;
-                    const requiredCount = Math.max(
-                      0,
-                      toFiniteNumber(coverage?.requiredCount, 0),
-                    );
-                    const directAssigned = Number(coverage?.assignedCount);
-                    const scheduledCount = Number.isFinite(directAssigned)
-                      ? Math.max(0, directAssigned)
-                      : Math.max(0, requiredCount - openSpots);
-                    const barTotal = Math.max(
-                      1,
-                      requiredCount,
-                      scheduledCount + openSpots,
-                    );
-                    const scheduledPct = Math.round(
-                      (scheduledCount / barTotal) * 100,
-                    );
-                    const openPct = Math.round((openSpots / barTotal) * 100);
-                    const gapColor =
-                      openSpots >= 3
-                        ? "#b45309"
-                        : openSpots > 0
-                          ? "#2563eb"
-                          : "#166534";
-
-                    return (
-                      <Paper
-                        key={coverage._id}
-                        variant="outlined"
-                        sx={{
-                          p: 1,
-                          mb: 0.75,
-                          borderRadius: 2,
-                          borderColor: selected ? "#2563eb" : "#dbeafe",
-                          borderWidth: selected ? 2 : 1,
-                          backgroundColor: selected ? "#eff6ff" : "#ffffff",
-                          opacity: disabled ? 0.68 : 1,
-                          cursor: disabled ? "default" : "pointer",
-                          "&:hover": {
-                            borderColor: selected ? "#2563eb" : "#93c5fd",
-                            backgroundColor: selected ? "#eff6ff" : "#f8fafc",
-                          },
-                        }}
-                        onClick={() =>
-                          !disabled && toggleCoverageSelection(coverage._id)
-                        }
-                      >
-                        <Stack spacing={0.55}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "flex-start",
-                              gap: 1,
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "flex-start",
-                                gap: 1,
-                              }}
-                            >
-                              <Checkbox
-                                checked={selected}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  toggleCoverageSelection(coverage._id);
-                                }}
-                                disabled={disabled}
-                                sx={{ mt: -0.5, ml: -0.5 }}
-                              />
-
-                              <Box>
-                                <Typography
-                                  sx={{ fontSize: 13, fontWeight: 700 }}
-                                >
-                                  {formatDatePart(
-                                    coverage.startTime || coverage.date,
-                                  )}{" "}
-                                  · {formatTimePart(coverage.startTime)}-
-                                  {formatTimePart(coverage.endTime)}
-                                </Typography>
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                  sx={{ display: "block", mt: 0.15 }}
-                                >
-                                  {getRoleDisplayName(coverage.role)}
-                                  {coverage.unitArea
-                                    ? ` · ${getUnitAreaDisplayName(coverage.unitArea)}`
-                                    : ""}
-                                  {coverage.shiftType
-                                    ? ` · ${getShiftTypeDisplayName(coverage.shiftType)}`
-                                    : ""}
-                                  {coverage.shiftTag
-                                    ? ` · ${getShiftTagDisplayName(coverage.shiftTag)}`
-                                    : ""}
-                                </Typography>
-                              </Box>
-                            </Box>
-
-                            <Stack
-                              direction="row"
-                              spacing={0.5}
-                              alignItems="center"
-                            >
-                              <Chip
-                                size="small"
-                                label={`${openSpots} open`}
-                                sx={{
-                                  height: 22,
-                                  color: gapColor,
-                                  backgroundColor: "#fff7ed",
-                                  border: "1px solid #fed7aa",
-                                  fontWeight: 700,
-                                }}
-                              />
-                              <Chip
-                                size="small"
-                                label={`${requiredCount} req`}
-                                sx={{
-                                  height: 22,
-                                  color: "#334155",
-                                  backgroundColor: "#f8fafc",
-                                  border: "1px solid #e2e8f0",
-                                  fontWeight: 700,
-                                }}
-                              />
-                            </Stack>
-                          </Box>
-
-                          <Box
-                            sx={{
-                              display: "flex",
-                              width: "100%",
-                              height: 8,
-                              borderRadius: 999,
-                              overflow: "hidden",
-                              border: "1px solid #e2e8f0",
-                              backgroundColor: "#f8fafc",
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                width: `${scheduledPct}%`,
-                                backgroundColor: "#22c55e",
-                              }}
-                            />
-                            <Box
-                              sx={{
-                                width: `${openPct}%`,
-                                backgroundColor: "#f59e0b",
-                              }}
-                            />
-                          </Box>
-
-                          <Typography variant="caption" color="text.secondary">
-                            {scheduledCount} scheduled / {openSpots} open
-                            {draftCount > 0
-                              ? ` · In ${draftCount} draft${draftCount > 1 ? "s" : ""}`
-                              : ""}
-                          </Typography>
-                        </Stack>
-                      </Paper>
-                    );
-                  })}
-                </Box>
-
-                <Button
-                  sx={{ mt: 0.35 }}
-                  fullWidth
-                  variant="contained"
-                  color="warning"
-                  onClick={handleCreateDraft}
-                  disabled={creatingDraft}
-                >
-                  {creatingDraft ? (
-                    <CircularProgress size={20} />
-                  ) : (
-                    "Create Draft with AI"
-                  )}
-                </Button>
-              </>
-            )}
-          </Stack>
-        </Paper>
-
-        <Divider />
-
-        <Paper
-          variant="outlined"
-          sx={{
-            p: 1.5,
-            borderRadius: 2.5,
-            borderColor: "#dbeafe",
-            backgroundColor: "#f8fbff",
-          }}
-        >
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1}
-            justifyContent="space-between"
-            alignItems={{ xs: "flex-start", sm: "center" }}
-            sx={{ mb: 1 }}
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={loadDrafts}
+            disabled={loadingDrafts}
           >
-            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-              Draft Schedules
-            </Typography>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Chip
-                size="small"
-                variant="outlined"
-                label={selectedDraftSummaryLabel}
-              />
-              <Chip
-                size="small"
-                variant="outlined"
-                label={`${selectedDrafts.length} shown`}
-              />
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={loadDrafts}
-                disabled={loadingDrafts}
-              >
-                Refresh
-              </Button>
-            </Stack>
-          </Stack>
-
-          {drafts.length > 0 && (
-            <Stack
-              direction="row"
-              spacing={1}
-              justifyContent="space-between"
-              alignItems="center"
-              sx={{ mb: 1 }}
-            >
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={
-                      selectedDraftIds.length === drafts.length &&
-                      drafts.length > 0
-                    }
-                    indeterminate={
-                      selectedDraftIds.length > 0 &&
-                      selectedDraftIds.length < drafts.length
-                    }
-                    onChange={(e) =>
-                      handleToggleAllDraftSelection(e.target.checked)
-                    }
-                  />
-                }
-                label="Show all drafts in calendar"
-              />
-              <Button
-                size="small"
-                variant="text"
-                onClick={() => setSelectedDraftIds([])}
-                disabled={selectedDraftIds.length === 0}
-              >
-                Clear
-              </Button>
-            </Stack>
-          )}
-
-          {drafts.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              No active drafts yet.
-            </Typography>
-          ) : (
-            <Stack spacing={0.75}>
-              {drafts.map((draft) => (
-                <Paper
-                  key={draft._id}
-                  variant="outlined"
-                  onClick={() => setActiveDraftId(draft._id)}
-                  sx={{
-                    p: 1,
-                    cursor: "pointer",
-                    borderRadius: 2,
-                    backgroundColor:
-                      draft._id === activeDraftId ? "#eff6ff" : "#ffffff",
-                    borderColor:
-                      draft._id === activeDraftId ? "primary.main" : "divider",
-                    borderWidth: draft._id === activeDraftId ? 2 : 1,
-                    "&:hover": {
-                      borderColor:
-                        draft._id === activeDraftId
-                          ? "primary.main"
-                          : "#93c5fd",
-                    },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: 1,
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Checkbox
-                        size="small"
-                        checked={selectedDraftIds.includes(String(draft._id))}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          toggleDraftSelection(String(draft._id));
-                        }}
-                      />
-                      <Typography sx={{ fontSize: 13, fontWeight: 700 }}>
-                        Created {formatDatePart(draft.createdAt)}
-                      </Typography>
-                    </Box>
-                    <Chip
-                      size="small"
-                      label={String(draft.status || "draft")
-                        .replace("_", " ")
-                        .toUpperCase()}
-                      color={
-                        draft.status === "partially_published"
-                          ? "info"
-                          : "warning"
-                      }
-                    />
-                  </Box>
-                  <Typography variant="caption" color="text.secondary">
-                    {Number(draft?.summary?.generatedAssignmentCount || 0)}{" "}
-                    generated assignment(s)
-                  </Typography>
-                </Paper>
-              ))}
-            </Stack>
-          )}
-        </Paper>
+            Refresh
+          </Button>
+        </Stack>
 
         {activeDraftId && (
           <Paper
@@ -2156,12 +1313,14 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                       size="small"
                       variant="outlined"
                       color="error"
-                      onClick={handleDiscardDraft}
-                      disabled={Boolean(actionLoading)}
+                      onClick={handleDeleteSelected}
+                      disabled={
+                        Boolean(actionLoading) || selectedPublishableCount <= 0
+                      }
                     >
-                      {actionLoading === "discard"
-                        ? "Discarding..."
-                        : "Discard Draft"}
+                      {actionLoading === "delete:selected"
+                        ? "Deleting..."
+                        : `Delete Selected (${selectedPublishableCount})`}
                     </Button>
                     <Button
                       size="small"
@@ -2173,7 +1332,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                     >
                       {actionLoading === "publish:selected"
                         ? "Publishing..."
-                        : `Publish Selected (${selectedPublishableCount})`}
+                        : `Publish Selected to Schedule (${selectedPublishableCount})`}
                     </Button>
                     <Button
                       size="small"
@@ -2186,7 +1345,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                     >
                       {actionLoading === "publish:all"
                         ? "Publishing..."
-                        : "Publish All"}
+                        : "Publish All to Schedule"}
                     </Button>
                   </Stack>
                 </Stack>
@@ -2205,12 +1364,6 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                   }
                   label={`Select all publishable (${selectedPublishableCount}/${publishableAssignments.length})`}
                 />
-
-                <Alert severity="info">
-                  Overtime threshold is {overtimeThresholdHours}h. "Close to
-                  40h" appears when projected weekly load is within 4 hours of
-                  threshold.
-                </Alert>
 
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
@@ -2248,15 +1401,6 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                     />
                     <Chip
                       size="small"
-                      label="Locked"
-                      sx={{
-                        bgcolor: "#ccfbf1",
-                        color: "#115e59",
-                        fontWeight: 700,
-                      }}
-                    />
-                    <Chip
-                      size="small"
                       label="Removed"
                       sx={{
                         bgcolor: "#f3f4f6",
@@ -2266,7 +1410,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                     />
                     <Chip
                       size="small"
-                      label="Needs Coverage"
+                      label="Needs coverage"
                       sx={{
                         bgcolor: "#ffedd5",
                         color: "#9a3412",
@@ -2275,7 +1419,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                     />
                     <Chip
                       size="small"
-                      label="Partially Filled"
+                      label="Partially filled"
                       sx={{
                         bgcolor: "#fef3c7",
                         color: "#92400e",
@@ -2284,7 +1428,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                     />
                     <Chip
                       size="small"
-                      label="Fully Filled"
+                      label="Fully filled"
                       sx={{
                         bgcolor: "#dcfce7",
                         color: "#166534",
@@ -2395,14 +1539,8 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                         dayCellContent={(arg) => {
                           const dayKey = getLocalDayKey(arg.date);
                           const summary = coverageSummaryByDay.get(dayKey);
-                          const roleEntries = summary
-                            ? Object.entries(summary.byRole || {}).sort(
-                                (a, b) =>
-                                  getRoleDisplayName(a[0]).localeCompare(
-                                    getRoleDisplayName(b[0]),
-                                  ),
-                              )
-                            : [];
+                          const dayCoverages =
+                            coverageDetailsByDay.get(dayKey) || [];
                           const statusRows = summary
                             ? [
                                 {
@@ -2452,6 +1590,19 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                                   arrow
                                   placement="top"
                                   enterDelay={120}
+                                  slotProps={{
+                                    tooltip: {
+                                      sx: {
+                                        maxWidth: { xs: 360, sm: 520 },
+                                        width: {
+                                          xs: "calc(100vw - 32px)",
+                                          sm: 520,
+                                        },
+                                        maxHeight: { xs: 280, sm: 360 },
+                                        overflowY: "auto",
+                                      },
+                                    },
+                                  }}
                                   title={
                                     <Box sx={{ py: 0.25 }}>
                                       <Typography
@@ -2526,29 +1677,130 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                                             );
                                           })}
                                       </Box>
-                                      {roleEntries.length > 0 ? (
-                                        <Box sx={{ mt: 0.45 }}>
+                                      {dayCoverages.length > 0 ? (
+                                        <Box
+                                          sx={{
+                                            mt: 0.65,
+                                            display: "grid",
+                                            gap: 0.55,
+                                          }}
+                                        >
                                           <Typography
                                             sx={{
                                               fontSize: "0.68rem",
                                               fontWeight: 700,
                                             }}
                                           >
-                                            By role
+                                            Coverage details
                                           </Typography>
-                                          {roleEntries.map(
-                                            ([roleKey, roleSummary]) => (
-                                              <Typography
-                                                key={roleKey}
-                                                sx={{ fontSize: "0.66rem" }}
-                                              >
-                                                {getRoleDisplayName(roleKey)}:
-                                                Req {roleSummary.requiredCount},
-                                                Proposed{" "}
-                                                {roleSummary.proposedCount},
-                                                Open {roleSummary.openCount}
-                                              </Typography>
-                                            ),
+                                          {dayCoverages.map(
+                                            (coverage, index) => {
+                                              const statusMeta =
+                                                COVERAGE_STATUS_META[
+                                                  coverage.fillStatus
+                                                ] || OPEN_COVERAGE_META;
+                                              const certTags = Array.isArray(
+                                                coverage.requiredCertificationTags,
+                                              )
+                                                ? coverage.requiredCertificationTags
+                                                : [];
+                                              const certDisplay =
+                                                certTags.length
+                                                  ? certTags
+                                                      .map((tag) =>
+                                                        getCertificationTagDisplayName(
+                                                          tag,
+                                                        ),
+                                                      )
+                                                      .join(", ")
+                                                  : "None";
+
+                                              return (
+                                                <Box
+                                                  key={`${coverage.coverageKey || dayKey}-${index}`}
+                                                  sx={{
+                                                    px: 0.7,
+                                                    py: 0.55,
+                                                    borderRadius: 1,
+                                                    border: `1px solid ${statusMeta.eventBorder}`,
+                                                    backgroundColor:
+                                                      statusMeta.eventBg,
+                                                  }}
+                                                >
+                                                  <Typography
+                                                    sx={{
+                                                      fontSize: "0.66rem",
+                                                      fontWeight: 800,
+                                                      color: "#0f172a",
+                                                    }}
+                                                  >
+                                                    {statusMeta.label}
+                                                  </Typography>
+                                                  <Typography
+                                                    sx={{
+                                                      fontSize: "0.66rem",
+                                                      color: "#111827",
+                                                    }}
+                                                  >
+                                                    Time:{" "}
+                                                    {formatTimePart(
+                                                      coverage.startTime,
+                                                    )}{" "}
+                                                    -{" "}
+                                                    {formatTimePart(
+                                                      coverage.endTime,
+                                                    )}
+                                                  </Typography>
+                                                  <Typography
+                                                    sx={{
+                                                      fontSize: "0.66rem",
+                                                      color: "#111827",
+                                                    }}
+                                                  >
+                                                    Role:{" "}
+                                                    {getRoleDisplayName(
+                                                      coverage.role,
+                                                    )}
+                                                  </Typography>
+                                                  <Typography
+                                                    sx={{
+                                                      fontSize: "0.66rem",
+                                                      color: "#111827",
+                                                    }}
+                                                  >
+                                                    Unit:{" "}
+                                                    {getUnitAreaDisplayName(
+                                                      coverage.unitArea,
+                                                    )}
+                                                  </Typography>
+                                                  <Typography
+                                                    sx={{
+                                                      fontSize: "0.66rem",
+                                                      color: "#111827",
+                                                    }}
+                                                  >
+                                                    Certification: {certDisplay}
+                                                  </Typography>
+                                                  <Typography
+                                                    sx={{
+                                                      fontSize: "0.66rem",
+                                                      fontWeight: 700,
+                                                      color: "#1f2937",
+                                                    }}
+                                                  >
+                                                    Need{" "}
+                                                    {coverage.requiredCount} |
+                                                    Fit{" "}
+                                                    {
+                                                      coverage.matchingStaffCount
+                                                    }{" "}
+                                                    | Proposed{" "}
+                                                    {coverage.proposedCount} |
+                                                    Open {coverage.openCount}
+                                                  </Typography>
+                                                </Box>
+                                              );
+                                            },
                                           )}
                                         </Box>
                                       ) : null}
@@ -2674,9 +1926,9 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                       color="text.secondary"
                       sx={{ display: "block", mt: 1 }}
                     >
-                      Calendar shows only checked drafts. Coverage cards show
-                      needs/partial/full status from proposed, locked, and
-                      published assignments.
+                      Calendar combines all active drafts and highlights where
+                      coverage is fully filled, partially filled, or still open
+                      based on proposed, locked, and published assignments.
                     </Typography>
                   </Box>
                 )}
@@ -2736,6 +1988,9 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                               assignment?.staffId?.name ||
                               staffById.get(staffId)?.name ||
                               "Unknown";
+                            const assignmentStateMeta = getDraftStateMeta(
+                              assignment?.state,
+                            );
 
                             return (
                               <Paper
@@ -2796,16 +2051,15 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                                         </Typography>
                                         <Chip
                                           size="small"
-                                          label={String(
-                                            assignment.state || "",
-                                          ).toUpperCase()}
-                                          color={
-                                            assignment.state === "published"
-                                              ? "success"
-                                              : assignment.state === "removed"
-                                                ? "default"
-                                                : "warning"
-                                          }
+                                          label={assignmentStateMeta.label}
+                                          sx={{
+                                            bgcolor:
+                                              assignmentStateMeta.eventBg,
+                                            color:
+                                              assignmentStateMeta.textColor,
+                                            border: `1px solid ${assignmentStateMeta.eventBorder}`,
+                                            fontWeight: 700,
+                                          }}
                                         />
                                       </Stack>
 
@@ -2843,38 +2097,6 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                                             }
                                           >
                                             Edit
-                                          </Button>
-                                        )}
-                                        {assignment.state !== "locked" && (
-                                          <Button
-                                            size="small"
-                                            variant="outlined"
-                                            onClick={() =>
-                                              handleStateQuickUpdate(
-                                                assignment,
-                                                "locked",
-                                                assignmentDraftId,
-                                              )
-                                            }
-                                            disabled={Boolean(actionLoading)}
-                                          >
-                                            Lock
-                                          </Button>
-                                        )}
-                                        {assignment.state === "locked" && (
-                                          <Button
-                                            size="small"
-                                            variant="outlined"
-                                            onClick={() =>
-                                              handleStateQuickUpdate(
-                                                assignment,
-                                                "proposed",
-                                                assignmentDraftId,
-                                              )
-                                            }
-                                            disabled={Boolean(actionLoading)}
-                                          >
-                                            Unlock
                                           </Button>
                                         )}
                                         {assignment.state !== "removed" ? (

@@ -244,7 +244,6 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   const [requirements, setRequirements] = useState([{ ...defaultRequirement }]);
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
-  const [loadingMode, setLoadingMode] = useState("create");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [repeatOpen, setRepeatOpen] = useState(false);
@@ -397,7 +396,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
     setExcludedDates([]);
   };
 
-  const handleSubmit = async (event, autoGenerate = false) => {
+  const handleSubmit = async (event) => {
     if (event) event.preventDefault();
 
     setError("");
@@ -439,7 +438,6 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
       }
     }
 
-    setLoadingMode(autoGenerate ? "ai" : "create");
     setLoading(true);
 
     try {
@@ -496,15 +494,25 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
         createdCoverages.push(...createdForDate);
       });
 
-      if (autoGenerate && createdCoverages.length) {
-        await api.post("/schedules/auto-generate", {
-          coverageIds: createdCoverages.map((item) => item._id),
-        });
+      let draftWasGenerated = false;
+      if (createdCoverages.length) {
+        try {
+          await api.post("/schedules/auto-generate", {
+            coverageIds: createdCoverages.map((item) => item._id),
+          });
+          draftWasGenerated = true;
+        } catch (draftErr) {
+          console.error(draftErr);
+          toast.warning(
+            draftErr?.response?.data?.message ||
+              "Coverage was created, but AI could not generate a draft yet. You can still review coverage and schedule manually.",
+          );
+        }
       }
 
-      const message = autoGenerate
-        ? "Coverage created and AI draft generated. Review and publish it from the schedule planner."
-        : "Coverage requirements added successfully.";
+      const message = draftWasGenerated
+        ? "Coverage created and AI draft is ready. Review, adjust, and publish from Draft Schedule Board."
+        : "Coverage created successfully.";
 
       setSuccess(message);
       toast.success(message);
@@ -523,7 +531,6 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
       toast.error(message);
     } finally {
       setLoading(false);
-      setLoadingMode("create");
     }
   };
 
@@ -631,8 +638,20 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
           Coverage Planner
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.3 }}>
-          Define your date pattern and shift requirements, then review before
-          saving.
+          Define your date pattern and requirements. When you create coverage,
+          AI automatically builds the best draft it can from available,
+          qualified staff.
+        </Typography>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ mt: 0.45, display: "block" }}
+        >
+          If a draft is partially filled, it usually means there are not enough
+          available staff who meet role, certification, shift, unit, or policy
+          constraints (such as overtime limits). You can resolve this by
+          adjusting requirements, updating staffing availability/qualifications,
+          or assigning manually.
         </Typography>
       </Box>
 
@@ -1341,9 +1360,9 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
             boxShadow: "0 4px 12px rgba(37,99,235,0.3)",
           }}
         >
-          {loading && loadingMode === "create"
-            ? "Saving…"
-            : "Save Requirements"}
+          {loading
+            ? "Saving Requirements and Generating Draft Schedule..."
+            : "Save Requirements and Generate Draft Schedule"}
         </Button>
       </Stack>
     </Paper>

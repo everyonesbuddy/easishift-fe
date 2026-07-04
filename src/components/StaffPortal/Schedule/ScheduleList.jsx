@@ -1187,7 +1187,7 @@ export default function ScheduleList() {
                 "&:hover": { bgcolor: "#1146b1" },
               }}
             >
-              AI Scheduler
+              Review AI Draft Schedules
             </Button>
           )}
 

@@ -75,6 +75,7 @@ export default function ScheduleList() {
   const [open, setOpen] = useState(false);
   const [openAutoModal, setOpenAutoModal] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
+  const [manualCoverageFromAuto, setManualCoverageFromAuto] = useState(null);
   const [view, setView] = useState("table");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("");
@@ -285,13 +286,22 @@ export default function ScheduleList() {
   const openCreate = () => {
     if (!isAdmin) return;
     setEditingSchedule(null);
+    setManualCoverageFromAuto(null);
     setOpen(true);
   };
 
   const closeModal = (refresh = false) => {
     setOpen(false);
     setEditingSchedule(null);
+    setManualCoverageFromAuto(null);
     if (refresh) fetchSchedules();
+  };
+
+  const openManualFromCoverage = (coverage) => {
+    setOpenAutoModal(false);
+    setEditingSchedule(null);
+    setManualCoverageFromAuto(coverage || null);
+    setOpen(true);
   };
 
   // ---------------------------
@@ -432,14 +442,17 @@ export default function ScheduleList() {
     user?._id,
   ]);
 
-  const paginatedSchedules = useMemo(
-    () =>
-      filteredSchedules.slice(
-        page * rowsPerPage,
-        page * rowsPerPage + rowsPerPage,
-      ),
-    [filteredSchedules, page, rowsPerPage],
-  );
+  const paginatedSchedules = useMemo(() => {
+    const listOrdered = [...filteredSchedules].sort(
+      (a, b) =>
+        new Date(b?.startTime).getTime() - new Date(a?.startTime).getTime(),
+    );
+
+    return listOrdered.slice(
+      page * rowsPerPage,
+      page * rowsPerPage + rowsPerPage,
+    );
+  }, [filteredSchedules, page, rowsPerPage]);
 
   const paginatedScheduleIds = paginatedSchedules.map(
     (schedule) => schedule._id,
@@ -2368,6 +2381,7 @@ export default function ScheduleList() {
             onClose={() => closeModal()}
             schedule={editingSchedule}
             staffList={staff}
+            initialCoverage={manualCoverageFromAuto}
             // If user is not admin and the modal was opened via the Individual Schedule button,
             // we prefill with the current user's id and disable staff selection.
             initialStaffId={!isAdmin && !editingSchedule ? user._id : ""}
@@ -2521,7 +2535,9 @@ export default function ScheduleList() {
       >
         <DialogContent dividers sx={{ p: { xs: 1.25, md: 2 } }}>
           <AutoGenerateScheduleForm
+            schedules={schedules}
             onClose={() => setOpenAutoModal(false)}
+            onOpenManualSchedule={openManualFromCoverage}
             onSuccess={() => {
               fetchSchedules();
             }}

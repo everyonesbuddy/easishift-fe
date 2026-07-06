@@ -93,7 +93,7 @@ src/
         │   └── CoverageEditCountForm.jsx  # Edit headcount for existing slot
         │
         ├── Dashboard/
-        │   ├── StaffDashboard.jsx              # Main hub — stats, charts, quick actions
+        │   ├── StaffDashboard.jsx              # Main hub — stats, charts, profile actions
         │   ├── StatCard.jsx                    # Individual KPI card
         │   ├── ScheduleAndCoverageCharts.jsx   # Recharts/Chart.js visualisations
         │   └── Paywall.jsx                     # Billing gate rendered when subscription inactive
@@ -293,7 +293,7 @@ Examples:
 
 - **`StatCard` row** — KPIs like total staff count, pending time-off count, unread messages, upcoming shifts.
 - **`ScheduleAndCoverageCharts`** — Bar/line charts showing scheduled hours vs coverage requirements.
-- **Quick-action modals** — Inline dialogs to add a staff member, send a message, create a coverage slot, or build/auto-generate a schedule without navigating away.
+- **Profile section** — Avatar + self-service profile picture upload.
 
 The dashboard is visible to both admins and staff, but admin sees the full summary (org-wide) while staff sees their personal snapshot.
 
@@ -321,6 +321,7 @@ UI notes:
 - Selecting a definition auto-populates start/end time from the selected slot.
 - If no shift definitions are configured, the shift-definition field remains visible but disabled with guidance text.
 - Coverage list/cards now display unit area, shift type, shift slot, and required cert tags.
+- Coverage planner now has two submission paths: **Save Requirement Only** or **Save Requirements and Generate Draft Schedule**.
 
 API endpoints used: `GET /api/v1/coverage`, `POST /api/v1/coverage`, `PATCH /api/v1/coverage/:id`, `DELETE /api/v1/coverage/:id`.
 
@@ -331,7 +332,11 @@ API endpoints used: `GET /api/v1/coverage`, `POST /api/v1/coverage`, `PATCH /api
 **`ScheduleList`** is a dual-mode shift management page.
 
 - **Table view** — paginated list with columns for staff name, role, shift window, status, plus taxonomy details.
-- **Calendar view** — FullCalendar day/week grid with colour-coded events by role (colours defined in the local `ROLE_COLORS` map).
+- **Calendar view** — FullCalendar month view with colour-coded events by role.
+
+List behavior note:
+
+- Table/list rows are sorted newest-to-oldest by shift start time.
 
 Schedule rows now include:
 
@@ -355,6 +360,15 @@ Draft scheduling workflow now includes:
 - Quick state transitions (`proposed`, `locked`, `removed`) and overtime/consecutive-day warning chips.
 - Selective publish or publish-all actions from draft.
 - Draft discard action and refresh behavior that re-syncs coverage + draft state.
+- Calendar workspace is always visible, even when no draft is selected, and still overlays live schedules and open coverage.
+- Calendar toolbar is simplified to month navigation (no week switch).
+- Publish actions remain available but are disabled when no publishable assignments exist.
+
+Manual scheduling safeguards:
+
+- `ScheduleForm` excludes draft-linked coverages by default to avoid collisions.
+- Admins can toggle inclusion of draft-flow coverages when needed.
+- Non-admin users always have draft-linked coverages excluded and do not see the toggle.
 
 **Shift swaps (staff):** Any staff member can open `ShiftSwapRequestModal` on a shift they are scheduled for to request a swap with a colleague. The swap request then appears in `ShiftSwapRequestsPage`.
 
@@ -548,6 +562,27 @@ Highlights:
 8. Staff preferences simplification
 
 - Preferences now submit only backend-supported fields to prevent schema mismatch.
+
+9. Dashboard simplification
+
+- Dashboard quick-action modal block was removed to keep the dashboard lightweight and focused on operational visibility.
+
+10. Coverage create flow split actions
+
+- Coverage planner now supports a save-only path in addition to save-and-generate-draft.
+
+11. Manual scheduling draft-safety
+
+- Manual shift creation now protects against scheduling into draft-linked coverages by default.
+
+12. Schedule list ordering
+
+- Table/list schedule rows now default to newest-first ordering.
+
+13. Auto-generate workspace visibility and calendar controls
+
+- Schedule workspace calendar now renders even with no active draft selected.
+- Calendar view controls were simplified to month navigation only.
 
 Components check `isAdmin` or `role` from `useAuth()` to show/hide UI sections rather than maintaining separate pages. For example, `TimeOffRequestList` shows admin approve/deny actions inline when `isAdmin === true`.
 

@@ -49,7 +49,12 @@ const toastOptions = {
   draggable: true,
 };
 
-const DRAFT_EDITABLE_STATES = new Set(["proposed", "locked", "removed"]);
+const DRAFT_EDITABLE_STATES = new Set([
+  "proposed",
+  "locked",
+  "removed",
+  "unfilled",
+]);
 
 const DRAFT_STATE_META = {
   proposed: {
@@ -75,6 +80,14 @@ const DRAFT_STATE_META = {
     textColor: "#111827",
     subTextColor: "#374151",
     accentTextColor: "#4b5563",
+  },
+  unfilled: {
+    label: "Unfilled",
+    eventBg: "#ffedd5",
+    eventBorder: "#fb923c",
+    textColor: "#9a3412",
+    subTextColor: "#c2410c",
+    accentTextColor: "#9a3412",
   },
   published: {
     label: "Published",
@@ -133,6 +146,43 @@ const COVERAGE_STATUS_META = {
     subTextColor: "#6b7280",
   },
 };
+
+const LIVE_SCHEDULE_STATUS_META = {
+  scheduled: {
+    label: "Live schedule",
+    eventBg: "#0f172a",
+    eventBorder: "#020617",
+    textColor: "#ffffff",
+    subTextColor: "#cbd5e1",
+    accentTextColor: "#94a3b8",
+  },
+  completed: {
+    label: "Live schedule",
+    eventBg: "#0f172a",
+    eventBorder: "#020617",
+    textColor: "#ffffff",
+    subTextColor: "#cbd5e1",
+    accentTextColor: "#94a3b8",
+  },
+  call_out: {
+    label: "Call-out schedule",
+    eventBg: "#b91c1c",
+    eventBorder: "#7f1d1d",
+    textColor: "#ffffff",
+    subTextColor: "#fee2e2",
+    accentTextColor: "#fecaca",
+  },
+};
+
+const getLiveScheduleMeta = (status) =>
+  LIVE_SCHEDULE_STATUS_META[String(status || "").toLowerCase()] || {
+    label: "Live schedule",
+    eventBg: "#334155",
+    eventBorder: "#0f172a",
+    textColor: "#ffffff",
+    subTextColor: "#cbd5e1",
+    accentTextColor: "#94a3b8",
+  };
 
 const getDraftStateMeta = (state) =>
   DRAFT_STATE_META[state] || {
@@ -285,6 +335,71 @@ const doesCoverageMatchStaffTags = (staff, coverage) => {
   return true;
 };
 
+const isLiveScheduleMatchingCoverage = (schedule, coverage) => {
+  if (!schedule || !coverage) return false;
+  if (String(schedule.status || "").toLowerCase() === "call_out") return false;
+
+  const scheduleStartMs = new Date(schedule.startTime).getTime();
+  const scheduleEndMs = new Date(schedule.endTime).getTime();
+  const coverageStartMs = new Date(coverage.startTime).getTime();
+  const coverageEndMs = new Date(coverage.endTime).getTime();
+
+  if (
+    Number.isNaN(scheduleStartMs) ||
+    Number.isNaN(scheduleEndMs) ||
+    Number.isNaN(coverageStartMs) ||
+    Number.isNaN(coverageEndMs)
+  ) {
+    return false;
+  }
+
+  if (scheduleStartMs !== coverageStartMs || scheduleEndMs !== coverageEndMs) {
+    return false;
+  }
+
+  if (!isRoleCompatible(schedule.role, coverage.role)) {
+    return false;
+  }
+
+  const coverageUnit = normalizeTag(coverage.unitArea);
+  const scheduleUnit = normalizeTag(schedule.unitArea);
+  if (coverageUnit && coverageUnit !== scheduleUnit) {
+    return false;
+  }
+
+  const coverageShiftType = normalizeTag(coverage.shiftType);
+  const scheduleShiftType = normalizeTag(schedule.shiftType);
+  if (coverageShiftType && coverageShiftType !== scheduleShiftType) {
+    return false;
+  }
+
+  const coverageShiftTag = normalizeTag(coverage.shiftTag);
+  const scheduleShiftTag = normalizeTag(schedule.shiftTag);
+  if (coverageShiftTag && coverageShiftTag !== scheduleShiftTag) {
+    return false;
+  }
+
+  return true;
+};
+
+const buildCoverageSignature = (coverage) => {
+  const startMs = new Date(
+    coverage?.startTime || coverage?.windowStart,
+  ).getTime();
+  const endMs = new Date(coverage?.endTime || coverage?.windowEnd).getTime();
+
+  if (Number.isNaN(startMs) || Number.isNaN(endMs)) return "";
+
+  return [
+    startMs,
+    endMs,
+    normalizeTag(coverage?.role),
+    normalizeTag(coverage?.unitArea),
+    normalizeTag(coverage?.shiftType),
+    normalizeTag(coverage?.shiftTag),
+  ].join("|");
+};
+
 const isPublishableState = (state) => ["proposed", "locked"].includes(state);
 
 const getWarningChips = (assignment, thresholdHours) => {
@@ -311,7 +426,12 @@ const getWarningChips = (assignment, thresholdHours) => {
   return chips;
 };
 
-export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
+export default function AutoGenerateScheduleForm({
+  onSuccess,
+  onClose,
+  schedules = [],
+  onOpenManualSchedule,
+}) {
   useAuth();
 
   const [coverages, setCoverages] = useState([]);
@@ -392,6 +512,11 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
     () =>
       drafts.filter((draft) => selectedDraftIds.includes(String(draft._id))),
     [drafts, selectedDraftIds],
+  );
+
+  const liveSchedules = useMemo(
+    () => (Array.isArray(schedules) ? schedules : []),
+    [schedules],
   );
 
   const calendarDraftDetails = useMemo(() => {
@@ -693,6 +818,35 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
     return detailsByDay;
   }, [draftCoverageCandidates, proposedCountByCoverageId, staffList]);
 
+  const draftCoverageIdSet = useMemo(
+    () =>
+      new Set(
+        draftCoverageCandidates
+          .map((coverage) => String(coverage.rawCoverageId || ""))
+          .filter(Boolean),
+      ),
+    [draftCoverageCandidates],
+  );
+
+  const draftCoverageSignatureSet = useMemo(
+    () =>
+      new Set(
+        draftCoverageCandidates
+          .map((coverage) =>
+            buildCoverageSignature({
+              startTime: coverage.startTime,
+              endTime: coverage.endTime,
+              role: coverage.role,
+              unitArea: coverage.unitArea,
+              shiftType: coverage.shiftType,
+              shiftTag: coverage.shiftTag,
+            }),
+          )
+          .filter(Boolean),
+      ),
+    [draftCoverageCandidates],
+  );
+
   const draftAssignmentEvents = useMemo(
     () =>
       calendarAssignments.map((assignment) => {
@@ -701,10 +855,11 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
         const staffId = String(
           assignment?.staffId?._id || assignment?.staffId || "",
         );
+        const isUnfilled = String(assignment?.state || "") === "unfilled";
         const staffName =
           assignment?.staffId?.name ||
           staffById.get(staffId)?.name ||
-          "Unknown";
+          (isUnfilled ? "Unfilled slot" : "Unknown");
 
         return {
           id: `assignment:${assignmentId}`,
@@ -727,10 +882,182 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
     [calendarAssignments, staffById],
   );
 
-  const draftCalendarEvents = useMemo(
-    () => [...draftAssignmentEvents],
-    [draftAssignmentEvents],
+  const liveScheduleEvents = useMemo(
+    () =>
+      liveSchedules
+        .filter((schedule) => schedule?.startTime && schedule?.endTime)
+        .map((schedule) => {
+          const scheduleId = String(schedule?._id || "");
+          const scheduleStatus = String(schedule?.status || "scheduled");
+          const liveMeta = getLiveScheduleMeta(scheduleStatus);
+          const staffId = String(
+            schedule?.staffId?._id || schedule?.staffId || "",
+          );
+          const staffName =
+            schedule?.staffId?.name ||
+            staffById.get(staffId)?.name ||
+            "Assigned staff";
+
+          return {
+            id: `live:${scheduleId}`,
+            title: `${staffName} • ${liveMeta.label}`,
+            start: schedule.startTime,
+            end: schedule.endTime,
+            backgroundColor: liveMeta.eventBg,
+            borderColor: liveMeta.eventBorder,
+            textColor: liveMeta.textColor,
+            extendedProps: {
+              type: "live-schedule",
+              scheduleId,
+              status: scheduleStatus,
+              statusLabel: liveMeta.label,
+              role: schedule?.role,
+              unitArea: schedule?.unitArea,
+              shiftType: schedule?.shiftType,
+              shiftTag: schedule?.shiftTag,
+              staffName,
+            },
+          };
+        }),
+    [liveSchedules, staffById],
   );
+
+  const openCoverageEvents = useMemo(
+    () =>
+      coverages
+        .filter((coverage) => {
+          const coverageId = getCoverageId(coverage);
+          const coverageSignature = buildCoverageSignature(coverage);
+
+          const alreadyRepresentedByDraftId =
+            Boolean(coverageId) && draftCoverageIdSet.has(coverageId);
+          const alreadyRepresentedBySignature =
+            Boolean(coverageSignature) &&
+            draftCoverageSignatureSet.has(coverageSignature);
+
+          return !alreadyRepresentedByDraftId && !alreadyRepresentedBySignature;
+        })
+        .map((coverage) => {
+          const coverageId = getCoverageId(coverage);
+          const requiredCount = Number(coverage?.requiredCount) || 0;
+          const liveAssignedCount = liveSchedules.filter((schedule) =>
+            isLiveScheduleMatchingCoverage(schedule, coverage),
+          ).length;
+          const reportedAssignedCount = Number(coverage?.assignedCount);
+          const assignedCount = Number.isFinite(reportedAssignedCount)
+            ? Math.max(reportedAssignedCount, liveAssignedCount)
+            : liveAssignedCount;
+          const openCount = Math.max(0, requiredCount - assignedCount);
+
+          return {
+            id: `open-coverage:${coverageId}`,
+            title: `Open coverage • ${getRoleDisplayName(coverage?.role)}`,
+            start: coverage?.startTime,
+            end: coverage?.endTime,
+            backgroundColor: OPEN_COVERAGE_META.eventBg,
+            borderColor: OPEN_COVERAGE_META.eventBorder,
+            textColor: OPEN_COVERAGE_META.textColor,
+            extendedProps: {
+              type: "open-coverage",
+              coverage,
+              coverageId,
+              coverageSignature: buildCoverageSignature(coverage),
+              role: coverage?.role,
+              requiredCount,
+              openCount,
+            },
+          };
+        })
+        .filter((event) => Number(event.extendedProps?.openCount) > 0)
+        .filter((event, index, events) => {
+          const coverageId = String(event.extendedProps?.coverageId || "");
+          const signature = String(
+            event.extendedProps?.coverageSignature || "",
+          );
+
+          return (
+            events.findIndex((candidate) => {
+              const candidateId = String(
+                candidate.extendedProps?.coverageId || "",
+              );
+              const candidateSignature = String(
+                candidate.extendedProps?.coverageSignature || "",
+              );
+
+              if (coverageId && candidateId) {
+                return coverageId === candidateId;
+              }
+
+              return signature && candidateSignature
+                ? signature === candidateSignature
+                : false;
+            }) === index
+          );
+        }),
+    [coverages, draftCoverageIdSet, draftCoverageSignatureSet, liveSchedules],
+  );
+
+  const draftCalendarEvents = useMemo(
+    () => [
+      ...liveScheduleEvents,
+      ...openCoverageEvents,
+      ...draftAssignmentEvents,
+    ],
+    [draftAssignmentEvents, liveScheduleEvents, openCoverageEvents],
+  );
+
+  const activitySummaryByDay = useMemo(() => {
+    const activity = new Map();
+
+    const ensureDay = (dayKey) => {
+      if (!dayKey) return null;
+      if (!activity.has(dayKey)) {
+        activity.set(dayKey, {
+          liveCount: 0,
+          proposedCount: 0,
+          unfilledDraftCount: 0,
+          removedCount: 0,
+          openCoverageCount: 0,
+          openCoverageSlots: 0,
+        });
+      }
+
+      return activity.get(dayKey);
+    };
+
+    liveScheduleEvents.forEach((event) => {
+      const dayKey = getLocalDayKey(event.start);
+      const row = ensureDay(dayKey);
+      if (!row) return;
+      row.liveCount += 1;
+    });
+
+    draftAssignmentEvents.forEach((event) => {
+      const dayKey = getLocalDayKey(event.start);
+      const row = ensureDay(dayKey);
+      if (!row) return;
+
+      const state = String(event.extendedProps?.state || "").toLowerCase();
+      if (state === "proposed") {
+        row.proposedCount += 1;
+      } else if (state === "unfilled") {
+        row.unfilledDraftCount += 1;
+      } else if (state === "removed") {
+        row.removedCount += 1;
+      }
+    });
+
+    openCoverageEvents.forEach((event) => {
+      const dayKey = getLocalDayKey(event.start);
+      const row = ensureDay(dayKey);
+      if (!row) return;
+
+      row.openCoverageCount += 1;
+      row.openCoverageSlots += Number(event.extendedProps?.openCount) || 0;
+    });
+
+    return activity;
+  }, [liveScheduleEvents, draftAssignmentEvents, openCoverageEvents]);
 
   const loadCoverages = async () => {
     try {
@@ -1183,6 +1510,17 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
     const { event } = eventClickInfo;
     const eventType = event?.extendedProps?.type;
 
+    if (eventType === "live-schedule") {
+      const roleName = getRoleDisplayName(event.extendedProps?.role);
+      const statusLabel = event.extendedProps?.statusLabel || "Live schedule";
+      const unitName = getUnitAreaDisplayName(event.extendedProps?.unitArea);
+      toast.info(
+        `${statusLabel}: ${event.extendedProps?.staffName || "Assigned staff"} · ${roleName} · ${unitName}`,
+        toastOptions,
+      );
+      return;
+    }
+
     if (eventType === "coverage") {
       const roleName = getRoleDisplayName(event.extendedProps?.role);
       const remaining = Number(event.extendedProps?.remaining) || 0;
@@ -1197,6 +1535,22 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
             : "Needs coverage";
       toast.info(
         `${statusLabel}: Req ${requiredCount}, Proposed ${proposedCount}, Open ${Math.max(remaining, 0)} for ${roleName}.`,
+        toastOptions,
+      );
+      return;
+    }
+
+    if (eventType === "open-coverage") {
+      const coverage = event.extendedProps?.coverage || null;
+      if (!coverage) return;
+
+      if (onOpenManualSchedule) {
+        onOpenManualSchedule(coverage);
+        return;
+      }
+
+      toast.info(
+        "Open coverage has no draft assignment yet. Use Manual Scheduler to fill it.",
         toastOptions,
       );
       return;
@@ -1272,6 +1626,18 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
           <Chip
             size="small"
             variant="outlined"
+            color="info"
+            label={`${liveScheduleEvents.length} live schedules`}
+          />
+          <Chip
+            size="small"
+            variant="outlined"
+            color="warning"
+            label={`${openCoverageEvents.length} open coverages`}
+          />
+          <Chip
+            size="small"
+            variant="outlined"
             color="success"
             label={`${publishableAssignments.length} publishable assignments`}
           />
@@ -1285,241 +1651,291 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
           </Button>
         </Stack>
 
-        {activeDraftId && (
-          <Paper
-            variant="outlined"
-            sx={{
-              p: 1.5,
-              borderRadius: 2.5,
-              borderColor: "#93c5fd",
-              backgroundColor: "#ffffff",
-            }}
-          >
-            {loadingDraftDetail ? (
-              <CircularProgress size={20} />
-            ) : (
-              <Stack spacing={1.25}>
-                <Stack
-                  direction={{ xs: "column", md: "row" }}
-                  spacing={1}
-                  justifyContent="space-between"
-                >
-                  <Typography variant="subtitle2">
-                    Draft Workspace ({publishableAssignments.length}{" "}
-                    publishable)
-                  </Typography>
-                  <Stack direction="row" spacing={1}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      color="error"
-                      onClick={handleDeleteSelected}
-                      disabled={
-                        Boolean(actionLoading) || selectedPublishableCount <= 0
-                      }
-                    >
-                      {actionLoading === "delete:selected"
-                        ? "Deleting..."
-                        : `Delete Selected (${selectedPublishableCount})`}
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={handlePublishSelected}
-                      disabled={
-                        Boolean(actionLoading) || selectedPublishableCount <= 0
-                      }
-                    >
-                      {actionLoading === "publish:selected"
-                        ? "Publishing..."
-                        : `Publish Selected to Schedule (${selectedPublishableCount})`}
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      onClick={handlePublishAll}
-                      disabled={
-                        Boolean(actionLoading) ||
-                        publishableAssignments.length <= 0
-                      }
-                    >
-                      {actionLoading === "publish:all"
-                        ? "Publishing..."
-                        : "Publish All to Schedule"}
-                    </Button>
-                  </Stack>
-                </Stack>
-
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={allPublishableSelected}
-                      indeterminate={somePublishableSelected}
-                      onChange={(e) =>
-                        handleToggleAllPublishableSelection(e.target.checked)
-                      }
-                      disabled={publishableAssignments.length <= 0}
-                    />
-                  }
-                  label={`Select all publishable (${selectedPublishableCount}/${publishableAssignments.length})`}
-                />
-
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  spacing={1}
-                  justifyContent="space-between"
-                  alignItems={{ xs: "flex-start", sm: "center" }}
-                >
-                  <ToggleButtonGroup
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 1.5,
+            borderRadius: 2.5,
+            borderColor: "#93c5fd",
+            backgroundColor: "#ffffff",
+          }}
+        >
+          {loadingDraftDetail ? (
+            <CircularProgress size={20} />
+          ) : (
+            <Stack spacing={1.25}>
+              <Stack
+                direction={{ xs: "column", md: "row" }}
+                spacing={1}
+                justifyContent="space-between"
+              >
+                <Typography variant="subtitle2">
+                  Draft Workspace ({publishableAssignments.length} publishable)
+                </Typography>
+                <Stack direction="row" spacing={1}>
+                  <Button
                     size="small"
-                    color="primary"
-                    value={draftViewMode}
-                    exclusive
-                    onChange={(_, nextMode) => {
-                      if (nextMode) setDraftViewMode(nextMode);
-                    }}
+                    variant="outlined"
+                    color="error"
+                    onClick={handleDeleteSelected}
+                    disabled={
+                      Boolean(actionLoading) || selectedPublishableCount <= 0
+                    }
                   >
-                    <ToggleButton value="calendar">Calendar</ToggleButton>
-                    <ToggleButton value="list">List</ToggleButton>
-                  </ToggleButtonGroup>
-
-                  <Stack
-                    direction="row"
-                    spacing={0.75}
-                    flexWrap="wrap"
-                    useFlexGap
+                    {actionLoading === "delete:selected"
+                      ? "Deleting..."
+                      : `Delete Selected (${selectedPublishableCount})`}
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={handlePublishSelected}
+                    disabled={
+                      Boolean(actionLoading) || selectedPublishableCount <= 0
+                    }
                   >
-                    <Chip
-                      size="small"
-                      label="Proposed"
-                      sx={{
-                        bgcolor: "#dbeafe",
-                        color: "#1e3a8a",
-                        fontWeight: 700,
-                      }}
-                    />
-                    <Chip
-                      size="small"
-                      label="Removed"
-                      sx={{
-                        bgcolor: "#f3f4f6",
-                        color: "#374151",
-                        fontWeight: 700,
-                      }}
-                    />
-                    <Chip
-                      size="small"
-                      label="Needs coverage"
-                      sx={{
-                        bgcolor: "#ffedd5",
-                        color: "#9a3412",
-                        fontWeight: 700,
-                      }}
-                    />
-                    <Chip
-                      size="small"
-                      label="Partially filled"
-                      sx={{
-                        bgcolor: "#fef3c7",
-                        color: "#92400e",
-                        fontWeight: 700,
-                      }}
-                    />
-                    <Chip
-                      size="small"
-                      label="Fully filled"
-                      sx={{
-                        bgcolor: "#dcfce7",
-                        color: "#166534",
-                        fontWeight: 700,
-                      }}
-                    />
-                  </Stack>
+                    {actionLoading === "publish:selected"
+                      ? "Publishing..."
+                      : `Publish Selected to Schedule (${selectedPublishableCount})`}
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={handlePublishAll}
+                    disabled={
+                      Boolean(actionLoading) ||
+                      publishableAssignments.length <= 0
+                    }
+                  >
+                    {actionLoading === "publish:all"
+                      ? "Publishing..."
+                      : "Publish All to Schedule"}
+                  </Button>
                 </Stack>
+              </Stack>
 
-                {draftViewMode === "calendar" && (
-                  <Box
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={allPublishableSelected}
+                    indeterminate={somePublishableSelected}
+                    onChange={(e) =>
+                      handleToggleAllPublishableSelection(e.target.checked)
+                    }
+                    disabled={publishableAssignments.length <= 0}
+                  />
+                }
+                label={`Select all publishable (${selectedPublishableCount}/${publishableAssignments.length})`}
+              />
+
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1}
+                justifyContent="space-between"
+                alignItems={{ xs: "flex-start", sm: "center" }}
+              >
+                <ToggleButtonGroup
+                  size="small"
+                  color="primary"
+                  value={draftViewMode}
+                  exclusive
+                  onChange={(_, nextMode) => {
+                    if (nextMode) setDraftViewMode(nextMode);
+                  }}
+                >
+                  <ToggleButton value="calendar">Calendar</ToggleButton>
+                  <ToggleButton value="list">List</ToggleButton>
+                </ToggleButtonGroup>
+
+                <Stack
+                  direction="row"
+                  spacing={0.75}
+                  flexWrap="wrap"
+                  useFlexGap
+                >
+                  <Chip
+                    size="small"
+                    label="Live schedule"
                     sx={{
-                      background:
-                        "linear-gradient(135deg, rgba(248,250,252,0.96) 0%, rgba(239,246,255,0.92) 100%)",
-                      borderRadius: 2.5,
-                      border: "1px solid #dbeafe",
-                      p: { xs: 1, md: 1.5 },
+                      bgcolor: "#e2e8f0",
+                      color: "#0f172a",
+                      fontWeight: 700,
                     }}
-                  >
-                    <GlobalStyles
-                      styles={{
-                        ".fc": {
-                          "--fc-border-color": "#dbeafe",
-                          "--fc-page-bg-color": "transparent",
-                        },
-                        ".fc .fc-toolbar": {
-                          marginBottom: "0.85rem",
-                        },
-                        ".fc .fc-toolbar-title": {
-                          color: "#0f172a",
-                          fontWeight: 800,
-                          fontSize: "1rem",
-                        },
-                        ".fc .fc-button": {
-                          background: "#ffffff",
-                          border: "1px solid #bfdbfe",
-                          color: "#1e3a8a",
-                          boxShadow: "none",
-                          borderRadius: "8px",
-                          fontWeight: 600,
-                          textTransform: "capitalize",
-                        },
-                        ".fc .fc-button:hover": {
-                          background: "#eff6ff",
-                          borderColor: "#93c5fd",
-                        },
-                        ".fc .fc-button-primary:not(:disabled).fc-button-active, .fc .fc-button-primary:not(:disabled):active":
-                          {
-                            background: "#1d4ed8",
-                            borderColor: "#1d4ed8",
-                            color: "#ffffff",
-                          },
-                        ".fc .fc-scrollgrid": {
-                          border: "1px solid #bfdbfe",
-                          borderRadius: "12px",
-                          overflow: "hidden",
-                          background: "#fff",
-                        },
-                        ".fc .fc-daygrid-day-frame": {
-                          minHeight: "96px",
-                        },
-                        ".fc .fc-daygrid-day.fc-day-today": {
-                          backgroundColor: "#eff6ff",
-                        },
-                        ".fc .fc-col-header-cell": {
-                          backgroundColor: "#eff6ff",
-                        },
-                        ".fc .fc-daygrid-event": {
-                          borderRadius: "8px",
-                          borderWidth: "1px",
-                          boxShadow: "0 3px 8px rgba(15, 23, 42, 0.15)",
-                          marginTop: "3px",
-                        },
-                        ".fc .fc-daygrid-event:hover, .fc .fc-timegrid-event:hover":
-                          {
-                            filter: "brightness(0.98)",
-                            transform: "translateY(-1px)",
-                            boxShadow: "0 6px 14px rgba(15, 23, 42, 0.2)",
-                          },
-                      }}
-                    />
+                  />
+                  <Chip
+                    size="small"
+                    label="Open coverage"
+                    sx={{
+                      bgcolor: "#ffedd5",
+                      color: "#9a3412",
+                      fontWeight: 700,
+                    }}
+                  />
+                  <Chip
+                    size="small"
+                    label="Proposed"
+                    sx={{
+                      bgcolor: "#dbeafe",
+                      color: "#1e3a8a",
+                      fontWeight: 700,
+                    }}
+                  />
+                  <Chip
+                    size="small"
+                    label="Unfilled"
+                    sx={{
+                      bgcolor: "#ffedd5",
+                      color: "#9a3412",
+                      fontWeight: 700,
+                    }}
+                  />
+                  <Chip
+                    size="small"
+                    label="Removed"
+                    sx={{
+                      bgcolor: "#f3f4f6",
+                      color: "#374151",
+                      fontWeight: 700,
+                    }}
+                  />
+                  <Chip
+                    size="small"
+                    label="Needs coverage"
+                    sx={{
+                      bgcolor: "#ffedd5",
+                      color: "#9a3412",
+                      fontWeight: 700,
+                    }}
+                  />
+                  <Chip
+                    size="small"
+                    label="Partially filled"
+                    sx={{
+                      bgcolor: "#fef3c7",
+                      color: "#92400e",
+                      fontWeight: 700,
+                    }}
+                  />
+                  <Chip
+                    size="small"
+                    label="Fully filled"
+                    sx={{
+                      bgcolor: "#dcfce7",
+                      color: "#166534",
+                      fontWeight: 700,
+                    }}
+                  />
+                </Stack>
+              </Stack>
 
-                    {selectedDraftIds.length === 0 ? (
-                      <Typography variant="body2" color="text.secondary">
-                        Check one or more drafts to show them on the calendar.
-                      </Typography>
-                    ) : loadingSelectedDrafts ? (
-                      <Typography variant="body2" color="text.secondary">
-                        Loading selected draft calendars...
-                      </Typography>
-                    ) : (
+              {draftViewMode === "calendar" && (
+                <Box
+                  sx={{
+                    background:
+                      "linear-gradient(135deg, rgba(248,250,252,0.96) 0%, rgba(239,246,255,0.92) 100%)",
+                    borderRadius: 2.5,
+                    border: "1px solid #dbeafe",
+                    p: { xs: 1, md: 1.5 },
+                  }}
+                >
+                  <GlobalStyles
+                    styles={{
+                      ".fc": {
+                        "--fc-border-color": "#dbeafe",
+                        "--fc-page-bg-color": "transparent",
+                      },
+                      ".fc .fc-toolbar": {
+                        marginBottom: "0.85rem",
+                      },
+                      ".fc .fc-toolbar-title": {
+                        color: "#0f172a",
+                        fontWeight: 800,
+                        fontSize: "1rem",
+                      },
+                      ".fc .fc-button": {
+                        background: "#ffffff",
+                        border: "1px solid #bfdbfe",
+                        color: "#1e3a8a",
+                        boxShadow: "none",
+                        borderRadius: "8px",
+                        fontWeight: 600,
+                        textTransform: "capitalize",
+                      },
+                      ".fc .fc-button:hover": {
+                        background: "#eff6ff",
+                        borderColor: "#93c5fd",
+                      },
+                      ".fc .fc-button-primary:not(:disabled).fc-button-active, .fc .fc-button-primary:not(:disabled):active":
+                        {
+                          background: "#1d4ed8",
+                          borderColor: "#1d4ed8",
+                          color: "#ffffff",
+                        },
+                      ".fc .fc-scrollgrid": {
+                        border: "1px solid #bfdbfe",
+                        borderRadius: "12px",
+                        overflow: "hidden",
+                        background: "#fff",
+                      },
+                      ".fc .fc-popover, .fc .fc-more-popover": {
+                        backgroundColor: "#ffffff",
+                        border: "1px solid #bfdbfe",
+                        borderRadius: "12px",
+                        boxShadow: "0 14px 30px rgba(15, 23, 42, 0.22)",
+                        overflow: "hidden",
+                      },
+                      ".fc .fc-popover-header": {
+                        backgroundColor: "#eff6ff",
+                        borderBottom: "1px solid #dbeafe",
+                      },
+                      ".fc .fc-popover-body": {
+                        backgroundColor: "#ffffff",
+                      },
+                      ".fc .fc-popover .fc-daygrid-event-harness": {
+                        marginBottom: "4px",
+                      },
+                      ".fc .fc-daygrid-day-frame": {
+                        minHeight: "96px",
+                      },
+                      ".fc .fc-daygrid-day.fc-day-today": {
+                        backgroundColor: "#eff6ff",
+                      },
+                      ".fc .fc-col-header-cell": {
+                        backgroundColor: "#eff6ff",
+                      },
+                      ".fc .fc-daygrid-event": {
+                        borderRadius: "8px",
+                        borderWidth: "1px",
+                        boxShadow: "0 3px 8px rgba(15, 23, 42, 0.15)",
+                        marginTop: "3px",
+                      },
+                      ".fc .fc-daygrid-event:hover, .fc .fc-timegrid-event:hover":
+                        {
+                          filter: "brightness(0.98)",
+                          transform: "translateY(-1px)",
+                          boxShadow: "0 6px 14px rgba(15, 23, 42, 0.2)",
+                        },
+                    }}
+                  />
+
+                  {loadingSelectedDrafts ? (
+                    <Typography variant="body2" color="text.secondary">
+                      Loading selected draft calendars...
+                    </Typography>
+                  ) : (
+                    <>
+                      {selectedDraftIds.length === 0 ? (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mb: 1 }}
+                        >
+                          No draft selected. Showing live schedules and open
+                          coverage.
+                        </Typography>
+                      ) : null}
+
                       <FullCalendar
                         plugins={[
                           dayGridPlugin,
@@ -1530,7 +1946,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                         headerToolbar={{
                           left: "prev,next today",
                           center: "title",
-                          right: "dayGridMonth,timeGridWeek",
+                          right: "",
                         }}
                         fixedWeekCount={false}
                         showNonCurrentDates
@@ -1541,6 +1957,29 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                           const summary = coverageSummaryByDay.get(dayKey);
                           const dayCoverages =
                             coverageDetailsByDay.get(dayKey) || [];
+                          const dayActivity = activitySummaryByDay.get(dayKey);
+                          const hasAnyDayData =
+                            Boolean(summary) ||
+                            (Boolean(dayActivity) &&
+                              (dayActivity.liveCount > 0 ||
+                                dayActivity.proposedCount > 0 ||
+                                dayActivity.unfilledDraftCount > 0 ||
+                                dayActivity.removedCount > 0 ||
+                                dayActivity.openCoverageCount > 0));
+                          const dayStatusMessage = dayActivity
+                            ? dayActivity.openCoverageCount > 0
+                              ? `${dayActivity.openCoverageCount} open coverage item(s) require manual scheduling (${dayActivity.openCoverageSlots} open slot(s)).`
+                              : dayActivity.unfilledDraftCount > 0
+                                ? `${dayActivity.unfilledDraftCount} AI draft slot(s) are still unfilled.`
+                                : dayActivity.proposedCount > 0 &&
+                                    dayActivity.liveCount > 0
+                                  ? "Mixed day: live schedules plus AI proposals pending review."
+                                  : dayActivity.proposedCount > 0
+                                    ? "AI draft proposals are ready for review/publish."
+                                    : dayActivity.liveCount > 0
+                                      ? "All live: all visible shifts in this cell are already published."
+                                      : "Day has scheduling activity."
+                            : "Day has scheduling activity.";
                           const statusRows = summary
                             ? [
                                 {
@@ -1585,7 +2024,7 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                                 minHeight: 21,
                               }}
                             >
-                              {summary ? (
+                              {hasAnyDayData ? (
                                 <Tooltip
                                   arrow
                                   placement="top"
@@ -1611,198 +2050,253 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                                           fontWeight: 700,
                                         }}
                                       >
-                                        Coverage summary
+                                        Coverage & schedule summary
                                       </Typography>
-                                      <Typography sx={{ fontSize: "0.68rem" }}>
-                                        Total coverages: {summary.coverageCount}
-                                      </Typography>
-                                      <Typography sx={{ fontSize: "0.68rem" }}>
-                                        Required: {summary.requiredCount}
-                                      </Typography>
-                                      <Typography sx={{ fontSize: "0.68rem" }}>
-                                        Proposed: {summary.proposedCount}
-                                      </Typography>
-                                      <Typography sx={{ fontSize: "0.68rem" }}>
-                                        Open: {summary.openCount}
-                                      </Typography>
-                                      <Box
+                                      <Typography
                                         sx={{
-                                          mt: 0.55,
-                                          display: "grid",
-                                          gap: 0.3,
+                                          fontSize: "0.68rem",
+                                          fontWeight: 600,
                                         }}
                                       >
-                                        {statusRows
-                                          .filter((row) => row.count > 0)
-                                          .map((row) => {
-                                            const meta =
-                                              COVERAGE_STATUS_META[row.key] ||
-                                              OPEN_COVERAGE_META;
-
-                                            return (
-                                              <Box
-                                                key={row.key}
-                                                sx={{
-                                                  display: "flex",
-                                                  alignItems: "center",
-                                                  justifyContent:
-                                                    "space-between",
-                                                  gap: 0.75,
-                                                  px: 0.55,
-                                                  py: 0.25,
-                                                  borderRadius: 0.75,
-                                                  border: `1px solid ${meta.eventBorder}`,
-                                                  backgroundColor: meta.eventBg,
-                                                }}
-                                              >
-                                                <Typography
-                                                  sx={{
-                                                    fontSize: "0.66rem",
-                                                    fontWeight: 700,
-                                                    color: meta.textColor,
-                                                  }}
-                                                >
-                                                  {row.label}
-                                                </Typography>
-                                                <Typography
-                                                  sx={{
-                                                    fontSize: "0.66rem",
-                                                    fontWeight: 800,
-                                                    color: meta.subTextColor,
-                                                  }}
-                                                >
-                                                  {row.count}
-                                                </Typography>
-                                              </Box>
-                                            );
-                                          })}
-                                      </Box>
-                                      {dayCoverages.length > 0 ? (
-                                        <Box
-                                          sx={{
-                                            mt: 0.65,
-                                            display: "grid",
-                                            gap: 0.55,
-                                          }}
-                                        >
+                                        {dayStatusMessage}
+                                      </Typography>
+                                      {dayActivity ? (
+                                        <Box sx={{ mt: 0.4 }}>
                                           <Typography
+                                            sx={{ fontSize: "0.68rem" }}
+                                          >
+                                            Live schedules:{" "}
+                                            {dayActivity.liveCount}
+                                          </Typography>
+                                          <Typography
+                                            sx={{ fontSize: "0.68rem" }}
+                                          >
+                                            AI proposed:{" "}
+                                            {dayActivity.proposedCount}
+                                          </Typography>
+                                          <Typography
+                                            sx={{ fontSize: "0.68rem" }}
+                                          >
+                                            AI unfilled:{" "}
+                                            {dayActivity.unfilledDraftCount}
+                                          </Typography>
+                                          <Typography
+                                            sx={{ fontSize: "0.68rem" }}
+                                          >
+                                            Open coverage (manual):{" "}
+                                            {dayActivity.openCoverageCount}
+                                          </Typography>
+                                        </Box>
+                                      ) : null}
+                                      {summary ? (
+                                        <>
+                                          <Typography
+                                            sx={{ fontSize: "0.68rem" }}
+                                          >
+                                            Total coverages:{" "}
+                                            {summary.coverageCount}
+                                          </Typography>
+                                          <Typography
+                                            sx={{ fontSize: "0.68rem" }}
+                                          >
+                                            Required: {summary.requiredCount}
+                                          </Typography>
+                                          <Typography
+                                            sx={{ fontSize: "0.68rem" }}
+                                          >
+                                            Proposed: {summary.proposedCount}
+                                          </Typography>
+                                          <Typography
+                                            sx={{ fontSize: "0.68rem" }}
+                                          >
+                                            Open: {summary.openCount}
+                                          </Typography>
+                                          <Box
                                             sx={{
-                                              fontSize: "0.68rem",
-                                              fontWeight: 700,
+                                              mt: 0.55,
+                                              display: "grid",
+                                              gap: 0.3,
                                             }}
                                           >
-                                            Coverage details
-                                          </Typography>
-                                          {dayCoverages.map(
-                                            (coverage, index) => {
-                                              const statusMeta =
-                                                COVERAGE_STATUS_META[
-                                                  coverage.fillStatus
-                                                ] || OPEN_COVERAGE_META;
-                                              const certTags = Array.isArray(
-                                                coverage.requiredCertificationTags,
-                                              )
-                                                ? coverage.requiredCertificationTags
-                                                : [];
-                                              const certDisplay =
-                                                certTags.length
-                                                  ? certTags
-                                                      .map((tag) =>
-                                                        getCertificationTagDisplayName(
-                                                          tag,
-                                                        ),
-                                                      )
-                                                      .join(", ")
-                                                  : "None";
+                                            {statusRows
+                                              .filter((row) => row.count > 0)
+                                              .map((row) => {
+                                                const meta =
+                                                  COVERAGE_STATUS_META[
+                                                    row.key
+                                                  ] || OPEN_COVERAGE_META;
 
-                                              return (
-                                                <Box
-                                                  key={`${coverage.coverageKey || dayKey}-${index}`}
-                                                  sx={{
-                                                    px: 0.7,
-                                                    py: 0.55,
-                                                    borderRadius: 1,
-                                                    border: `1px solid ${statusMeta.eventBorder}`,
-                                                    backgroundColor:
-                                                      statusMeta.eventBg,
-                                                  }}
-                                                >
-                                                  <Typography
+                                                return (
+                                                  <Box
+                                                    key={row.key}
                                                     sx={{
-                                                      fontSize: "0.66rem",
-                                                      fontWeight: 800,
-                                                      color: "#0f172a",
+                                                      display: "flex",
+                                                      alignItems: "center",
+                                                      justifyContent:
+                                                        "space-between",
+                                                      gap: 0.75,
+                                                      px: 0.55,
+                                                      py: 0.25,
+                                                      borderRadius: 0.75,
+                                                      border: `1px solid ${meta.eventBorder}`,
+                                                      backgroundColor:
+                                                        meta.eventBg,
                                                     }}
                                                   >
-                                                    {statusMeta.label}
-                                                  </Typography>
-                                                  <Typography
-                                                    sx={{
-                                                      fontSize: "0.66rem",
-                                                      color: "#111827",
-                                                    }}
-                                                  >
-                                                    Time:{" "}
-                                                    {formatTimePart(
-                                                      coverage.startTime,
-                                                    )}{" "}
-                                                    -{" "}
-                                                    {formatTimePart(
-                                                      coverage.endTime,
-                                                    )}
-                                                  </Typography>
-                                                  <Typography
-                                                    sx={{
-                                                      fontSize: "0.66rem",
-                                                      color: "#111827",
-                                                    }}
-                                                  >
-                                                    Role:{" "}
-                                                    {getRoleDisplayName(
-                                                      coverage.role,
-                                                    )}
-                                                  </Typography>
-                                                  <Typography
-                                                    sx={{
-                                                      fontSize: "0.66rem",
-                                                      color: "#111827",
-                                                    }}
-                                                  >
-                                                    Unit:{" "}
-                                                    {getUnitAreaDisplayName(
-                                                      coverage.unitArea,
-                                                    )}
-                                                  </Typography>
-                                                  <Typography
-                                                    sx={{
-                                                      fontSize: "0.66rem",
-                                                      color: "#111827",
-                                                    }}
-                                                  >
-                                                    Certification: {certDisplay}
-                                                  </Typography>
-                                                  <Typography
-                                                    sx={{
-                                                      fontSize: "0.66rem",
-                                                      fontWeight: 700,
-                                                      color: "#1f2937",
-                                                    }}
-                                                  >
-                                                    Need{" "}
-                                                    {coverage.requiredCount} |
-                                                    Fit{" "}
-                                                    {
-                                                      coverage.matchingStaffCount
-                                                    }{" "}
-                                                    | Proposed{" "}
-                                                    {coverage.proposedCount} |
-                                                    Open {coverage.openCount}
-                                                  </Typography>
-                                                </Box>
-                                              );
-                                            },
-                                          )}
-                                        </Box>
+                                                    <Typography
+                                                      sx={{
+                                                        fontSize: "0.66rem",
+                                                        fontWeight: 700,
+                                                        color: meta.textColor,
+                                                      }}
+                                                    >
+                                                      {row.label}
+                                                    </Typography>
+                                                    <Typography
+                                                      sx={{
+                                                        fontSize: "0.66rem",
+                                                        fontWeight: 800,
+                                                        color:
+                                                          meta.subTextColor,
+                                                      }}
+                                                    >
+                                                      {row.count}
+                                                    </Typography>
+                                                  </Box>
+                                                );
+                                              })}
+                                          </Box>
+                                          {dayCoverages.length > 0 ? (
+                                            <Box
+                                              sx={{
+                                                mt: 0.65,
+                                                display: "grid",
+                                                gap: 0.55,
+                                              }}
+                                            >
+                                              <Typography
+                                                sx={{
+                                                  fontSize: "0.68rem",
+                                                  fontWeight: 700,
+                                                }}
+                                              >
+                                                Coverage details
+                                              </Typography>
+                                              {dayCoverages.map(
+                                                (coverage, index) => {
+                                                  const statusMeta =
+                                                    COVERAGE_STATUS_META[
+                                                      coverage.fillStatus
+                                                    ] || OPEN_COVERAGE_META;
+                                                  const certTags =
+                                                    Array.isArray(
+                                                      coverage.requiredCertificationTags,
+                                                    )
+                                                      ? coverage.requiredCertificationTags
+                                                      : [];
+                                                  const certDisplay =
+                                                    certTags.length
+                                                      ? certTags
+                                                          .map((tag) =>
+                                                            getCertificationTagDisplayName(
+                                                              tag,
+                                                            ),
+                                                          )
+                                                          .join(", ")
+                                                      : "None";
+
+                                                  return (
+                                                    <Box
+                                                      key={`${coverage.coverageKey || dayKey}-${index}`}
+                                                      sx={{
+                                                        px: 0.7,
+                                                        py: 0.55,
+                                                        borderRadius: 1,
+                                                        border: `1px solid ${statusMeta.eventBorder}`,
+                                                        backgroundColor:
+                                                          statusMeta.eventBg,
+                                                      }}
+                                                    >
+                                                      <Typography
+                                                        sx={{
+                                                          fontSize: "0.66rem",
+                                                          fontWeight: 800,
+                                                          color: "#0f172a",
+                                                        }}
+                                                      >
+                                                        {statusMeta.label}
+                                                      </Typography>
+                                                      <Typography
+                                                        sx={{
+                                                          fontSize: "0.66rem",
+                                                          color: "#111827",
+                                                        }}
+                                                      >
+                                                        Time:{" "}
+                                                        {formatTimePart(
+                                                          coverage.startTime,
+                                                        )}{" "}
+                                                        -{" "}
+                                                        {formatTimePart(
+                                                          coverage.endTime,
+                                                        )}
+                                                      </Typography>
+                                                      <Typography
+                                                        sx={{
+                                                          fontSize: "0.66rem",
+                                                          color: "#111827",
+                                                        }}
+                                                      >
+                                                        Role:{" "}
+                                                        {getRoleDisplayName(
+                                                          coverage.role,
+                                                        )}
+                                                      </Typography>
+                                                      <Typography
+                                                        sx={{
+                                                          fontSize: "0.66rem",
+                                                          color: "#111827",
+                                                        }}
+                                                      >
+                                                        Unit:{" "}
+                                                        {getUnitAreaDisplayName(
+                                                          coverage.unitArea,
+                                                        )}
+                                                      </Typography>
+                                                      <Typography
+                                                        sx={{
+                                                          fontSize: "0.66rem",
+                                                          color: "#111827",
+                                                        }}
+                                                      >
+                                                        Certification:{" "}
+                                                        {certDisplay}
+                                                      </Typography>
+                                                      <Typography
+                                                        sx={{
+                                                          fontSize: "0.66rem",
+                                                          fontWeight: 700,
+                                                          color: "#1f2937",
+                                                        }}
+                                                      >
+                                                        Need{" "}
+                                                        {coverage.requiredCount}{" "}
+                                                        | Fit{" "}
+                                                        {
+                                                          coverage.matchingStaffCount
+                                                        }{" "}
+                                                        | Proposed{" "}
+                                                        {coverage.proposedCount}{" "}
+                                                        | Open{" "}
+                                                        {coverage.openCount}
+                                                      </Typography>
+                                                    </Box>
+                                                  );
+                                                },
+                                              )}
+                                            </Box>
+                                          ) : null}
+                                        </>
                                       ) : null}
                                     </Box>
                                   }
@@ -1858,6 +2352,133 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                         events={draftCalendarEvents}
                         eventClick={handleDraftCalendarEventClick}
                         eventContent={(arg) => {
+                          if (
+                            arg.event.extendedProps?.type === "open-coverage"
+                          ) {
+                            const openCount =
+                              Number(arg.event.extendedProps?.openCount) || 0;
+
+                            return (
+                              <Box
+                                sx={{
+                                  px: 0.7,
+                                  py: 0.45,
+                                  width: "100%",
+                                  minHeight: 34,
+                                  borderRadius: 1,
+                                  backgroundColor: OPEN_COVERAGE_META.eventBg,
+                                  border: `1px solid ${OPEN_COVERAGE_META.eventBorder}`,
+                                  boxShadow:
+                                    "inset 0 1px 0 rgba(255,255,255,0.12)",
+                                }}
+                              >
+                                <Typography
+                                  sx={{
+                                    fontSize: "0.64rem",
+                                    fontWeight: 700,
+                                    lineHeight: 1.1,
+                                    color: OPEN_COVERAGE_META.textColor,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  Open coverage
+                                </Typography>
+                                <Typography
+                                  sx={{
+                                    fontSize: "0.6rem",
+                                    fontWeight: 600,
+                                    lineHeight: 1.1,
+                                    color: OPEN_COVERAGE_META.subTextColor,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {getRoleDisplayName(
+                                    arg.event.extendedProps?.role,
+                                  )}
+                                </Typography>
+                                <Typography
+                                  sx={{
+                                    fontSize: "0.58rem",
+                                    fontWeight: 700,
+                                    lineHeight: 1.1,
+                                    color: OPEN_COVERAGE_META.subTextColor,
+                                  }}
+                                >
+                                  {openCount} open slot
+                                  {openCount === 1 ? "" : "s"}
+                                </Typography>
+                              </Box>
+                            );
+                          }
+
+                          if (
+                            arg.event.extendedProps?.type === "live-schedule"
+                          ) {
+                            const liveMeta = getLiveScheduleMeta(
+                              arg.event.extendedProps?.status,
+                            );
+
+                            return (
+                              <Box
+                                sx={{
+                                  px: 0.7,
+                                  py: 0.45,
+                                  width: "100%",
+                                  minHeight: 34,
+                                  borderRadius: 1,
+                                  backgroundColor: liveMeta.eventBg,
+                                  border: `1px solid ${liveMeta.eventBorder}`,
+                                  boxShadow:
+                                    "inset 0 1px 0 rgba(255,255,255,0.12)",
+                                }}
+                              >
+                                <Typography
+                                  sx={{
+                                    fontSize: "0.64rem",
+                                    fontWeight: 700,
+                                    lineHeight: 1.1,
+                                    color: liveMeta.textColor,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {arg.event.extendedProps?.staffName ||
+                                    "Assigned staff"}
+                                </Typography>
+                                <Typography
+                                  sx={{
+                                    fontSize: "0.6rem",
+                                    fontWeight: 600,
+                                    lineHeight: 1.1,
+                                    color: liveMeta.subTextColor,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {getRoleDisplayName(
+                                    arg.event.extendedProps?.role,
+                                  )}
+                                </Typography>
+                                <Typography
+                                  sx={{
+                                    fontSize: "0.58rem",
+                                    fontWeight: 700,
+                                    lineHeight: 1.1,
+                                    color: liveMeta.accentTextColor,
+                                  }}
+                                >
+                                  {liveMeta.label}
+                                </Typography>
+                              </Box>
+                            );
+                          }
+
                           const stateMeta = getDraftStateMeta(
                             arg.event.extendedProps?.state,
                           );
@@ -1919,397 +2540,413 @@ export default function AutoGenerateScheduleForm({ onSuccess, onClose }) {
                           );
                         }}
                       />
-                    )}
+                    </>
+                  )}
 
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: "block", mt: 1 }}
-                    >
-                      Calendar combines all active drafts and highlights where
-                      coverage is fully filled, partially filled, or still open
-                      based on proposed, locked, and published assignments.
-                    </Typography>
-                  </Box>
-                )}
-
-                {draftViewMode === "list" &&
-                workspaceAssignments.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">
-                    This draft has no assignments.
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "block", mt: 1 }}
+                  >
+                    Calendar overlays live schedules and draft assignments so
+                    schedulers can compare current published staffing against
+                    draft changes in one place.
                   </Typography>
-                ) : null}
+                </Box>
+              )}
 
-                {draftViewMode === "list" && workspaceAssignments.length > 0 ? (
-                  <Stack spacing={1}>
-                    {assignmentsByDay.map((group) => (
-                      <Box key={group.dayLabel}>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            display: "block",
-                            mb: 0.75,
-                            mt: 0.25,
-                            fontWeight: 700,
-                            color: "text.secondary",
-                          }}
-                        >
-                          {group.dayLabel}
-                        </Typography>
+              {draftViewMode === "list" && workspaceAssignments.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  This draft has no assignments.
+                </Typography>
+              ) : null}
 
-                        <Stack spacing={1}>
-                          {group.assignments.map((assignment) => {
-                            const assignmentId = getAssignmentId(assignment);
-                            const assignmentDraftId = String(
-                              assignment.__workspaceDraftId ||
-                                activeDraftId ||
-                                "",
-                            );
-                            const scopedAssignmentId = getScopedAssignmentId(
-                              assignmentDraftId,
-                              assignmentId,
-                            );
-                            const chips = getWarningChips(
-                              assignment,
-                              overtimeThresholdHours,
-                            );
-                            const isEditable = DRAFT_EDITABLE_STATES.has(
-                              assignment?.state,
-                            );
-                            const isEditing =
-                              editingAssignmentId === assignmentId &&
-                              editingAssignmentDraftId === assignmentDraftId;
-                            const staffId = String(
-                              assignment?.staffId?._id ||
-                                assignment?.staffId ||
-                                "",
-                            );
-                            const staffName =
-                              assignment?.staffId?.name ||
-                              staffById.get(staffId)?.name ||
-                              "Unknown";
-                            const assignmentStateMeta = getDraftStateMeta(
-                              assignment?.state,
-                            );
+              {draftViewMode === "list" && workspaceAssignments.length > 0 ? (
+                <Stack spacing={1}>
+                  {assignmentsByDay.map((group) => (
+                    <Box key={group.dayLabel}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          display: "block",
+                          mb: 0.75,
+                          mt: 0.25,
+                          fontWeight: 700,
+                          color: "text.secondary",
+                        }}
+                      >
+                        {group.dayLabel}
+                      </Typography>
 
-                            return (
-                              <Paper
-                                key={assignmentId}
-                                variant="outlined"
-                                sx={{
-                                  p: 1,
-                                  borderRadius: 2,
-                                  borderColor: selectedAssignmentIds.includes(
-                                    scopedAssignmentId,
-                                  )
-                                    ? "primary.main"
-                                    : "divider",
-                                  backgroundColor:
-                                    selectedAssignmentIds.includes(
-                                      scopedAssignmentId,
-                                    )
-                                      ? "#eff6ff"
-                                      : "#fff",
-                                }}
-                              >
-                                <Stack spacing={1}>
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      justifyContent: "space-between",
-                                      alignItems: "flex-start",
-                                      gap: 1,
-                                    }}
-                                  >
-                                    <Box>
-                                      <Stack
-                                        direction="row"
-                                        spacing={1}
-                                        alignItems="center"
-                                      >
-                                        <Checkbox
-                                          size="small"
-                                          checked={selectedAssignmentIds.includes(
-                                            scopedAssignmentId,
-                                          )}
-                                          disabled={
-                                            !isPublishableState(
-                                              assignment.state,
-                                            )
-                                          }
-                                          onChange={() =>
-                                            toggleAssignmentSelection(
-                                              scopedAssignmentId,
-                                            )
-                                          }
-                                        />
-                                        <Typography
-                                          sx={{ fontWeight: 700, fontSize: 13 }}
-                                        >
-                                          {staffName} ·{" "}
-                                          {getRoleDisplayName(assignment.role)}
-                                        </Typography>
-                                        <Chip
-                                          size="small"
-                                          label={assignmentStateMeta.label}
-                                          sx={{
-                                            bgcolor:
-                                              assignmentStateMeta.eventBg,
-                                            color:
-                                              assignmentStateMeta.textColor,
-                                            border: `1px solid ${assignmentStateMeta.eventBorder}`,
-                                            fontWeight: 700,
-                                          }}
-                                        />
-                                      </Stack>
+                      <Stack spacing={1}>
+                        {group.assignments.map((assignment) => {
+                          const assignmentId = getAssignmentId(assignment);
+                          const assignmentDraftId = String(
+                            assignment.__workspaceDraftId ||
+                              activeDraftId ||
+                              "",
+                          );
+                          const scopedAssignmentId = getScopedAssignmentId(
+                            assignmentDraftId,
+                            assignmentId,
+                          );
+                          const chips = getWarningChips(
+                            assignment,
+                            overtimeThresholdHours,
+                          );
+                          const isEditable = DRAFT_EDITABLE_STATES.has(
+                            assignment?.state,
+                          );
+                          const isEditing =
+                            editingAssignmentId === assignmentId &&
+                            editingAssignmentDraftId === assignmentDraftId;
+                          const staffId = String(
+                            assignment?.staffId?._id ||
+                              assignment?.staffId ||
+                              "",
+                          );
+                          const isUnfilled =
+                            String(assignment?.state || "") === "unfilled";
+                          const staffName =
+                            assignment?.staffId?.name ||
+                            staffById.get(staffId)?.name ||
+                            (isUnfilled ? "Unfilled slot" : "Unknown");
+                          const assignmentStateMeta = getDraftStateMeta(
+                            assignment?.state,
+                          );
+                          const restoreTargetState = isUnfilled
+                            ? "unfilled"
+                            : "proposed";
 
-                                      <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                      >
-                                        {formatDateTimeWindow(
-                                          assignment.startTime,
-                                          assignment.endTime,
-                                        )}
-                                        {assignment.unitArea
-                                          ? ` · ${getUnitAreaDisplayName(assignment.unitArea)}`
-                                          : ""}
-                                        {assignment.shiftType
-                                          ? ` · ${getShiftTypeDisplayName(assignment.shiftType)}`
-                                          : ""}
-                                        {assignment.shiftTag
-                                          ? ` · ${getShiftTagDisplayName(assignment.shiftTag)}`
-                                          : ""}
-                                      </Typography>
-                                    </Box>
-
-                                    {isEditable && (
-                                      <Stack direction="row" spacing={0.75}>
-                                        {!isEditing && (
-                                          <Button
-                                            size="small"
-                                            variant="outlined"
-                                            onClick={() =>
-                                              beginEditAssignment(
-                                                assignment,
-                                                assignmentDraftId,
-                                              )
-                                            }
-                                          >
-                                            Edit
-                                          </Button>
-                                        )}
-                                        {assignment.state !== "removed" ? (
-                                          <Button
-                                            size="small"
-                                            variant="outlined"
-                                            color="error"
-                                            onClick={() =>
-                                              handleStateQuickUpdate(
-                                                assignment,
-                                                "removed",
-                                                assignmentDraftId,
-                                              )
-                                            }
-                                            disabled={Boolean(actionLoading)}
-                                          >
-                                            Remove
-                                          </Button>
-                                        ) : (
-                                          <Button
-                                            size="small"
-                                            variant="outlined"
-                                            onClick={() =>
-                                              handleStateQuickUpdate(
-                                                assignment,
-                                                "proposed",
-                                                assignmentDraftId,
-                                              )
-                                            }
-                                            disabled={Boolean(actionLoading)}
-                                          >
-                                            Restore
-                                          </Button>
-                                        )}
-                                      </Stack>
-                                    )}
-                                  </Box>
-
-                                  {chips.length > 0 && (
+                          return (
+                            <Paper
+                              key={assignmentId}
+                              variant="outlined"
+                              sx={{
+                                p: 1,
+                                borderRadius: 2,
+                                borderColor: selectedAssignmentIds.includes(
+                                  scopedAssignmentId,
+                                )
+                                  ? "primary.main"
+                                  : "divider",
+                                backgroundColor: selectedAssignmentIds.includes(
+                                  scopedAssignmentId,
+                                )
+                                  ? "#eff6ff"
+                                  : "#fff",
+                              }}
+                            >
+                              <Stack spacing={1}>
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "flex-start",
+                                    gap: 1,
+                                  }}
+                                >
+                                  <Box>
                                     <Stack
                                       direction="row"
-                                      spacing={0.5}
-                                      flexWrap="wrap"
-                                      useFlexGap
+                                      spacing={1}
+                                      alignItems="center"
                                     >
-                                      {chips.map((chip) => (
-                                        <Chip
-                                          key={`${assignmentId}-${chip.key}`}
+                                      <Checkbox
+                                        size="small"
+                                        checked={selectedAssignmentIds.includes(
+                                          scopedAssignmentId,
+                                        )}
+                                        disabled={
+                                          !isPublishableState(assignment.state)
+                                        }
+                                        onChange={() =>
+                                          toggleAssignmentSelection(
+                                            scopedAssignmentId,
+                                          )
+                                        }
+                                      />
+                                      <Typography
+                                        sx={{ fontWeight: 700, fontSize: 13 }}
+                                      >
+                                        {staffName} ·{" "}
+                                        {getRoleDisplayName(assignment.role)}
+                                      </Typography>
+                                      <Chip
+                                        size="small"
+                                        label={assignmentStateMeta.label}
+                                        sx={{
+                                          bgcolor: assignmentStateMeta.eventBg,
+                                          color: assignmentStateMeta.textColor,
+                                          border: `1px solid ${assignmentStateMeta.eventBorder}`,
+                                          fontWeight: 700,
+                                        }}
+                                      />
+                                    </Stack>
+
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
+                                      {formatDateTimeWindow(
+                                        assignment.startTime,
+                                        assignment.endTime,
+                                      )}
+                                      {assignment.unitArea
+                                        ? ` · ${getUnitAreaDisplayName(assignment.unitArea)}`
+                                        : ""}
+                                      {assignment.shiftType
+                                        ? ` · ${getShiftTypeDisplayName(assignment.shiftType)}`
+                                        : ""}
+                                      {assignment.shiftTag
+                                        ? ` · ${getShiftTagDisplayName(assignment.shiftTag)}`
+                                        : ""}
+                                    </Typography>
+                                  </Box>
+
+                                  {isEditable && (
+                                    <Stack direction="row" spacing={0.75}>
+                                      {!isEditing && (
+                                        <Button
                                           size="small"
-                                          label={chip.label}
-                                          color={chip.color}
                                           variant="outlined"
-                                        />
-                                      ))}
+                                          onClick={() =>
+                                            beginEditAssignment(
+                                              assignment,
+                                              assignmentDraftId,
+                                            )
+                                          }
+                                        >
+                                          Edit
+                                        </Button>
+                                      )}
+                                      {assignment.state !== "removed" ? (
+                                        <Button
+                                          size="small"
+                                          variant="outlined"
+                                          color="error"
+                                          onClick={() =>
+                                            handleStateQuickUpdate(
+                                              assignment,
+                                              "removed",
+                                              assignmentDraftId,
+                                            )
+                                          }
+                                          disabled={Boolean(actionLoading)}
+                                        >
+                                          Remove
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                          size="small"
+                                          variant="outlined"
+                                          onClick={() =>
+                                            handleStateQuickUpdate(
+                                              assignment,
+                                              restoreTargetState,
+                                              assignmentDraftId,
+                                            )
+                                          }
+                                          disabled={Boolean(actionLoading)}
+                                        >
+                                          Restore
+                                        </Button>
+                                      )}
                                     </Stack>
                                   )}
+                                </Box>
 
-                                  {isEditing && (
-                                    <Paper variant="outlined" sx={{ p: 1 }}>
-                                      <Stack spacing={1}>
-                                        <FormControl fullWidth size="small">
-                                          <InputLabel>Staff</InputLabel>
-                                          <Select
-                                            value={editForm.staffId}
-                                            label="Staff"
-                                            onChange={(e) =>
-                                              setEditForm((prev) => ({
+                                {chips.length > 0 && (
+                                  <Stack
+                                    direction="row"
+                                    spacing={0.5}
+                                    flexWrap="wrap"
+                                    useFlexGap
+                                  >
+                                    {chips.map((chip) => (
+                                      <Chip
+                                        key={`${assignmentId}-${chip.key}`}
+                                        size="small"
+                                        label={chip.label}
+                                        color={chip.color}
+                                        variant="outlined"
+                                      />
+                                    ))}
+                                  </Stack>
+                                )}
+
+                                {isEditing && (
+                                  <Paper variant="outlined" sx={{ p: 1 }}>
+                                    <Stack spacing={1}>
+                                      <FormControl fullWidth size="small">
+                                        <InputLabel>Staff</InputLabel>
+                                        <Select
+                                          value={editForm.staffId}
+                                          label="Staff"
+                                          onChange={(e) =>
+                                            setEditForm((prev) => {
+                                              const nextStaffId =
+                                                e.target.value;
+                                              const nextState =
+                                                nextStaffId &&
+                                                prev.state === "unfilled"
+                                                  ? "proposed"
+                                                  : prev.state;
+
+                                              return {
                                                 ...prev,
-                                                staffId: e.target.value,
-                                              }))
-                                            }
-                                          >
-                                            {staffList.map((member) => (
-                                              <MenuItem
-                                                key={member._id}
-                                                value={member._id}
-                                              >
-                                                {member.name ||
-                                                  member.email ||
-                                                  member._id}
-                                              </MenuItem>
-                                            ))}
-                                          </Select>
-                                        </FormControl>
-
-                                        <Stack
-                                          direction={{
-                                            xs: "column",
-                                            sm: "row",
-                                          }}
-                                          spacing={1}
+                                                staffId: nextStaffId,
+                                                state: nextState,
+                                              };
+                                            })
+                                          }
                                         >
-                                          <TextField
-                                            fullWidth
-                                            size="small"
-                                            label="Start"
-                                            type="datetime-local"
-                                            InputLabelProps={{ shrink: true }}
-                                            value={editForm.startTime}
-                                            onChange={(e) =>
-                                              setEditForm((prev) => ({
-                                                ...prev,
-                                                startTime: e.target.value,
-                                              }))
-                                            }
-                                          />
-                                          <TextField
-                                            fullWidth
-                                            size="small"
-                                            label="End"
-                                            type="datetime-local"
-                                            InputLabelProps={{ shrink: true }}
-                                            value={editForm.endTime}
-                                            onChange={(e) =>
-                                              setEditForm((prev) => ({
-                                                ...prev,
-                                                endTime: e.target.value,
-                                              }))
-                                            }
-                                          />
-                                        </Stack>
+                                          <MenuItem value="">
+                                            Unassigned (leave unfilled)
+                                          </MenuItem>
+                                          {staffList.map((member) => (
+                                            <MenuItem
+                                              key={member._id}
+                                              value={member._id}
+                                            >
+                                              {member.name ||
+                                                member.email ||
+                                                member._id}
+                                            </MenuItem>
+                                          ))}
+                                        </Select>
+                                      </FormControl>
 
-                                        <FormControl fullWidth size="small">
-                                          <InputLabel>State</InputLabel>
-                                          <Select
-                                            value={editForm.state}
-                                            label="State"
-                                            onChange={(e) =>
-                                              setEditForm((prev) => ({
-                                                ...prev,
-                                                state: e.target.value,
-                                              }))
-                                            }
-                                          >
-                                            <MenuItem value="proposed">
-                                              Proposed
-                                            </MenuItem>
-                                            <MenuItem value="locked">
-                                              Locked
-                                            </MenuItem>
-                                            <MenuItem value="removed">
-                                              Removed
-                                            </MenuItem>
-                                          </Select>
-                                        </FormControl>
-
+                                      <Stack
+                                        direction={{
+                                          xs: "column",
+                                          sm: "row",
+                                        }}
+                                        spacing={1}
+                                      >
                                         <TextField
                                           fullWidth
                                           size="small"
-                                          label="Notes"
-                                          value={editForm.notes}
+                                          label="Start"
+                                          type="datetime-local"
+                                          InputLabelProps={{ shrink: true }}
+                                          value={editForm.startTime}
                                           onChange={(e) =>
                                             setEditForm((prev) => ({
                                               ...prev,
-                                              notes: e.target.value,
+                                              startTime: e.target.value,
                                             }))
                                           }
                                         />
-
-                                        <FormControlLabel
-                                          control={
-                                            <Checkbox
-                                              checked={editForm.force}
-                                              onChange={(e) =>
-                                                setEditForm((prev) => ({
-                                                  ...prev,
-                                                  force: e.target.checked,
-                                                }))
-                                              }
-                                            />
+                                        <TextField
+                                          fullWidth
+                                          size="small"
+                                          label="End"
+                                          type="datetime-local"
+                                          InputLabelProps={{ shrink: true }}
+                                          value={editForm.endTime}
+                                          onChange={(e) =>
+                                            setEditForm((prev) => ({
+                                              ...prev,
+                                              endTime: e.target.value,
+                                            }))
                                           }
-                                          label="Force override checks"
                                         />
-
-                                        <Stack direction="row" spacing={1}>
-                                          <Button
-                                            size="small"
-                                            variant="contained"
-                                            onClick={handleSaveAssignment}
-                                            disabled={
-                                              actionLoading ===
-                                              `save:${editingAssignmentId}`
-                                            }
-                                          >
-                                            {actionLoading ===
-                                            `save:${editingAssignmentId}`
-                                              ? "Saving..."
-                                              : "Save"}
-                                          </Button>
-                                          <Button
-                                            size="small"
-                                            variant="text"
-                                            onClick={cancelEditAssignment}
-                                          >
-                                            Cancel
-                                          </Button>
-                                        </Stack>
                                       </Stack>
-                                    </Paper>
-                                  )}
-                                </Stack>
-                              </Paper>
-                            );
-                          })}
-                        </Stack>
-                      </Box>
-                    ))}
-                  </Stack>
-                ) : null}
-              </Stack>
-            )}
-          </Paper>
-        )}
+
+                                      <FormControl fullWidth size="small">
+                                        <InputLabel>State</InputLabel>
+                                        <Select
+                                          value={editForm.state}
+                                          label="State"
+                                          onChange={(e) =>
+                                            setEditForm((prev) => ({
+                                              ...prev,
+                                              state: e.target.value,
+                                            }))
+                                          }
+                                        >
+                                          <MenuItem value="proposed">
+                                            Proposed
+                                          </MenuItem>
+                                          <MenuItem value="unfilled">
+                                            Unfilled
+                                          </MenuItem>
+                                          <MenuItem value="locked">
+                                            Locked
+                                          </MenuItem>
+                                          <MenuItem value="removed">
+                                            Removed
+                                          </MenuItem>
+                                        </Select>
+                                      </FormControl>
+
+                                      <TextField
+                                        fullWidth
+                                        size="small"
+                                        label="Notes"
+                                        value={editForm.notes}
+                                        onChange={(e) =>
+                                          setEditForm((prev) => ({
+                                            ...prev,
+                                            notes: e.target.value,
+                                          }))
+                                        }
+                                      />
+
+                                      <FormControlLabel
+                                        control={
+                                          <Checkbox
+                                            checked={editForm.force}
+                                            onChange={(e) =>
+                                              setEditForm((prev) => ({
+                                                ...prev,
+                                                force: e.target.checked,
+                                              }))
+                                            }
+                                          />
+                                        }
+                                        label="Force override checks"
+                                      />
+
+                                      <Stack direction="row" spacing={1}>
+                                        <Button
+                                          size="small"
+                                          variant="contained"
+                                          onClick={handleSaveAssignment}
+                                          disabled={
+                                            actionLoading ===
+                                            `save:${editingAssignmentId}`
+                                          }
+                                        >
+                                          {actionLoading ===
+                                          `save:${editingAssignmentId}`
+                                            ? "Saving..."
+                                            : "Save"}
+                                        </Button>
+                                        <Button
+                                          size="small"
+                                          variant="text"
+                                          onClick={cancelEditAssignment}
+                                        >
+                                          Cancel
+                                        </Button>
+                                      </Stack>
+                                    </Stack>
+                                  </Paper>
+                                )}
+                              </Stack>
+                            </Paper>
+                          );
+                        })}
+                      </Stack>
+                    </Box>
+                  ))}
+                </Stack>
+              ) : null}
+            </Stack>
+          )}
+        </Paper>
       </Stack>
     </Paper>
   );

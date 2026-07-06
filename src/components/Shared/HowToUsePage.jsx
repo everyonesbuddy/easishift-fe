@@ -40,7 +40,7 @@ const GUIDE_DATA = {
         steps: [
           "Review KPI cards first: staffing totals, pending decisions, unread messages, and upcoming shifts.",
           "Review chart trends to spot under-coverage risk before it becomes a scheduling issue.",
-          "Use quick actions for common tasks such as creating staff, sending a message, and building schedules.",
+          "Use dashboard insights to prioritize actions, then complete tasks from Staff Management, Coverage Planning, and Schedule Builder pages.",
           "Revisit Overview after approvals or publishing to confirm metrics updated as expected.",
         ],
       },
@@ -74,6 +74,7 @@ const GUIDE_DATA = {
           "Use list view for quick updates and calendar view for time-based validation.",
           "For each coverage item, set role, date range, shift slot, and required headcount.",
           "Add unit area, shift type, shift tag, and certification requirements where needed.",
+          "Choose the right submit action: save requirement only, or save and generate a draft schedule.",
           "Adjust headcount quickly when census or acuity changes.",
         ],
       },
@@ -84,8 +85,9 @@ const GUIDE_DATA = {
         steps: [
           "Create single shifts manually for urgent edits or one-off assignments.",
           "Use auto-generate to produce draft schedules from selected open coverage records.",
+          "Use the always-visible calendar workspace to compare live schedules, open coverage, and draft impact before publishing.",
           "Review each assignment for overtime warnings, consecutive day risks, and role compatibility.",
-          "Edit draft assignments as needed, then publish selected items or publish all.",
+          "Edit draft assignments as needed, then publish selected items or publish all when publishable counts are available.",
         ],
       },
       {

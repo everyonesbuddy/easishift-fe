@@ -5,20 +5,12 @@ import {
   Box,
   Button,
   CircularProgress,
-  Dialog,
-  DialogContent,
 } from "@mui/material";
 
 import { useAuth } from "../../../context/AuthContext";
 import api from "../../../config/api";
 
-import {
-  FiUsers,
-  FiUserCheck,
-  FiCalendar,
-  FiPlus,
-  FiUpload,
-} from "react-icons/fi";
+import { FiUsers, FiCalendar, FiUpload } from "react-icons/fi";
 import {
   FiCheckCircle,
   FiAlertTriangle,
@@ -28,10 +20,6 @@ import {
 
 import StatCard from "./StatCard";
 import ScheduleAndCoverageCharts from "./ScheduleAndCoverageCharts";
-import StaffCreateAndEditForm from "../Staffs/StaffCreateAndEditForm";
-import CoverageCreateForm from "../Coverage/CoverageCreateForm";
-import ScheduleForm from "../Schedule/ScheduleForm";
-import AutoGenerateScheduleForm from "../Schedule/AutoGenerateScheduleForm";
 import { toast } from "react-toastify";
 
 export default function StaffDashboard() {
@@ -41,13 +29,7 @@ export default function StaffDashboard() {
   const [tenant, setTenant] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const [openStaffModal, setOpenStaffModal] = useState(false);
-  const [openCoverageModal, setOpenCoverageModal] = useState(false);
-  const [openScheduleModal, setOpenScheduleModal] = useState(false);
-  const [openAutoModal, setOpenAutoModal] = useState(false);
   const [uploadingProfile, setUploadingProfile] = useState(false);
-
-  const [staffList, setStaffList] = useState([]);
   const profileInputRef = useRef(null);
 
   // Extracted loader so we can refresh after modal actions
@@ -68,10 +50,6 @@ export default function StaffDashboard() {
       // Tenant
       const tenantRes = await api.get(`/tenants/${user.tenantId}`);
       setTenant(tenantRes.data);
-
-      // Staff List (required for schedule form)
-      const staffRes = await api.get(`/auth/users`);
-      setStaffList(staffRes.data);
     } catch (err) {
       console.error("Failed to load dashboard", err);
     } finally {
@@ -363,131 +341,6 @@ export default function StaffDashboard() {
         </Box>
       </Box>
 
-      {/* Action buttons */}
-      <Box
-        sx={{
-          mb: 4,
-          display: "flex",
-          gap: 2,
-          flexWrap: "wrap",
-          justifyContent: { xs: "center", md: "space-between" },
-          flexDirection: { xs: "column", sm: "row" },
-          alignItems: { xs: "stretch", sm: "center" },
-        }}
-      >
-        <Box>
-          <Typography
-            sx={{
-              color: "#0F172A",
-              fontWeight: 700,
-              fontSize: { xs: "0.92rem", md: "1rem" },
-            }}
-          >
-            Quick Actions
-          </Typography>
-          <Typography sx={{ color: "#64748B", fontSize: "0.8rem" }}>
-            Manage staff, coverage, and schedules with action buttons.
-          </Typography>
-        </Box>
-
-        {isAdmin ? (
-          <>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<FiUsers />}
-              onClick={() => setOpenStaffModal(true)}
-              sx={{
-                textTransform: "none",
-                borderRadius: 2,
-                px: 3,
-                color: "#1E293B",
-                borderColor: "#CBD5E1",
-                width: { xs: "100%", md: "auto" },
-                "&:hover": { bgcolor: "#F8FAFC", borderColor: "#94A3B8" },
-              }}
-            >
-              Add Staff
-            </Button>
-
-            <Button
-              size="small"
-              variant="contained"
-              startIcon={<FiPlus />}
-              onClick={() => setOpenCoverageModal(true)}
-              sx={{
-                textTransform: "none",
-                borderRadius: 2,
-                px: 3,
-                bgcolor: "#0F4C81",
-                color: "#fff",
-                width: { xs: "100%", md: "auto" },
-                "&:hover": { bgcolor: "#0C3F6B" },
-              }}
-            >
-              Add Coverage
-            </Button>
-
-            <Button
-              size="small"
-              variant="contained"
-              startIcon={<FiCalendar />}
-              onClick={() => setOpenScheduleModal(true)}
-              sx={{
-                textTransform: "none",
-                borderRadius: 2,
-                px: 3,
-                bgcolor: "#1E293B",
-                color: "#fff",
-                width: { xs: "100%", md: "auto" },
-                "&:hover": { bgcolor: "#0F172A" },
-              }}
-            >
-              Manual Scheduler
-            </Button>
-
-            <Button
-              size="small"
-              variant="contained"
-              startIcon={<FiUserCheck />}
-              onClick={() => setOpenAutoModal(true)}
-              sx={{
-                textTransform: "none",
-                borderRadius: 2,
-                px: 3,
-                bgcolor: "#0284C7",
-                color: "#fff",
-                width: { xs: "100%", md: "auto" },
-                "&:hover": { bgcolor: "#0369A1" },
-              }}
-            >
-              Review AI Draft Schedules
-            </Button>
-          </>
-        ) : (
-          <Button
-            size="small"
-            variant="contained"
-            startIcon={<FiPlus />}
-            onClick={() => {
-              // open schedule modal prefilled for current user
-              setOpenScheduleModal(true);
-            }}
-            sx={{
-              textTransform: "none",
-              borderRadius: 2,
-              px: 3,
-              bgcolor: "#0F4C81",
-              color: "#fff",
-              width: { xs: "100%", md: "auto" },
-              "&:hover": { bgcolor: "#0C3F6B" },
-            }}
-          >
-            Pick Up Shift
-          </Button>
-        )}
-      </Box>
-
       {/* Cards */}
       <Box
         sx={{
@@ -523,104 +376,6 @@ export default function StaffDashboard() {
       {/* Charts */}
       {/* 🔥 CHARTS STILL USE SCHEDULES + COVERAGE DIRECTLY — NOTHING TO CHANGE */}
       <ScheduleAndCoverageCharts userId={user._id} isAdmin={isAdmin} />
-
-      {/* Modals for actions */}
-      <Dialog
-        open={openStaffModal}
-        onClose={() => setOpenStaffModal(false)}
-        fullWidth
-        maxWidth="md"
-        scroll="paper"
-        PaperProps={{
-          sx: {
-            borderRadius: { xs: 3, md: 4 },
-          },
-        }}
-      >
-        <DialogContent dividers>
-          <StaffCreateAndEditForm
-            staff={null}
-            staffList={staffList}
-            onClose={() => setOpenStaffModal(false)}
-            onSuccess={() => {
-              setOpenStaffModal(false);
-              loadDashboardData();
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={openCoverageModal}
-        onClose={() => setOpenCoverageModal(false)}
-        fullWidth
-        maxWidth="md"
-        scroll="paper"
-        PaperProps={{
-          sx: {
-            borderRadius: { xs: 3, md: 4 },
-          },
-        }}
-      >
-        <DialogContent dividers>
-          <CoverageCreateForm
-            tenantId={user?.tenantId}
-            onClose={() => setOpenCoverageModal(false)}
-            onSuccess={() => {
-              setOpenCoverageModal(false);
-              loadDashboardData();
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={openScheduleModal}
-        onClose={() => setOpenScheduleModal(false)}
-        fullWidth
-        maxWidth="md"
-        scroll="paper"
-        PaperProps={{
-          sx: {
-            borderRadius: { xs: 3, md: 4 },
-          },
-        }}
-      >
-        <DialogContent dividers>
-          <ScheduleForm
-            staffList={staffList}
-            initialStaffId={isAdmin ? "" : user?._id}
-            disableStaffSelect={!isAdmin}
-            onClose={() => setOpenScheduleModal(false)}
-            onSuccess={() => {
-              setOpenScheduleModal(false);
-              loadDashboardData();
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={openAutoModal}
-        onClose={() => setOpenAutoModal(false)}
-        fullWidth
-        maxWidth="md"
-        scroll="paper"
-        PaperProps={{
-          sx: {
-            borderRadius: { xs: 3, md: 4 },
-          },
-        }}
-      >
-        <DialogContent dividers>
-          <AutoGenerateScheduleForm
-            onClose={() => setOpenAutoModal(false)}
-            onSuccess={() => {
-              setOpenAutoModal(false);
-              loadDashboardData();
-            }}
-          />
-        </DialogContent>
-      </Dialog>
     </Container>
   );
 }

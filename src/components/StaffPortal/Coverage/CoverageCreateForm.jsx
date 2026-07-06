@@ -244,6 +244,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   const [requirements, setRequirements] = useState([{ ...defaultRequirement }]);
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
+  const [submitMode, setSubmitMode] = useState("generate");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [repeatOpen, setRepeatOpen] = useState(false);
@@ -396,8 +397,11 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
     setExcludedDates([]);
   };
 
-  const handleSubmit = async (event) => {
+  const handleSubmit = async (event, modeOverride) => {
     if (event) event.preventDefault();
+
+    const mode = modeOverride || submitMode;
+    const shouldGenerateDraft = mode !== "save-only";
 
     setError("");
     setSuccess("");
@@ -495,7 +499,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
       });
 
       let draftWasGenerated = false;
-      if (createdCoverages.length) {
+      if (shouldGenerateDraft && createdCoverages.length) {
         try {
           await api.post("/schedules/auto-generate", {
             coverageIds: createdCoverages.map((item) => item._id),
@@ -510,9 +514,11 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
         }
       }
 
-      const message = draftWasGenerated
-        ? "Coverage created and AI draft is ready. Review, adjust, and publish from Draft Schedule Board."
-        : "Coverage created successfully.";
+      const message = shouldGenerateDraft
+        ? draftWasGenerated
+          ? "Coverage created and AI draft is ready. Review, adjust, and publish from Draft Schedule Board."
+          : "Coverage created successfully."
+        : "Coverage requirements saved successfully.";
 
       setSuccess(message);
       toast.success(message);
@@ -1346,24 +1352,54 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
         />
 
         {/* Submit */}
-        <Button
-          type="submit"
-          variant="contained"
-          disabled={loading}
-          fullWidth
-          sx={{
-            textTransform: "none",
-            fontWeight: 700,
-            py: 1.1,
-            borderRadius: 2,
-            background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
-            boxShadow: "0 4px 12px rgba(37,99,235,0.3)",
-          }}
-        >
-          {loading
-            ? "Saving Requirements and Generating Draft Schedule..."
-            : "Save Requirements and Generate Draft Schedule"}
-        </Button>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+          <Button
+            type="button"
+            variant="outlined"
+            disabled={loading}
+            fullWidth
+            onClick={() => {
+              setSubmitMode("save-only");
+              handleSubmit(null, "save-only");
+            }}
+            sx={{
+              textTransform: "none",
+              fontWeight: 700,
+              py: 1.1,
+              borderRadius: 2,
+              borderColor: "#93C5FD",
+              color: "#1E3A8A",
+              "&:hover": {
+                borderColor: "#60A5FA",
+                backgroundColor: "#EFF6FF",
+              },
+            }}
+          >
+            {loading && submitMode === "save-only"
+              ? "Saving Requirements..."
+              : "Save Requirement Only"}
+          </Button>
+
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={loading}
+            fullWidth
+            onClick={() => setSubmitMode("generate")}
+            sx={{
+              textTransform: "none",
+              fontWeight: 700,
+              py: 1.1,
+              borderRadius: 2,
+              background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
+              boxShadow: "0 4px 12px rgba(37,99,235,0.3)",
+            }}
+          >
+            {loading && submitMode === "generate"
+              ? "Saving Requirements and Generating Draft Schedule..."
+              : "Save Requirements and Generate Draft Schedule"}
+          </Button>
+        </Stack>
       </Stack>
     </Paper>
   );

@@ -57,7 +57,7 @@ Your sidebar links depend on your role:
 - Admins see organization-level operations such as staff, coverage, scheduling, time-off decisions, and billing
 - Non-admin staff see personal workflows such as my schedule, preferences, shift swaps, and my time-off requests
 
-The dashboard is your main hub for snapshots, alerts, and quick actions.
+The dashboard is your main hub for snapshots, alerts, and trend visibility.
 
 ---
 
@@ -69,7 +69,7 @@ The dashboard is your main hub for snapshots, alerts, and quick actions.
 
 - Dashboard KPI cards
 - Charts
-- Quick-action modals
+- Profile picture upload action
 
 ### Voiceover script
 
@@ -77,7 +77,7 @@ As an admin, your dashboard gives you an organization-level snapshot.
 
 Use stat cards and charts to track staffing load, coverage gaps, pending requests, and unread messages.
 
-For speed, use dashboard quick actions to create staff records, coverage slots, schedules, or messages without leaving the page.
+Use the dashboard to prioritize what needs attention, then move into the dedicated pages for Staff Management, Coverage Planning, and Schedule Builder.
 
 ---
 
@@ -139,6 +139,8 @@ Use list view for batch management and calendar view for time-based context.
 
 When creating coverage, include unit area, shift type, shift slot tag, and required certifications when applicable.
 
+You can now either save requirements only, or save and generate a draft schedule immediately.
+
 Accurate coverage is the foundation for high-quality scheduling and auto-generation.
 
 ---
@@ -165,6 +167,8 @@ For larger periods, use Auto-Generate Schedule:
 - Review assignments and warnings
 - Adjust assignment details where needed
 - Publish selected items or publish all
+
+The calendar workspace now remains visible even when no draft is selected, so you can always compare live schedules and open coverage before publishing.
 
 This draft-first workflow gives control and safety before finalizing schedules.
 

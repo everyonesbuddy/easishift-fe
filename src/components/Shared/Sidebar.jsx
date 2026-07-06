@@ -64,12 +64,6 @@ function Sidebar({ mobileOpen, onMobileClose }) {
     },
     { id: "staff", icon: MdPeople, label: "Staff Management", to: "/staffs" },
     {
-      id: "subscription",
-      icon: MdSettings,
-      label: "Manage Subscription",
-      to: "/billing",
-    },
-    {
       id: "facility-preferences",
       icon: MdTune,
       label: "Facility Preferences",
@@ -94,6 +88,12 @@ function Sidebar({ mobileOpen, onMobileClose }) {
       to: "/swap-requests",
     },
     { id: "messages", icon: MdMessage, label: "Messages", to: "/messages" },
+    {
+      id: "subscription",
+      icon: MdSettings,
+      label: "Manage Subscription",
+      to: "/billing",
+    },
   ];
 
   const staffMenuItems = [

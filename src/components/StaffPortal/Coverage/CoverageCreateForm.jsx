@@ -1,5 +1,6 @@
 ﻿import { useMemo, useState } from "react";
 import {
+  Autocomplete,
   Alert,
   Box,
   Button,
@@ -338,6 +339,14 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
     const shiftTag = normalizeToken(req?.shiftTag);
     if (!shiftType || !shiftTag) return null;
     return slotLookup.get(`${shiftType}:${shiftTag}`) || null;
+  };
+
+  const getSelectedShiftDefinitionOption = (req) => {
+    const value = getShiftDefinitionValue(req);
+    if (!value) return null;
+    return (
+      shiftDefinitionOptions.find((option) => option.value === value) || null
+    );
   };
 
   const getShiftDefinitionValue = (req) => {
@@ -1052,40 +1061,70 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                     </Stack>
 
                     {/* Row 2: Shift Definition */}
-                    <TextField
-                      select
+                    <Autocomplete
                       fullWidth
-                      label="Time Slot"
-                      value={getShiftDefinitionValue(req)}
-                      onChange={(e) =>
-                        handleShiftDefinitionSelect(index, e.target.value)
-                      }
-                      disabled={shiftDefinitionOptions.length === 0}
-                      size="small"
-                      inputProps={{ sx: { fontSize: "0.78rem" } }}
-                      InputLabelProps={{ sx: { fontSize: "0.78rem" } }}
-                      helperText={
-                        shiftDefinitionOptions.length === 0
-                          ? "No time slots configured yet."
-                          : undefined
-                      }
-                      FormHelperTextProps={{
-                        sx: { fontSize: "0.68rem", mt: 0.3 },
+                      options={shiftDefinitionOptions}
+                      value={getSelectedShiftDefinitionOption(req)}
+                      clearOnBlur
+                      selectOnFocus
+                      handleHomeEndKeys
+                      blurOnSelect
+                      onChange={(_, selectedOption) => {
+                        if (!selectedOption) {
+                          handleRequirementChange(index, "shiftType", "");
+                          handleRequirementChange(index, "shiftTag", "");
+                          return;
+                        }
+
+                        handleShiftDefinitionSelect(
+                          index,
+                          selectedOption.value,
+                        );
                       }}
-                    >
-                      <MenuItem value="" sx={{ fontSize: "0.78rem" }}>
-                        Use Custom Manual Time
-                      </MenuItem>
-                      {shiftDefinitionOptions.map((option) => (
-                        <MenuItem
-                          key={option.value}
-                          value={option.value}
-                          sx={{ fontSize: "0.78rem" }}
-                        >
-                          {option.label}
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                      isOptionEqualToValue={(option, value) =>
+                        option.value === value?.value
+                      }
+                      getOptionLabel={(option) => option?.label || ""}
+                      filterOptions={(options, state) => {
+                        const query = normalizeToken(state.inputValue);
+                        if (!query) return options;
+
+                        return options.filter((option) => {
+                          const haystack = normalizeToken(
+                            [
+                              option.label,
+                              option.shiftType,
+                              option.shiftTag,
+                            ].join(" "),
+                          );
+                          return haystack.includes(query);
+                        });
+                      }}
+                      disabled={shiftDefinitionOptions.length === 0}
+                      ListboxProps={{
+                        sx: { maxHeight: 280 },
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Time Slot"
+                          size="small"
+                          helperText={
+                            shiftDefinitionOptions.length === 0
+                              ? "No time slots are configured yet. Add one in Facility Preferences."
+                              : "Type to search this select. Only an existing slot can be chosen; if it is not listed, add it in Facility Preferences."
+                          }
+                          FormHelperTextProps={{
+                            sx: { fontSize: "0.68rem", mt: 0.3 },
+                          }}
+                          inputProps={{
+                            ...params.inputProps,
+                            sx: { fontSize: "0.78rem" },
+                          }}
+                          InputLabelProps={{ sx: { fontSize: "0.78rem" } }}
+                        />
+                      )}
+                    />
 
                     {/* Row 3: Unit Area + Cert Tags */}
                     <Stack
@@ -1163,52 +1202,6 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                           ),
                         )}
                       </TextField>
-                    </Stack>
-
-                    {/* Row 4: Start + End time (only shown when no slot locked) */}
-                    <Stack direction="row" spacing={0.9}>
-                      <TextField
-                        fullWidth
-                        label="Start"
-                        type="time"
-                        value={selectedSlot?.startLocalTime || req.startTime}
-                        onChange={(e) =>
-                          handleRequirementChange(
-                            index,
-                            "startTime",
-                            e.target.value,
-                          )
-                        }
-                        disabled={Boolean(selectedSlot)}
-                        InputLabelProps={{
-                          shrink: true,
-                          sx: { fontSize: "0.78rem" },
-                        }}
-                        inputProps={{ sx: { fontSize: "0.78rem" } }}
-                        size="small"
-                        required
-                      />
-                      <TextField
-                        fullWidth
-                        label="End"
-                        type="time"
-                        value={selectedSlot?.endLocalTime || req.endTime}
-                        onChange={(e) =>
-                          handleRequirementChange(
-                            index,
-                            "endTime",
-                            e.target.value,
-                          )
-                        }
-                        disabled={Boolean(selectedSlot)}
-                        InputLabelProps={{
-                          shrink: true,
-                          sx: { fontSize: "0.78rem" },
-                        }}
-                        inputProps={{ sx: { fontSize: "0.78rem" } }}
-                        size="small"
-                        required
-                      />
                     </Stack>
 
                     {isOvernightTimeRange(

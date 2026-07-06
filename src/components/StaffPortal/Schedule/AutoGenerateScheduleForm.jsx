@@ -22,7 +22,10 @@ import {
   Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import DoneAllIcon from "@mui/icons-material/DoneAll";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import PublishIcon from "@mui/icons-material/Publish";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -445,6 +448,9 @@ export default function AutoGenerateScheduleForm({
   const [loadingDrafts, setLoadingDrafts] = useState(false);
   const [loadingDraftDetail, setLoadingDraftDetail] = useState(false);
   const [actionLoading, setActionLoading] = useState("");
+  const [coverageActionLoadingId, setCoverageActionLoadingId] = useState("");
+  const [assignmentActionLoadingId, setAssignmentActionLoadingId] =
+    useState("");
 
   const [staffList, setStaffList] = useState([]);
   const [selectedAssignmentIds, setSelectedAssignmentIds] = useState([]);
@@ -872,6 +878,7 @@ export default function AutoGenerateScheduleForm({
           extendedProps: {
             type: "assignment",
             assignmentId,
+            draftId: String(assignment?.__calendarDraftId || ""),
             role: assignment?.role,
             staffName,
             state: assignment?.state,
@@ -1506,6 +1513,96 @@ export default function AutoGenerateScheduleForm({
     }
   };
 
+  const handleCreateDraftFromCoverage = async (coverage) => {
+    const coverageId = getCoverageId(coverage);
+    if (!coverageId) {
+      toast.error(
+        "Unable to create draft for this coverage. Missing coverage id.",
+        toastOptions,
+      );
+      return;
+    }
+
+    const loadingKey = `create-draft:${coverageId}`;
+    setCoverageActionLoadingId(loadingKey);
+
+    try {
+      const res = await api.post("/schedules/auto-generate", {
+        coverageIds: [coverageId],
+      });
+
+      toast.success(
+        "Draft created for this coverage. Review assignments and publish when ready.",
+        toastOptions,
+      );
+
+      if (res?.data?.warning) {
+        toast.warn(res.data.warning, toastOptions);
+      }
+
+      await Promise.all([loadDrafts(), loadCoverages()]);
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err.response?.data?.message ||
+          "Failed to create draft from this coverage.",
+        toastOptions,
+      );
+    } finally {
+      setCoverageActionLoadingId("");
+    }
+  };
+
+  const handleFillAssignmentWithAI = async ({ draftId, assignmentId }) => {
+    const safeDraftId = String(draftId || "");
+    const safeAssignmentId = String(assignmentId || "");
+
+    if (!safeDraftId || !safeAssignmentId) {
+      toast.error(
+        "Unable to fill this slot with AI. Missing draft or assignment id.",
+        toastOptions,
+      );
+      return;
+    }
+
+    const loadingKey = `fill-ai:${safeDraftId}:${safeAssignmentId}`;
+    setAssignmentActionLoadingId(loadingKey);
+
+    try {
+      const res = await api.post(
+        `/schedules/draft-schedules/${safeDraftId}/assignments/${safeAssignmentId}/fill-ai`,
+      );
+
+      toast.success(
+        res?.data?.message || "Draft assignment filled with AI.",
+        toastOptions,
+      );
+
+      await Promise.all([
+        activeDraftId ? loadDraftDetail(activeDraftId) : Promise.resolve(),
+        loadSelectedDraftDetails(selectedDraftIds),
+        loadDrafts(),
+      ]);
+    } catch (err) {
+      console.error(err);
+      const responseData = err?.response?.data || {};
+      const msg =
+        responseData.message ||
+        "Unable to fill this assignment with AI right now.";
+      const skippedByReason = responseData.skippedByReason;
+      if (skippedByReason && Object.keys(skippedByReason).length > 0) {
+        const detail = Object.entries(skippedByReason)
+          .map(([reason, count]) => `${reason} (${count})`)
+          .join("; ");
+        toast.error(`${msg} ${detail}`, toastOptions);
+      } else {
+        toast.error(msg, toastOptions);
+      }
+    } finally {
+      setAssignmentActionLoadingId("");
+    }
+  };
+
   const handleDraftCalendarEventClick = (eventClickInfo) => {
     const { event } = eventClickInfo;
     const eventType = event?.extendedProps?.type;
@@ -1672,44 +1769,73 @@ export default function AutoGenerateScheduleForm({
                 <Typography variant="subtitle2">
                   Draft Workspace ({publishableAssignments.length} publishable)
                 </Typography>
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color="error"
-                    onClick={handleDeleteSelected}
-                    disabled={
-                      Boolean(actionLoading) || selectedPublishableCount <= 0
-                    }
-                  >
-                    {actionLoading === "delete:selected"
-                      ? "Deleting..."
-                      : `Delete Selected (${selectedPublishableCount})`}
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={handlePublishSelected}
-                    disabled={
-                      Boolean(actionLoading) || selectedPublishableCount <= 0
-                    }
-                  >
-                    {actionLoading === "publish:selected"
-                      ? "Publishing..."
-                      : `Publish Selected to Schedule (${selectedPublishableCount})`}
-                  </Button>
+                <Stack
+                  direction="row"
+                  spacing={0.75}
+                  flexWrap="wrap"
+                  useFlexGap
+                >
+                  {(selectedPublishableCount > 0 ||
+                    actionLoading === "delete:selected" ||
+                    actionLoading === "publish:selected") && (
+                    <>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="error"
+                        startIcon={<DeleteOutlineIcon sx={{ fontSize: 15 }} />}
+                        onClick={handleDeleteSelected}
+                        disabled={Boolean(actionLoading)}
+                        sx={{
+                          textTransform: "none",
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                          minHeight: 30,
+                        }}
+                      >
+                        {actionLoading === "delete:selected"
+                          ? "Deleting..."
+                          : `Delete selected (${selectedPublishableCount})`}
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<DoneAllIcon sx={{ fontSize: 15 }} />}
+                        onClick={handlePublishSelected}
+                        disabled={Boolean(actionLoading)}
+                        sx={{
+                          textTransform: "none",
+                          fontSize: "0.72rem",
+                          fontWeight: 700,
+                          minHeight: 30,
+                        }}
+                      >
+                        {actionLoading === "publish:selected"
+                          ? "Publishing..."
+                          : `Publish selected AI proposed (${selectedPublishableCount})`}
+                      </Button>
+                    </>
+                  )}
+
                   <Button
                     size="small"
                     variant="contained"
+                    startIcon={<PublishIcon sx={{ fontSize: 15 }} />}
                     onClick={handlePublishAll}
                     disabled={
                       Boolean(actionLoading) ||
                       publishableAssignments.length <= 0
                     }
+                    sx={{
+                      textTransform: "none",
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      minHeight: 30,
+                    }}
                   >
                     {actionLoading === "publish:all"
                       ? "Publishing..."
-                      : "Publish All to Schedule"}
+                      : "Publish all AI proposed to live schedule"}
                   </Button>
                 </Stack>
               </Stack>
@@ -1750,82 +1876,154 @@ export default function AutoGenerateScheduleForm({
 
                 <Stack
                   direction="row"
-                  spacing={0.75}
+                  spacing={0.7}
                   flexWrap="wrap"
                   useFlexGap
+                  alignItems="center"
+                  sx={{
+                    px: 1,
+                    py: 0.75,
+                    borderRadius: 999,
+                    border: "1px solid #dbeafe",
+                    background:
+                      "linear-gradient(180deg, rgba(248,250,252,0.92) 0%, rgba(239,246,255,0.92) 100%)",
+                  }}
                 >
-                  <Chip
-                    size="small"
-                    label="Live schedule"
+                  <Typography
+                    variant="caption"
                     sx={{
+                      color: "#334155",
+                      fontWeight: 800,
+                      letterSpacing: 0.2,
+                      mr: 0.25,
+                    }}
+                  >
+                    Legend
+                  </Typography>
+
+                  <Box
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      px: 0.8,
+                      py: 0.35,
+                      borderRadius: 999,
                       bgcolor: "#e2e8f0",
-                      color: "#0f172a",
-                      fontWeight: 700,
+                      border: "1px solid #cbd5e1",
                     }}
-                  />
-                  <Chip
-                    size="small"
-                    label="Open coverage"
+                  >
+                    <Box
+                      sx={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: "50%",
+                        bgcolor: "#0f172a",
+                      }}
+                    />
+                    <Typography
+                      sx={{
+                        fontSize: "0.68rem",
+                        fontWeight: 700,
+                        color: "#0f172a",
+                      }}
+                    >
+                      Live schedule
+                    </Typography>
+                  </Box>
+
+                  <Box
                     sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      px: 0.8,
+                      py: 0.35,
+                      borderRadius: 999,
                       bgcolor: "#ffedd5",
-                      color: "#9a3412",
-                      fontWeight: 700,
+                      border: "1px solid #fdba74",
                     }}
-                  />
-                  <Chip
-                    size="small"
-                    label="Proposed"
+                  >
+                    <Box
+                      sx={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: "50%",
+                        bgcolor: "#ea580c",
+                      }}
+                    />
+                    <Typography
+                      sx={{
+                        fontSize: "0.68rem",
+                        fontWeight: 700,
+                        color: "#9a3412",
+                      }}
+                    >
+                      Open coverage (manual)
+                    </Typography>
+                  </Box>
+
+                  <Box
                     sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      px: 0.8,
+                      py: 0.35,
+                      borderRadius: 999,
                       bgcolor: "#dbeafe",
-                      color: "#1e3a8a",
-                      fontWeight: 700,
+                      border: "1px solid #93c5fd",
                     }}
-                  />
-                  <Chip
-                    size="small"
-                    label="Unfilled"
+                  >
+                    <Box
+                      sx={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: "50%",
+                        bgcolor: "#1d4ed8",
+                      }}
+                    />
+                    <Typography
+                      sx={{
+                        fontSize: "0.68rem",
+                        fontWeight: 700,
+                        color: "#1e3a8a",
+                      }}
+                    >
+                      AI proposed
+                    </Typography>
+                  </Box>
+
+                  <Box
                     sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      px: 0.8,
+                      py: 0.35,
+                      borderRadius: 999,
                       bgcolor: "#ffedd5",
-                      color: "#9a3412",
-                      fontWeight: 700,
+                      border: "1px solid #fdba74",
                     }}
-                  />
-                  <Chip
-                    size="small"
-                    label="Removed"
-                    sx={{
-                      bgcolor: "#f3f4f6",
-                      color: "#374151",
-                      fontWeight: 700,
-                    }}
-                  />
-                  <Chip
-                    size="small"
-                    label="Needs coverage"
-                    sx={{
-                      bgcolor: "#ffedd5",
-                      color: "#9a3412",
-                      fontWeight: 700,
-                    }}
-                  />
-                  <Chip
-                    size="small"
-                    label="Partially filled"
-                    sx={{
-                      bgcolor: "#fef3c7",
-                      color: "#92400e",
-                      fontWeight: 700,
-                    }}
-                  />
-                  <Chip
-                    size="small"
-                    label="Fully filled"
-                    sx={{
-                      bgcolor: "#dcfce7",
-                      color: "#166534",
-                      fontWeight: 700,
-                    }}
-                  />
+                  >
+                    <Box
+                      sx={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: "50%",
+                        bgcolor: "#c2410c",
+                      }}
+                    />
+                    <Typography
+                      sx={{
+                        fontSize: "0.68rem",
+                        fontWeight: 700,
+                        color: "#9a3412",
+                      }}
+                    >
+                      AI unfilled
+                    </Typography>
+                  </Box>
                 </Stack>
               </Stack>
 
@@ -2357,6 +2555,13 @@ export default function AutoGenerateScheduleForm({
                           ) {
                             const openCount =
                               Number(arg.event.extendedProps?.openCount) || 0;
+                            const coverage =
+                              arg.event.extendedProps?.coverage || null;
+                            const coverageId = getCoverageId(coverage);
+                            const isCreatingDraft =
+                              Boolean(coverageId) &&
+                              coverageActionLoadingId ===
+                                `create-draft:${coverageId}`;
 
                             return (
                               <Box
@@ -2411,6 +2616,45 @@ export default function AutoGenerateScheduleForm({
                                   {openCount} open slot
                                   {openCount === 1 ? "" : "s"}
                                 </Typography>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  disableElevation
+                                  disabled={isCreatingDraft}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleCreateDraftFromCoverage(coverage);
+                                  }}
+                                  sx={{
+                                    mt: 0.5,
+                                    minHeight: 22,
+                                    px: 1,
+                                    py: 0.15,
+                                    borderRadius: 999,
+                                    fontSize: "0.56rem",
+                                    fontWeight: 900,
+                                    letterSpacing: 0.3,
+                                    textTransform: "none",
+                                    justifyContent: "flex-start",
+                                    alignSelf: "flex-start",
+                                    background:
+                                      "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+                                    color: "#fff",
+                                    border: "1px solid rgba(255,255,255,0.28)",
+                                    boxShadow: "0 6px 12px rgba(180,83,9,0.22)",
+                                    minWidth: 0,
+                                    "&:hover": {
+                                      background:
+                                        "linear-gradient(135deg, #FBBF24 0%, #D97706 100%)",
+                                      boxShadow:
+                                        "0 8px 16px rgba(180,83,9,0.28)",
+                                    },
+                                  }}
+                                >
+                                  {isCreatingDraft
+                                    ? "Creating..."
+                                    : "Create draft"}
+                                </Button>
                               </Box>
                             );
                           }
@@ -2536,6 +2780,61 @@ export default function AutoGenerateScheduleForm({
                               >
                                 {stateMeta.label}
                               </Typography>
+                              {String(arg.event.extendedProps?.state || "") ===
+                                "unfilled" && (
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  disableElevation
+                                  disabled={
+                                    assignmentActionLoadingId ===
+                                    `fill-ai:${String(arg.event.extendedProps?.draftId || "")}:${String(arg.event.extendedProps?.assignmentId || "")}`
+                                  }
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleFillAssignmentWithAI({
+                                      draftId: String(
+                                        arg.event.extendedProps?.draftId || "",
+                                      ),
+                                      assignmentId: String(
+                                        arg.event.extendedProps?.assignmentId ||
+                                          "",
+                                      ),
+                                    });
+                                  }}
+                                  sx={{
+                                    mt: 0.5,
+                                    minHeight: 22,
+                                    px: 1,
+                                    py: 0.15,
+                                    borderRadius: 999,
+                                    fontSize: "0.56rem",
+                                    fontWeight: 900,
+                                    letterSpacing: 0.3,
+                                    textTransform: "none",
+                                    justifyContent: "flex-start",
+                                    alignSelf: "flex-start",
+                                    background:
+                                      "linear-gradient(135deg, #1D4ED8 0%, #0F766E 100%)",
+                                    color: "#fff",
+                                    border: "1px solid rgba(255,255,255,0.22)",
+                                    boxShadow:
+                                      "0 6px 12px rgba(29,78,216,0.22)",
+                                    minWidth: 0,
+                                    "&:hover": {
+                                      background:
+                                        "linear-gradient(135deg, #2563EB 0%, #0F766E 100%)",
+                                      boxShadow:
+                                        "0 8px 16px rgba(29,78,216,0.28)",
+                                    },
+                                  }}
+                                >
+                                  {assignmentActionLoadingId ===
+                                  `fill-ai:${String(arg.event.extendedProps?.draftId || "")}:${String(arg.event.extendedProps?.assignmentId || "")}`
+                                    ? "Filling..."
+                                    : "Fill with AI"}
+                                </Button>
+                              )}
                             </Box>
                           );
                         }}

@@ -73,6 +73,7 @@ const GUIDE_DATA = {
         steps: [
           "Use list view for quick updates and calendar view for time-based validation.",
           "For each coverage item, set role, date range, shift slot, and required headcount.",
+          "Use the Time Slot select as a searchable field: type to filter, then choose an existing configured slot.",
           "Add unit area, shift type, shift tag, and certification requirements where needed.",
           "Choose the right submit action: save requirement only, or save and generate a draft schedule.",
           "Adjust headcount quickly when census or acuity changes.",
@@ -85,7 +86,9 @@ const GUIDE_DATA = {
         steps: [
           "Create single shifts manually for urgent edits or one-off assignments.",
           "Use auto-generate to produce draft schedules from selected open coverage records.",
+          "Use open coverage card actions to create a draft directly from one specific coverage item when needed.",
           "Use the always-visible calendar workspace to compare live schedules, open coverage, and draft impact before publishing.",
+          "Use Fill with AI on unfilled draft slots to retry one assignment without rerunning the full draft.",
           "Review each assignment for overtime warnings, consecutive day risks, and role compatibility.",
           "Edit draft assignments as needed, then publish selected items or publish all when publishable counts are available.",
         ],

@@ -139,6 +139,8 @@ Use list view for batch management and calendar view for time-based context.
 
 When creating coverage, include unit area, shift type, shift slot tag, and required certifications when applicable.
 
+Use the Time Slot field as a searchable select. Type to filter, then choose one configured slot. If the slot does not exist yet, define it in Facility Preferences first.
+
 You can now either save requirements only, or save and generate a draft schedule immediately.
 
 Accurate coverage is the foundation for high-quality scheduling and auto-generation.
@@ -167,6 +169,11 @@ For larger periods, use Auto-Generate Schedule:
 - Review assignments and warnings
 - Adjust assignment details where needed
 - Publish selected items or publish all
+
+You can also use contextual card actions in the draft workspace:
+
+- On open coverage cards, use **Create draft** to generate a draft directly from that coverage item.
+- On unfilled draft assignments, use **Fill with AI** to attempt a targeted AI refill for that single slot.
 
 The calendar workspace now remains visible even when no draft is selected, so you can always compare live schedules and open coverage before publishing.
 

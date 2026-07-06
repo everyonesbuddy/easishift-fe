@@ -318,7 +318,9 @@ Coverage now supports taxonomy-aware fields:
 UI notes:
 
 - Coverage creation uses `Shift Definition` options generated from facility `shiftTypeDefinitions` and stores both `shiftType` and `shiftTag`.
+- Time Slot is a searchable inline select (type to filter by time, label, or shift name).
 - Selecting a definition auto-populates start/end time from the selected slot.
+- Time entry is slot-definition-first; users must choose an existing slot from Facility Preferences.
 - If no shift definitions are configured, the shift-definition field remains visible but disabled with guidance text.
 - Coverage list/cards now display unit area, shift type, shift slot, and required cert tags.
 - Coverage planner now has two submission paths: **Save Requirement Only** or **Save Requirements and Generate Draft Schedule**.
@@ -355,14 +357,17 @@ Draft scheduling workflow now includes:
 - Open-coverage intake from `GET /api/v1/coverage/unfilled-auto` with role filtering and multi-select.
 - Coverage cards that show taxonomy metadata and headcount context (`required / scheduled`).
 - Draft creation from selected coverage IDs via `POST /api/v1/schedules/auto-generate`.
+- Open coverage cards include a direct **Create draft** action for one-click draft generation from a single coverage item.
 - Active draft list and detail loading from draft schedule endpoints.
 - Assignment-level editing in draft (staff, start/end time, notes, state, force override).
+- Unfilled draft assignments include a direct **Fill with AI** action using `POST /api/v1/schedules/draft-schedules/:draftId/assignments/:assignmentId/fill-ai`.
 - Quick state transitions (`proposed`, `locked`, `removed`) and overtime/consecutive-day warning chips.
 - Selective publish or publish-all actions from draft.
 - Draft discard action and refresh behavior that re-syncs coverage + draft state.
 - Calendar workspace is always visible, even when no draft is selected, and still overlays live schedules and open coverage.
 - Calendar toolbar is simplified to month navigation (no week switch).
 - Publish actions remain available but are disabled when no publishable assignments exist.
+- Legend is intentionally minimal for scanability: live schedule, open coverage (manual), AI proposed, and AI unfilled.
 
 Manual scheduling safeguards:
 
@@ -583,6 +588,16 @@ Highlights:
 
 - Schedule workspace calendar now renders even with no active draft selected.
 - Calendar view controls were simplified to month navigation only.
+
+14. Coverage slot-select UX hardening
+
+- Coverage planning now enforces existing slot selection via a searchable Time Slot select.
+- Invalid free-typed values are not persisted; users must pick a configured slot.
+
+15. Draft workspace contextual actions
+
+- Open coverage cards can now create a draft directly from the card.
+- Unfilled draft cards can now trigger AI refill on a single assignment slot.
 
 Components check `isAdmin` or `role` from `useAuth()` to show/hide UI sections rather than maintaining separate pages. For example, `TimeOffRequestList` shows admin approve/deny actions inline when `isAdmin === true`.
 

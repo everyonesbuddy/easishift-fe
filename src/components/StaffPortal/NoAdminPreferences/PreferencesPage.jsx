@@ -11,18 +11,29 @@ import {
   FormControlLabel,
   Stack,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import { FiSave, FiInfo } from "react-icons/fi";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
+import { useAuth } from "../../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function PreferencesPage() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [prefs, setPrefs] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     async function fetchPrefs() {
@@ -81,6 +92,37 @@ export default function PreferencesPage() {
       setError("Failed to save preferences");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const userId = user?._id || user?.id;
+
+    if (!userId) {
+      setError("Unable to determine which account to delete");
+      setDeleteDialogOpen(false);
+      return;
+    }
+
+    setDeletingAccount(true);
+    setError("");
+
+    try {
+      const res = await api.delete(`/auth/${userId}`);
+
+      toast.success(res.data?.message || "Your account has been deleted", {
+        position: "top-right",
+        autoClose: 2500,
+      });
+
+      logout();
+      navigate("/", { replace: true });
+    } catch (err) {
+      console.error(err);
+      setError(err?.response?.data?.message || "Failed to delete account");
+    } finally {
+      setDeletingAccount(false);
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -269,6 +311,34 @@ export default function PreferencesPage() {
           </Stack>
         </Paper>
 
+        <Paper
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "error.light",
+            boxShadow: 1,
+            bgcolor: "error.50",
+          }}
+        >
+          <Typography variant="h6" mb={0.5} sx={{ fontWeight: 700 }}>
+            Danger Zone
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mb={2.25}>
+            Delete your account and remove your personal scheduling data from
+            this facility.
+          </Typography>
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={() => setDeleteDialogOpen(true)}
+            disabled={deletingAccount}
+            sx={{ textTransform: "none", borderRadius: 2.5 }}
+          >
+            Delete My Account
+          </Button>
+        </Paper>
+
         <Box display="flex" justifyContent="flex-end">
           <Button
             variant="contained"
@@ -288,6 +358,36 @@ export default function PreferencesPage() {
           </Button>
         </Box>
       </Stack>
+
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => !deletingAccount && setDeleteDialogOpen(false)}
+      >
+        <DialogTitle>Delete Your Account?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This will permanently delete your account, preferences, messages,
+            time-off requests, schedules, and shift swap history tied to your
+            profile. This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setDeleteDialogOpen(false)}
+            disabled={deletingAccount}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteAccount}
+            color="error"
+            variant="contained"
+            disabled={deletingAccount}
+          >
+            {deletingAccount ? "Deleting..." : "Delete Account"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

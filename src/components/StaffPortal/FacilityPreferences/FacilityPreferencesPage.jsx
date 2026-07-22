@@ -24,6 +24,8 @@ import { FiSave, FiInfo, FiRotateCcw } from "react-icons/fi";
 import { FiX, FiPlus } from "react-icons/fi";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
+import { useAuth } from "../../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const SCHEDULING_PATTERNS = [
   { value: "balance", label: "Balance (fairness-based)" },
@@ -154,12 +156,16 @@ const normalizeTaxonomyPrefs = (inputPrefs) => {
 };
 
 export default function FacilityPreferencesPage() {
+  const { tenant, logout } = useAuth();
+  const navigate = useNavigate();
   const [prefs, setPrefs] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingTenant, setDeletingTenant] = useState(false);
 
   // UI state for adding new items to arrays
   const [arrayInputs, setArrayInputs] = useState({
@@ -399,6 +405,43 @@ export default function FacilityPreferencesPage() {
       setError("Failed to reset facility preferences");
     } finally {
       setResetting(false);
+    }
+  };
+
+  const handleDeleteTenant = async () => {
+    const tenantId = tenant?._id || tenant?.id;
+
+    if (!tenantId) {
+      setError("Unable to determine tenant account to delete");
+      setDeleteDialogOpen(false);
+      return;
+    }
+
+    setDeletingTenant(true);
+    setError("");
+
+    try {
+      const res = await api.delete(`/tenants/${tenantId}`);
+
+      toast.success(
+        res.data?.message ||
+          "Facility account and related data deleted successfully",
+        {
+          position: "top-right",
+          autoClose: 3000,
+        },
+      );
+
+      logout();
+      navigate("/", { replace: true });
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message || "Failed to delete facility account",
+      );
+    } finally {
+      setDeletingTenant(false);
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -1089,6 +1132,34 @@ export default function FacilityPreferencesPage() {
           </Typography>
         </Paper>
 
+        <Paper
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "error.light",
+            boxShadow: 1,
+            bgcolor: "error.50",
+          }}
+        >
+          <Typography variant="h6" mb={0.5} sx={{ fontWeight: 700 }}>
+            Danger Zone
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mb={2.25}>
+            Delete this facility account and permanently remove all staff,
+            schedules, messages, preferences, and tenant-scoped data.
+          </Typography>
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={() => setDeleteDialogOpen(true)}
+            disabled={deletingTenant || !tenant}
+            sx={{ textTransform: "none", borderRadius: 2 }}
+          >
+            Delete Facility Account
+          </Button>
+        </Paper>
+
         {/* Save button */}
         <Box sx={{ display: "flex", justifyContent: "flex-end", pb: 2 }}>
           <Button
@@ -1138,6 +1209,37 @@ export default function FacilityPreferencesPage() {
             }
           >
             {resetting ? "Resetting…" : "Reset"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => !deletingTenant && setDeleteDialogOpen(false)}
+      >
+        <DialogTitle>Delete Facility Account?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This will permanently delete your tenant account and all related
+            data for this facility, including staff accounts, schedules,
+            coverage, messages, time off, and preferences. This action cannot be
+            undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setDeleteDialogOpen(false)}
+            disabled={deletingTenant}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteTenant}
+            color="error"
+            variant="contained"
+            disabled={deletingTenant}
+          >
+            {deletingTenant ? "Deleting..." : "Delete Facility"}
           </Button>
         </DialogActions>
       </Dialog>

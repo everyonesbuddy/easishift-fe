@@ -159,6 +159,14 @@ const LIVE_SCHEDULE_STATUS_META = {
     subTextColor: "#cbd5e1",
     accentTextColor: "#94a3b8",
   },
+  in_progress: {
+    label: "Live schedule",
+    eventBg: "#1d4ed8",
+    eventBorder: "#1e40af",
+    textColor: "#ffffff",
+    subTextColor: "#dbeafe",
+    accentTextColor: "#bfdbfe",
+  },
   completed: {
     label: "Live schedule",
     eventBg: "#0f172a",
@@ -174,6 +182,22 @@ const LIVE_SCHEDULE_STATUS_META = {
     textColor: "#ffffff",
     subTextColor: "#fee2e2",
     accentTextColor: "#fecaca",
+  },
+  left_early: {
+    label: "Left-early schedule",
+    eventBg: "#ea580c",
+    eventBorder: "#c2410c",
+    textColor: "#ffffff",
+    subTextColor: "#ffedd5",
+    accentTextColor: "#fed7aa",
+  },
+  no_show: {
+    label: "No-show schedule",
+    eventBg: "#4b5563",
+    eventBorder: "#374151",
+    textColor: "#ffffff",
+    subTextColor: "#e5e7eb",
+    accentTextColor: "#d1d5db",
   },
 };
 

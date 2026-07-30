@@ -44,6 +44,16 @@ const TAXONOMY_FIELDS = [
   "certificationTags",
 ];
 
+const TIME_TRACKING_DEFAULTS = {
+  enabled: false,
+  mode: "open",
+  requireScheduleMatch: true,
+  clockInGraceMinutes: 15,
+  clockOutGraceMinutes: 30,
+  roundingMinutes: 0,
+  autoCloseOpenBreakOnClockOut: true,
+};
+
 const toSnakeCase = (value) =>
   String(value || "")
     .trim()
@@ -90,6 +100,50 @@ const normalizeArrayValues = (values) =>
         .filter(Boolean),
     ),
   );
+
+const normalizeTimeTrackingPrefs = (input) => {
+  const safe = input && typeof input === "object" ? input : {};
+
+  const normalizedMode = ["open", "qr"].includes(safe.mode)
+    ? safe.mode
+    : safe.mode === "geofence"
+      ? "qr"
+    : safe.mode === "manual"
+      ? "open"
+      : TIME_TRACKING_DEFAULTS.mode;
+
+  const normalizedRounding = [0, 5, 6, 10, 15].includes(
+    Number(safe.roundingMinutes),
+  )
+    ? Number(safe.roundingMinutes)
+    : TIME_TRACKING_DEFAULTS.roundingMinutes;
+
+  return {
+    enabled: Boolean(safe.enabled),
+    mode: normalizedMode,
+    requireScheduleMatch:
+      typeof safe.requireScheduleMatch === "boolean"
+        ? safe.requireScheduleMatch
+        : TIME_TRACKING_DEFAULTS.requireScheduleMatch,
+    clockInGraceMinutes: Math.max(
+      0,
+      Number.isFinite(Number(safe.clockInGraceMinutes))
+        ? Number(safe.clockInGraceMinutes)
+        : TIME_TRACKING_DEFAULTS.clockInGraceMinutes,
+    ),
+    clockOutGraceMinutes: Math.max(
+      0,
+      Number.isFinite(Number(safe.clockOutGraceMinutes))
+        ? Number(safe.clockOutGraceMinutes)
+        : TIME_TRACKING_DEFAULTS.clockOutGraceMinutes,
+    ),
+    roundingMinutes: normalizedRounding,
+    autoCloseOpenBreakOnClockOut:
+      typeof safe.autoCloseOpenBreakOnClockOut === "boolean"
+        ? safe.autoCloseOpenBreakOnClockOut
+        : TIME_TRACKING_DEFAULTS.autoCloseOpenBreakOnClockOut,
+  };
+};
 
 const normalizeTaxonomyPrefs = (inputPrefs) => {
   const safePrefs = inputPrefs || {};
@@ -152,6 +206,8 @@ const normalizeTaxonomyPrefs = (inputPrefs) => {
     new Set([...(next.shiftTypes || []), ...definitionKeys]),
   );
 
+  next.timeTracking = normalizeTimeTrackingPrefs(safePrefs.timeTracking);
+
   return next;
 };
 
@@ -199,6 +255,16 @@ export default function FacilityPreferencesPage() {
 
   const handleChange = (field, value) => {
     setPrefs((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleTimeTrackingChange = (field, value) => {
+    setPrefs((prev) => ({
+      ...prev,
+      timeTracking: {
+        ...normalizeTimeTrackingPrefs(prev?.timeTracking),
+        [field]: value,
+      },
+    }));
   };
 
   const handleArrayAdd = (field) => {
@@ -375,6 +441,7 @@ export default function FacilityPreferencesPage() {
     setError("");
     try {
       const payload = normalizeTaxonomyPrefs(prefs);
+
       const res = await api.post("/facility-preferences", payload);
       setPrefs(normalizeTaxonomyPrefs(res.data));
       toast.success("Facility preferences saved", {
@@ -383,7 +450,7 @@ export default function FacilityPreferencesPage() {
       });
     } catch (err) {
       console.error(err);
-      setError("Failed to save facility preferences");
+      setError(err?.message || "Failed to save facility preferences");
     } finally {
       setSaving(false);
     }
@@ -1054,6 +1121,207 @@ export default function FacilityPreferencesPage() {
             helperText="7 – 90 days of history used for workload fairness scoring"
             sx={{ maxWidth: 320 }}
           />
+        </Paper>
+
+        {/* ── Notifications ── */}
+        <Paper
+          sx={{
+            p: { xs: 2, md: 3 },
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "divider",
+            boxShadow: 1,
+          }}
+        >
+          <Typography variant="h6" mb={0.5} sx={{ fontWeight: 700 }}>
+            Time Tracking
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mb={2.25}>
+            Configure open or QR-based clock in/out behavior for your
+            facility
+          </Typography>
+
+          <Stack spacing={2.25}>
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                bgcolor: "grey.50",
+                border: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <FormControlLabel
+                sx={{ m: 0, width: "100%" }}
+                control={
+                  <Switch
+                    checked={Boolean(prefs.timeTracking?.enabled)}
+                    onChange={(e) =>
+                      handleTimeTrackingChange("enabled", e.target.checked)
+                    }
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography>Enable Time Tracking</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      When disabled, clock in/out endpoints reject attendance actions
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Box>
+
+            {!prefs.timeTracking?.enabled ? (
+              <Alert severity="info">
+                Time tracking is off. Turn it on to configure attendance behavior.
+              </Alert>
+            ) : null}
+
+            <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+              <FormControl fullWidth>
+                <InputLabel>Tracking Mode</InputLabel>
+                <Select
+                  label="Tracking Mode"
+                  value={prefs.timeTracking?.mode || "open"}
+                  onChange={(e) =>
+                    handleTimeTrackingChange("mode", e.target.value)
+                  }
+                  sx={{ borderRadius: 2 }}
+                >
+                  <MenuItem value="open">Open</MenuItem>
+                  <MenuItem value="qr">QR</MenuItem>
+                </Select>
+              </FormControl>
+
+              <FormControl fullWidth>
+                <InputLabel>Rounding</InputLabel>
+                <Select
+                  label="Rounding"
+                  value={prefs.timeTracking?.roundingMinutes ?? 0}
+                  onChange={(e) =>
+                    handleTimeTrackingChange(
+                      "roundingMinutes",
+                      Number(e.target.value),
+                    )
+                  }
+                  sx={{ borderRadius: 2 }}
+                >
+                  <MenuItem value={0}>No Rounding</MenuItem>
+                  <MenuItem value={5}>5 Minutes</MenuItem>
+                  <MenuItem value={6}>6 Minutes</MenuItem>
+                  <MenuItem value={10}>10 Minutes</MenuItem>
+                  <MenuItem value={15}>15 Minutes</MenuItem>
+                </Select>
+              </FormControl>
+            </Stack>
+
+            <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+              <TextField
+                fullWidth
+                type="number"
+                label="Clock In Grace (minutes)"
+                value={prefs.timeTracking?.clockInGraceMinutes ?? 15}
+                onChange={(e) =>
+                  handleTimeTrackingChange(
+                    "clockInGraceMinutes",
+                    Math.max(0, Number(e.target.value) || 0),
+                  )
+                }
+                inputProps={{ min: 0 }}
+                helperText="Allow early/late clock-in around shift start"
+              />
+              <TextField
+                fullWidth
+                type="number"
+                label="Clock Out Grace (minutes)"
+                value={prefs.timeTracking?.clockOutGraceMinutes ?? 30}
+                onChange={(e) =>
+                  handleTimeTrackingChange(
+                    "clockOutGraceMinutes",
+                    Math.max(0, Number(e.target.value) || 0),
+                  )
+                }
+                inputProps={{ min: 0 }}
+                helperText="Allow early/late clock-out around shift end"
+              />
+            </Stack>
+
+            {prefs.timeTracking?.mode === "qr" ? (
+              <Alert severity="info">
+                QR mode is active. Staff must scan a valid facility QR token to
+                clock in and clock out.
+              </Alert>
+            ) : null}
+
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                bgcolor: "grey.50",
+                border: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <FormControlLabel
+                sx={{ m: 0, width: "100%" }}
+                control={
+                  <Switch
+                    checked={Boolean(prefs.timeTracking?.requireScheduleMatch)}
+                    onChange={(e) =>
+                      handleTimeTrackingChange(
+                        "requireScheduleMatch",
+                        e.target.checked,
+                      )
+                    }
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography>Require Schedule Match</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Staff can only clock in/out when a matching shift exists in the grace window
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Box>
+
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                bgcolor: "grey.50",
+                border: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <FormControlLabel
+                sx={{ m: 0, width: "100%" }}
+                control={
+                  <Switch
+                    checked={Boolean(
+                      prefs.timeTracking?.autoCloseOpenBreakOnClockOut,
+                    )}
+                    onChange={(e) =>
+                      handleTimeTrackingChange(
+                        "autoCloseOpenBreakOnClockOut",
+                        e.target.checked,
+                      )
+                    }
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography>Auto Close Open Break on Clock Out</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      If a break is still open at clock-out, close it automatically
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Box>
+          </Stack>
         </Paper>
 
         {/* ── Notifications ── */}

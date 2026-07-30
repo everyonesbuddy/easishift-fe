@@ -27,6 +27,7 @@ import {
   MdClose,
   MdTune,
   MdHelpOutline,
+  MdAccessTime,
 } from "react-icons/md";
 import logo from "../../assets/logos/wiserShifts-logo-dark.svg";
 import { useAuth } from "../../context/AuthContext";
@@ -37,7 +38,7 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import ChangePasswordModal from "../Auth/ChangePasswordModal";
 
 function Sidebar({ mobileOpen, onMobileClose }) {
-  const { user } = useAuth();
+  const { user, facilityPreferences, isAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -46,7 +47,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const menuOpen = Boolean(anchorEl);
 
-  const role = user?.role || "staff";
+  const trackingEnabled = Boolean(facilityPreferences?.timeTracking?.enabled);
 
   const adminMenuItems = [
     { id: "overview", icon: MdDashboard, label: "Overview", to: "/dashboard" },
@@ -87,6 +88,16 @@ function Sidebar({ mobileOpen, onMobileClose }) {
       label: "Shift Swaps",
       to: "/swap-requests",
     },
+    ...(trackingEnabled
+      ? [
+          {
+            id: "attendance",
+            icon: MdAccessTime,
+            label: "Attendance",
+            to: "/time-tracking",
+          },
+        ]
+      : []),
     { id: "messages", icon: MdMessage, label: "Messages", to: "/messages" },
     {
       id: "subscription",
@@ -122,10 +133,20 @@ function Sidebar({ mobileOpen, onMobileClose }) {
       label: "Shift Swaps",
       to: "/swap-requests",
     },
+    ...(trackingEnabled
+      ? [
+          {
+            id: "time-tracking",
+            icon: MdAccessTime,
+            label: "Time Tracking",
+            to: "/time-tracking",
+          },
+        ]
+      : []),
     { id: "messages", icon: MdMessage, label: "Messages", to: "/messages" },
   ];
 
-  const menuItems = role === "admin" ? adminMenuItems : staffMenuItems;
+  const menuItems = isAdmin ? adminMenuItems : staffMenuItems;
   const activePath = location.pathname;
 
   return (

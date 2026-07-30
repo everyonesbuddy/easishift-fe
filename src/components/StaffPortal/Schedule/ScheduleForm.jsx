@@ -82,6 +82,15 @@ const getCoverageId = (coverage) =>
     coverage?.coverageId?._id || coverage?.coverageId || coverage?._id || "",
   );
 
+const SCHEDULE_STATUS_OPTIONS = [
+  { value: "scheduled", label: "Scheduled", adminOnly: false },
+  { value: "in_progress", label: "In Progress", adminOnly: true },
+  { value: "completed", label: "Completed", adminOnly: true },
+  { value: "left_early", label: "Left Early", adminOnly: true },
+  { value: "no_show", label: "No Show", adminOnly: true },
+  { value: "call_out", label: "Call Out", adminOnly: false },
+];
+
 const buildCoverageSignature = (coverage) => {
   const startRaw = coverage?.startTime || coverage?.windowStart;
   const endRaw = coverage?.endTime || coverage?.windowEnd;
@@ -771,9 +780,13 @@ export default function ScheduleForm({
               value={formData.status}
               onChange={handleChange}
             >
-              <MenuItem value="scheduled">Scheduled</MenuItem>
-              {isAdmin && <MenuItem value="completed">Completed</MenuItem>}
-              <MenuItem value="call_out">Call Out</MenuItem>
+              {SCHEDULE_STATUS_OPTIONS.filter(
+                (option) => !option.adminOnly || isAdmin,
+              ).map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
         )}

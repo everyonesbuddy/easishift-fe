@@ -27,6 +27,7 @@ import TimeOffDecision from "./components/StaffPortal/TimeOff/TimeOffDecision";
 import PreferencesPage from "./components/StaffPortal/NoAdminPreferences/PreferencesPage";
 import FacilityPreferencesPage from "./components/StaffPortal/FacilityPreferences/FacilityPreferencesPage";
 import CoveragePlanningPage from "./components/StaffPortal/Coverage/CoveragePlanningPage";
+import TimeTrackingPage from "./components/StaffPortal/TimeTracking/TimeTrackingPage";
 import { ToastContainer } from "react-toastify";
 import { Box } from "@mui/material";
 import { useAuth } from "./context/AuthContext";
@@ -166,6 +167,14 @@ export default function App() {
             element={
               <PrivateRoute>
                 <TimeOffRequestList />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/time-tracking"
+            element={
+              <PrivateRoute>
+                <TimeTrackingPage />
               </PrivateRoute>
             }
           />

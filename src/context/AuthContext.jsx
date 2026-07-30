@@ -1,4 +1,11 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import api from "../config/api";
 
 const AuthContext = createContext();
@@ -47,7 +54,7 @@ export const AuthProvider = ({ children }) => {
 
   const [facilityPreferences, setFacilityPreferences] = useState(null);
 
-  const fetchFacilityPreferences = async () => {
+  const fetchFacilityPreferences = useCallback(async () => {
     try {
       const res = await api.get("/facility-preferences");
       setFacilityPreferences(res.data || {});
@@ -57,8 +64,8 @@ export const AuthProvider = ({ children }) => {
       setFacilityPreferences({});
       return {};
     }
-  };
-  const login = (data) => {
+  }, []);
+  const login = useCallback((data) => {
     let userData = null;
     let detectedRole = "staff";
 
@@ -100,10 +107,10 @@ export const AuthProvider = ({ children }) => {
 
     localStorage.setItem("user", JSON.stringify(userData));
     localStorage.setItem("role", detectedRole);
-  };
+  }, [fetchFacilityPreferences]);
 
   // Allow manual refresh of tenant data
-  const refreshTenant = async () => {
+  const refreshTenant = useCallback(async () => {
     if (!user || !user.tenantId) return null;
     try {
       const res = await api.get(`/tenants/${user.tenantId}`);
@@ -114,9 +121,9 @@ export const AuthProvider = ({ children }) => {
       console.error("Failed to refresh tenant", err);
       return null;
     }
-  };
+  }, [user]);
 
-  const updateCurrentUser = (partialUser) => {
+  const updateCurrentUser = useCallback((partialUser) => {
     if (!partialUser) return;
 
     setUser((prev) => {
@@ -128,9 +135,9 @@ export const AuthProvider = ({ children }) => {
       }
       return nextUser;
     });
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
     setRole("");
     setTenant(null);
@@ -141,31 +148,48 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem("token");
       delete api.defaults.headers.common["Authorization"];
     } catch (err) {}
-  };
+  }, []);
 
   const normalizedRole = String(role || "").toLowerCase();
   const isPatient = normalizedRole === "patient";
   const isAdmin = normalizedRole === "admin" || normalizedRole === "superadmin";
   const isStaff = Boolean(user) && !isPatient;
 
+  const contextValue = useMemo(
+    () => ({
+      user,
+      role,
+      tenant,
+      refreshTenant,
+      facilityPreferences,
+      fetchFacilityPreferences,
+      isPatient,
+      isStaff,
+      isAdmin,
+      login,
+      logout,
+      updateCurrentUser,
+      loading,
+    }),
+    [
+      user,
+      role,
+      tenant,
+      refreshTenant,
+      facilityPreferences,
+      fetchFacilityPreferences,
+      isPatient,
+      isStaff,
+      isAdmin,
+      login,
+      logout,
+      updateCurrentUser,
+      loading,
+    ],
+  );
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        role,
-        tenant,
-        refreshTenant,
-        facilityPreferences,
-        fetchFacilityPreferences,
-        isPatient,
-        isStaff,
-        isAdmin,
-        login,
-        logout,
-        updateCurrentUser,
-        loading,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

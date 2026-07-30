@@ -10,7 +10,10 @@ import {
   Button,
   Box,
   Dialog,
+  DialogActions,
   DialogContent,
+  DialogTitle,
+  Alert,
   Paper,
   TablePagination,
   ToggleButton,
@@ -23,6 +26,7 @@ import {
   GlobalStyles,
   Checkbox,
   IconButton,
+  TextField,
   Tooltip,
 } from "@mui/material";
 
@@ -32,6 +36,7 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
 import api from "../../../config/api";
+import { toast } from "react-toastify";
 import {
   FiCalendar,
   FiList,
@@ -43,6 +48,7 @@ import {
   FiPrinter,
   FiDownload,
   FiChevronDown,
+  FiClock,
 } from "react-icons/fi";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -55,6 +61,8 @@ import { useAuth } from "../../../context/AuthContext";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Stack from "@mui/material/Stack";
+import { useNavigate } from "react-router-dom";
+import QrScannerDialog from "../../Shared/QrScannerDialog";
 import {
   getRoleColor,
   getRoleDisplayName,
@@ -65,8 +73,36 @@ import {
   getRoleOptionsFromFacilityPreferences,
 } from "../../../constants/industryRoles";
 
+const SCHEDULE_STATUS_META = {
+  scheduled: { label: "Scheduled", color: "#fbc02d" },
+  in_progress: { label: "In Progress", color: "#3b82f6" },
+  completed: { label: "Completed", color: "#66bb6a" },
+  left_early: { label: "Left Early", color: "#f97316" },
+  no_show: { label: "No Show", color: "#6b7280" },
+  call_out: { label: "Call Out", color: "#ef5350" },
+};
+
+const SCHEDULE_STATUS_FILTER_OPTIONS = [
+  "scheduled",
+  "in_progress",
+  "completed",
+  "left_early",
+  "no_show",
+  "call_out",
+];
+
+const getScheduleStatusColor = (status) =>
+  SCHEDULE_STATUS_META[String(status || "").toLowerCase()]?.color || "#9e9e9e";
+
+const getScheduleStatusLabel = (status) =>
+  SCHEDULE_STATUS_META[String(status || "").toLowerCase()]?.label ||
+  String(status || "unknown")
+    .replace(/_/g, " ")
+    .toUpperCase();
+
 export default function ScheduleList() {
   const { user, isAdmin, facilityPreferences } = useAuth();
+  const navigate = useNavigate();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -88,6 +124,12 @@ export default function ScheduleList() {
   const [swapSchedule, setSwapSchedule] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
+  const [timeEntryOpen, setTimeEntryOpen] = useState(false);
+  const [timeEntrySchedule, setTimeEntrySchedule] = useState(null);
+  const [timeEntrySubmitting, setTimeEntrySubmitting] = useState(false);
+  const [timeEntryLoading, setTimeEntryLoading] = useState(false);
+  const [activeTimeEntry, setActiveTimeEntry] = useState(null);
+  const [qrScanAction, setQrScanAction] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [monthDate, setMonthDate] = useState(new Date());
@@ -383,9 +425,219 @@ export default function ScheduleList() {
     setSelectedSchedule(null);
   };
 
+  const getEntityId = (value) => {
+    if (!value) return "";
+    if (typeof value === "string") return value;
+    return value?._id || value?.id || "";
+  };
+
+  const isCurrentUserSchedule = (schedule) => {
+    const scheduleStaffId = String(getEntityId(schedule?.staffId) || "");
+    const currentUserId = String(getEntityId(user) || "");
+    return Boolean(
+      scheduleStaffId && currentUserId && scheduleStaffId === currentUserId,
+    );
+  };
+
   const canManageSchedule = (schedule) => {
     if (isAdmin) return true;
-    return schedule?.staffId?._id === user?._id;
+    return isCurrentUserSchedule(schedule);
+  };
+
+  const timeTrackingEnabled = Boolean(
+    facilityPreferences?.timeTracking?.enabled,
+  );
+  const configuredTimeTrackingMode =
+    facilityPreferences?.timeTracking?.mode || "open";
+  const timeTrackingMode =
+    configuredTimeTrackingMode === "geofence"
+      ? "qr"
+      : configuredTimeTrackingMode === "manual"
+        ? "open"
+        : configuredTimeTrackingMode;
+  const requiresQrToken = timeTrackingMode === "qr";
+
+  const normalizeTimeEntries = (data) => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.entries)) return data.entries;
+    if (Array.isArray(data?.timeEntries)) return data.timeEntries;
+    if (data?.entry) return [data.entry];
+    return [];
+  };
+
+  const fetchActiveTimeEntry = async () => {
+    try {
+      setTimeEntryLoading(true);
+      const res = await api.get("/time-tracking/me");
+      const entries = normalizeTimeEntries(res.data);
+      const active =
+        res.data?.activeEntry ||
+        entries.find((item) => item?.status === "in_progress") ||
+        null;
+      setActiveTimeEntry(active);
+    } catch (err) {
+      console.error("Failed to fetch active time entry", err);
+      setActiveTimeEntry(null);
+    } finally {
+      setTimeEntryLoading(false);
+    }
+  };
+
+  const openTimeEntryModal = async (schedule) => {
+    setTimeEntrySchedule(schedule || null);
+    setTimeEntryOpen(true);
+    await fetchActiveTimeEntry();
+  };
+
+  const closeTimeEntryModal = () => {
+    setTimeEntryOpen(false);
+    setTimeEntrySchedule(null);
+    setActiveTimeEntry(null);
+    setQrScanAction(null);
+  };
+
+  const submitClockInFromSchedule = async (qrToken = "") => {
+    if (!timeEntrySchedule?._id) return;
+
+    try {
+      setTimeEntrySubmitting(true);
+      await api.post("/time-tracking/clock-in", {
+        at: new Date().toISOString(),
+        source: "web",
+        scheduleId: timeEntrySchedule._id,
+        ...(requiresQrToken ? { qrToken: String(qrToken || "").trim() } : {}),
+      });
+      await fetchActiveTimeEntry();
+      await fetchSchedules();
+      toast.success("Clocked in successfully.");
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.message || "Failed to clock in for this schedule.",
+      );
+    } finally {
+      setTimeEntrySubmitting(false);
+    }
+  };
+
+  const handleClockInFromSchedule = async () => {
+    if (requiresQrToken) {
+      setQrScanAction("clock-in");
+      return;
+    }
+    await submitClockInFromSchedule();
+  };
+
+  const submitClockOutFromSchedule = async (qrToken = "") => {
+    try {
+      setTimeEntrySubmitting(true);
+      await api.post("/time-tracking/clock-out", {
+        at: new Date().toISOString(),
+        source: "web",
+        ...(requiresQrToken ? { qrToken: String(qrToken || "").trim() } : {}),
+      });
+      await fetchActiveTimeEntry();
+      await fetchSchedules();
+      toast.success("Clocked out successfully.");
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.message ||
+          "Failed to clock out for this schedule.",
+      );
+    } finally {
+      setTimeEntrySubmitting(false);
+    }
+  };
+
+  const handleClockOutFromSchedule = async () => {
+    if (requiresQrToken) {
+      setQrScanAction("clock-out");
+      return;
+    }
+    await submitClockOutFromSchedule();
+  };
+
+  const handleQrScannedForSchedule = async (token) => {
+    const action = qrScanAction;
+    const trimmedToken = String(token || "").trim();
+    setQrScanAction(null);
+
+    if (!trimmedToken) {
+      toast.warning("Invalid QR code. Please try again.");
+      return;
+    }
+
+    if (action === "clock-in") {
+      await submitClockInFromSchedule(trimmedToken);
+      return;
+    }
+
+    if (action === "clock-out") {
+      await submitClockOutFromSchedule(trimmedToken);
+    }
+  };
+
+  const getOpenBreak = (entry) => {
+    if (!entry || !Array.isArray(entry.breaks)) return null;
+    return entry.breaks.find((item) => item && !item.endAt) || null;
+  };
+
+  const handleStartBreakFromSchedule = async () => {
+    if (!activeTimeEntry) {
+      toast.warning("Clock in first before starting a break.");
+      return;
+    }
+
+    if (getOpenBreak(activeTimeEntry)) {
+      toast.warning("You already have an active break.");
+      return;
+    }
+
+    try {
+      setTimeEntrySubmitting(true);
+      await api.post("/time-tracking/breaks/start", {
+        at: new Date().toISOString(),
+        type: "rest",
+        paid: false,
+        source: "web",
+      });
+      await fetchActiveTimeEntry();
+      toast.success("Break started.");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to start break.");
+    } finally {
+      setTimeEntrySubmitting(false);
+    }
+  };
+
+  const handleEndBreakFromSchedule = async () => {
+    if (!activeTimeEntry) {
+      toast.warning("No active time entry found.");
+      return;
+    }
+
+    if (!getOpenBreak(activeTimeEntry)) {
+      toast.warning("No active break to end.");
+      return;
+    }
+
+    try {
+      setTimeEntrySubmitting(true);
+      await api.post("/time-tracking/breaks/end", {
+        at: new Date().toISOString(),
+      });
+      await fetchActiveTimeEntry();
+      toast.success("Break ended.");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to end break.");
+    } finally {
+      setTimeEntrySubmitting(false);
+    }
+  };
+
+  const canOpenTimeEntryForSchedule = (schedule) => {
+    if (isAdmin) return false;
+    if (!timeTrackingEnabled) return false;
+    return isCurrentUserSchedule(schedule);
   };
 
   const uniqueShiftTimes = useMemo(() => {
@@ -411,11 +663,7 @@ export default function ScheduleList() {
   // ---------------------------
   const filteredSchedules = useMemo(() => {
     return schedules.filter((s) => {
-      if (
-        !isAdmin &&
-        staffVisibility === "mine" &&
-        s.staffId?._id !== user?._id
-      )
+      if (!isAdmin && staffVisibility === "mine" && !isCurrentUserSchedule(s))
         return false;
       // roleFilter is 'all' to allow all roles
       if (roleFilter && roleFilter !== "all" && s.role !== roleFilter)
@@ -439,7 +687,7 @@ export default function ScheduleList() {
     shiftTimeFilter,
     isAdmin,
     staffVisibility,
-    user?._id,
+    user,
   ]);
 
   const paginatedSchedules = useMemo(() => {
@@ -519,12 +767,6 @@ export default function ScheduleList() {
     month: "long",
     year: "numeric",
   });
-
-  const statusColors = {
-    scheduled: "#fbc02d",
-    completed: "#66bb6a",
-    call_out: "#ef5350",
-  };
 
   const monthRosterStaffRows = useMemo(() => {
     const inMonthSchedules = filteredSchedules.filter((schedule) => {
@@ -1222,6 +1464,23 @@ export default function ScheduleList() {
             </Button>
           )}
 
+          {!isAdmin && timeTrackingEnabled && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<FiClock />}
+              onClick={() => navigate("/time-tracking")}
+              sx={{
+                textTransform: "none",
+                borderRadius: 2,
+                px: 3,
+                width: { xs: "100%", md: "auto" },
+              }}
+            >
+              Clock In/Out
+            </Button>
+          )}
+
           <Button
             size="small"
             variant="contained"
@@ -1368,9 +1627,11 @@ export default function ScheduleList() {
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
                 <MenuItem value="">All</MenuItem>
-                <MenuItem value="scheduled">Scheduled</MenuItem>
-                <MenuItem value="completed">Completed</MenuItem>
-                <MenuItem value="call_out">Call Out</MenuItem>
+                {SCHEDULE_STATUS_FILTER_OPTIONS.map((statusValue) => (
+                  <MenuItem key={statusValue} value={statusValue}>
+                    {getScheduleStatusLabel(statusValue)}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
 
@@ -1447,15 +1708,15 @@ export default function ScheduleList() {
                           px: 1,
                           py: 0.3,
                           borderRadius: 1,
-                          border: `1px solid ${statusColors[s.status] || "#9e9e9e"}`,
-                          color: statusColors[s.status] || "#000",
+                          border: `1px solid ${getScheduleStatusColor(s.status)}`,
+                          color: getScheduleStatusColor(s.status),
                           fontWeight: 700,
                           fontSize: "0.64rem",
                           background: "#fff",
                           letterSpacing: 0.2,
                         }}
                       >
-                        {s.status.replace("_", " ").toUpperCase()}
+                        {getScheduleStatusLabel(s.status)}
                       </Box>
                     </Box>
                   </Box>
@@ -1468,6 +1729,17 @@ export default function ScheduleList() {
                     >
                       View
                     </Button>
+                    {canOpenTimeEntryForSchedule(s) && (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        startIcon={<FiClock />}
+                        onClick={() => openTimeEntryModal(s)}
+                        sx={{ textTransform: "none" }}
+                      >
+                        Time Entry
+                      </Button>
+                    )}
                     {canManageSchedule(s) && (
                       <Button
                         size="small"
@@ -1708,15 +1980,15 @@ export default function ScheduleList() {
                           px: 1,
                           py: 0.3,
                           borderRadius: 1,
-                          border: `1px solid ${statusColors[s.status] || "#9e9e9e"}`,
-                          color: statusColors[s.status] || "#000",
+                          border: `1px solid ${getScheduleStatusColor(s.status)}`,
+                          color: getScheduleStatusColor(s.status),
                           fontWeight: 700,
                           fontSize: "0.64rem",
                           background: "#fff",
                           letterSpacing: 0.2,
                         }}
                       >
-                        {s.status.replace("_", " ").toUpperCase()}
+                        {getScheduleStatusLabel(s.status)}
                       </Box>
                     </TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap", py: 0.75 }}>
@@ -1729,6 +2001,17 @@ export default function ScheduleList() {
                           <FiEye />
                         </IconButton>
                       </Tooltip>
+                      {canOpenTimeEntryForSchedule(s) && (
+                        <Tooltip title="Time entry">
+                          <IconButton
+                            size="small"
+                            onClick={() => openTimeEntryModal(s)}
+                            sx={{ mr: 0.5, color: "#0f766e" }}
+                          >
+                            <FiClock />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                       {canManageSchedule(s) && (
                         <Tooltip title="Edit schedule">
                           <IconButton
@@ -2331,8 +2614,8 @@ export default function ScheduleList() {
               title: s.staffId?.name,
               start: s.startTime,
               end: s.endTime,
-              backgroundColor: statusColors[s.status],
-              borderColor: statusColors[s.status],
+              backgroundColor: getScheduleStatusColor(s.status),
+              borderColor: getScheduleStatusColor(s.status),
               textColor: "#fff",
               extendedProps: {
                 staffName: s.staffId?.name,
@@ -2519,6 +2802,145 @@ export default function ScheduleList() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={timeEntryOpen}
+        onClose={closeTimeEntryModal}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Time Entry</DialogTitle>
+        <DialogContent>
+          {timeEntrySchedule ? (
+            <Stack spacing={1.5} sx={{ pt: 0.5 }}>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Staff
+                </Typography>
+                <Typography sx={{ fontWeight: 600 }}>
+                  {timeEntrySchedule.staffId?.name || "Unknown"}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Shift
+                </Typography>
+                <Typography>
+                  {formatScheduleDateRange(timeEntrySchedule)} |{" "}
+                  {formatScheduleTimeRange(timeEntrySchedule)}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  Current Schedule Status
+                </Typography>
+                <Typography sx={{ fontWeight: 600 }}>
+                  {(timeEntrySchedule.status || "scheduled")
+                    .replace("_", " ")
+                    .toUpperCase()}
+                </Typography>
+              </Box>
+
+              {requiresQrToken ? (
+                <Stack spacing={1}>
+                  <Alert severity="info">
+                    QR mode is active. Tap Clock In or Clock Out to open your
+                    camera and scan the facility QR code.
+                  </Alert>
+                </Stack>
+              ) : null}
+
+              {timeEntryLoading ? (
+                <Typography variant="body2" color="text.secondary">
+                  Loading active time entry...
+                </Typography>
+              ) : activeTimeEntry ? (
+                <Stack spacing={1}>
+                  <Alert severity="info">
+                    You already have an active time entry from{" "}
+                    {new Date(activeTimeEntry.clockInAt).toLocaleString()}. Use
+                    Clock Out to complete it.
+                  </Alert>
+                  {getOpenBreak(activeTimeEntry) ? (
+                    <Alert severity="warning">
+                      Active break started at{" "}
+                      {new Date(
+                        getOpenBreak(activeTimeEntry).startAt,
+                      ).toLocaleString()}
+                      .
+                    </Alert>
+                  ) : null}
+                </Stack>
+              ) : (
+                <Alert severity="success">
+                  No active time entry. You can clock in for this schedule.
+                </Alert>
+              )}
+            </Stack>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeTimeEntryModal} disabled={timeEntrySubmitting}>
+            Close
+          </Button>
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={handleClockOutFromSchedule}
+            disabled={timeEntrySubmitting || !activeTimeEntry}
+          >
+            Clock Out
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={handleStartBreakFromSchedule}
+            disabled={
+              timeEntrySubmitting ||
+              !activeTimeEntry ||
+              Boolean(getOpenBreak(activeTimeEntry))
+            }
+          >
+            Start Break
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={handleEndBreakFromSchedule}
+            disabled={
+              timeEntrySubmitting ||
+              !activeTimeEntry ||
+              !Boolean(getOpenBreak(activeTimeEntry))
+            }
+          >
+            End Break
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleClockInFromSchedule}
+            disabled={
+              timeEntrySubmitting ||
+              Boolean(activeTimeEntry) ||
+              !timeEntrySchedule ||
+              timeEntrySchedule.status !== "scheduled"
+            }
+          >
+            Clock In
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <QrScannerDialog
+        open={Boolean(qrScanAction)}
+        onClose={() => setQrScanAction(null)}
+        onScan={handleQrScannedForSchedule}
+        title={
+          qrScanAction === "clock-out"
+            ? "Scan to Clock Out"
+            : "Scan to Clock In"
+        }
+        description="Allow camera access, then point at your facility attendance QR code."
+      />
 
       <Dialog
         open={openAutoModal}

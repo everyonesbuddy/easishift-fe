@@ -31,6 +31,12 @@ const STATUS_COLOR = {
   call_out: "error",
 };
 
+const getDisplayAttendanceStatus = (entry) => {
+  const attendanceOutcome = String(entry?.attendanceOutcome || "").trim();
+  if (attendanceOutcome) return attendanceOutcome;
+  return String(entry?.status || "unknown").trim() || "unknown";
+};
+
 const formatStatusLabel = (status) =>
   String(status || "unknown")
     .replace(/_/g, " ")
@@ -46,27 +52,6 @@ const formatDateTime = (value) => {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleString();
-};
-
-const formatMinutes = (value) => {
-  const safe = Number(value || 0);
-  if (!Number.isFinite(safe)) return "0m";
-  const rounded = Math.max(0, Math.round(safe));
-  const hours = Math.floor(rounded / 60);
-  const minutes = rounded % 60;
-  if (!hours) return `${minutes}m`;
-  return `${hours}h ${minutes}m`;
-};
-
-const getWorkedMinutes = (entry) => {
-  if (!entry) return 0;
-  if (Number.isFinite(Number(entry?.workedMinutes))) {
-    return Number(entry.workedMinutes);
-  }
-  if (Number.isFinite(Number(entry?.totals?.workedMinutes))) {
-    return Number(entry.totals.workedMinutes);
-  }
-  return 0;
 };
 
 const normalizeEntriesFromResponse = (data) => {
@@ -569,6 +554,7 @@ export default function TimeTrackingPage() {
           ) : (
             <Stack spacing={1.25}>
               {entries.slice(0, 10).map((entry) => {
+                const displayStatus = getDisplayAttendanceStatus(entry);
                 const breakCount = Array.isArray(entry?.breaks)
                   ? entry.breaks.length
                   : 0;
@@ -588,14 +574,13 @@ export default function TimeTrackingPage() {
                           {formatDateTime(entry.clockOutAt)}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          Breaks: {breakCount} | Worked:{" "}
-                          {formatMinutes(getWorkedMinutes(entry))}
+                          Breaks: {breakCount}
                         </Typography>
                       </Box>
                       <Chip
                         size="small"
-                        color={STATUS_COLOR[entry.status] || "default"}
-                        label={formatStatusLabel(entry.status)}
+                        color={STATUS_COLOR[displayStatus] || "default"}
+                        label={formatStatusLabel(displayStatus)}
                       />
                     </Stack>
                   </Paper>
@@ -706,14 +691,14 @@ export default function TimeTrackingPage() {
                   <TableHead>
                     <TableRow>
                       <TableCell>Staff</TableCell>
-                      <TableCell>Status</TableCell>
+                      <TableCell>Attendance Status</TableCell>
                       <TableCell>Clock In</TableCell>
                       <TableCell>Clock Out</TableCell>
-                      <TableCell>Worked</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {adminEntries.slice(0, 20).map((entry) => {
+                      const displayStatus = getDisplayAttendanceStatus(entry);
                       const staffName =
                         entry?.staffId?.name ||
                         entry?.staff?.name ||
@@ -731,8 +716,8 @@ export default function TimeTrackingPage() {
                           <TableCell>
                             <Chip
                               size="small"
-                              color={STATUS_COLOR[entry.status] || "default"}
-                              label={formatStatusLabel(entry.status)}
+                              color={STATUS_COLOR[displayStatus] || "default"}
+                              label={formatStatusLabel(displayStatus)}
                             />
                           </TableCell>
                           <TableCell>
@@ -740,9 +725,6 @@ export default function TimeTrackingPage() {
                           </TableCell>
                           <TableCell>
                             {formatDateTime(entry.clockOutAt)}
-                          </TableCell>
-                          <TableCell>
-                            {formatMinutes(entry.workedMinutes)}
                           </TableCell>
                         </TableRow>
                       );

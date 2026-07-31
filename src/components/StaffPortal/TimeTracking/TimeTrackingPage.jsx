@@ -54,11 +54,53 @@ const formatDateTime = (value) => {
   return d.toLocaleString();
 };
 
+const formatElapsedFromNow = (startValue) => {
+  if (!startValue) return "-";
+  const start = new Date(startValue).getTime();
+  if (Number.isNaN(start)) return "-";
+
+  const diffMs = Date.now() - start;
+  if (diffMs <= 0) return "0m";
+
+  const totalMinutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (!hours) return `${minutes}m`;
+  return `${hours}h ${minutes}m`;
+};
+
+const getBreakSummary = (entry) => {
+  const breaks = Array.isArray(entry?.breaks) ? entry.breaks : [];
+  if (!breaks.length) return "No breaks yet";
+
+  const openBreak = breaks.find((item) => item && !item.endAt);
+  if (openBreak) {
+    return `On break since ${formatDateTime(openBreak.startAt)}`;
+  }
+
+  return `${breaks.length} break${breaks.length > 1 ? "s" : ""} logged`;
+};
+
+const formatSessionWindow = (schedule) => {
+  const startTime = schedule?.startTime;
+  const endTime = schedule?.endTime;
+  if (!startTime || !endTime) return "Time not available";
+  return `${formatDateTime(startTime)} to ${formatDateTime(endTime)}`;
+};
+
 const normalizeEntriesFromResponse = (data) => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.entries)) return data.entries;
   if (Array.isArray(data?.timeEntries)) return data.timeEntries;
   if (data?.entry) return [data.entry];
+  return [];
+};
+
+const normalizeSchedulesFromResponse = (data) => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.schedules)) return data.schedules;
+  if (Array.isArray(data?.items)) return data.items;
   return [];
 };
 
@@ -97,6 +139,7 @@ export default function TimeTrackingPage() {
 
   const [entries, setEntries] = useState([]);
   const [activeEntry, setActiveEntry] = useState(null);
+  const [staffSchedules, setStaffSchedules] = useState([]);
   const [adminEntries, setAdminEntries] = useState([]);
   const [qrScanAction, setQrScanAction] = useState(null);
   const [qrStationToken, setQrStationToken] = useState("");
@@ -120,6 +163,19 @@ export default function TimeTrackingPage() {
     setEntries(normalizedEntries);
     setActiveEntry(getActiveEntryFromResponse(res.data, normalizedEntries));
   }, []);
+
+  const loadStaffSchedules = useCallback(async () => {
+    if (isAdmin) return;
+    try {
+      const res = await api.get("/schedules");
+      const normalizedSchedules = normalizeSchedulesFromResponse(res.data);
+      setStaffSchedules(
+        Array.isArray(normalizedSchedules) ? normalizedSchedules : [],
+      );
+    } catch {
+      setStaffSchedules([]);
+    }
+  }, [isAdmin]);
 
   const loadAdminEntries = useCallback(async () => {
     if (!isAdmin) return;
@@ -174,6 +230,7 @@ export default function TimeTrackingPage() {
     try {
       const latestPrefs = await fetchFacilityPreferences();
       await loadStaffEntries();
+      await loadStaffSchedules();
       await loadAdminEntries();
 
       const latestMode = normalizeTrackingMode(latestPrefs?.timeTracking?.mode);
@@ -194,6 +251,7 @@ export default function TimeTrackingPage() {
     isAdmin,
     loadAdminEntries,
     loadStaffEntries,
+    loadStaffSchedules,
     syncCurrentQrStationToken,
   ]);
 
@@ -208,6 +266,7 @@ export default function TimeTrackingPage() {
         );
 
         await loadStaffEntries();
+        await loadStaffSchedules();
         await loadAdminEntries();
         if (isAdmin && latestMode === "qr") {
           await syncCurrentQrStationToken({ silent: true });
@@ -235,8 +294,82 @@ export default function TimeTrackingPage() {
     isAdmin,
     loadAdminEntries,
     loadStaffEntries,
+    loadStaffSchedules,
     syncCurrentQrStationToken,
   ]);
+
+  const clockInWindowState = useMemo(() => {
+    const requireScheduleMatch = Boolean(trackingConfig?.requireScheduleMatch);
+    if (isAdmin || !requireScheduleMatch) {
+      return {
+        canClockInFromScheduleWindow: true,
+        reason: "",
+        nextAvailableAt: null,
+        nextSchedule: null,
+      };
+    }
+
+    const clockInGraceMinutes = Number(
+      trackingConfig?.clockInGraceMinutes || 0,
+    );
+    const clockOutGraceMinutes = Number(
+      trackingConfig?.clockOutGraceMinutes || 0,
+    );
+    const nowMs = Date.now();
+
+    const candidates = (Array.isArray(staffSchedules) ? staffSchedules : [])
+      .filter((schedule) => {
+        const status = String(schedule?.status || "").toLowerCase();
+        return status === "scheduled" || status === "in_progress";
+      })
+      .map((schedule) => {
+        const startMs = new Date(schedule?.startTime).getTime();
+        const endMs = new Date(schedule?.endTime).getTime();
+        if (Number.isNaN(startMs) || Number.isNaN(endMs)) return null;
+
+        // Mirror backend window logic from findScheduleForClockAction.
+        const windowStartMs = startMs - clockOutGraceMinutes * 60 * 1000;
+        const windowEndMs = endMs + clockInGraceMinutes * 60 * 1000;
+
+        return {
+          schedule,
+          windowStartMs,
+          windowEndMs,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.windowStartMs - b.windowStartMs);
+
+    const activeWindow = candidates.find(
+      (item) => nowMs >= item.windowStartMs && nowMs <= item.windowEndMs,
+    );
+
+    if (activeWindow) {
+      return {
+        canClockInFromScheduleWindow: true,
+        reason: "",
+        nextAvailableAt: null,
+        nextSchedule: activeWindow.schedule,
+      };
+    }
+
+    const nextWindow = candidates.find((item) => item.windowStartMs > nowMs);
+    if (nextWindow) {
+      return {
+        canClockInFromScheduleWindow: false,
+        reason: "outside_window",
+        nextAvailableAt: nextWindow.windowStartMs,
+        nextSchedule: nextWindow.schedule,
+      };
+    }
+
+    return {
+      canClockInFromScheduleWindow: false,
+      reason: "no_upcoming_schedule",
+      nextAvailableAt: null,
+      nextSchedule: null,
+    };
+  }, [isAdmin, staffSchedules, trackingConfig]);
 
   useEffect(() => {
     if (!isAdmin || !requiresQrToken || !trackingEnabled) return undefined;
@@ -353,7 +486,8 @@ export default function TimeTrackingPage() {
     }
   };
 
-  const canClockIn = !activeEntry;
+  const canClockIn =
+    !activeEntry && clockInWindowState.canClockInFromScheduleWindow;
   const canStartBreak = Boolean(activeEntry) && !openBreak;
   const canEndBreak = Boolean(activeEntry) && Boolean(openBreak);
   const canClockOut = Boolean(activeEntry) && !openBreak;
@@ -480,25 +614,72 @@ export default function TimeTrackingPage() {
             />
           </Stack>
 
-          <Stack sx={{ gap: 0.75, mb: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              Clock In: {formatDateTime(activeEntry?.clockInAt)}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Open Break:{" "}
-              {openBreak
-                ? `Started ${formatDateTime(openBreak.startAt)}`
-                : "No"}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Linked Schedule: {activeEntry?.scheduleId ? "Yes" : "No"}
-            </Typography>
-            {requiresQrToken ? (
-              <Alert severity="info" sx={{ mt: 0.5 }}>
-                QR mode: tap Clock In or Clock Out to open your camera and scan.
-              </Alert>
-            ) : null}
-          </Stack>
+          {activeEntry ? (
+            <Stack sx={{ gap: 0.75, mb: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                Started: {formatDateTime(activeEntry.clockInAt)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Elapsed: {formatElapsedFromNow(activeEntry.clockInAt)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Breaks: {getBreakSummary(activeEntry)}
+              </Typography>
+              {activeEntry?.scheduleId?.startTime &&
+              activeEntry?.scheduleId?.endTime ? (
+                <Typography variant="body2" color="text.secondary">
+                  Shift Window:{" "}
+                  {formatDateTime(activeEntry.scheduleId.startTime)} to{" "}
+                  {formatDateTime(activeEntry.scheduleId.endTime)}
+                </Typography>
+              ) : null}
+              {requiresQrToken ? (
+                <Alert severity="info" sx={{ mt: 0.5 }}>
+                  QR mode: tap Clock Out to open your camera and scan.
+                </Alert>
+              ) : null}
+            </Stack>
+          ) : (
+            <Stack sx={{ gap: 0.75, mb: 2 }}>
+              <Alert severity="info">No active session right now.</Alert>
+              {clockInWindowState.nextSchedule ? (
+                <Typography variant="body2" color="text.secondary">
+                  Next session:{" "}
+                  {formatSessionWindow(clockInWindowState.nextSchedule)}
+                </Typography>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No upcoming schedule.
+                </Typography>
+              )}
+              {!clockInWindowState.canClockInFromScheduleWindow ? (
+                <Typography variant="caption" color="text.secondary">
+                  {clockInWindowState.reason === "no_upcoming_schedule"
+                    ? "Clock In is unavailable because there is no upcoming schedule in your allowed window."
+                    : clockInWindowState.nextAvailableAt
+                      ? `Clock In will be available at ${formatDateTime(
+                          clockInWindowState.nextAvailableAt,
+                        )} based on your shift window.`
+                      : "Clock In is unavailable right now because you are outside your allowed shift window."}
+                </Typography>
+              ) : (
+                <Typography variant="caption" color="text.secondary">
+                  Clock In is available now.
+                </Typography>
+              )}
+              {entries[0]?.clockOutAt ? (
+                <Typography variant="caption" color="text.secondary">
+                  Last clock-out: {formatDateTime(entries[0].clockOutAt)}
+                </Typography>
+              ) : null}
+              {requiresQrToken ? (
+                <Typography variant="caption" color="text.secondary">
+                  Tip: tap Scan to Clock In and point your camera at your
+                  facility QR code.
+                </Typography>
+              ) : null}
+            </Stack>
+          )}
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <Button

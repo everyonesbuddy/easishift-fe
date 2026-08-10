@@ -45,6 +45,9 @@ export default function Footer() {
             <Link component={RouterLink} to="/eula" underline="hover">
               EULA
             </Link>
+            <Link component={RouterLink} to="/contact" underline="hover">
+              Contact
+            </Link>
           </Stack>
         </Box>
 

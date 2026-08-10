@@ -326,6 +326,7 @@ export default function Home() {
                 sx={{
                   width: "100%",
                   alignItems: { xs: "stretch", sm: "center" },
+                  flexWrap: "wrap",
                 }}
               >
                 <Button
@@ -335,28 +336,24 @@ export default function Home() {
                   onClick={() => navigate("/signup-tenant")}
                   sx={{
                     width: { xs: "100%", sm: "auto" },
-                    fontWeight: 600,
+                    fontWeight: 700,
                     textTransform: "none",
                     borderRadius: 999,
-                    // bgcolor: "#1d1d1f",
-                    color: "#fff",
-                    px: { xs: 2.25, sm: 3 },
+                    px: { xs: 2.5, sm: 3.5 },
                     py: 1.2,
-                    // boxShadow:
-                    //   "0 1px 2px rgba(0,0,0,0.08), 0 6px 18px rgba(0,0,0,0.16)",
-                    // "&:hover": {
-                    //   bgcolor: "#000",
-                    //   boxShadow:
-                    //     "0 2px 6px rgba(0,0,0,0.12), 0 10px 24px rgba(0,0,0,0.2)",
-                    // },
+                    color: "#fff",
+                    bgcolor: "#2563EB",
+                    boxShadow: "0 10px 24px rgba(37, 99, 235, 0.22)",
+                    "&:hover": {
+                      bgcolor: "#1D4ED8",
+                    },
                   }}
                 >
                   Sign Up
                 </Button>
                 <Button
-                  variant="outlined"
+                  variant="text"
                   size="large"
-                  startIcon={<FiUser />}
                   onClick={() => navigate("/login")}
                   sx={{
                     width: { xs: "100%", sm: "auto" },
@@ -366,12 +363,6 @@ export default function Home() {
                     px: { xs: 2.5, sm: 3.5 },
                     py: 1.2,
                     color: "#1d1d1f",
-                    borderColor: "#d2d2d7",
-                    bgcolor: "#fff",
-                    "&:hover": {
-                      borderColor: "#b9b9be",
-                      bgcolor: "#f5f5f7",
-                    },
                   }}
                 >
                   Log in

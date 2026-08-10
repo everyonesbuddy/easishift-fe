@@ -11,6 +11,7 @@ import CostLeakCalculator from "./components/Home/CostLeakCalculator";
 import TermsAndConditions from "./components/Home/TermsAndConditions";
 import PrivacyPolicy from "./components/Home/PrivacyPolicy";
 import EndUserLicenseAgreement from "./components/Home/EndUserLicenseAgreement";
+import ContactPage from "./components/Home/ContactPage";
 import Navbar from "./components/Shared/Navbar";
 import Sidebar from "./components/Shared/Sidebar";
 import HowToUsePage from "./components/Shared/HowToUsePage";
@@ -92,6 +93,7 @@ export default function App() {
           />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/eula" element={<EndUserLicenseAgreement />} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/signup-tenant" element={<SignupTenant />} />

@@ -12,6 +12,7 @@ import { useTheme } from "@mui/material/styles";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { MdNotifications, MdLogout } from "react-icons/md";
+import { FiPhoneCall } from "react-icons/fi";
 import logo from "../../assets/logos/wiserShifts-logo-light.svg";
 import { MdMenu } from "react-icons/md";
 
@@ -92,9 +93,31 @@ export default function Navbar({ onMobileOpen }) {
           )}
         </Box>
 
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
           {!user ? (
             <>
+              <Button
+                component="a"
+                href="https://calendly.com/wisershifts-info/30min"
+                target="_blank"
+                rel="noopener noreferrer"
+                startIcon={<FiPhoneCall size={16} />}
+                sx={{
+                  color: "#fff",
+                  bgcolor: "#2563EB",
+                  borderRadius: 999,
+                  px: 2,
+                  py: 0.9,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  boxShadow: "0 10px 24px rgba(37, 99, 235, 0.22)",
+                  "&:hover": {
+                    bgcolor: "#1D4ED8",
+                  },
+                }}
+              >
+                Book demo
+              </Button>
               <Button component={Link} to="/login" sx={{ color: "black" }}>
                 Login
               </Button>

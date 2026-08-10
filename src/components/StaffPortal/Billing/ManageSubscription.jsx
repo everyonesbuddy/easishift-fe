@@ -9,24 +9,19 @@ import {
   Stack,
   Divider,
   Chip,
-  ToggleButton,
-  ToggleButtonGroup,
 } from "@mui/material";
 import ArrowOutwardRoundedIcon from "@mui/icons-material/ArrowOutwardRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import { useTheme } from "@mui/material/styles";
-import useMediaQuery from "@mui/material/useMediaQuery";
 import { useAuth } from "../../../context/AuthContext";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 
 export default function ManageSubscription() {
   const theme = useTheme();
-  const isCompact = useMediaQuery(theme.breakpoints.down("md"));
   const { tenant, refreshTenant } = useAuth();
   const [loadingPlan, setLoadingPlan] = useState(null);
   const [error, setError] = useState(null);
-  const [billingPeriod, setBillingPeriod] = useState("yearly");
 
   if (!tenant) return <Typography>Loading tenant...</Typography>;
 
@@ -70,47 +65,7 @@ export default function ManageSubscription() {
     },
   ];
 
-  const monthlyPlans = [
-    {
-      key: "starterMonthly",
-      name: "Starter",
-      priceLabel: "$400/mo",
-      price: 400,
-      seats: 50,
-      supportTier: "standard",
-      highlight: false,
-    },
-    {
-      key: "growthMonthly",
-      name: "Growth",
-      priceLabel: "$700/mo",
-      price: 700,
-      seats: 100,
-      supportTier: "standard",
-      highlight: true,
-    },
-    {
-      key: "premiumMonthly",
-      name: "Premium",
-      priceLabel: "$900/mo",
-      price: 900,
-      seats: 150,
-      supportTier: "priority",
-      highlight: false,
-    },
-    {
-      key: "enterpriseMonthly",
-      name: "Enterprise",
-      priceLabel: "Custom pricing",
-      price: null,
-      seats: "150+",
-      supportTier: "priority",
-      highlight: false,
-      isEnterprise: true,
-    },
-  ];
-
-  const plans = billingPeriod === "yearly" ? yearlyPlans : monthlyPlans;
+  const plans = yearlyPlans;
   const sharedFeatureList = [
     "Automated scheduling",
     "Shift swaps",
@@ -120,18 +75,18 @@ export default function ManageSubscription() {
     "Staff directory",
   ];
 
-  const getYearlySavingsPercent = () => {
-    const sampleMonthly = monthlyPlans[0]?.price;
-    const sampleYearly = yearlyPlans[0]?.price;
-    if (!sampleMonthly || !sampleYearly) return null;
-    const monthlyTotal = sampleMonthly * 12;
-    const savingsPercent = Math.round(
-      ((monthlyTotal - sampleYearly) / monthlyTotal) * 100,
-    );
-    return Number.isFinite(savingsPercent) ? savingsPercent : null;
+  const getPlanDisplayName = (planKey) => {
+    const displayMap = {
+      starterYearly: "Starter Annual",
+      growthYearly: "Growth Annual",
+      premiumYearly: "Premium Annual",
+      enterpriseYearly: "Enterprise Annual",
+    };
+
+    if (!planKey) return "No plan";
+    return displayMap[planKey] || planKey;
   };
 
-  const yearlySavingsPercent = getYearlySavingsPercent();
   const getCapacityLabel = (plan) =>
     plan.isEnterprise
       ? `${plan.seats} active employees`
@@ -210,133 +165,144 @@ export default function ManageSubscription() {
         </Typography>
       </Box>
 
-      <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>
-        <ToggleButtonGroup
-          value={billingPeriod}
-          exclusive
-          onChange={(e, newPeriod) => {
-            if (newPeriod !== null) setBillingPeriod(newPeriod);
-          }}
-          sx={{
-            p: 0.5,
-            borderRadius: 999,
-            backgroundColor: "rgba(15, 23, 42, 0.06)",
-            boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.08)",
-            gap: 0.5,
-            "& .MuiToggleButtonGroup-grouped": {
-              border: 0,
-              borderRadius: 999,
-              px: 3,
-              py: 0.8,
-              textTransform: "none",
-              fontWeight: 700,
-              color: "text.secondary",
-            },
-            "& .MuiToggleButtonGroup-grouped.Mui-selected": {
-              backgroundColor: "#fff",
-              color: "text.primary",
-              boxShadow: "0 10px 24px rgba(15, 23, 42, 0.12)",
-            },
-            "& .MuiToggleButtonGroup-grouped.Mui-selected:hover": {
-              backgroundColor: "#fff",
-            },
-          }}
-        >
-          <ToggleButton value="yearly">Yearly</ToggleButton>
-          <ToggleButton value="monthly">Monthly</ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
-
-      <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>
-        <Chip
-          label={
-            billingPeriod === "yearly" && yearlySavingsPercent
-              ? `Yearly saves ${yearlySavingsPercent}% compared to monthly`
-              : "Monthly offers flexibility with no long-term commitment"
-          }
-          color={billingPeriod === "yearly" ? "primary" : "default"}
-          variant={billingPeriod === "yearly" ? "filled" : "outlined"}
-          sx={{ fontWeight: 700 }}
-        />
-      </Box>
-
       <Box sx={{ display: "flex", justifyContent: "center" }}>
         <Box sx={{ width: "100%", maxWidth: 1100 }}>
           <Paper
             sx={{
               p: { xs: 2, md: 3 },
               mb: 3,
-              display: "flex",
-              gap: 3,
-              alignItems: "center",
-              flexDirection: { xs: "column", md: "row" },
+              borderRadius: 4,
+              border: "1px solid rgba(15, 23, 42, 0.08)",
+              background:
+                "linear-gradient(135deg, rgba(37, 99, 235, 0.06) 0%, rgba(255,255,255,1) 100%)",
             }}
           >
-            <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontWeight: 800 }}>
-                Current subscription
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  color: "text.secondary",
-                  mb: 0.5,
-                  fontSize: { xs: "0.85rem", md: "0.95rem" },
-                }}
-              >
-                Status:{" "}
-                <strong>{tenant.subscriptionStatus || "inactive"}</strong>
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  color: "text.secondary",
-                  mb: 0.5,
-                  fontSize: { xs: "0.85rem", md: "0.95rem" },
-                }}
-              >
-                Plan: <strong>{tenant.planKey || "None"}</strong> • Seats:{" "}
-                <strong>{tenant.seatLimit ?? "1"}</strong>
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  color: "text.secondary",
-                  fontSize: { xs: "0.85rem", md: "0.95rem" },
-                }}
-              >
-                Billing: <strong>{tenant.billingEmail || "Not set"}</strong>
-              </Typography>
-            </Box>
-
-            <Box
-              sx={{
-                display: "flex",
-                gap: 2,
-                alignItems: "center",
-                width: "100%",
-                justifyContent: { xs: "stretch", md: "flex-end" },
-                flexDirection: { xs: "column", md: "row" },
-              }}
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              spacing={2.5}
+              justifyContent="space-between"
+              alignItems={{ xs: "flex-start", md: "flex-start" }}
             >
+              <Box sx={{ flex: 1 }}>
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1.5}
+                  alignItems={{ xs: "flex-start", sm: "center" }}
+                  sx={{ mb: 1.5 }}
+                >
+                  <Typography sx={{ fontWeight: 800, fontSize: "1.05rem" }}>
+                    Current subscription
+                  </Typography>
+                  <Chip
+                    label={tenant.subscriptionStatus || "Inactive"}
+                    color={
+                      (tenant.subscriptionStatus || "inactive") === "active"
+                        ? "success"
+                        : "default"
+                    }
+                    size="small"
+                    sx={{ fontWeight: 700 }}
+                  />
+                </Stack>
+
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: "text.secondary",
+                    mb: 1.5,
+                    fontSize: { xs: "0.85rem", md: "0.95rem" },
+                  }}
+                >
+                  Your active plan, seats, and billing contact are shown here.
+                </Typography>
+
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: {
+                      xs: "1fr",
+                      sm: "repeat(3, minmax(0, 1fr))",
+                    },
+                    gap: 1.25,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      p: 1.25,
+                      borderRadius: 3,
+                      bgcolor: "rgba(255,255,255,0.7)",
+                      border: "1px solid rgba(15, 23, 42, 0.06)",
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "text.secondary" }}
+                    >
+                      Plan
+                    </Typography>
+                    <Typography sx={{ fontWeight: 800, mt: 0.3 }}>
+                      {getPlanDisplayName(tenant.planKey)}
+                    </Typography>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      p: 1.25,
+                      borderRadius: 3,
+                      bgcolor: "rgba(255,255,255,0.7)",
+                      border: "1px solid rgba(15, 23, 42, 0.06)",
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "text.secondary" }}
+                    >
+                      Seats
+                    </Typography>
+                    <Typography sx={{ fontWeight: 800, mt: 0.3 }}>
+                      {tenant.seatLimit ?? "1"}
+                    </Typography>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      p: 1.25,
+                      borderRadius: 3,
+                      bgcolor: "rgba(255,255,255,0.7)",
+                      border: "1px solid rgba(15, 23, 42, 0.06)",
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "text.secondary" }}
+                    >
+                      Billing
+                    </Typography>
+                    <Typography sx={{ fontWeight: 800, mt: 0.3 }}>
+                      {tenant.billingEmail || "Not set"}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+
               <Button
                 variant="contained"
+                color="error"
                 onClick={() => handleCancelSubscription()}
                 sx={{
                   textTransform: "none",
                   borderRadius: 2,
                   px: 3,
-                  bgcolor: "#2563EB",
-                  color: "#fff",
-                  width: { xs: "100%", md: "auto" },
-                  "&:hover": { bgcolor: "#1D4ED8" },
+                  minWidth: { xs: "100%", md: 220 },
+                  alignSelf: { xs: "stretch", md: "flex-start" },
+                  fontWeight: 700,
                 }}
               >
                 {loadingPlan === "cancel"
                   ? "Processing..."
                   : "Cancel subscription"}
               </Button>
-            </Box>
+            </Stack>
           </Paper>
 
           <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>
@@ -411,8 +377,7 @@ export default function ManageSubscription() {
                             fontSize: { xs: "0.76rem", md: "0.78rem" },
                           }}
                         >
-                          Per facility /{" "}
-                          {billingPeriod === "yearly" ? "year" : "month"}
+                          Per facility / year
                         </Typography>
                       </Box>
 
@@ -446,12 +411,8 @@ export default function ManageSubscription() {
                       }}
                     >
                       {p.isEnterprise
-                        ? "Talk to sales for a custom package"
-                        : billingPeriod === "yearly"
-                          ? `Equivalent to $${Math.round(
-                              p.price / 12,
-                            )}/mo billed yearly`
-                          : "Billed monthly, cancel anytime"}
+                        ? "Custom annual package"
+                        : `Equivalent to $${Math.round(p.price / 12)}/mo billed annually`}
                     </Typography>
                     <Typography
                       variant="body2"

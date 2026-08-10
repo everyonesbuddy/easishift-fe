@@ -10,8 +10,6 @@ import {
   Divider,
   Stack,
   useTheme,
-  ToggleButton,
-  ToggleButtonGroup,
 } from "@mui/material";
 import ArrowOutwardRoundedIcon from "@mui/icons-material/ArrowOutwardRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
@@ -22,7 +20,6 @@ export default function Paywall({ tenant }) {
   const theme = useTheme();
   const [loadingPlan, setLoadingPlan] = useState(null);
   const [error, setError] = useState(null);
-  const [billingPeriod, setBillingPeriod] = useState("yearly");
 
   if (!tenant) return null;
 
@@ -66,47 +63,7 @@ export default function Paywall({ tenant }) {
     },
   ];
 
-  const monthlyPlans = [
-    {
-      key: "starterMonthly",
-      name: "Starter",
-      priceLabel: "$400/mo",
-      price: 400,
-      seats: 50,
-      supportTier: "standard",
-      highlight: false,
-    },
-    {
-      key: "growthMonthly",
-      name: "Growth",
-      priceLabel: "$700/mo",
-      price: 700,
-      seats: 100,
-      supportTier: "standard",
-      highlight: true,
-    },
-    {
-      key: "premiumMonthly",
-      name: "Premium",
-      priceLabel: "$900/mo",
-      price: 900,
-      seats: 150,
-      supportTier: "priority",
-      highlight: false,
-    },
-    {
-      key: "enterpriseMonthly",
-      name: "Enterprise",
-      priceLabel: "Custom pricing",
-      price: null,
-      seats: "150+",
-      supportTier: "priority",
-      highlight: false,
-      isEnterprise: true,
-    },
-  ];
-
-  const plans = billingPeriod === "yearly" ? yearlyPlans : monthlyPlans;
+  const plans = yearlyPlans;
   const sharedFeatureList = [
     "Automated scheduling",
     "Shift swaps",
@@ -116,18 +73,6 @@ export default function Paywall({ tenant }) {
     "Staff directory",
   ];
 
-  const getYearlySavingsPercent = () => {
-    const sampleMonthly = monthlyPlans[0]?.price;
-    const sampleYearly = yearlyPlans[0]?.price;
-    if (!sampleMonthly || !sampleYearly) return null;
-    const monthlyTotal = sampleMonthly * 12;
-    const savingsPercent = Math.round(
-      ((monthlyTotal - sampleYearly) / monthlyTotal) * 100,
-    );
-    return Number.isFinite(savingsPercent) ? savingsPercent : null;
-  };
-
-  const yearlySavingsPercent = getYearlySavingsPercent();
   const getCapacityLabel = (plan) =>
     plan.isEnterprise
       ? `${plan.seats} active employees`
@@ -180,56 +125,6 @@ export default function Paywall({ tenant }) {
         <Typography sx={{ color: "text.secondary", mt: 1 }}>
           Select a plan to unlock staff seats and activate your subscription.
         </Typography>
-      </Box>
-
-      <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>
-        <ToggleButtonGroup
-          value={billingPeriod}
-          exclusive
-          onChange={(e, newPeriod) => {
-            if (newPeriod !== null) setBillingPeriod(newPeriod);
-          }}
-          sx={{
-            p: 0.5,
-            borderRadius: 999,
-            backgroundColor: "rgba(15, 23, 42, 0.06)",
-            boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.08)",
-            gap: 0.5,
-            "& .MuiToggleButtonGroup-grouped": {
-              border: 0,
-              borderRadius: 999,
-              px: 3,
-              py: 0.8,
-              textTransform: "none",
-              fontWeight: 700,
-              color: "text.secondary",
-            },
-            "& .MuiToggleButtonGroup-grouped.Mui-selected": {
-              backgroundColor: "#fff",
-              color: "text.primary",
-              boxShadow: "0 10px 24px rgba(15, 23, 42, 0.12)",
-            },
-            "& .MuiToggleButtonGroup-grouped.Mui-selected:hover": {
-              backgroundColor: "#fff",
-            },
-          }}
-        >
-          <ToggleButton value="yearly">Yearly</ToggleButton>
-          <ToggleButton value="monthly">Monthly</ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
-
-      <Box sx={{ display: "flex", justifyContent: "center", mb: 4 }}>
-        <Chip
-          label={
-            billingPeriod === "yearly" && yearlySavingsPercent
-              ? `Yearly saves ${yearlySavingsPercent}% compared to monthly`
-              : "Monthly offers flexibility with no long-term commitment"
-          }
-          color={billingPeriod === "yearly" ? "primary" : "default"}
-          variant={billingPeriod === "yearly" ? "filled" : "outlined"}
-          sx={{ fontWeight: 700 }}
-        />
       </Box>
 
       <Box
@@ -300,8 +195,7 @@ export default function Paywall({ tenant }) {
                         fontSize: { xs: "0.76rem", md: "0.78rem" },
                       }}
                     >
-                      Per facility /{" "}
-                      {billingPeriod === "yearly" ? "year" : "month"}
+                      Per facility / year
                     </Typography>
                   </Box>
 
@@ -335,12 +229,8 @@ export default function Paywall({ tenant }) {
                   }}
                 >
                   {p.isEnterprise
-                    ? "Talk to sales for a custom package"
-                    : billingPeriod === "yearly"
-                      ? `Equivalent to $${Math.round(
-                          p.price / 12,
-                        )}/mo billed yearly`
-                      : "Billed monthly, cancel anytime"}
+                    ? "Custom annual package"
+                    : `Equivalent to $${Math.round(p.price / 12)}/mo billed annually`}
                 </Typography>
                 <Typography
                   variant="body2"

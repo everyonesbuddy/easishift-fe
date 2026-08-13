@@ -3,6 +3,9 @@ import {
   Box,
   Typography,
   Paper,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
   Button,
   CircularProgress,
   ToggleButton,
@@ -17,13 +20,60 @@ import {
   DialogContentText,
   DialogActions,
 } from "@mui/material";
-import { FiSave, FiInfo } from "react-icons/fi";
+import { FiSave, FiInfo, FiChevronDown } from "react-icons/fi";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const ACCORDION_BASE_SX = {
+  borderRadius: 3,
+  border: "1px solid",
+  borderColor: "divider",
+  boxShadow: 1,
+  overflow: "hidden",
+  "&:before": { display: "none" },
+  "&.Mui-expanded": {
+    margin: 0,
+  },
+};
+
+const ACCORDION_SUMMARY_SX = {
+  px: { xs: 2, md: 3 },
+  py: 0.75,
+  minHeight: 72,
+  bgcolor: "grey.50",
+  transition: "background-color 120ms ease",
+  "&:hover": {
+    bgcolor: "grey.100",
+  },
+  "&.Mui-focusVisible": {
+    bgcolor: "grey.50",
+    outline: "none",
+  },
+  "&:focus, &:focus-visible, &:active": {
+    outline: "none",
+    boxShadow: "none",
+  },
+  "&.Mui-expanded": {
+    minHeight: 72,
+  },
+  "& .MuiAccordionSummary-content": {
+    my: 1,
+  },
+  "& .MuiAccordionSummary-content.Mui-expanded": {
+    my: 1,
+  },
+};
+
+const ACCORDION_DETAILS_SX = {
+  pt: 2,
+  px: { xs: 2, md: 3 },
+  pb: { xs: 2, md: 3 },
+  bgcolor: "background.paper",
+};
 
 export default function PreferencesPage() {
   const { user, logout } = useAuth();
@@ -181,163 +231,184 @@ export default function PreferencesPage() {
       </Paper>
 
       <Stack sx={{ gap: { xs: 2, md: 3 } }}>
-        <Paper
-          sx={{
-            p: { xs: 2, md: 3 },
-            borderRadius: 3,
-            border: "1px solid",
-            borderColor: "divider",
-            boxShadow: 1,
-          }}
-        >
-          <Typography variant="h6" mb={0.5} sx={{ fontWeight: 700 }}>
-            Preferred Days
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mb={2.25}>
-            Select the days you prefer to work
-          </Typography>
-          <ToggleButtonGroup
-            sx={{
-              display: "grid",
-              gridTemplateColumns: "repeat(7, minmax(42px, 1fr))",
-              gap: 1,
-            }}
+        <Accordion disableGutters sx={ACCORDION_BASE_SX}>
+          <AccordionSummary
+            expandIcon={<FiChevronDown size={18} />}
+            sx={ACCORDION_SUMMARY_SX}
           >
-            {DAYS.map((d, i) => {
-              const isPreferred = hasPref(prefs.preferredDaysOfWeek, i);
-              return (
-                <ToggleButton
-                  key={i}
-                  value={d}
-                  selected={isPreferred}
-                  onClick={() => toggleArrayItem("preferredDaysOfWeek", i)}
-                  sx={{
-                    borderRadius: 2,
-                    minHeight: 44,
-                    fontWeight: 600,
-                    bgcolor: isPreferred
-                      ? "success.lighter"
-                      : "background.paper",
-                    color: isPreferred ? "success.dark" : "text.primary",
-                    border: isPreferred ? "2px solid" : "1px solid",
-                    borderColor: isPreferred ? "success.main" : "divider",
-                    "&:hover": {
-                      borderColor: "success.light",
-                    },
-                  }}
-                >
-                  {d}
-                </ToggleButton>
-              );
-            })}
-          </ToggleButtonGroup>
-        </Paper>
-
-        <Paper
-          sx={{
-            p: { xs: 2, md: 3 },
-            borderRadius: 3,
-            border: "1px solid",
-            borderColor: "divider",
-            boxShadow: 1,
-          }}
-        >
-          <Typography variant="h6" mb={1.75} sx={{ fontWeight: 700 }}>
-            Notification Preferences
-          </Typography>
-          <Stack spacing={2}>
-            <Box
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Preferred Days
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Select the days you prefer to work
+              </Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails sx={ACCORDION_DETAILS_SX}>
+            <ToggleButtonGroup
               sx={{
-                p: 1.5,
-                borderRadius: 2,
-                bgcolor: "grey.50",
-                border: "1px solid",
-                borderColor: "divider",
+                display: "grid",
+                gridTemplateColumns: "repeat(7, minmax(42px, 1fr))",
+                gap: 1,
               }}
             >
-              <FormControlLabel
-                sx={{ m: 0, width: "100%" }}
-                control={
-                  <Switch
-                    checked={prefs.emailNotificationsEnabled ?? true}
-                    onChange={(e) =>
-                      handleChange(
-                        "emailNotificationsEnabled",
-                        e.target.checked,
-                      )
-                    }
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography>Email Notifications</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Receive email alerts for important updates
-                    </Typography>
-                  </Box>
-                }
-              />
-            </Box>
+              {DAYS.map((d, i) => {
+                const isPreferred = hasPref(prefs.preferredDaysOfWeek, i);
+                return (
+                  <ToggleButton
+                    key={i}
+                    value={d}
+                    selected={isPreferred}
+                    onClick={() => toggleArrayItem("preferredDaysOfWeek", i)}
+                    sx={{
+                      borderRadius: 2,
+                      minHeight: 44,
+                      fontWeight: 600,
+                      bgcolor: isPreferred
+                        ? "success.lighter"
+                        : "background.paper",
+                      color: isPreferred ? "success.dark" : "text.primary",
+                      border: isPreferred ? "2px solid" : "1px solid",
+                      borderColor: isPreferred ? "success.main" : "divider",
+                      "&:hover": {
+                        borderColor: "success.light",
+                      },
+                    }}
+                  >
+                    {d}
+                  </ToggleButton>
+                );
+              })}
+            </ToggleButtonGroup>
+          </AccordionDetails>
+        </Accordion>
 
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: 2,
-                bgcolor: "grey.50",
-                border: "1px solid",
-                borderColor: "divider",
-              }}
-            >
-              <FormControlLabel
-                sx={{ m: 0, width: "100%" }}
-                control={
-                  <Switch
-                    checked={prefs.smsNotificationsEnabled ?? true}
-                    onChange={(e) =>
-                      handleChange("smsNotificationsEnabled", e.target.checked)
-                    }
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography>SMS Notifications</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Receive text alerts for important updates
-                    </Typography>
-                  </Box>
-                }
-              />
+        <Accordion disableGutters sx={ACCORDION_BASE_SX}>
+          <AccordionSummary
+            expandIcon={<FiChevronDown size={18} />}
+            sx={ACCORDION_SUMMARY_SX}
+          >
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Notification Preferences
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Choose how you receive important updates
+              </Typography>
             </Box>
-          </Stack>
-        </Paper>
+          </AccordionSummary>
+          <AccordionDetails sx={ACCORDION_DETAILS_SX}>
+            <Stack spacing={2}>
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderRadius: 2,
+                  bgcolor: "grey.50",
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                <FormControlLabel
+                  sx={{ m: 0, width: "100%" }}
+                  control={
+                    <Switch
+                      checked={prefs.emailNotificationsEnabled ?? true}
+                      onChange={(e) =>
+                        handleChange(
+                          "emailNotificationsEnabled",
+                          e.target.checked,
+                        )
+                      }
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography>Email Notifications</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Receive email alerts for important updates
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
 
-        <Paper
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderRadius: 2,
+                  bgcolor: "grey.50",
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                <FormControlLabel
+                  sx={{ m: 0, width: "100%" }}
+                  control={
+                    <Switch
+                      checked={prefs.smsNotificationsEnabled ?? true}
+                      onChange={(e) =>
+                        handleChange(
+                          "smsNotificationsEnabled",
+                          e.target.checked,
+                        )
+                      }
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography>SMS Notifications</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Receive text alerts for important updates
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+            </Stack>
+          </AccordionDetails>
+        </Accordion>
+
+        <Accordion
+          disableGutters
           sx={{
-            p: { xs: 2, md: 3 },
-            borderRadius: 3,
-            border: "1px solid",
+            ...ACCORDION_BASE_SX,
             borderColor: "error.light",
-            boxShadow: 1,
             bgcolor: "error.50",
+            "& .MuiAccordionSummary-root": {
+              bgcolor: "error.50",
+            },
+            "& .MuiAccordionDetails-root": {
+              bgcolor: "error.50",
+            },
           }}
         >
-          <Typography variant="h6" mb={0.5} sx={{ fontWeight: 700 }}>
-            Danger Zone
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mb={2.25}>
-            Delete your account and remove your personal scheduling data from
-            this facility.
-          </Typography>
-          <Button
-            variant="outlined"
-            color="error"
-            onClick={() => setDeleteDialogOpen(true)}
-            disabled={deletingAccount}
-            sx={{ textTransform: "none", borderRadius: 2.5 }}
+          <AccordionSummary
+            expandIcon={<FiChevronDown size={18} />}
+            sx={ACCORDION_SUMMARY_SX}
           >
-            Delete My Account
-          </Button>
-        </Paper>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Danger Zone
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Delete your account and remove your personal scheduling data
+                from this facility.
+              </Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails sx={ACCORDION_DETAILS_SX}>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => setDeleteDialogOpen(true)}
+              disabled={deletingAccount}
+              sx={{ textTransform: "none", borderRadius: 2.5 }}
+            >
+              Delete My Account
+            </Button>
+          </AccordionDetails>
+        </Accordion>
 
         <Box display="flex" justifyContent="flex-end">
           <Button

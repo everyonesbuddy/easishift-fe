@@ -1,6 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   Alert,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
   TextField,
   Button,
   Typography,
@@ -16,6 +19,7 @@ import {
   Switch,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
@@ -119,6 +123,44 @@ const extractStaffIdFromResponse = (data) =>
   data?.id ||
   null;
 
+const SELECTOR_ACCORDION_SX = {
+  borderRadius: 3,
+  border: "1px solid",
+  borderColor: "rgba(191, 219, 254, 0.95)",
+  boxShadow: "0 10px 30px rgba(15, 23, 42, 0.05)",
+  bgcolor: "background.paper",
+  "&:before": { display: "none" },
+  "&.Mui-expanded": { margin: 0 },
+};
+
+const SELECTOR_SUMMARY_SX = {
+  px: { xs: 1.75, sm: 2.25 },
+  py: 1,
+  minHeight: 68,
+  bgcolor: "rgba(248, 250, 252, 0.96)",
+  borderBottom: "1px solid",
+  borderBottomColor: "rgba(226, 232, 240, 0.9)",
+  transition: "background-color 140ms ease, transform 140ms ease",
+  "&:hover": {
+    bgcolor: "rgba(241, 245, 249, 1)",
+  },
+  "&.Mui-expanded": {
+    minHeight: 68,
+    bgcolor: "rgba(248, 250, 252, 1)",
+  },
+  "& .MuiAccordionSummary-content": {
+    my: 0,
+  },
+  "& .MuiAccordionSummary-content.Mui-expanded": {
+    my: 0,
+  },
+};
+
+const SELECTOR_DETAILS_SX = {
+  p: { xs: 1.75, sm: 2.25 },
+  bgcolor: "white",
+};
+
 const MultiChipSelector = ({
   label,
   helperText,
@@ -127,8 +169,24 @@ const MultiChipSelector = ({
   onChange,
   getOptionValue,
   getOptionLabel,
+  getOptionGroup,
+  hideLabel = false,
 }) => {
   const selectedValues = normalizeStringArray(values);
+
+  const groupedVisibleOptions = useMemo(() => {
+    const groupMap = new Map();
+
+    options.forEach((option) => {
+      const group = (getOptionGroup ? getOptionGroup(option) : "") || "Other";
+      if (!groupMap.has(group)) {
+        groupMap.set(group, []);
+      }
+      groupMap.get(group).push(option);
+    });
+
+    return Array.from(groupMap.entries());
+  }, [options, getOptionGroup]);
 
   const toggleValue = (option) => {
     const value = getOptionValue(option);
@@ -144,9 +202,11 @@ const MultiChipSelector = ({
 
   return (
     <Box>
-      <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-        {label}
-      </Typography>
+      {!hideLabel ? (
+        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+          {label}
+        </Typography>
+      ) : null}
       <Typography
         variant="caption"
         color="text.secondary"
@@ -155,28 +215,83 @@ const MultiChipSelector = ({
         {helperText}
       </Typography>
 
+      {selectedValues.length > 0 && (
+        <Stack
+          direction="row"
+          spacing={0.75}
+          flexWrap="wrap"
+          useFlexGap
+          sx={{ mb: 1 }}
+        >
+          {selectedValues.map((selectedValue) => (
+            <Chip
+              key={selectedValue}
+              size="small"
+              color="primary"
+              label={toDisplayLabel(selectedValue)}
+              onDelete={() =>
+                onChange(
+                  selectedValues.filter((item) => item !== selectedValue),
+                )
+              }
+            />
+          ))}
+        </Stack>
+      )}
+
       {!options.length ? (
         <Typography variant="caption" color="text.secondary">
           No options configured yet
         </Typography>
       ) : (
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-          {options.map((option) => {
-            const value = getOptionValue(option);
-            const selected = selectedValues.includes(value);
+        <Box
+          sx={{
+            maxHeight: 220,
+            overflowY: "auto",
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 2,
+            p: 1,
+            bgcolor: "background.paper",
+          }}
+        >
+          <Stack spacing={1.25}>
+            {groupedVisibleOptions.map(([groupLabel, groupOptions]) => (
+              <Box key={groupLabel}>
+                {getOptionGroup ? (
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      display: "block",
+                      mb: 0.75,
+                      fontWeight: 700,
+                      color: "text.secondary",
+                    }}
+                  >
+                    {groupLabel}
+                  </Typography>
+                ) : null}
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  {groupOptions.map((option) => {
+                    const value = getOptionValue(option);
+                    const selected = selectedValues.includes(value);
 
-            return (
-              <Chip
-                key={value}
-                label={getOptionLabel(option)}
-                clickable
-                color={selected ? "primary" : "default"}
-                variant={selected ? "filled" : "outlined"}
-                onClick={() => toggleValue(option)}
-              />
-            );
-          })}
-        </Stack>
+                    return (
+                      <Chip
+                        key={value}
+                        label={getOptionLabel(option)}
+                        clickable
+                        color={selected ? "primary" : "default"}
+                        variant={selected ? "filled" : "outlined"}
+                        onClick={() => toggleValue(option)}
+                      />
+                    );
+                  })}
+                </Stack>
+              </Box>
+            ))}
+          </Stack>
+        </Box>
       )}
     </Box>
   );
@@ -186,24 +301,36 @@ const SectionCard = ({ eyebrow, title, description, children }) => (
   <Paper
     variant="outlined"
     sx={{
-      p: { xs: 1.5, sm: 2 },
-      borderRadius: 2.5,
-      borderColor: "#dbeafe",
-      backgroundColor: "#f8fbff",
+      p: { xs: 1.75, sm: 2.25 },
+      borderRadius: 3,
+      borderColor: "rgba(191, 219, 254, 0.95)",
+      background:
+        "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,251,255,0.96) 100%)",
+      boxShadow: "0 12px 30px rgba(15, 23, 42, 0.06)",
     }}
   >
-    <Stack spacing={1.5}>
-      <Box>
+    <Stack spacing={2}>
+      <Box
+        sx={{
+          pb: 1,
+          borderBottom: "1px solid",
+          borderColor: "rgba(226, 232, 240, 0.9)",
+        }}
+      >
         <Typography
           variant="overline"
-          sx={{ color: "primary.main", fontWeight: 700, letterSpacing: 0.8 }}
+          sx={{ color: "primary.main", fontWeight: 800, letterSpacing: 1 }}
         >
           {eyebrow}
         </Typography>
-        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
           {title}
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ maxWidth: 760 }}
+        >
           {description}
         </Typography>
       </Box>
@@ -271,14 +398,8 @@ export default function StaffCreateAndEditForm({
   const [phoneError, setPhoneError] = useState("");
 
   const allowedAreaOptions = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...(facilityPreferences?.unitAreas || []),
-          ...(Array.isArray(form?.allowedAreas) ? form.allowedAreas : []),
-        ]),
-      ),
-    [facilityPreferences?.unitAreas, form?.allowedAreas],
+    () => Array.from(new Set(facilityPreferences?.unitAreas || [])),
+    [facilityPreferences?.unitAreas],
   );
 
   const certificationTagOptions = useMemo(
@@ -598,10 +719,14 @@ export default function StaffCreateAndEditForm({
         handleSubmit();
       }}
       sx={{
-        p: 3,
-        borderRadius: 2,
-        backgroundColor: "rgba(255,255,255,0.02)",
+        p: { xs: 2, sm: 2.5, md: 3 },
+        borderRadius: 4,
+        background:
+          "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,250,252,0.92) 100%)",
+        border: "1px solid rgba(226, 232, 240, 0.95)",
+        boxShadow: "0 24px 60px rgba(15, 23, 42, 0.08)",
         position: "relative",
+        backdropFilter: "blur(8px)",
       }}
       elevation={0}
     >
@@ -734,50 +859,124 @@ export default function StaffCreateAndEditForm({
           </Alert>
 
           {allowedAreaOptions.length > 0 && (
-            <MultiChipSelector
-              label="Allowed Unit Areas"
-              helperText="Leave empty to allow any area. Once areas are selected, this staff member is limited to those areas."
-              options={allowedAreaOptions}
-              values={form.allowedAreas}
-              onChange={(value) => setForm({ ...form, allowedAreas: value })}
-              getOptionValue={(option) => option}
-              getOptionLabel={(option) =>
-                areaLabelLookup.get(option) || toDisplayLabel(option)
-              }
-            />
+            <Accordion disableGutters sx={SELECTOR_ACCORDION_SX}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  sx={{ width: "100%" }}
+                >
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                      Allowed Unit Areas
+                    </Typography>
+                  </Box>
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    label={`${form.allowedAreas.length} selected`}
+                  />
+                </Stack>
+              </AccordionSummary>
+              <AccordionDetails sx={SELECTOR_DETAILS_SX}>
+                <MultiChipSelector
+                  helperText="Leave empty to allow any area. Once areas are selected, this staff member is limited to those areas."
+                  options={allowedAreaOptions}
+                  values={form.allowedAreas}
+                  onChange={(value) =>
+                    setForm({ ...form, allowedAreas: value })
+                  }
+                  getOptionValue={(option) => option}
+                  getOptionLabel={(option) =>
+                    areaLabelLookup.get(option) || toDisplayLabel(option)
+                  }
+                  hideLabel
+                />
+              </AccordionDetails>
+            </Accordion>
           )}
 
-          <MultiChipSelector
-            label="Allowed Shift Time Slots"
-            helperText={
-              shiftSlotOptions.length
-                ? "Leave empty to allow any time slot. Selecting chips restricts this staff member to those exact shift slots."
-                : "No shift definitions configured yet. Define shift type time slots in Facility Preferences to use this."
-            }
-            options={shiftSlotOptions}
-            values={form.allowedShiftTags}
-            onChange={(value) => setForm({ ...form, allowedShiftTags: value })}
-            getOptionValue={(option) => option.value}
-            getOptionLabel={(option) =>
-              shiftSlotLabelLookup.get(option.value) || option.label
-            }
-          />
+          <Accordion disableGutters sx={SELECTOR_ACCORDION_SX}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                sx={{ width: "100%" }}
+              >
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                    Allowed Shift Time Slots
+                  </Typography>
+                </Box>
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`${form.allowedShiftTags.length} selected`}
+                />
+              </Stack>
+            </AccordionSummary>
+            <AccordionDetails sx={SELECTOR_DETAILS_SX}>
+              <MultiChipSelector
+                helperText={
+                  shiftSlotOptions.length
+                    ? "Leave empty to allow any time slot. Selecting chips restricts this staff member to those exact shift slots."
+                    : "No shift definitions configured yet. Define shift type time slots in Facility Preferences to use this."
+                }
+                options={shiftSlotOptions}
+                values={form.allowedShiftTags}
+                onChange={(value) =>
+                  setForm({ ...form, allowedShiftTags: value })
+                }
+                getOptionValue={(option) => option.value}
+                getOptionLabel={(option) =>
+                  shiftSlotLabelLookup.get(option.value) || option.label
+                }
+                getOptionGroup={(option) => option.shiftTypeLabel || "Other"}
+              />
+            </AccordionDetails>
+          </Accordion>
 
-          <MultiChipSelector
-            label="Certification Tags"
-            helperText={
-              certificationTagOptions.length
-                ? "Leave empty if no certification restriction is needed. Selecting certifications limits staff to coverages requiring those tags."
-                : "No certification tags configured yet — add them in Facility Preferences"
-            }
-            options={certificationTagOptions}
-            values={form.certificationTags}
-            onChange={(value) => setForm({ ...form, certificationTags: value })}
-            getOptionValue={(option) => option}
-            getOptionLabel={(option) =>
-              certificationLabelLookup.get(option) || toDisplayLabel(option)
-            }
-          />
+          <Accordion disableGutters sx={SELECTOR_ACCORDION_SX}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                sx={{ width: "100%" }}
+              >
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                    Certification Tags
+                  </Typography>
+                </Box>
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`${form.certificationTags.length} selected`}
+                />
+              </Stack>
+            </AccordionSummary>
+            <AccordionDetails sx={SELECTOR_DETAILS_SX}>
+              <MultiChipSelector
+                helperText={
+                  certificationTagOptions.length
+                    ? "Leave empty if no certification restriction is needed. Selecting certifications limits staff to coverages requiring those tags."
+                    : "No certification tags configured yet — add them in Facility Preferences"
+                }
+                options={certificationTagOptions}
+                values={form.certificationTags}
+                onChange={(value) =>
+                  setForm({ ...form, certificationTags: value })
+                }
+                getOptionValue={(option) => option}
+                getOptionLabel={(option) =>
+                  certificationLabelLookup.get(option) || toDisplayLabel(option)
+                }
+              />
+            </AccordionDetails>
+          </Accordion>
         </SectionCard>
 
         <SectionCard

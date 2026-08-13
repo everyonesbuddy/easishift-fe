@@ -342,7 +342,7 @@ export default function StaffDashboard() {
       </Box>
 
       {/* Cards */}
-      <Box
+      {/* <Box
         sx={{
           display: "grid",
           gap: 2.5,
@@ -371,7 +371,7 @@ export default function StaffDashboard() {
             />
           </Box>
         ))}
-      </Box>
+      </Box> */}
 
       {/* Charts */}
       {/* 🔥 CHARTS STILL USE SCHEDULES + COVERAGE DIRECTLY — NOTHING TO CHANGE */}

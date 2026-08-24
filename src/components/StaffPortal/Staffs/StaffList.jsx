@@ -679,7 +679,7 @@ export default function StaffList() {
                             onClick={() => handleOpenEdit(u)}
                             sx={compactActionButtonSx}
                           >
-                            Edit
+                            {/* Edit */}
                           </Button>
                           <Button
                             size="small"
@@ -693,7 +693,7 @@ export default function StaffList() {
                             onClick={() => handleAskDelete(u._id || u.id)}
                             sx={compactActionButtonSx}
                           >
-                            Delete
+                            {/* Delete */}
                           </Button>
                         </Box>
                       </TableCell>

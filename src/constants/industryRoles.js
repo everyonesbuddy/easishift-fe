@@ -1,10 +1,7 @@
-export const COMMON_STAFF_ROLES = ["staff", "other"];
-export const ADMIN_ROLES = ["admin", "superadmin"];
-export const SYSTEM_ROLE_OPTIONS = [
-  "user",
-  ...COMMON_STAFF_ROLES,
-  ...ADMIN_ROLES,
-];
+export const SYSTEM_ROLE_OPTIONS = ["staff", "scheduler", "admin", "owner"];
+export const COMMON_STAFF_ROLES = ["staff"];
+export const ADMIN_ROLES = ["admin", "owner"];
+export const FACILITY_BASELINE_ROLE = "staff";
 
 const toDisplayLabel = (value) =>
   String(value || "")
@@ -80,19 +77,52 @@ export const isRoleCompatible = (staffRole, coverageRole) => {
 };
 
 export const ROLE_LABEL_MAP = {
-  user: "User",
-  admin: "Admin",
-  superadmin: "Super Admin",
   staff: "Staff",
-  other: "Other",
+  scheduler: "Scheduler",
+  admin: "Admin",
+  owner: "Owner",
 };
 
 const ROLE_COLOR_MAP = {
-  user: "#64748b",
-  admin: "#7c3aed",
-  superadmin: "#5b21b6",
   staff: "#6b7280",
-  other: "#64748b",
+  scheduler: "#0f766e",
+  admin: "#7c3aed",
+  owner: "#5b21b6",
+};
+
+export const isSystemRole = (role) =>
+  SYSTEM_ROLE_OPTIONS.includes(normalizeRoleKey(role));
+
+export const getUserRoles = (user) => {
+  if (Array.isArray(user?.roles) && user.roles.length) {
+    return Array.from(
+      new Set(user.roles.map((role) => normalizeRoleKey(role)).filter(Boolean)),
+    );
+  }
+
+  const legacyRole = normalizeRoleKey(user?.role);
+  if (!legacyRole) return [];
+  if (legacyRole === "user" || legacyRole === "other") return ["staff"];
+  if (legacyRole === "superadmin") return ["owner"];
+  return [legacyRole];
+};
+
+export const getSystemRolesFromUser = (user) =>
+  getUserRoles(user).filter((role) => isSystemRole(role));
+
+export const getFacilityRolesFromUser = (user, facilityPreferences) => {
+  const userRoles = getUserRoles(user);
+  const facilityRoleSet = new Set(
+    (facilityPreferences?.roleFamilies || [])
+      .map((role) => normalizeRoleKey(role))
+      .filter(Boolean),
+  );
+
+  if (!facilityRoleSet.size) {
+    return userRoles.filter((role) => !isSystemRole(role));
+  }
+
+  return userRoles.filter((role) => facilityRoleSet.has(role));
 };
 
 export const ALL_NON_ADMIN_ROLES = [...COMMON_STAFF_ROLES];
@@ -138,7 +168,7 @@ export const getRoleOptionsFromFacilityPreferences = (
   const roles = [...facilityRoles];
 
   if (includeSystem) {
-    roles.push("user", ...COMMON_STAFF_ROLES);
+    roles.push(...SYSTEM_ROLE_OPTIONS.filter((role) => role !== "owner"));
   }
 
   if (includeAdmin) {

@@ -41,11 +41,13 @@ import {
   FiDelete,
   FiEdit2,
   FiEye,
+  FiPlayCircle,
 } from "react-icons/fi";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import { useAuth } from "../../../context/AuthContext";
 import CoverageCreateForm from "./CoverageCreateForm";
 import CoverageEditCountForm from "./CoverageEditCountForm";
+import GuideVideoDialog from "../../Shared/GuideVideoDialog";
 import {
   getRoleDisplayName,
   getRoleColor,
@@ -56,6 +58,25 @@ import {
   getRoleOptionsFromFacilityPreferences,
   isRoleCompatible,
 } from "../../../constants/industryRoles";
+
+const COVERAGE_GUIDE_VIDEOS = [
+  {
+    id: "requirements",
+    label: "Save requirements only",
+    title: "Create and Save Requirements",
+    description:
+      "Learn how to add coverage requirements without generating a draft schedule.",
+    embedUrl: "https://www.youtube.com/embed/-7mv6I-eqG0",
+  },
+  {
+    id: "ai-draft",
+    label: "AI-generate draft",
+    title: "Create and AI-Generate a Draft",
+    description:
+      "Learn how to create coverage and generate a draft schedule in the same flow.",
+    embedUrl: "https://www.youtube.com/embed/qJpZoB-dL7A",
+  },
+];
 
 const formatShortTime = (dateValue) => {
   if (!dateValue) return "";
@@ -78,7 +99,8 @@ const formatShortDate = (dateValue) => {
 };
 
 export default function CoveragePlanningPage() {
-  const { isAdmin, facilityPreferences } = useAuth();
+  const { can, facilityPreferences } = useAuth();
+  const isAdmin = can("coverage.manage");
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -95,6 +117,7 @@ export default function CoveragePlanningPage() {
   const [deleteId, setDeleteId] = useState(null);
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [selectedCoverageIds, setSelectedCoverageIds] = useState([]);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -421,6 +444,30 @@ export default function CoveragePlanningPage() {
             flexDirection: { xs: "column", md: "row" },
           }}
         >
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<FiPlayCircle />}
+            onClick={() => setGuideOpen(true)}
+            sx={{
+              textTransform: "none",
+              borderRadius: 2,
+              px: 2.25,
+              width: { xs: "100%", md: "auto" },
+              borderColor: "#cbd5e1",
+              color: "#334155",
+              bgcolor: "#f8fafc",
+              fontWeight: 700,
+              "&:hover": {
+                borderColor: "#2563EB",
+                bgcolor: "#eff6ff",
+                color: "#1D4ED8",
+              },
+            }}
+          >
+            Watch guides
+          </Button>
+
           <Stack
             direction="row"
             spacing={0}
@@ -1298,6 +1345,13 @@ export default function CoveragePlanningPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <GuideVideoDialog
+        open={guideOpen}
+        onClose={() => setGuideOpen(false)}
+        title="Coverage Planning Guide Videos"
+        videos={COVERAGE_GUIDE_VIDEOS}
+      />
 
       <Dialog
         open={Boolean(editingCoverage)}

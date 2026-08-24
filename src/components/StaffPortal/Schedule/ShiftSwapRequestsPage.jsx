@@ -48,7 +48,8 @@ const formatWindow = (startTime, endTime) => {
 };
 
 export default function ShiftSwapRequestsPage() {
-  const { user, isAdmin } = useAuth();
+  const { user, can } = useAuth();
+  const canManageSchedules = can("schedule.manage");
 
   const [activeTab, setActiveTab] = useState("inbox");
   const [loading, setLoading] = useState(false);
@@ -77,7 +78,7 @@ export default function ShiftSwapRequestsPage() {
     try {
       setLoading(true);
 
-      if (isAdmin) {
+      if (canManageSchedules) {
         const res = await api.get("/schedules/swap-requests");
         setInboxRequests(res.data || []);
         setSentRequests([]);
@@ -152,11 +153,11 @@ export default function ShiftSwapRequestsPage() {
   }, [activeTab, inboxRequests, sentRequests]);
 
   const isPendingForAdmin = (requestItem) =>
-    requestItem.status === "pending_admin" && isAdmin;
+    requestItem.status === "pending_admin" && canManageSchedules;
 
   const isPendingForReceiver = (requestItem) => {
     if (requestItem.status !== "pending_receiver") return false;
-      if (isAdmin) return false;
+    if (canManageSchedules) return false;
     return String(requestItem.receiverStaffId?._id) === String(user?._id);
   };
 
@@ -194,7 +195,7 @@ export default function ShiftSwapRequestsPage() {
           >
             Refresh
           </Button>
-          {!isAdmin && (
+          {!canManageSchedules && (
             <Button
               variant="contained"
               startIcon={<FiSend />}
@@ -219,7 +220,7 @@ export default function ShiftSwapRequestsPage() {
           variant="fullWidth"
         >
           <Tab label={`Inbox (${inboxRequests.length})`} value="inbox" />
-          {!isAdmin && (
+          {!canManageSchedules && (
             <Tab label={`Sent (${sentRequests.length})`} value="sent" />
           )}
         </Tabs>
@@ -282,7 +283,8 @@ export default function ShiftSwapRequestsPage() {
                     label={STATUS_LABEL[status] || status.toUpperCase()}
                     color={STATUS_COLOR[status] || "default"}
                     variant={
-                      status === "pending_admin" || status === "pending_receiver"
+                      status === "pending_admin" ||
+                      status === "pending_receiver"
                         ? "filled"
                         : "outlined"
                     }

@@ -17,7 +17,11 @@ import {
 import { toast } from "react-toastify";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
-import { isRoleCompatible } from "../../../constants/industryRoles";
+import {
+  getFacilityRolesFromUser,
+  getRoleDisplayName,
+  isRoleCompatible,
+} from "../../../constants/industryRoles";
 
 const formatWindow = (startTime, endTime) => {
   const start = new Date(startTime);
@@ -33,7 +37,7 @@ export default function ShiftSwapRequestModal({
   enableSchedulePicker = false,
   staffList = [],
 }) {
-  const { user } = useAuth();
+  const { user, facilityPreferences } = useAuth();
 
   const [mySchedules, setMySchedules] = useState([]);
   const [selectedScheduleId, setSelectedScheduleId] = useState(
@@ -90,9 +94,18 @@ export default function ShiftSwapRequestModal({
     return staffList.filter((staff) => {
       if (!staff?._id) return false;
       if (String(staff._id) === String(assignedStaffId)) return false;
-      return isRoleCompatible(staff.role, activeSchedule.role);
+      const facilityRoles = getFacilityRolesFromUser(
+        staff,
+        facilityPreferences,
+      );
+      return (
+        isRoleCompatible(staff.role, activeSchedule.role) ||
+        facilityRoles.some((role) =>
+          isRoleCompatible(role, activeSchedule.role),
+        )
+      );
     });
-  }, [activeSchedule, staffList]);
+  }, [activeSchedule, facilityPreferences, staffList]);
 
   const submitSwapRequest = async () => {
     if (!activeSchedule?._id) {
@@ -198,7 +211,7 @@ export default function ShiftSwapRequestModal({
             {receiverOptions.length ? (
               receiverOptions.map((staff) => (
                 <MenuItem key={staff._id} value={staff._id}>
-                  {staff.name} ({staff.role})
+                  {staff.name} ({getRoleDisplayName(staff.role)})
                 </MenuItem>
               ))
             ) : (

@@ -36,9 +36,10 @@ import { useState } from "react";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import ChangePasswordModal from "../Auth/ChangePasswordModal";
+import { getFacilityRolesFromUser } from "../../constants/industryRoles";
 
 function Sidebar({ mobileOpen, onMobileClose }) {
-  const { user, facilityPreferences, isAdmin } = useAuth();
+  const { user, facilityPreferences, can } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -48,40 +49,86 @@ function Sidebar({ mobileOpen, onMobileClose }) {
   const menuOpen = Boolean(anchorEl);
 
   const trackingEnabled = Boolean(facilityPreferences?.timeTracking?.enabled);
+  const hasSchedulableRole =
+    getFacilityRolesFromUser(user, facilityPreferences).length > 0;
+  const canViewFacilityPreferences =
+    can("facility_preferences.view") || can("facility_preferences.manage");
 
-  const adminMenuItems = [
+  const menuItems = [
     { id: "overview", icon: MdDashboard, label: "Overview", to: "/dashboard" },
-    {
-      id: "coverage",
-      icon: MdAssignment,
-      label: "Coverage Planning",
-      to: "/coverage-planning",
-    },
-    {
-      id: "schedule",
-      icon: MdCalendarToday,
-      label: "Schedule Builder",
-      to: "/schedule",
-    },
-    { id: "staff", icon: MdPeople, label: "Staff Management", to: "/staffs" },
-    {
-      id: "facility-preferences",
-      icon: MdTune,
-      label: "Facility Preferences",
-      to: "/facility-preferences",
-    },
+    ...(can("coverage.manage")
+      ? [
+          {
+            id: "coverage",
+            icon: MdAssignment,
+            label: "Coverage Planning",
+            to: "/coverage-planning",
+          },
+        ]
+      : []),
+    ...(can("schedule.manage")
+      ? [
+          {
+            id: "schedule-builder",
+            icon: MdCalendarToday,
+            label: "Schedule Builder",
+            to: "/schedule",
+          },
+        ]
+      : [
+          {
+            id: "schedule",
+            icon: MdCalendarToday,
+            label: "My Schedule",
+            to: "/schedule",
+          },
+        ]),
+    ...(can("staff.manage")
+      ? [
+          {
+            id: "staff",
+            icon: MdPeople,
+            label: "Staff Management",
+            to: "/staffs",
+          },
+        ]
+      : []),
+    ...(canViewFacilityPreferences
+      ? [
+          {
+            id: "facility-preferences",
+            icon: MdTune,
+            label: "Facility Preferences",
+            to: "/facility-preferences",
+          },
+        ]
+      : []),
+    ...(can("timeoff.review")
+      ? [
+          {
+            id: "timeoff",
+            icon: MdSchedule,
+            label: "Time Off Decisions",
+            to: "/timeoff-decisions",
+          },
+        ]
+      : []),
     {
       id: "timeoff",
-      icon: MdSchedule,
-      label: "Time Off Decisions",
-      to: "/timeoff-decisions",
-    },
-    {
-      id: "my-timeoff",
       icon: MdSchedule,
       label: "My Time Off Requests",
       to: "/timeoff-requests",
     },
+    ...(hasSchedulableRole && can("preferences.manage_own")
+      ? [
+          {
+            id: "preferences",
+            icon: MdSettings,
+            label: "Preferences",
+            to: "/preferences",
+          },
+        ]
+      : []),
     {
       id: "swap-requests",
       icon: MdSwapHoriz,
@@ -91,62 +138,25 @@ function Sidebar({ mobileOpen, onMobileClose }) {
     ...(trackingEnabled
       ? [
           {
-            id: "attendance",
+            id: can("staff.view") ? "attendance" : "time-tracking",
             icon: MdAccessTime,
-            label: "Attendance",
+            label: can("staff.view") ? "Attendance" : "Time Tracking",
             to: "/time-tracking",
           },
         ]
       : []),
     { id: "messages", icon: MdMessage, label: "Messages", to: "/messages" },
-    {
-      id: "subscription",
-      icon: MdSettings,
-      label: "Manage Subscription",
-      to: "/billing",
-    },
-  ];
-
-  const staffMenuItems = [
-    { id: "overview", icon: MdDashboard, label: "Overview", to: "/dashboard" },
-    {
-      id: "schedule",
-      icon: MdCalendarToday,
-      label: "My Schedule",
-      to: "/schedule",
-    },
-    {
-      id: "preferences",
-      icon: MdSettings,
-      label: "Preferences",
-      to: "/preferences",
-    },
-    {
-      id: "timeoff",
-      icon: MdSchedule,
-      label: "My Time Off Requests",
-      to: "/timeoff-requests",
-    },
-    {
-      id: "swap-requests",
-      icon: MdSwapHoriz,
-      label: "Shift Swaps",
-      to: "/swap-requests",
-    },
-    ...(trackingEnabled
+    ...(can("billing.manage")
       ? [
           {
-            id: "time-tracking",
-            icon: MdAccessTime,
-            label: "Time Tracking",
-            to: "/time-tracking",
+            id: "subscription",
+            icon: MdSettings,
+            label: "Manage Subscription",
+            to: "/billing",
           },
         ]
       : []),
-    { id: "messages", icon: MdMessage, label: "Messages", to: "/messages" },
   ];
-
-  const menuItems = isAdmin ? adminMenuItems : staffMenuItems;
   const activePath = location.pathname;
 
   return (

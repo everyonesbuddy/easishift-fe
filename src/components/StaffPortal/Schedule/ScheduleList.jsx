@@ -49,6 +49,7 @@ import {
   FiDownload,
   FiChevronDown,
   FiClock,
+  FiPlayCircle,
 } from "react-icons/fi";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -63,6 +64,7 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import Stack from "@mui/material/Stack";
 import { useNavigate } from "react-router-dom";
 import QrScannerDialog from "../../Shared/QrScannerDialog";
+import GuideVideoDialog from "../../Shared/GuideVideoDialog";
 import {
   getRoleColor,
   getRoleDisplayName,
@@ -70,7 +72,9 @@ import {
   getShiftTypeDisplayName,
   getShiftTagDisplayName,
   getCertificationTagDisplayName,
+  getFacilityRolesFromUser,
   getRoleOptionsFromFacilityPreferences,
+  getUserRoles,
 } from "../../../constants/industryRoles";
 
 const SCHEDULE_STATUS_META = {
@@ -91,6 +95,17 @@ const SCHEDULE_STATUS_FILTER_OPTIONS = [
   "call_out",
 ];
 
+const SCHEDULE_GUIDE_VIDEOS = [
+  {
+    id: "ai-generated-schedule",
+    label: "AI-generated schedule",
+    title: "AI-Generated Schedule Guide",
+    description:
+      "Learn how to review AI-generated draft schedules before publishing.",
+    embedUrl: "https://www.youtube.com/embed/r8kQbvdqWpA",
+  },
+];
+
 const getScheduleStatusColor = (status) =>
   SCHEDULE_STATUS_META[String(status || "").toLowerCase()]?.color || "#9e9e9e";
 
@@ -101,7 +116,12 @@ const getScheduleStatusLabel = (status) =>
     .toUpperCase();
 
 export default function ScheduleList() {
-  const { user, isAdmin, facilityPreferences } = useAuth();
+  const { user, can, facilityPreferences } = useAuth();
+  const canManageSchedules = can("schedule.manage");
+  const canViewAllSchedules = can("schedule.view");
+  const hasSchedulableRole =
+    getFacilityRolesFromUser(user, facilityPreferences).length > 0;
+  const canUsePersonalSchedule = hasSchedulableRole;
   const navigate = useNavigate();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
@@ -111,6 +131,7 @@ export default function ScheduleList() {
   const [open, setOpen] = useState(false);
   const [openAutoModal, setOpenAutoModal] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState(null);
+  const [scheduleFormMode, setScheduleFormMode] = useState("manual");
   const [manualCoverageFromAuto, setManualCoverageFromAuto] = useState(null);
   const [view, setView] = useState("table");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -141,13 +162,14 @@ export default function ScheduleList() {
   const [staffVisibility, setStaffVisibility] = useState("mine");
   const [shiftTimeFilter, setShiftTimeFilter] = useState("");
   const [exportMenuAnchorEl, setExportMenuAnchorEl] = useState(null);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const roleFilterOptions = useMemo(() => {
     const facilityRoleValues = getRoleOptionsFromFacilityPreferences(
       facilityPreferences,
     ).map((option) => option.value);
     const scheduleRoles = schedules.map((s) => s.role).filter(Boolean);
-    const staffRoles = staff.map((s) => s.role).filter(Boolean);
+    const staffRoles = staff.flatMap((member) => getUserRoles(member));
     return [
       "all",
       ...Array.from(
@@ -317,6 +339,12 @@ export default function ScheduleList() {
     fetchSchedules();
   }, []);
 
+  useEffect(() => {
+    if (canViewAllSchedules) {
+      setStaffVisibility("all");
+    }
+  }, [canViewAllSchedules]);
+
   // ---------------------------
   // Modals
   // ---------------------------
@@ -326,7 +354,8 @@ export default function ScheduleList() {
   };
 
   const openCreate = () => {
-    if (!isAdmin) return;
+    if (!canManageSchedules) return;
+    setScheduleFormMode("manual");
     setEditingSchedule(null);
     setManualCoverageFromAuto(null);
     setOpen(true);
@@ -335,12 +364,14 @@ export default function ScheduleList() {
   const closeModal = (refresh = false) => {
     setOpen(false);
     setEditingSchedule(null);
+    setScheduleFormMode("manual");
     setManualCoverageFromAuto(null);
     if (refresh) fetchSchedules();
   };
 
   const openManualFromCoverage = (coverage) => {
     setOpenAutoModal(false);
+    setScheduleFormMode("manual");
     setEditingSchedule(null);
     setManualCoverageFromAuto(coverage || null);
     setOpen(true);
@@ -350,7 +381,7 @@ export default function ScheduleList() {
   // Delete
   // ---------------------------
   const askDelete = (id) => {
-    if (!isAdmin) return;
+    if (!canManageSchedules) return;
     setDeleteId(id);
     setConfirmOpen(true);
   };
@@ -440,7 +471,7 @@ export default function ScheduleList() {
   };
 
   const canManageSchedule = (schedule) => {
-    if (isAdmin) return true;
+    if (canManageSchedules) return true;
     return isCurrentUserSchedule(schedule);
   };
 
@@ -635,8 +666,8 @@ export default function ScheduleList() {
   };
 
   const canOpenTimeEntryForSchedule = (schedule) => {
-    if (isAdmin) return false;
     if (!timeTrackingEnabled) return false;
+    if (!canUsePersonalSchedule) return false;
     return isCurrentUserSchedule(schedule);
   };
 
@@ -663,8 +694,11 @@ export default function ScheduleList() {
   // ---------------------------
   const filteredSchedules = useMemo(() => {
     return schedules.filter((s) => {
-      if (!isAdmin && staffVisibility === "mine" && !isCurrentUserSchedule(s))
-        return false;
+      const shouldShowMineOnly = canViewAllSchedules
+        ? staffVisibility === "mine"
+        : true;
+
+      if (shouldShowMineOnly && !isCurrentUserSchedule(s)) return false;
       // roleFilter is 'all' to allow all roles
       if (roleFilter && roleFilter !== "all" && s.role !== roleFilter)
         return false;
@@ -685,7 +719,7 @@ export default function ScheduleList() {
     roleFilter,
     statusFilter,
     shiftTimeFilter,
-    isAdmin,
+    canViewAllSchedules,
     staffVisibility,
     user,
   ]);
@@ -1397,7 +1431,9 @@ export default function ScheduleList() {
               "& .MuiToggleButton-root": {
                 textTransform: "none",
                 color: "#374151",
-                px: 2,
+                px: 1.5,
+                py: 0.55,
+                fontSize: "0.78rem",
               },
               "& .MuiToggleButton-root.Mui-selected": {
                 backgroundColor: "#2563eb",
@@ -1426,7 +1462,36 @@ export default function ScheduleList() {
             </ToggleButton>
           </ToggleButtonGroup>
 
-          {isAdmin && (
+          {canManageSchedules && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<FiPlayCircle />}
+              onClick={() => setGuideOpen(true)}
+              sx={{
+                textTransform: "none",
+                borderRadius: 2,
+                px: 1.5,
+                py: 0.55,
+                minHeight: 32,
+                fontSize: "0.78rem",
+                width: { xs: "100%", md: "auto" },
+                borderColor: "#cbd5e1",
+                color: "#334155",
+                bgcolor: "#f8fafc",
+                fontWeight: 700,
+                "&:hover": {
+                  borderColor: "#2563EB",
+                  bgcolor: "#eff6ff",
+                  color: "#1D4ED8",
+                },
+              }}
+            >
+              Watch Guide
+            </Button>
+          )}
+
+          {canManageSchedules && (
             <Button
               size="small"
               variant="contained"
@@ -1435,18 +1500,21 @@ export default function ScheduleList() {
               sx={{
                 textTransform: "none",
                 borderRadius: 2,
-                px: 3,
+                px: 1.75,
+                py: 0.55,
+                minHeight: 32,
+                fontSize: "0.78rem",
                 bgcolor: "#1D4ED8",
                 color: "#fff",
                 width: { xs: "100%", md: "auto" },
                 "&:hover": { bgcolor: "#1146b1" },
               }}
             >
-              Review AI Draft Schedules
+              Review AI Drafts
             </Button>
           )}
 
-          {isAdmin && view === "table" && (
+          {canManageSchedules && view === "table" && (
             <Button
               size="small"
               variant="outlined"
@@ -1456,15 +1524,18 @@ export default function ScheduleList() {
               sx={{
                 textTransform: "none",
                 borderRadius: 2,
-                px: 3,
+                px: 1.5,
+                py: 0.55,
+                minHeight: 32,
+                fontSize: "0.78rem",
                 width: { xs: "100%", md: "auto" },
               }}
             >
-              Delete Selected ({selectedScheduleIds.length})
+              Delete ({selectedScheduleIds.length})
             </Button>
           )}
 
-          {!isAdmin && timeTrackingEnabled && (
+          {canUsePersonalSchedule && timeTrackingEnabled && (
             <Button
               size="small"
               variant="outlined"
@@ -1473,7 +1544,10 @@ export default function ScheduleList() {
               sx={{
                 textTransform: "none",
                 borderRadius: 2,
-                px: 3,
+                px: 1.75,
+                py: 0.55,
+                minHeight: 32,
+                fontSize: "0.78rem",
                 width: { xs: "100%", md: "auto" },
               }}
             >
@@ -1481,32 +1555,37 @@ export default function ScheduleList() {
             </Button>
           )}
 
-          <Button
-            size="small"
-            variant="contained"
-            startIcon={<FiPlus />}
-            onClick={() => {
-              if (isAdmin) {
-                openCreate();
-              } else {
-                // open modal but prefill with current user's id
-                setEditingSchedule(null);
-                // open modal with a flag handled in ScheduleForm via props
-                setOpen(true);
-              }
-            }}
-            sx={{
-              textTransform: "none",
-              borderRadius: 2,
-              px: 3,
-              bgcolor: "#111827",
-              color: "#fff",
-              width: { xs: "100%", md: "auto" },
-              "&:hover": { bgcolor: "#0f172a" },
-            }}
-          >
-            {isAdmin ? "Manual Scheduler" : "Pick Up Shift"}
-          </Button>
+          {(canManageSchedules || canUsePersonalSchedule) && (
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<FiPlus />}
+              onClick={() => {
+                if (canManageSchedules) {
+                  openCreate();
+                } else {
+                  setScheduleFormMode("pickup");
+                  setEditingSchedule(null);
+                  setManualCoverageFromAuto(null);
+                  setOpen(true);
+                }
+              }}
+              sx={{
+                textTransform: "none",
+                borderRadius: 2,
+                px: 1.75,
+                py: 0.55,
+                minHeight: 32,
+                fontSize: "0.78rem",
+                bgcolor: "#111827",
+                color: "#fff",
+                width: { xs: "100%", md: "auto" },
+                "&:hover": { bgcolor: "#0f172a" },
+              }}
+            >
+              {canManageSchedules ? "Manual Scheduler" : "Pick Up Shift"}
+            </Button>
+          )}
 
           {(view === "calendar" || view === "month") && (
             <>
@@ -1519,7 +1598,10 @@ export default function ScheduleList() {
                 sx={{
                   textTransform: "none",
                   borderRadius: 2,
-                  px: 2,
+                  px: 1.5,
+                  py: 0.55,
+                  minHeight: 32,
+                  fontSize: "0.78rem",
                   width: { xs: "100%", md: "auto" },
                 }}
               >
@@ -1576,7 +1658,7 @@ export default function ScheduleList() {
             alignItems={{ xs: "stretch", sm: "center" }}
             sx={{ width: { xs: "100%", md: "auto" } }}
           >
-            {!isAdmin && (
+            {canViewAllSchedules && canUsePersonalSchedule && (
               <ToggleButtonGroup
                 value={staffVisibility}
                 exclusive
@@ -1596,7 +1678,7 @@ export default function ScheduleList() {
               </ToggleButtonGroup>
             )}
 
-            {(isAdmin || staffVisibility === "all") && (
+            {canViewAllSchedules && (
               <FormControl
                 size="small"
                 sx={{ minWidth: { xs: "100%", sm: 220 } }}
@@ -1672,7 +1754,7 @@ export default function ScheduleList() {
                   gap={1.5}
                 >
                   <Box>
-                    {isAdmin && (
+                    {canManageSchedules && (
                       <Checkbox
                         size="small"
                         checked={selectedScheduleIds.includes(s._id)}
@@ -1749,8 +1831,8 @@ export default function ScheduleList() {
                         Edit
                       </Button>
                     )}
-                    {!isAdmin &&
-                      canManageSchedule(s) &&
+                    {canUsePersonalSchedule &&
+                      isCurrentUserSchedule(s) &&
                       s.status === "scheduled" && (
                         <Button
                           size="small"
@@ -1762,7 +1844,7 @@ export default function ScheduleList() {
                           Swap Shift
                         </Button>
                       )}
-                    {isAdmin && (
+                    {canManageSchedules && (
                       <Button
                         size="small"
                         variant="outlined"
@@ -1797,7 +1879,7 @@ export default function ScheduleList() {
             <Table sx={{ mt: 2, background: "white" }} size="small">
               <TableHead>
                 <TableRow sx={{ background: "#F8FAFC" }}>
-                  {isAdmin && (
+                  {canManageSchedules && (
                     <TableCell padding="checkbox">
                       <Checkbox
                         size="small"
@@ -1882,7 +1964,7 @@ export default function ScheduleList() {
                     key={s._id}
                     sx={{ "&:hover": { background: "#f3f4f6" } }}
                   >
-                    {isAdmin && (
+                    {canManageSchedules && (
                       <TableCell padding="checkbox">
                         <Checkbox
                           size="small"
@@ -2024,8 +2106,8 @@ export default function ScheduleList() {
                           </IconButton>
                         </Tooltip>
                       )}
-                      {!isAdmin &&
-                        canManageSchedule(s) &&
+                      {canUsePersonalSchedule &&
+                        isCurrentUserSchedule(s) &&
                         s.status === "scheduled" && (
                           <Tooltip title="Swap shift">
                             <IconButton
@@ -2037,7 +2119,7 @@ export default function ScheduleList() {
                             </IconButton>
                           </Tooltip>
                         )}
-                      {isAdmin && (
+                      {canManageSchedules && (
                         <Tooltip title="Delete schedule">
                           <IconButton
                             size="small"
@@ -2494,8 +2576,8 @@ export default function ScheduleList() {
           <FullCalendar
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
-            editable={isAdmin}
-            selectable={isAdmin}
+            editable={canManageSchedules}
+            selectable={canManageSchedules}
             headerToolbar={{
               left: "prev,next",
               center: "title",
@@ -2663,12 +2745,14 @@ export default function ScheduleList() {
             onSuccess={() => closeModal(true)}
             onClose={() => closeModal()}
             schedule={editingSchedule}
+            mode={scheduleFormMode}
             staffList={staff}
             initialCoverage={manualCoverageFromAuto}
-            // If user is not admin and the modal was opened via the Individual Schedule button,
-            // we prefill with the current user's id and disable staff selection.
-            initialStaffId={!isAdmin && !editingSchedule ? user._id : ""}
-            disableStaffSelect={!isAdmin && !editingSchedule}
+            // Pickup mode is always bound to the logged-in staff member.
+            initialStaffId={
+              !canManageSchedules && !editingSchedule ? user._id : ""
+            }
+            disableStaffSelect={!canManageSchedules && !editingSchedule}
           />
         </DialogContent>
       </Dialog>
@@ -2966,6 +3050,13 @@ export default function ScheduleList() {
           />
         </DialogContent>
       </Dialog>
+
+      <GuideVideoDialog
+        open={guideOpen}
+        onClose={() => setGuideOpen(false)}
+        title="Schedule Guide Videos"
+        videos={SCHEDULE_GUIDE_VIDEOS}
+      />
 
       <ConfirmDialog
         open={confirmOpen}

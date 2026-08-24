@@ -24,7 +24,8 @@ import { FiSave, FiInfo, FiChevronDown } from "react-icons/fi";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
+import { getFacilityRolesFromUser } from "../../../constants/industryRoles";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -76,8 +77,10 @@ const ACCORDION_DETAILS_SX = {
 };
 
 export default function PreferencesPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, facilityPreferences } = useAuth();
   const navigate = useNavigate();
+  const hasSchedulableRole =
+    getFacilityRolesFromUser(user, facilityPreferences).length > 0;
   const [prefs, setPrefs] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -86,6 +89,11 @@ export default function PreferencesPage() {
   const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
+    if (!hasSchedulableRole) {
+      setLoading(false);
+      return;
+    }
+
     async function fetchPrefs() {
       try {
         const res = await api.get("/preferences/me");
@@ -98,7 +106,7 @@ export default function PreferencesPage() {
       }
     }
     fetchPrefs();
-  }, []);
+  }, [hasSchedulableRole]);
 
   if (loading)
     return (
@@ -106,6 +114,10 @@ export default function PreferencesPage() {
         <CircularProgress />
       </Box>
     );
+
+  if (!hasSchedulableRole) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const handleChange = (field, value) => {
     setPrefs((prev) => ({ ...prev, [field]: value }));

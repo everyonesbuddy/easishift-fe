@@ -148,7 +148,11 @@ const CARD_INNER_SCROLL_SX = {
 // -------------------
 // Main Component
 // -------------------
-export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
+export default function ScheduleAndCoverageCharts({
+  canViewOperations = false,
+  canUsePersonalSchedule = false,
+  userId,
+}) {
   const [schedules, setSchedules] = useState([]);
   const [coverage, setCoverage] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -162,7 +166,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
   useEffect(() => {
     async function load() {
       try {
-        const scheduleURL = isAdmin
+        const scheduleURL = canViewOperations
           ? `/schedules`
           : `/schedules?staffId=${userId}`;
 
@@ -181,7 +185,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
     }
 
     load();
-  }, [isAdmin, userId]);
+  }, [canViewOperations, userId]);
 
   // -------------------
   // Normalize schedules & coverage
@@ -224,6 +228,15 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
       }));
     });
   }, [schedules]);
+
+  const personalSchedulesNormalized = useMemo(() => {
+    return schedulesNormalized.filter((schedule) => {
+      const staffRef = schedule.staffId;
+      const scheduleStaffId =
+        typeof staffRef === "string" ? staffRef : staffRef?._id || staffRef?.id;
+      return String(scheduleStaffId || "") === String(userId || "");
+    });
+  }, [schedulesNormalized, userId]);
 
   // Week days for current week (Monday -> Sunday)
   // Week days for current week (Sunday -> Saturday)
@@ -274,7 +287,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
   }, [coverageNormalized]);
 
   const weeklyOvertimeData = useMemo(() => {
-    if (!isAdmin) return [];
+    if (!canViewOperations) return [];
 
     const weekDayKeys = new Set(weekDays.map((d) => getLocalDayKey(d)));
     const totals = new Map();
@@ -326,19 +339,19 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
         };
       })
       .sort((a, b) => b.hours - a.hours);
-  }, [isAdmin, schedulesNormalized, weekDays]);
+  }, [canViewOperations, schedulesNormalized, weekDays]);
 
   const filteredWeeklyOvertimeData = useMemo(() => {
-    if (!isAdmin) return [];
+    if (!canViewOperations) return [];
     return weeklyOvertimeData.filter(
       (row) =>
         selectedOvertimeRole === "all" ||
         isRoleCompatible(row.role, selectedOvertimeRole),
     );
-  }, [isAdmin, weeklyOvertimeData, selectedOvertimeRole]);
+  }, [canViewOperations, weeklyOvertimeData, selectedOvertimeRole]);
 
   const overtimeSummary = useMemo(() => {
-    if (!isAdmin || filteredWeeklyOvertimeData.length === 0) {
+    if (!canViewOperations || filteredWeeklyOvertimeData.length === 0) {
       return { nearCount: 0, overtimeCount: 0 };
     }
 
@@ -350,10 +363,10 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
     ).length;
 
     return { nearCount, overtimeCount };
-  }, [isAdmin, filteredWeeklyOvertimeData]);
+  }, [canViewOperations, filteredWeeklyOvertimeData]);
 
   const consolidatedCoverageWithStaffing = useMemo(() => {
-    if (!isAdmin) return [];
+    if (!canViewOperations) return [];
 
     const startKey =
       coverageStartDate && coverageEndDate
@@ -419,7 +432,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
         };
       });
   }, [
-    isAdmin,
+    canViewOperations,
     coverageStartDate,
     coverageEndDate,
     selectedCoverageRole,
@@ -463,11 +476,11 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
     return getMappedRoleColor(role);
   }
 
-  const todayShift = schedulesNormalized.find(
+  const todayShift = personalSchedulesNormalized.find(
     (s) => s.dayKey === todayKey && s.status !== "call_out",
   );
 
-  const upcomingShifts = schedulesNormalized
+  const upcomingShifts = personalSchedulesNormalized
     .filter((s) => s.dayKey > todayKey && s.status !== "call_out")
     .sort((a, b) =>
       a.dayKey === b.dayKey
@@ -553,7 +566,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
 
   return (
     <Box mt={4} px={{ xs: 2, md: 4 }}>
-      {isAdmin ? (
+      {canViewOperations && (
         <Box
           display="grid"
           gridTemplateColumns={{ xs: "1fr", lg: "1fr 1fr" }}
@@ -943,15 +956,18 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
             </Box>
           </Paper>
         </Box>
-      ) : (
+      )}
+
+      {canUsePersonalSchedule && (
         <Box
           display="grid"
           gridTemplateColumns={{ xs: "1fr", lg: "1fr 1fr" }}
           gap={3}
+          mt={canViewOperations ? 3 : 0}
         >
           <Paper sx={{ ...CARD_SX, p: 3 }} elevation={1}>
             <Typography variant="h6" mb={2}>
-              Today's Shift
+              My Shifts Today
             </Typography>
             {todayShift ? (
               <Box
@@ -1035,7 +1051,7 @@ export default function ScheduleAndCoverageCharts({ isAdmin, userId }) {
                 justifyContent="space-between"
                 alignItems="center"
               >
-                <Typography variant="h6">Upcoming Shifts</Typography>
+                <Typography variant="h6">My Upcoming Shifts</Typography>
                 <Typography variant="body2" sx={{ color: "#666" }}>
                   {upcomingShifts.length} shifts
                 </Typography>

@@ -35,12 +35,12 @@ import { useAuth } from "./context/AuthContext";
 import { useState } from "react";
 
 export default function App() {
-  const { user, tenant, isAdmin } = useAuth();
+  const { user, tenant, can } = useAuth();
   const hasPaywallExemptStatus =
     tenant && ["active", "trialing"].includes(tenant.subscriptionStatus);
 
   const showPaywall =
-    isAdmin &&
+    can("billing.manage") &&
     tenant &&
     (!hasPaywallExemptStatus || (tenant.seatLimit && tenant.seatLimit <= 1));
 

@@ -26,6 +26,9 @@ import { useAuth } from "../../../context/AuthContext";
 import {
   getRoleOptionsFromFacilityPreferences,
   getRoleDisplayName,
+  getUserRoles,
+  isSystemRole,
+  SYSTEM_ROLE_OPTIONS,
 } from "../../../constants/industryRoles";
 
 const validateEmail = (email) => {
@@ -171,6 +174,7 @@ const MultiChipSelector = ({
   getOptionLabel,
   getOptionGroup,
   hideLabel = false,
+  disabled = false,
 }) => {
   const selectedValues = normalizeStringArray(values);
 
@@ -281,9 +285,10 @@ const MultiChipSelector = ({
                         key={value}
                         label={getOptionLabel(option)}
                         clickable
+                        disabled={disabled}
                         color={selected ? "primary" : "default"}
                         variant={selected ? "filled" : "outlined"}
-                        onClick={() => toggleValue(option)}
+                        onClick={() => !disabled && toggleValue(option)}
                       />
                     );
                   })}
@@ -345,40 +350,27 @@ export default function StaffCreateAndEditForm({
   onClose,
   staffList = [],
 }) {
-  const { user, role: loggedInRole, facilityPreferences, tenant } = useAuth();
+  const { user, can, facilityPreferences, tenant } = useAuth();
 
-  const canAssignAdminRole = loggedInRole === "admin";
+  const canAssignOwnerRole = can("roles.manage");
 
   const facilityRoleOptions = useMemo(
     () => getRoleOptionsFromFacilityPreferences(facilityPreferences),
     [facilityPreferences],
   );
 
-  const roleOptions = useMemo(() => {
-    return facilityRoleOptions;
-  }, [facilityRoleOptions]);
-
-  const selectableRoleOptions = useMemo(() => {
-    const options = canAssignAdminRole
-      ? [...roleOptions, { value: "admin", label: getRoleDisplayName("admin") }]
-      : roleOptions;
-
-    const dedupedOptions = Array.from(
-      new Map(options.map((item) => [item.value, item])).values(),
-    );
-
-    if (
-      !staff?.role ||
-      dedupedOptions.some((item) => item.value === staff.role)
-    ) {
-      return dedupedOptions;
-    }
-
-    return [
-      ...dedupedOptions,
-      { value: staff.role, label: getRoleDisplayName(staff.role) },
-    ];
-  }, [roleOptions, staff?.role, canAssignAdminRole]);
+  const systemRoleOptions = useMemo(
+    () =>
+      SYSTEM_ROLE_OPTIONS.filter(
+        (systemRole) =>
+          systemRole !== "staff" &&
+          (systemRole !== "owner" || canAssignOwnerRole),
+      ).map((systemRole) => ({
+        value: systemRole,
+        label: getRoleDisplayName(systemRole),
+      })),
+    [canAssignOwnerRole],
+  );
 
   const [form, setForm] = useState({
     name: "",
@@ -392,7 +384,7 @@ export default function StaffCreateAndEditForm({
     preferredDaysOfWeek: [],
     emailNotificationsEnabled: true,
     smsNotificationsEnabled: true,
-    role: "",
+    roles: [],
   });
   const [emailError, setEmailError] = useState("");
   const [phoneError, setPhoneError] = useState("");
@@ -498,7 +490,10 @@ export default function StaffCreateAndEditForm({
   }, [shiftSlotOptions]);
 
   const isEditingSelf = staff && staff._id === user._id;
-  const disableRoleChange = isEditingSelf && loggedInRole === "admin";
+  const disableRoleChange = Boolean(isEditingSelf);
+  const hasFacilityRole = form.roles.some((roleValue) =>
+    facilityRoleOptions.some((option) => option.value === roleValue),
+  );
   const hasTagRestrictions =
     form.allowedAreas.length > 0 ||
     form.allowedShiftTags.length > 0 ||
@@ -553,7 +548,7 @@ export default function StaffCreateAndEditForm({
         preferredDaysOfWeek: [],
         emailNotificationsEnabled: true,
         smsNotificationsEnabled: true,
-        role: staff.role,
+        roles: getUserRoles(staff),
       });
 
       fetchStaffPreferences(staff._id || staff.id);
@@ -564,18 +559,22 @@ export default function StaffCreateAndEditForm({
     if (staff) return;
 
     setForm((prev) => {
-      if (!roleOptions.length) {
-        if (prev.role) return prev;
-        return { ...prev, role: "staff" };
+      if (!facilityRoleOptions.length) {
+        if (prev.roles.length) return prev;
+        return { ...prev, roles: [] };
       }
 
-      if (prev.role && roleOptions.some((item) => item.value === prev.role)) {
+      if (
+        prev.roles.some((roleValue) =>
+          facilityRoleOptions.some((item) => item.value === roleValue),
+        )
+      ) {
         return prev;
       }
 
-      return { ...prev, role: roleOptions[0].value };
+      return { ...prev, roles: [facilityRoleOptions[0].value] };
     });
-  }, [roleOptions, staff]);
+  }, [facilityRoleOptions, staff]);
 
   const handleSubmit = async () => {
     setEmailError("");
@@ -626,6 +625,18 @@ export default function StaffCreateAndEditForm({
       const normalizedPreferredDays = normalizeNumberArray(
         form.preferredDaysOfWeek,
       );
+      const normalizedAssignedRoles = normalizeStringArray(form.roles);
+
+      if (!normalizedAssignedRoles.length) {
+        toast.error(
+          "Select at least one system permission or facility/job role.",
+          {
+            position: "top-right",
+            autoClose: 3500,
+          },
+        );
+        return;
+      }
 
       const preferencesPayload = {
         preferredDaysOfWeek: normalizedPreferredDays,
@@ -635,10 +646,13 @@ export default function StaffCreateAndEditForm({
 
       if (staff) {
         // Prevent self-role modification
+        const nextRoles = disableRoleChange
+          ? getUserRoles(staff)
+          : normalizedAssignedRoles;
         const payload = {
           name: form.name,
           email: form.email,
-          role: disableRoleChange ? staff.role : form.role,
+          roles: nextRoles,
           allowedAreas: normalizeStringArray(form.allowedAreas),
           allowedShiftTags: normalizedShiftTags,
           allowedShiftTypes: normalizedShiftTypes,
@@ -676,7 +690,7 @@ export default function StaffCreateAndEditForm({
         const res = await api.post("/auth/signup/staff", {
           name: form.name,
           email: form.email,
-          role: form.role,
+          roles: normalizedAssignedRoles,
           allowedAreas: normalizeStringArray(form.allowedAreas),
           allowedShiftTags: normalizedShiftTags,
           allowedShiftTypes: normalizedShiftTypes,
@@ -802,27 +816,55 @@ export default function StaffCreateAndEditForm({
             />
           </Stack>
 
-          <TextField
-            select
-            fullWidth
-            label="Role"
-            value={form.role}
-            disabled={disableRoleChange}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
-            SelectProps={{
-              MenuProps: {
-                PaperProps: {
-                  sx: { maxHeight: 480 },
-                },
-              },
-            }}
-          >
-            {selectableRoleOptions.map((item) => (
-              <MenuItem key={item.value} value={item.value}>
-                {item.label}
-              </MenuItem>
-            ))}
-          </TextField>
+          <Stack spacing={2}>
+            <MultiChipSelector
+              label="System permissions"
+              helperText="Optional access roles. Scheduler can manage schedules; Admin can manage staff and facility operations. Only owners can assign Owner."
+              options={systemRoleOptions}
+              values={form.roles.filter((roleValue) => isSystemRole(roleValue))}
+              onChange={(nextSystemRoles) => {
+                const facilityRoles = form.roles.filter(
+                  (roleValue) => !isSystemRole(roleValue),
+                );
+                setForm({
+                  ...form,
+                  roles: normalizeStringArray([
+                    ...nextSystemRoles,
+                    ...facilityRoles,
+                  ]),
+                });
+              }}
+              getOptionValue={(option) => option.value}
+              getOptionLabel={(option) => option.label}
+              hideLabel={false}
+              disabled={disableRoleChange}
+            />
+
+            <MultiChipSelector
+              label="Facility/job roles"
+              helperText="Select schedulable job roles. A user can have a system permission role, a facility role, or both."
+              options={facilityRoleOptions}
+              values={form.roles.filter(
+                (roleValue) => !isSystemRole(roleValue),
+              )}
+              onChange={(nextFacilityRoles) => {
+                const systemRoles = form.roles.filter((roleValue) =>
+                  isSystemRole(roleValue),
+                );
+                setForm({
+                  ...form,
+                  roles: normalizeStringArray([
+                    ...systemRoles,
+                    ...nextFacilityRoles,
+                  ]),
+                });
+              }}
+              getOptionValue={(option) => option.value}
+              getOptionLabel={(option) => option.label}
+              hideLabel={false}
+              disabled={disableRoleChange}
+            />
+          </Stack>
         </SectionCard>
 
         <SectionCard
@@ -979,113 +1021,115 @@ export default function StaffCreateAndEditForm({
           </Accordion>
         </SectionCard>
 
-        <SectionCard
-          eyebrow="Staff Preferences"
-          title="Availability and Notifications"
-          description="These preferences help guide scheduling and how this staff member receives updates."
-        >
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-              Preferred Work Days
-            </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: "block", mb: 1 }}
-            >
-              Select days this staff member prefers to work.
-            </Typography>
-            <ToggleButtonGroup
-              sx={{
-                display: "grid",
-                gridTemplateColumns: "repeat(7, minmax(42px, 1fr))",
-                gap: 1,
-              }}
-            >
-              {DAYS.map((day, index) => {
-                const isPreferred = form.preferredDaysOfWeek.includes(index);
-                return (
-                  <ToggleButton
-                    key={day}
-                    value={day}
-                    selected={isPreferred}
-                    onClick={() => {
-                      const nextValues = isPreferred
-                        ? form.preferredDaysOfWeek.filter(
-                            (item) => item !== index,
-                          )
-                        : [...form.preferredDaysOfWeek, index];
+        {hasFacilityRole && (
+          <SectionCard
+            eyebrow="Staff Preferences"
+            title="Availability and Notifications"
+            description="These preferences help guide scheduling and how this staff member receives updates."
+          >
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                Preferred Work Days
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mb: 1 }}
+              >
+                Select days this staff member prefers to work.
+              </Typography>
+              <ToggleButtonGroup
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, minmax(42px, 1fr))",
+                  gap: 1,
+                }}
+              >
+                {DAYS.map((day, index) => {
+                  const isPreferred = form.preferredDaysOfWeek.includes(index);
+                  return (
+                    <ToggleButton
+                      key={day}
+                      value={day}
+                      selected={isPreferred}
+                      onClick={() => {
+                        const nextValues = isPreferred
+                          ? form.preferredDaysOfWeek.filter(
+                              (item) => item !== index,
+                            )
+                          : [...form.preferredDaysOfWeek, index];
 
-                      setForm({
-                        ...form,
-                        preferredDaysOfWeek: normalizeNumberArray(nextValues),
-                      });
-                    }}
-                    sx={{
-                      borderRadius: 2,
-                      minHeight: 40,
-                      fontWeight: 600,
-                      bgcolor: isPreferred
-                        ? "success.lighter"
-                        : "background.paper",
-                      color: isPreferred ? "success.dark" : "text.primary",
-                      border: isPreferred ? "2px solid" : "1px solid",
-                      borderColor: isPreferred ? "success.main" : "divider",
-                      "&:hover": {
-                        borderColor: "success.light",
-                      },
-                    }}
-                  >
-                    {day}
-                  </ToggleButton>
-                );
-              })}
-            </ToggleButtonGroup>
-          </Box>
+                        setForm({
+                          ...form,
+                          preferredDaysOfWeek: normalizeNumberArray(nextValues),
+                        });
+                      }}
+                      sx={{
+                        borderRadius: 2,
+                        minHeight: 40,
+                        fontWeight: 600,
+                        bgcolor: isPreferred
+                          ? "success.lighter"
+                          : "background.paper",
+                        color: isPreferred ? "success.dark" : "text.primary",
+                        border: isPreferred ? "2px solid" : "1px solid",
+                        borderColor: isPreferred ? "success.main" : "divider",
+                        "&:hover": {
+                          borderColor: "success.light",
+                        },
+                      }}
+                    >
+                      {day}
+                    </ToggleButton>
+                  );
+                })}
+              </ToggleButtonGroup>
+            </Box>
 
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-              Notification Preferences
-            </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: "block", mb: 1 }}
-            >
-              Configure email and SMS alerts for this staff member.
-            </Typography>
-            <Stack spacing={1}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={!!form.emailNotificationsEnabled}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        emailNotificationsEnabled: e.target.checked,
-                      })
-                    }
-                  />
-                }
-                label="Email Notifications"
-              />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={!!form.smsNotificationsEnabled}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        smsNotificationsEnabled: e.target.checked,
-                      })
-                    }
-                  />
-                }
-                label="SMS Notifications"
-              />
-            </Stack>
-          </Box>
-        </SectionCard>
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                Notification Preferences
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mb: 1 }}
+              >
+                Configure email and SMS alerts for this staff member.
+              </Typography>
+              <Stack spacing={1}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={!!form.emailNotificationsEnabled}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          emailNotificationsEnabled: e.target.checked,
+                        })
+                      }
+                    />
+                  }
+                  label="Email Notifications"
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={!!form.smsNotificationsEnabled}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          smsNotificationsEnabled: e.target.checked,
+                        })
+                      }
+                    />
+                  }
+                  label="SMS Notifications"
+                />
+              </Stack>
+            </Box>
+          </SectionCard>
+        )}
 
         <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
           <Button variant="contained" fullWidth onClick={handleSubmit}>

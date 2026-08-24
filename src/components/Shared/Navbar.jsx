@@ -15,9 +15,10 @@ import { MdNotifications, MdLogout } from "react-icons/md";
 import { FiPhoneCall } from "react-icons/fi";
 import logo from "../../assets/logos/wiserShifts-logo-light.svg";
 import { MdMenu } from "react-icons/md";
+import { getRoleDisplayName } from "../../constants/industryRoles";
 
 export default function Navbar({ onMobileOpen }) {
-  const { user, isStaff, isAdmin, logout, role } = useAuth();
+  const { user, logout, roles } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
   const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
@@ -83,7 +84,10 @@ export default function Navbar({ onMobileOpen }) {
                       variant={isSmall ? "h6" : "h5"}
                       sx={{ color: "text.primary" }}
                     >
-                      {role.charAt(0).toUpperCase() + role.slice(1)} Dashboard
+                      {roles.length
+                        ? roles.map(getRoleDisplayName).join(" / ")
+                        : "Staff"}{" "}
+                      Dashboard
                     </Typography>
                   </Box>
                   {/* no collapse controls on desktop */}

@@ -21,9 +21,19 @@ import {
 import StatCard from "./StatCard";
 import ScheduleAndCoverageCharts from "./ScheduleAndCoverageCharts";
 import { toast } from "react-toastify";
+import {
+  getFacilityRolesFromUser,
+  getRoleDisplayName,
+} from "../../../constants/industryRoles";
 
 export default function StaffDashboard() {
-  const { user, isAdmin, updateCurrentUser } = useAuth();
+  const { user, roles, can, facilityPreferences, updateCurrentUser } =
+    useAuth();
+  const canViewOperations = can("schedule.view");
+  const canViewStaffSummary = can("staff.view");
+  const hasSchedulableRole =
+    getFacilityRolesFromUser(user, facilityPreferences).length > 0;
+  const canUsePersonalSchedule = hasSchedulableRole;
 
   const [summary, setSummary] = useState(null);
   const [tenant, setTenant] = useState(null);
@@ -38,14 +48,25 @@ export default function StaffDashboard() {
     try {
       if (!user || !user.tenantId) throw new Error("No tenant ID");
 
-      // 🔥 USE THE NEW ROUTES WITH ID
-      const endpoint = isAdmin
-        ? `/summary/admin/${user._id}`
-        : `/summary/staff/${user._id}`;
+      const [operationalResult, personalResult] = await Promise.allSettled([
+        canViewStaffSummary
+          ? api.get(`/summary/admin/${user._id}`)
+          : Promise.resolve(null),
+        canUsePersonalSchedule
+          ? api.get(`/summary/staff/${user._id}`)
+          : Promise.resolve(null),
+      ]);
 
-      // Summary
-      const summaryRes = await api.get(`${endpoint}`);
-      setSummary(summaryRes.data);
+      setSummary({
+        operational:
+          operationalResult.status === "fulfilled"
+            ? operationalResult.value?.data || null
+            : null,
+        personal:
+          personalResult.status === "fulfilled"
+            ? personalResult.value?.data || null
+            : null,
+      });
 
       // Tenant
       const tenantRes = await api.get(`/tenants/${user.tenantId}`);
@@ -60,7 +81,7 @@ export default function StaffDashboard() {
   useEffect(() => {
     loadDashboardData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isAdmin]);
+  }, [user, canViewStaffSummary, canUsePersonalSchedule]);
 
   const handleProfileButtonClick = () => {
     if (profileInputRef.current) profileInputRef.current.click();
@@ -106,6 +127,8 @@ export default function StaffDashboard() {
           name: updatedUser.name,
           email: updatedUser.email,
           role: updatedUser.role,
+          roles: updatedUser.roles,
+          permissions: updatedUser.permissions,
           userPhone: updatedUser.userPhone,
           userPhoneCountryCode: updatedUser.userPhoneCountryCode,
         });
@@ -128,13 +151,18 @@ export default function StaffDashboard() {
       </Box>
     );
 
-  if (!summary) return <p>Error loading dashboard.</p>;
+  if (!summary && !canViewOperations && !canUsePersonalSchedule) {
+    return <p>Error loading dashboard.</p>;
+  }
+
+  const operationalSummary = summary?.operational || {};
+  const personalSummary = summary?.personal || {};
 
   // Admin cards
   const adminCards = [
     {
       title: "Active Staff",
-      value: summary.activeStaffCount ?? 0,
+      value: operationalSummary.activeStaffCount ?? 0,
       subtitle: "Active Staff",
       icon: <FiUsers size={20} color="#1e88e5" />,
       bgColor: "#e3f2fd",
@@ -142,7 +170,7 @@ export default function StaffDashboard() {
     },
     {
       title: "Fully Staffed Today",
-      value: summary.fullyStaffedCount ?? 0,
+      value: operationalSummary.fullyStaffedCount ?? 0,
       subtitle: "Fully Staffed Today",
       icon: <FiCheckCircle size={20} color="#2e7d32" />,
       bgColor: "#e8f5e9",
@@ -150,21 +178,21 @@ export default function StaffDashboard() {
     },
     {
       title: "Understaffed Today",
-      value: summary.understaffedCount ?? 0,
+      value: operationalSummary.understaffedCount ?? 0,
       subtitle: "Understaffed Shifts Today",
       icon: <FiAlertTriangle size={20} color="#c62828" />,
       bgColor: "#ffebee",
       layout: "center",
-      badge: summary.understaffedCount > 0 ? "Alert" : null,
+      badge: operationalSummary.understaffedCount > 0 ? "Alert" : null,
     },
     {
       title: "Pending Requests",
-      value: summary.pendingTimeOffCount ?? 0,
+      value: operationalSummary.pendingTimeOffCount ?? 0,
       subtitle: "Pending Requests",
       icon: <FiClock size={20} color="#f9a825" />,
       bgColor: "#fff8e1",
       layout: "center",
-      badge: summary.pendingTimeOffCount ?? 0,
+      badge: operationalSummary.pendingTimeOffCount ?? 0,
     },
   ];
 
@@ -172,7 +200,7 @@ export default function StaffDashboard() {
   const staffCards = [
     {
       title: "Upcoming Shifts",
-      value: summary.shiftsThisWeekCount ?? 0,
+      value: personalSummary.shiftsThisWeekCount ?? 0,
       subtitle: "Upcoming Shifts",
       icon: <FiCalendar size={20} color="#1e88e5" />,
       bgColor: "#e3f2fd",
@@ -180,7 +208,7 @@ export default function StaffDashboard() {
     },
     {
       title: "Hours This Week",
-      value: summary.hoursThisWeek ?? 0,
+      value: personalSummary.hoursThisWeek ?? 0,
       subtitle: "Hours This Week",
       icon: <FiClock size={20} color="#2e7d32" />,
       bgColor: "#e8f5e9",
@@ -188,7 +216,7 @@ export default function StaffDashboard() {
     },
     {
       title: "Unread Messages",
-      value: summary.unreadMessages ?? 0,
+      value: personalSummary.unreadMessages ?? 0,
       subtitle: "Unread Messages",
       icon: <FiMail size={20} color="#8e24aa" />,
       bgColor: "#f3e5f5",
@@ -196,7 +224,7 @@ export default function StaffDashboard() {
     },
     {
       title: "Approved Time Off",
-      value: summary.approvedUpcomingTimeOffCount ?? 0,
+      value: personalSummary.approvedUpcomingTimeOffCount ?? 0,
       subtitle: "Approved Time Off",
       icon: <FiCheckCircle size={20} color="#f9a825" />,
       bgColor: "#fff8e1",
@@ -204,9 +232,48 @@ export default function StaffDashboard() {
     },
   ];
 
-  const visibleCards = isAdmin ? adminCards : staffCards;
-  const mdCardColumns = Math.max(1, Math.min(4, visibleCards.length));
-  const smCardColumns = Math.max(1, Math.min(2, mdCardColumns));
+  const renderCardSection = (title, cards) => {
+    const mdCardColumns = Math.max(1, Math.min(4, cards.length));
+    const smCardColumns = Math.max(1, Math.min(2, mdCardColumns));
+
+    return (
+      <Box sx={{ mb: 3 }}>
+        <Typography sx={{ fontWeight: 800, mb: 1.5 }}>{title}</Typography>
+        <Box
+          sx={{
+            display: "grid",
+            gap: 2.5,
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: `repeat(${smCardColumns}, minmax(0, 1fr))`,
+              md: `repeat(${mdCardColumns}, minmax(0, 1fr))`,
+            },
+          }}
+        >
+          {cards.map((card) => (
+            <Box key={card.title} sx={{ display: "flex" }}>
+              <StatCard
+                title={card.title}
+                value={card.value}
+                subtitle={card.subtitle}
+                icon={card.icon}
+                layout={card.layout}
+                bgColor={card.bgColor}
+                minWidth={0}
+                badge={card.badge}
+                sx={{
+                  height: { xs: 152, md: 164 },
+                  width: "100%",
+                }}
+              />
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    );
+  };
+
+  const displayRoles = roles.length ? roles : [user?.role].filter(Boolean);
 
   return (
     <Container sx={{ mt: 4, mb: 5 }}>
@@ -239,8 +306,8 @@ export default function StaffDashboard() {
               variant="body1"
               sx={{ color: "rgba(255,255,255,0.88)", mb: 1.5 }}
             >
-              {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}
-              {tenant && ` • ${tenant.tenant.name}`}
+              {displayRoles.map(getRoleDisplayName).join(" • ")}
+              {tenant && ` • ${tenant.tenant?.name || tenant.name || ""}`}
             </Typography>
 
             <Box display="flex" gap={1}>
@@ -341,41 +408,21 @@ export default function StaffDashboard() {
         </Box>
       </Box>
 
-      {/* Cards */}
-      {/* <Box
-        sx={{
-          display: "grid",
-          gap: 2.5,
-          gridTemplateColumns: {
-            xs: "1fr",
-            sm: `repeat(${smCardColumns}, minmax(0, 1fr))`,
-            md: `repeat(${mdCardColumns}, minmax(0, 1fr))`,
-          },
-        }}
-      >
-        {visibleCards.map((card) => (
-          <Box key={card.title} sx={{ display: "flex" }}>
-            <StatCard
-              title={card.title}
-              value={card.value}
-              subtitle={card.subtitle}
-              icon={card.icon}
-              layout={card.layout}
-              bgColor={card.bgColor}
-              minWidth={0}
-              badge={card.badge}
-              sx={{
-                height: { xs: 152, md: 164 },
-                width: "100%",
-              }}
-            />
-          </Box>
-        ))}
-      </Box> */}
+      {/* {canViewOperations && summary.operational
+        ? renderCardSection("Operational Summary", adminCards)
+        : null} */}
+
+      {/* {canUsePersonalSchedule && summary.personal
+        ? renderCardSection("My Schedule Summary", staffCards)
+        : null} */}
 
       {/* Charts */}
       {/* 🔥 CHARTS STILL USE SCHEDULES + COVERAGE DIRECTLY — NOTHING TO CHANGE */}
-      <ScheduleAndCoverageCharts userId={user._id} isAdmin={isAdmin} />
+      <ScheduleAndCoverageCharts
+        userId={user._id}
+        canViewOperations={canViewOperations}
+        canUsePersonalSchedule={canUsePersonalSchedule}
+      />
     </Container>
   );
 }

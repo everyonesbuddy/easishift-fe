@@ -19,6 +19,7 @@ import { useAuth } from "../../../context/AuthContext";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 import {
+  getFacilityRolesFromUser,
   getRoleDisplayName,
   getUnitAreaDisplayName,
   getShiftTypeDisplayName,
@@ -168,18 +169,30 @@ function doesCoverageMatchStaffTags(staff, coverage) {
   return true;
 }
 
+function doesStaffHaveCompatibleFacilityRole(
+  staff,
+  coverageRole,
+  facilityPreferences,
+) {
+  const facilityRoles = getFacilityRolesFromUser(staff, facilityPreferences);
+  return facilityRoles.some((role) => isRoleCompatible(role, coverageRole));
+}
+
 export default function ScheduleForm({
   onSuccess,
   onClose,
   schedule,
+  mode = "manual",
   staffList,
   initialStaffId = "",
   initialCoverage = null,
   disableStaffSelect = false,
 }) {
   const isEditing = Boolean(schedule);
+  const isPickup = mode === "pickup";
 
-  const { isAdmin } = useAuth();
+  const { can, facilityPreferences } = useAuth();
+  const canManageSchedules = can("schedule.manage");
 
   const [formData, setFormData] = useState({
     staffId: "",
@@ -217,10 +230,13 @@ export default function ScheduleForm({
   const compatibleStaffOptions = staffList.filter((member) => {
     if (!activeCoverageContext) return true;
 
-    const isCompatibleRole = isRoleCompatible(
-      member?.role,
-      activeCoverageContext?.role,
-    );
+    const isCompatibleRole =
+      isRoleCompatible(member?.role, activeCoverageContext?.role) ||
+      doesStaffHaveCompatibleFacilityRole(
+        member,
+        activeCoverageContext?.role,
+        facilityPreferences,
+      );
     if (!isCompatibleRole) return false;
 
     return doesCoverageMatchStaffTags(member, activeCoverageContext);
@@ -285,7 +301,7 @@ export default function ScheduleForm({
 
   // Load draft coverage references so manual scheduling can avoid draft collisions.
   useEffect(() => {
-    if (isEditing) {
+    if (isEditing || isPickup || !canManageSchedules) {
       setHasLoadedDraftCoverageRefs(true);
       setDraftCoverageFetchFailed(false);
       return;
@@ -381,14 +397,37 @@ export default function ScheduleForm({
     return () => {
       isMounted = false;
     };
-  }, [isEditing]);
+  }, [canManageSchedules, isEditing, isPickup]);
 
   // Load available coverage when staff changes
   useEffect(() => {
     async function loadCoverage() {
       if (!formData.staffId || isEditing) return;
 
-      const excludeDraftCoverages = !isAdmin || !includeDraftCoverages;
+      if (isPickup) {
+        try {
+          const res = await api.get("/schedules/open-for-me");
+          const openCoverages = Array.isArray(res.data) ? res.data : [];
+          setCoverageOptions(
+            openCoverages
+              .map((coverage) => ({
+                ...coverage,
+                spotsRemaining: Number(coverage.remaining) || 0,
+              }))
+              .filter((coverage) => coverage.spotsRemaining > 0),
+          );
+        } catch (err) {
+          console.error("Failed to load open shifts", err);
+          setCoverageOptions([]);
+          setMessage(
+            err?.response?.data?.message || "Unable to load open shifts",
+          );
+        }
+        return;
+      }
+
+      const excludeDraftCoverages =
+        !canManageSchedules || !includeDraftCoverages;
       if (excludeDraftCoverages && !hasLoadedDraftCoverageRefs) {
         setCoverageOptions([]);
         return;
@@ -456,7 +495,12 @@ export default function ScheduleForm({
 
             return (
               new Date(c.startTime) > now &&
-              isRoleCompatible(selectedStaff.role, c.role) &&
+              (isRoleCompatible(selectedStaff.role, c.role) ||
+                doesStaffHaveCompatibleFacilityRole(
+                  selectedStaff,
+                  c.role,
+                  facilityPreferences,
+                )) &&
               doesCoverageMatchStaffTags(selectedStaff, c)
             );
           })
@@ -494,9 +538,11 @@ export default function ScheduleForm({
     formData.staffId,
     hasLoadedDraftCoverageRefs,
     includeDraftCoverages,
-    isAdmin,
+    canManageSchedules,
     isEditing,
+    isPickup,
     staffList,
+    facilityPreferences,
   ]);
 
   const handleChange = (e) =>
@@ -506,11 +552,44 @@ export default function ScheduleForm({
     e.preventDefault();
     setMessage("");
 
+    if (isPickup) {
+      if (!formData.coverageId) {
+        const msg = "Select an available shift first.";
+        setMessage(`❌ ${msg}`);
+        toast.error(msg, { position: "top-right", autoClose: 3500 });
+        return;
+      }
+
+      try {
+        await api.post("/schedules/pick-up", {
+          coverageId: formData.coverageId,
+        });
+        toast.success("Shift picked up successfully", {
+          position: "top-right",
+          autoClose: 2500,
+        });
+        if (onSuccess) onSuccess();
+      } catch (err) {
+        console.error(err);
+        const msg =
+          err?.response?.data?.message ||
+          "This shift is no longer available for pickup.";
+        setMessage("❌ " + msg);
+        toast.error(msg, { position: "top-right", autoClose: 4000 });
+      }
+      return;
+    }
+
     if (!isEditing && activeCoverageContext) {
       const selectedStaff = staffList.find((s) => s._id === formData.staffId);
       const isCompatible =
         Boolean(selectedStaff) &&
-        isRoleCompatible(selectedStaff?.role, activeCoverageContext?.role) &&
+        (isRoleCompatible(selectedStaff?.role, activeCoverageContext?.role) ||
+          doesStaffHaveCompatibleFacilityRole(
+            selectedStaff,
+            activeCoverageContext?.role,
+            facilityPreferences,
+          )) &&
         doesCoverageMatchStaffTags(selectedStaff, activeCoverageContext);
 
       if (!isCompatible) {
@@ -538,7 +617,7 @@ export default function ScheduleForm({
       timezone: formData.timezone,
     };
 
-    if (!isAdmin && isEditing) {
+    if (!canManageSchedules && isEditing) {
       payload.status = formData.status;
       delete payload.staffId;
       delete payload.role;
@@ -595,7 +674,11 @@ export default function ScheduleForm({
       )}
       <Stack spacing={2}>
         <Typography variant="h6">
-          {isEditing ? "Edit Schedule" : "Create New Schedule"}
+          {isEditing
+            ? "Edit Schedule"
+            : isPickup
+              ? "Pick Up an Open Shift"
+              : "Create New Schedule"}
         </Typography>
 
         {message && (
@@ -604,56 +687,58 @@ export default function ScheduleForm({
           </Alert>
         )}
 
-        <FormControl
-          fullWidth
-          required
-          disabled={isEditing || disableStaffSelect}
-        >
-          <InputLabel>Staff</InputLabel>
-          <Select
-            name="staffId"
-            value={formData.staffId}
-            onChange={(e) =>
-              setFormData((prev) => {
-                const nextStaffId = e.target.value;
+        {!isPickup && (
+          <FormControl
+            fullWidth
+            required
+            disabled={isEditing || disableStaffSelect}
+          >
+            <InputLabel>Staff</InputLabel>
+            <Select
+              name="staffId"
+              value={formData.staffId}
+              onChange={(e) =>
+                setFormData((prev) => {
+                  const nextStaffId = e.target.value;
 
-                if (initialCoverage && !isEditing) {
+                  if (initialCoverage && !isEditing) {
+                    return {
+                      ...prev,
+                      staffId: nextStaffId,
+                    };
+                  }
+
                   return {
                     ...prev,
                     staffId: nextStaffId,
+                    coverageId: "",
+                    startTime: "",
+                    endTime: "",
+                    role: "",
+                    unitArea: "",
+                    shiftType: "",
+                    shiftTag: "",
+                    certificationTags: [],
                   };
-                }
-
-                return {
-                  ...prev,
-                  staffId: nextStaffId,
-                  coverageId: "",
-                  startTime: "",
-                  endTime: "",
-                  role: "",
-                  unitArea: "",
-                  shiftType: "",
-                  shiftTag: "",
-                  certificationTags: [],
-                };
-              })
-            }
-          >
-            {compatibleStaffOptions.map((s) => (
-              <MenuItem key={s._id} value={s._id}>
-                {s.name} ({getRoleDisplayName(s.role)})
-              </MenuItem>
-            ))}
-            {compatibleStaffOptions.length === 0 && (
-              <MenuItem disabled>
-                No compatible staff for this coverage
-              </MenuItem>
-            )}
-          </Select>
-        </FormControl>
+                })
+              }
+            >
+              {compatibleStaffOptions.map((s) => (
+                <MenuItem key={s._id} value={s._id}>
+                  {s.name} ({getRoleDisplayName(s.role)})
+                </MenuItem>
+              ))}
+              {compatibleStaffOptions.length === 0 && (
+                <MenuItem disabled>
+                  No compatible staff for this coverage
+                </MenuItem>
+              )}
+            </Select>
+          </FormControl>
+        )}
 
         {/* Coverage selection (create only) */}
-        {!isEditing && initialCoverage && (
+        {!isPickup && !isEditing && initialCoverage && (
           <Alert severity="info">
             Scheduling open coverage: {getRoleDisplayName(initialCoverage.role)}
             {initialCoverage.unitArea
@@ -671,7 +756,7 @@ export default function ScheduleForm({
 
         {!isEditing && !initialCoverage && (
           <>
-            {isAdmin && (
+            {canManageSchedules && !isPickup && (
               <FormControlLabel
                 control={
                   <Switch
@@ -684,15 +769,19 @@ export default function ScheduleForm({
               />
             )}
 
-            {!includeDraftCoverages && draftCoverageFetchFailed && (
-              <Alert severity="warning">
-                Unable to verify draft coverages right now. To prevent
-                conflicts, draft-linked shifts are hidden.
-              </Alert>
-            )}
+            {!isPickup &&
+              !includeDraftCoverages &&
+              draftCoverageFetchFailed && (
+                <Alert severity="warning">
+                  Unable to verify draft coverages right now. To prevent
+                  conflicts, draft-linked shifts are hidden.
+                </Alert>
+              )}
 
-            <FormControl fullWidth>
-              <InputLabel>Select Shift</InputLabel>
+            <FormControl fullWidth required>
+              <InputLabel>
+                {isPickup ? "Available Open Shifts" : "Select Shift"}
+              </InputLabel>
               <Select
                 name="coverageId"
                 value={formData.coverageId}
@@ -761,7 +850,7 @@ export default function ScheduleForm({
           disabled
         />
 
-        {isAdmin && (
+        {canManageSchedules && !isPickup && (
           <TextField
             label="Notes"
             name="notes"
@@ -781,7 +870,7 @@ export default function ScheduleForm({
               onChange={handleChange}
             >
               {SCHEDULE_STATUS_OPTIONS.filter(
-                (option) => !option.adminOnly || isAdmin,
+                (option) => !option.adminOnly || canManageSchedules,
               ).map((option) => (
                 <MenuItem key={option.value} value={option.value}>
                   {option.label}
@@ -792,7 +881,11 @@ export default function ScheduleForm({
         )}
 
         <Button variant="contained" type="submit">
-          {isEditing ? "Update Schedule" : "Create Schedule"}
+          {isEditing
+            ? "Update Schedule"
+            : isPickup
+              ? "Pick Up Shift"
+              : "Create Schedule"}
         </Button>
       </Stack>
     </Paper>

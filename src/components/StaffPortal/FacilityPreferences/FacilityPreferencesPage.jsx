@@ -23,12 +23,30 @@ import {
   DialogContentText,
   DialogActions,
 } from "@mui/material";
-import { FiSave, FiInfo, FiRotateCcw, FiChevronDown } from "react-icons/fi";
+import {
+  FiSave,
+  FiInfo,
+  FiRotateCcw,
+  FiChevronDown,
+  FiPlayCircle,
+} from "react-icons/fi";
 import { FiX, FiPlus } from "react-icons/fi";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
+import GuideVideoDialog from "../../Shared/GuideVideoDialog";
+
+const FACILITY_PREFERENCES_GUIDE_VIDEOS = [
+  {
+    id: "facility-preferences",
+    label: "Facility preferences",
+    title: "Facility Preferences Guide",
+    description:
+      "Learn how to configure facility rules used across scheduling.",
+    embedUrl: "https://www.youtube.com/embed/fI3JscDuFkk",
+  },
+];
 
 const SCHEDULING_PATTERNS = [
   { value: "balance", label: "Balance (fairness-based)" },
@@ -256,8 +274,11 @@ const normalizeTaxonomyPrefs = (inputPrefs) => {
 };
 
 export default function FacilityPreferencesPage() {
-  const { tenant, logout } = useAuth();
+  const { tenant, logout, can } = useAuth();
   const navigate = useNavigate();
+  const canManageFacilityPreferences = can("facility_preferences.manage");
+  const canViewFacilityPreferences =
+    can("facility_preferences.view") || canManageFacilityPreferences;
   const [prefs, setPrefs] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -266,6 +287,7 @@ export default function FacilityPreferencesPage() {
   const [resetting, setResetting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingTenant, setDeletingTenant] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
 
   // UI state for adding new items to arrays
   const [arrayInputs, setArrayInputs] = useState({
@@ -276,6 +298,11 @@ export default function FacilityPreferencesPage() {
   });
   const [slotInputsByShiftType, setSlotInputsByShiftType] = useState({});
   useEffect(() => {
+    if (!canViewFacilityPreferences) {
+      setLoading(false);
+      return;
+    }
+
     async function fetchPrefs() {
       try {
         const res = await api.get("/facility-preferences");
@@ -288,7 +315,7 @@ export default function FacilityPreferencesPage() {
       }
     }
     fetchPrefs();
-  }, []);
+  }, [canViewFacilityPreferences]);
 
   if (loading)
     return (
@@ -296,6 +323,10 @@ export default function FacilityPreferencesPage() {
         <CircularProgress />
       </Box>
     );
+
+  if (!canViewFacilityPreferences) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const handleChange = (field, value) => {
     setPrefs((prev) => ({ ...prev, [field]: value }));
@@ -580,20 +611,50 @@ export default function FacilityPreferencesPage() {
             Configure facility-level scheduling policy and rules
           </Typography>
         </Box>
-        <Button
-          variant="outlined"
-          color="error"
-          startIcon={<FiRotateCcw size={16} />}
-          onClick={() => setResetDialogOpen(true)}
-          sx={{ borderRadius: 2, textTransform: "none" }}
-        >
-          Reset to Defaults
-        </Button>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
+          <Button
+            variant="outlined"
+            startIcon={<FiPlayCircle size={16} />}
+            onClick={() => setVideoOpen(true)}
+            sx={{
+              borderRadius: 2,
+              textTransform: "none",
+              borderColor: "#cbd5e1",
+              color: "#334155",
+              bgcolor: "#f8fafc",
+              fontWeight: 700,
+              "&:hover": {
+                borderColor: "#2563EB",
+                bgcolor: "#eff6ff",
+                color: "#1D4ED8",
+              },
+            }}
+          >
+            Watch guide
+          </Button>
+          {canManageFacilityPreferences && (
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<FiRotateCcw size={16} />}
+              onClick={() => setResetDialogOpen(true)}
+              sx={{ borderRadius: 2, textTransform: "none" }}
+            >
+              Reset to Defaults
+            </Button>
+          )}
+        </Stack>
       </Box>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
+        </Alert>
+      )}
+
+      {!canManageFacilityPreferences && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          You have view-only access to these facility settings.
         </Alert>
       )}
 
@@ -620,7 +681,17 @@ export default function FacilityPreferencesPage() {
         </Stack>
       </Paper>
 
-      <Stack sx={{ gap: { xs: 2, md: 3 } }}>
+      <Stack
+        sx={{
+          gap: { xs: 2, md: 3 },
+          ...(!canManageFacilityPreferences && {
+            "& .MuiAccordionDetails-root": {
+              pointerEvents: "none",
+              userSelect: "none",
+            },
+          }),
+        }}
+      >
         {/* ── Scheduling Pattern ── */}
         <Accordion disableGutters sx={ACCORDION_BASE_SX}>
           <AccordionSummary
@@ -1399,66 +1470,77 @@ export default function FacilityPreferencesPage() {
           </AccordionDetails>
         </Accordion>
 
-        <Accordion
-          disableGutters
-          sx={{
-            ...ACCORDION_BASE_SX,
-            borderColor: "error.light",
-            bgcolor: "error.50",
-            "& .MuiAccordionSummary-root": {
+        {canManageFacilityPreferences && can("tenant.delete") && (
+          <Accordion
+            disableGutters
+            sx={{
+              ...ACCORDION_BASE_SX,
+              borderColor: "error.light",
               bgcolor: "error.50",
-            },
-            "& .MuiAccordionDetails-root": {
-              bgcolor: "error.50",
-            },
-          }}
-        >
-          <AccordionSummary
-            expandIcon={<FiChevronDown size={18} />}
-            sx={ACCORDION_SUMMARY_SX}
+              "& .MuiAccordionSummary-root": {
+                bgcolor: "error.50",
+              },
+              "& .MuiAccordionDetails-root": {
+                bgcolor: "error.50",
+              },
+            }}
           >
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Danger Zone
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Delete this facility account and permanently remove all staff,
-                schedules, messages, preferences, and tenant-scoped data.
-              </Typography>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails sx={ACCORDION_DETAILS_SX}>
-            <Button
-              variant="outlined"
-              color="error"
-              onClick={() => setDeleteDialogOpen(true)}
-              disabled={deletingTenant || !tenant}
-              sx={{ textTransform: "none", borderRadius: 2 }}
+            <AccordionSummary
+              expandIcon={<FiChevronDown size={18} />}
+              sx={ACCORDION_SUMMARY_SX}
             >
-              Delete Facility Account
-            </Button>
-          </AccordionDetails>
-        </Accordion>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Danger Zone
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Delete this facility account and permanently remove all staff,
+                  schedules, messages, preferences, and tenant-scoped data.
+                </Typography>
+              </Box>
+            </AccordionSummary>
+            <AccordionDetails sx={ACCORDION_DETAILS_SX}>
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={() => setDeleteDialogOpen(true)}
+                disabled={deletingTenant || !tenant}
+                sx={{ textTransform: "none", borderRadius: 2 }}
+              >
+                Delete Facility Account
+              </Button>
+            </AccordionDetails>
+          </Accordion>
+        )}
 
         {/* Save button */}
-        <Box sx={{ display: "flex", justifyContent: "flex-end", pb: 2 }}>
-          <Button
-            variant="contained"
-            startIcon={
-              saving ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : (
-                <FiSave size={16} />
-              )
-            }
-            onClick={handleSave}
-            disabled={saving}
-            sx={{ borderRadius: 2, textTransform: "none", px: 3, py: 1.25 }}
-          >
-            {saving ? "Saving…" : "Save Preferences"}
-          </Button>
-        </Box>
+        {canManageFacilityPreferences && (
+          <Box sx={{ display: "flex", justifyContent: "flex-end", pb: 2 }}>
+            <Button
+              variant="contained"
+              startIcon={
+                saving ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : (
+                  <FiSave size={16} />
+                )
+              }
+              onClick={handleSave}
+              disabled={saving}
+              sx={{ borderRadius: 2, textTransform: "none", px: 3, py: 1.25 }}
+            >
+              {saving ? "Saving…" : "Save Preferences"}
+            </Button>
+          </Box>
+        )}
       </Stack>
+
+      <GuideVideoDialog
+        open={videoOpen}
+        onClose={() => setVideoOpen(false)}
+        title="Facility Preferences Guide Videos"
+        videos={FACILITY_PREFERENCES_GUIDE_VIDEOS}
+      />
 
       {/* Reset confirmation dialog */}
       <Dialog

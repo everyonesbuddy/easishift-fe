@@ -6,7 +6,9 @@ import {
   Button,
   Paper,
   Dialog,
+  DialogActions,
   DialogContent,
+  DialogTitle,
   Table,
   TableHead,
   TableBody,
@@ -22,6 +24,7 @@ import {
   Avatar,
 } from "@mui/material";
 import api from "../../../config/api";
+import { toast } from "react-toastify";
 import {
   FiUserPlus,
   FiMail,
@@ -30,24 +33,39 @@ import {
   FiUsers,
   FiEdit,
   FiDelete,
+  FiPlayCircle,
+  FiKey,
 } from "react-icons/fi";
 import { useAuth } from "../../../context/AuthContext";
 import StaffCreateAndEditForm from "./StaffCreateAndEditForm";
 import BulkStaffModal from "./BulkStaffModal";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
+import GuideVideoDialog from "../../Shared/GuideVideoDialog";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { Stack } from "@mui/material";
 import {
   getRoleDisplayName,
   getRoleColor,
+  getSystemRolesFromUser,
+  getUserRoles,
   getUnitAreaDisplayName,
   getCertificationTagDisplayName,
   getRoleOptionsFromFacilityPreferences,
 } from "../../../constants/industryRoles";
 
+const STAFF_MANAGEMENT_GUIDE_VIDEOS = [
+  {
+    id: "staff-management",
+    label: "Staff management",
+    title: "Staff Management Guide",
+    description: "Learn how to add, edit, filter, and import staff profiles.",
+    embedUrl: "https://www.youtube.com/embed/GEzs9F-LysY",
+  },
+];
+
 export default function StaffList() {
-  const { role, facilityPreferences } = useAuth();
+  const { can, facilityPreferences } = useAuth();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -55,6 +73,7 @@ export default function StaffList() {
 
   const [open, setOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
 
   const [page, setPage] = useState(0);
@@ -62,6 +81,8 @@ export default function StaffList() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+  const [resetSendingId, setResetSendingId] = useState(null);
+  const [resetTargetStaff, setResetTargetStaff] = useState(null);
 
   // filters/search
   const [searchTerm, setSearchTerm] = useState("");
@@ -104,6 +125,45 @@ export default function StaffList() {
     }
   };
 
+  const handleAskPasswordReset = (staffUser) => {
+    const systemRoles = getSystemRolesFromUser(staffUser);
+    if (
+      !staffUser?.email ||
+      systemRoles.includes("admin") ||
+      systemRoles.includes("owner")
+    ) {
+      return;
+    }
+    setResetTargetStaff(staffUser);
+  };
+
+  const handleSendPasswordReset = async () => {
+    const staffUser = resetTargetStaff;
+    const userId = staffUser?._id || staffUser?.id;
+    if (!userId || !staffUser?.email) return;
+
+    try {
+      setResetSendingId(userId);
+      await api.post(`/auth/users/${userId}/send-password-reset`);
+      toast.success(`Password reset link sent to ${staffUser.email}`, {
+        position: "top-right",
+        autoClose: 2500,
+      });
+    } catch (err) {
+      console.error("Failed to send password reset link", err);
+      toast.error(
+        err?.response?.data?.message || "Failed to send password reset link",
+        {
+          position: "top-right",
+          autoClose: 3000,
+        },
+      );
+    } finally {
+      setResetSendingId(null);
+      setResetTargetStaff(null);
+    }
+  };
+
   const handleModalClose = (refresh = false) => {
     setOpen(false);
     setEditingStaff(null);
@@ -114,7 +174,7 @@ export default function StaffList() {
     const facilityRoleValues = getRoleOptionsFromFacilityPreferences(
       facilityPreferences,
     ).map((option) => option.value);
-    const existingRoles = staff.map((u) => u.role).filter(Boolean);
+    const existingRoles = staff.flatMap((user) => getUserRoles(user));
 
     return [
       "all",
@@ -142,7 +202,8 @@ export default function StaffList() {
         u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.email?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesRole = filterRole === "all" || u.role === filterRole;
+      const matchesRole =
+        filterRole === "all" || getUserRoles(u).includes(filterRole);
 
       return matchesSearch && matchesRole;
     });
@@ -171,6 +232,25 @@ export default function StaffList() {
     return normalized.length ? normalized.join(", ") : "-";
   };
 
+  const resetTargetId = resetTargetStaff?._id || resetTargetStaff?.id;
+  const canManageStaff = can("staff.manage");
+  const canResetPassword = can("staff.reset_password");
+  const compactActionButtonSx = {
+    borderRadius: 1.5,
+    textTransform: "none",
+    fontSize: "0.68rem",
+    fontWeight: 800,
+    lineHeight: 1.1,
+    minHeight: 28,
+    px: 0.95,
+    py: 0.45,
+    whiteSpace: "nowrap",
+    "& .MuiButton-startIcon": {
+      mr: 0.45,
+      "& svg": { width: 14, height: 14 },
+    },
+  };
+
   return (
     <Container sx={{ mt: 4 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center">
@@ -179,43 +259,69 @@ export default function StaffList() {
           <Typography color="text.secondary">Manage your team</Typography>
         </Box>
 
-        {role === "admin" && (
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => setBulkOpen(true)}
-              sx={{
-                textTransform: "none",
-                borderRadius: 2,
-                px: 3,
-                width: { xs: "100%", md: "auto" },
-              }}
-            >
-              Bulk Add Staff
-            </Button>
-            <Button
-              size="small"
-              variant="contained"
-              startIcon={<FiUsers />}
-              onClick={() => {
-                setEditingStaff(null);
-                setOpen(true);
-              }}
-              sx={{
-                textTransform: "none",
-                borderRadius: 2,
-                px: 3,
-                bgcolor: "#2563EB",
-                color: "#fff",
-                width: { xs: "100%", md: "auto" },
-                "&:hover": { bgcolor: "#1D4ED8" },
-              }}
-            >
-              Add Staff Member
-            </Button>
-          </Stack>
-        )}
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<FiPlayCircle />}
+            onClick={() => setVideoOpen(true)}
+            sx={{
+              textTransform: "none",
+              borderRadius: 2,
+              px: 2.25,
+              width: { xs: "100%", sm: "auto" },
+              borderColor: "#cbd5e1",
+              color: "#334155",
+              bgcolor: "#f8fafc",
+              fontWeight: 700,
+              "&:hover": {
+                borderColor: "#2563EB",
+                bgcolor: "#eff6ff",
+                color: "#1D4ED8",
+              },
+            }}
+          >
+            Watch guide
+          </Button>
+
+          {canManageStaff && (
+            <>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => setBulkOpen(true)}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: 2,
+                  px: 3,
+                  width: { xs: "100%", md: "auto" },
+                }}
+              >
+                Bulk Add Staff
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<FiUsers />}
+                onClick={() => {
+                  setEditingStaff(null);
+                  setOpen(true);
+                }}
+                sx={{
+                  textTransform: "none",
+                  borderRadius: 2,
+                  px: 3,
+                  bgcolor: "#2563EB",
+                  color: "#fff",
+                  width: { xs: "100%", md: "auto" },
+                  "&:hover": { bgcolor: "#1D4ED8" },
+                }}
+              >
+                Add Staff Member
+              </Button>
+            </>
+          )}
+        </Stack>
       </Box>
 
       {/* filters */}
@@ -292,7 +398,7 @@ export default function StaffList() {
                         sx={{ fontSize: 12, color: "text.secondary" }}
                         noWrap
                       >
-                        {getRoleDisplayName(u.role)}
+                        {getUserRoles(u).map(getRoleDisplayName).join(", ")}
                       </Typography>
                       <Typography
                         sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
@@ -322,17 +428,38 @@ export default function StaffList() {
                       </Typography>
                     </Box>
 
-                    <Stack direction="row" spacing={1}>
+                    <Stack
+                      direction="row"
+                      spacing={0.75}
+                      flexWrap="wrap"
+                      useFlexGap
+                    >
+                      {canResetPassword && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<FiKey />}
+                          disabled={
+                            !u.email ||
+                            getSystemRolesFromUser(u).includes("admin") ||
+                            getSystemRolesFromUser(u).includes("owner") ||
+                            resetSendingId === (u._id || u.id)
+                          }
+                          onClick={() => handleAskPasswordReset(u)}
+                          sx={compactActionButtonSx}
+                        >
+                          {resetSendingId === (u._id || u.id)
+                            ? "Sending..."
+                            : "Resend reset link"}
+                        </Button>
+                      )}
                       <Button
                         size="small"
                         variant="contained"
                         color="info"
+                        disabled={!canManageStaff}
                         onClick={() => handleOpenEdit(u)}
-                        sx={{
-                          mr: 1,
-                          borderRadius: 2,
-                          textTransform: "none",
-                        }}
+                        sx={compactActionButtonSx}
                       >
                         Edit
                       </Button>
@@ -340,13 +467,12 @@ export default function StaffList() {
                         size="small"
                         variant="contained"
                         color="error"
-                        disabled={u.role === "admin"}
+                        disabled={
+                          !canManageStaff ||
+                          getSystemRolesFromUser(u).includes("owner")
+                        }
                         onClick={() => handleAskDelete(u._id || u.id)}
-                        sx={{
-                          mr: 1,
-                          borderRadius: 2,
-                          textTransform: "none",
-                        }}
+                        sx={compactActionButtonSx}
                       >
                         Delete
                       </Button>
@@ -392,7 +518,7 @@ export default function StaffList() {
                     fontSize: "0.72rem",
                   }}
                 >
-                  Role
+                  Role(s)
                 </TableCell>
                 <TableCell
                   sx={{
@@ -450,9 +576,22 @@ export default function StaffList() {
                       </TableCell>
 
                       <TableCell sx={{ py: 1 }}>
-                        <Box component="span" sx={getRoleChipStyles(u.role)}>
-                          {getRoleDisplayName(u.role)}
-                        </Box>
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          flexWrap="wrap"
+                          useFlexGap
+                        >
+                          {getUserRoles(u).map((assignedRole) => (
+                            <Box
+                              key={assignedRole}
+                              component="span"
+                              sx={getRoleChipStyles(assignedRole)}
+                            >
+                              {getRoleDisplayName(assignedRole)}
+                            </Box>
+                          ))}
+                        </Stack>
                       </TableCell>
 
                       <TableCell sx={{ py: 1 }}>
@@ -511,13 +650,34 @@ export default function StaffList() {
                       </TableCell>
 
                       <TableCell sx={{ py: 1 }}>
-                        <Box display="flex" gap={1}>
+                        <Box display="flex" gap={0.75} flexWrap="wrap">
+                          {canResetPassword && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<FiKey />}
+                              disabled={
+                                !u.email ||
+                                getSystemRolesFromUser(u).includes("admin") ||
+                                getSystemRolesFromUser(u).includes("owner") ||
+                                resetSendingId === (u._id || u.id)
+                              }
+                              onClick={() => handleAskPasswordReset(u)}
+                              sx={compactActionButtonSx}
+                            >
+                              {resetSendingId === (u._id || u.id)
+                                ? "Sending..."
+                                : "Resend password reset link"}
+                            </Button>
+                          )}
                           <Button
                             size="small"
                             variant="contained"
                             color="info"
                             startIcon={<FiEdit />}
+                            disabled={!canManageStaff}
                             onClick={() => handleOpenEdit(u)}
+                            sx={compactActionButtonSx}
                           >
                             Edit
                           </Button>
@@ -526,8 +686,12 @@ export default function StaffList() {
                             variant="contained"
                             color="error"
                             startIcon={<FiDelete />}
-                            disabled={u.role === "admin"}
+                            disabled={
+                              !canManageStaff ||
+                              getSystemRolesFromUser(u).includes("owner")
+                            }
                             onClick={() => handleAskDelete(u._id || u.id)}
+                            sx={compactActionButtonSx}
                           >
                             Delete
                           </Button>
@@ -580,6 +744,49 @@ export default function StaffList() {
             onSuccess={() => handleModalClose(true)}
           />
         </DialogContent>
+      </Dialog>
+
+      <GuideVideoDialog
+        open={videoOpen}
+        onClose={() => setVideoOpen(false)}
+        title="Staff Management Guide Videos"
+        videos={STAFF_MANAGEMENT_GUIDE_VIDEOS}
+      />
+
+      <Dialog
+        open={Boolean(resetTargetStaff)}
+        onClose={() => setResetTargetStaff(null)}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>
+          Resend password reset link?
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: "#334155", lineHeight: 1.6 }}>
+            This will email a new password reset link to{" "}
+            <Box component="span" sx={{ fontWeight: 800 }}>
+              {resetTargetStaff?.email}
+            </Box>
+            . Any previous reset link for this staff account will no longer be
+            usable.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setResetTargetStaff(null)}>Cancel</Button>
+          <Button
+            variant="contained"
+            startIcon={<FiKey />}
+            disabled={resetSendingId === resetTargetId}
+            onClick={handleSendPasswordReset}
+            sx={{ textTransform: "none", borderRadius: 2 }}
+          >
+            {resetSendingId === resetTargetId
+              ? "Sending..."
+              : "Send reset link"}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       <ConfirmDialog

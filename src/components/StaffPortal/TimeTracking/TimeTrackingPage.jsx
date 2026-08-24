@@ -131,7 +131,8 @@ const normalizeTrackingMode = (mode) => {
 };
 
 export default function TimeTrackingPage() {
-  const { isAdmin, facilityPreferences, fetchFacilityPreferences } = useAuth();
+  const { can, facilityPreferences, fetchFacilityPreferences } = useAuth();
+  const isAdmin = can("staff.view");
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

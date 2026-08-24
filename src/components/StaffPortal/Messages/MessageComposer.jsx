@@ -12,6 +12,10 @@ import CloseIcon from "@mui/icons-material/Close";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
+import {
+  getRoleDisplayName,
+  getUserRoles,
+} from "../../../constants/industryRoles";
 
 export default function MessageComposer({
   onSuccess,
@@ -58,7 +62,7 @@ export default function MessageComposer({
 
   const roleOptions = useMemo(() => {
     const uniqueRoles = [
-      ...new Set(staffList.map((staff) => staff.role).filter(Boolean)),
+      ...new Set(staffList.flatMap((staff) => getUserRoles(staff))),
     ];
     return uniqueRoles.sort((a, b) => a.localeCompare(b));
   }, [staffList]);
@@ -75,7 +79,7 @@ export default function MessageComposer({
     if (selection.startsWith("role:")) {
       const role = selection.replace("role:", "");
       return staffList
-        .filter((staff) => staff.role === role)
+        .filter((staff) => getUserRoles(staff).includes(role))
         .map((staff) => staff._id);
     }
 
@@ -151,7 +155,7 @@ export default function MessageComposer({
         {roleOptions.length > 0 && <ListSubheader>By Role</ListSubheader>}
         {roleOptions.map((role) => (
           <MenuItem key={role} value={`role:${role}`}>
-            Role: {role}
+            Role: {getRoleDisplayName(role)}
           </MenuItem>
         ))}
 

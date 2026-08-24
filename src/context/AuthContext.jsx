@@ -11,6 +11,116 @@ import api from "../config/api";
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
 
+const FALLBACK_SYSTEM_ROLE_PERMISSIONS = {
+  staff: [
+    "schedule.view_own",
+    "schedule.pick_up",
+    "timeoff.request",
+    "shift_swap.use",
+    "messages.use",
+    "preferences.manage_own",
+  ],
+  scheduler: [
+    "schedule.view",
+    "schedule.manage",
+    "coverage.view",
+    "coverage.manage",
+    "staff.view",
+    "facility_preferences.view",
+  ],
+  admin: [
+    "schedule.view",
+    "schedule.manage",
+    "coverage.view",
+    "coverage.manage",
+    "staff.view",
+    "staff.manage",
+    "staff.reset_password",
+    "timeoff.review",
+    "messages.manage",
+    "facility_preferences.manage",
+  ],
+  owner: [
+    "schedule.view",
+    "schedule.manage",
+    "coverage.view",
+    "coverage.manage",
+    "staff.view",
+    "staff.manage",
+    "staff.reset_password",
+    "timeoff.review",
+    "messages.manage",
+    "facility_preferences.manage",
+    "billing.view",
+    "billing.manage",
+    "tenant.settings",
+    "tenant.delete",
+    "roles.manage",
+  ],
+};
+
+const normalizeRole = (role) => {
+  const value = String(role || "")
+    .trim()
+    .toLowerCase();
+
+  if (value === "user" || value === "other") return "staff";
+  if (value === "superadmin") return "owner";
+  return value;
+};
+
+const normalizeRoles = (user) => {
+  if (Array.isArray(user?.roles) && user.roles.length) {
+    return Array.from(
+      new Set(user.roles.map((role) => normalizeRole(role)).filter(Boolean)),
+    );
+  }
+
+  const legacyRole = normalizeRole(user?.role);
+  return legacyRole ? [legacyRole] : [];
+};
+
+const normalizePermissions = (user) => {
+  if (!user) return [];
+
+  const backendPermissions = Array.from(
+    new Set(
+      (Array.isArray(user?.permissions) ? user.permissions : [])
+        .map((permission) => String(permission || "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  const roles = normalizeRoles(user);
+  const permissionRoles = roles.some(
+    (role) => FALLBACK_SYSTEM_ROLE_PERMISSIONS[role],
+  )
+    ? roles.filter((role) => FALLBACK_SYSTEM_ROLE_PERMISSIONS[role])
+    : ["staff"];
+
+  return Array.from(
+    new Set([
+      ...backendPermissions,
+      ...permissionRoles.flatMap(
+        (role) => FALLBACK_SYSTEM_ROLE_PERMISSIONS[role] || [],
+      ),
+    ]),
+  );
+};
+
+const normalizeUser = (user) => {
+  if (!user) return null;
+  const roles = normalizeRoles(user);
+  const permissions = normalizePermissions(user);
+
+  return {
+    ...user,
+    roles,
+    permissions,
+    role: user.role || roles[0] || "staff",
+  };
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(""); // always string
@@ -29,9 +139,9 @@ export const AuthProvider = ({ children }) => {
       // ignore storage errors
     }
     if (savedUser) {
-      const parsedUser = JSON.parse(savedUser);
+      const parsedUser = normalizeUser(JSON.parse(savedUser));
       setUser(parsedUser);
-      setRole(parsedUser.role || "staff"); // ✅ always a string
+      setRole(parsedUser.role || parsedUser.roles?.[0] || "staff"); // ✅ always a string
       // try to fetch tenant if available
       if (parsedUser.tenantId) {
         (async () => {
@@ -65,49 +175,59 @@ export const AuthProvider = ({ children }) => {
       return {};
     }
   }, []);
-  const login = useCallback((data) => {
-    let userData = null;
-    let detectedRole = "staff";
+  const login = useCallback(
+    (data) => {
+      let userData = null;
+      let detectedRole = "staff";
 
-    if (data.user) {
-      userData = data.user;
-      detectedRole = data.user.role || "staff";
-    } else if (data.patient || data.firstName) {
-      userData = data.patient || data;
-      detectedRole = "patient";
-    } else if (data.role) {
-      userData = data;
-      detectedRole = data.role || "staff";
-    } else {
-      userData = data;
-      detectedRole = data.role || "staff";
-    }
+      if (data.user) {
+        userData = data.user;
+        detectedRole = data.user.role || "staff";
+      } else if (data.patient || data.firstName) {
+        userData = data.patient || data;
+        detectedRole = "patient";
+      } else if (data.role) {
+        userData = data;
+        detectedRole = data.role || "staff";
+      } else {
+        userData = data;
+        detectedRole = data.role || "staff";
+      }
 
-    // ✅ Make sure role is always string
-    if (typeof detectedRole !== "string") detectedRole = "staff";
+      // ✅ Make sure role is always string
+      if (typeof detectedRole !== "string") detectedRole = "staff";
 
-    setUser(userData);
-    setRole(detectedRole);
-    // fetch tenant for global state if present
-    if (userData && userData.tenantId) {
-      (async () => {
-        try {
-          const res = await api.get(`/tenants/${userData.tenantId}`);
-          setTenant(res.data?.tenant || res.data || null);
-          // Also fetch facility preferences on login
-          await fetchFacilityPreferences();
-        } catch (err) {
-          console.error("Failed to fetch tenant after login", err);
-          setTenant(null);
-        }
-      })();
-    } else {
-      setTenant(null);
-    }
+      const normalizedUserData = normalizeUser(userData);
+      const normalizedRoles = normalizeRoles(normalizedUserData);
+      const nextRole =
+        normalizedUserData?.role || normalizedRoles[0] || detectedRole;
 
-    localStorage.setItem("user", JSON.stringify(userData));
-    localStorage.setItem("role", detectedRole);
-  }, [fetchFacilityPreferences]);
+      setUser(normalizedUserData);
+      setRole(nextRole);
+      // fetch tenant for global state if present
+      if (normalizedUserData && normalizedUserData.tenantId) {
+        (async () => {
+          try {
+            const res = await api.get(
+              `/tenants/${normalizedUserData.tenantId}`,
+            );
+            setTenant(res.data?.tenant || res.data || null);
+            // Also fetch facility preferences on login
+            await fetchFacilityPreferences();
+          } catch (err) {
+            console.error("Failed to fetch tenant after login", err);
+            setTenant(null);
+          }
+        })();
+      } else {
+        setTenant(null);
+      }
+
+      localStorage.setItem("user", JSON.stringify(normalizedUserData));
+      localStorage.setItem("role", nextRole);
+    },
+    [fetchFacilityPreferences],
+  );
 
   // Allow manual refresh of tenant data
   const refreshTenant = useCallback(async () => {
@@ -127,7 +247,7 @@ export const AuthProvider = ({ children }) => {
     if (!partialUser) return;
 
     setUser((prev) => {
-      const nextUser = { ...(prev || {}), ...partialUser };
+      const nextUser = normalizeUser({ ...(prev || {}), ...partialUser });
       localStorage.setItem("user", JSON.stringify(nextUser));
       if (nextUser.role) {
         localStorage.setItem("role", nextUser.role);
@@ -152,13 +272,26 @@ export const AuthProvider = ({ children }) => {
 
   const normalizedRole = String(role || "").toLowerCase();
   const isPatient = normalizedRole === "patient";
-  const isAdmin = normalizedRole === "admin" || normalizedRole === "superadmin";
+  const roles = normalizeRoles(user);
+  const permissions = normalizePermissions(user);
+  const hasRole = useCallback(
+    (targetRole) => roles.includes(normalizeRole(targetRole)),
+    [roles],
+  );
+  const can = useCallback(
+    (permission) => permissions.includes(permission),
+    [permissions],
+  );
+  const isOwner = hasRole("owner");
+  const isAdmin = hasRole("admin") || isOwner;
   const isStaff = Boolean(user) && !isPatient;
 
   const contextValue = useMemo(
     () => ({
       user,
       role,
+      roles,
+      permissions,
       tenant,
       refreshTenant,
       facilityPreferences,
@@ -166,6 +299,9 @@ export const AuthProvider = ({ children }) => {
       isPatient,
       isStaff,
       isAdmin,
+      isOwner,
+      hasRole,
+      can,
       login,
       logout,
       updateCurrentUser,
@@ -174,6 +310,8 @@ export const AuthProvider = ({ children }) => {
     [
       user,
       role,
+      roles,
+      permissions,
       tenant,
       refreshTenant,
       facilityPreferences,
@@ -181,6 +319,9 @@ export const AuthProvider = ({ children }) => {
       isPatient,
       isStaff,
       isAdmin,
+      isOwner,
+      hasRole,
+      can,
       login,
       logout,
       updateCurrentUser,
@@ -189,8 +330,6 @@ export const AuthProvider = ({ children }) => {
   );
 
   return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 };

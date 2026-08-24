@@ -29,7 +29,7 @@ const STATUS_COLORS = {
 };
 
 export default function TimeOffRequestList() {
-  const { user, role } = useAuth();
+  const { user, can } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [openModal, setOpenModal] = useState(false);
@@ -51,19 +51,12 @@ export default function TimeOffRequestList() {
     fetchRequests();
   }, []);
 
-  const isAdmin = useMemo(
-    () => role === "admin" || role === "superadmin",
-    [role],
-  );
+  const isAdmin = can("timeoff.review");
 
   const handleReview = async (id, newStatus) => {
     try {
       setActionLoadingId(id);
-      await axios.patch(
-        `/timeoff/${id}/review`,
-        { status: newStatus },
-        { withCredentials: true },
-      );
+      await api.patch(`/timeoff/${id}/review`, { status: newStatus });
       await fetchRequests();
     } catch (err) {
       console.error(err);

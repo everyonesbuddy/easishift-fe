@@ -20,6 +20,7 @@ import { useAuth } from "../../../context/AuthContext";
 import {
   getFacilityRolesFromUser,
   getRoleDisplayName,
+  getUserRoles,
   isRoleCompatible,
 } from "../../../constants/industryRoles";
 
@@ -99,7 +100,9 @@ export default function ShiftSwapRequestModal({
         facilityPreferences,
       );
       return (
-        isRoleCompatible(staff.role, activeSchedule.role) ||
+        getUserRoles(staff).some((role) =>
+          isRoleCompatible(role, activeSchedule.role),
+        ) ||
         facilityRoles.some((role) =>
           isRoleCompatible(role, activeSchedule.role),
         )

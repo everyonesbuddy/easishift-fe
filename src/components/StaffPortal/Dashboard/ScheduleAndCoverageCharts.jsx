@@ -221,7 +221,8 @@ export default function ScheduleAndCoverageCharts({
       });
       return splitShifts.map((part) => ({
         ...part,
-        staffRole: part.staffId?.role,
+        // Prefer the shift-specific role over the staff profile's singular role
+        staffRole: part.role || part.staffId?.role,
         dayKey: part.dayKey,
         start: part.start,
         end: part.end,

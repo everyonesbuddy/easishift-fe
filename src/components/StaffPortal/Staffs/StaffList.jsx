@@ -386,7 +386,7 @@ export default function StaffList() {
                     <Avatar
                       src={u.profilePicture || ""}
                       alt={`${u.name || "Staff"} profile`}
-                      sx={{ bgcolor: getRoleColor(u.role) }}
+                      sx={{ bgcolor: getRoleColor(getUserRoles(u)[0]) }}
                     >
                       {initials}
                     </Avatar>
@@ -563,7 +563,7 @@ export default function StaffList() {
                           <Avatar
                             src={u.profilePicture || ""}
                             alt={`${u.name || "Staff"} profile`}
-                            sx={{ bgcolor: getRoleColor(u.role) }}
+                            sx={{ bgcolor: getRoleColor(getUserRoles(u)[0]) }}
                           >
                             {initials}
                           </Avatar>

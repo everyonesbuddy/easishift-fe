@@ -24,6 +24,7 @@ import {
   getUnitAreaDisplayName,
   getShiftTypeDisplayName,
   getShiftTagDisplayName,
+  getUserRoles,
   isRoleCompatible,
 } from "../../../constants/industryRoles";
 
@@ -231,7 +232,9 @@ export default function ScheduleForm({
     if (!activeCoverageContext) return true;
 
     const isCompatibleRole =
-      isRoleCompatible(member?.role, activeCoverageContext?.role) ||
+      getUserRoles(member).some((role) =>
+        isRoleCompatible(role, activeCoverageContext?.role),
+      ) ||
       doesStaffHaveCompatibleFacilityRole(
         member,
         activeCoverageContext?.role,
@@ -241,6 +244,14 @@ export default function ScheduleForm({
 
     return doesCoverageMatchStaffTags(member, activeCoverageContext);
   });
+
+  const selectedStaffMember =
+    staffList.find((s) => s._id === formData.staffId) || null;
+  const selectedStaffRoleOptions = selectedStaffMember
+    ? getUserRoles(selectedStaffMember)
+    : [];
+  const needsRoleSelection =
+    !isEditing && !activeCoverageContext && selectedStaffRoleOptions.length > 1;
 
   // Load existing schedule when editing
   useEffect(() => {
@@ -263,14 +274,17 @@ export default function ScheduleForm({
     }
   }, [schedule]);
 
-  // If an initialStaffId is provided (e.g., non-admin scheduling themselves), prefill it
+  // If an initialStaffId is provided (e.g., non-admin scheduling themselves), prefill it.
+  // Only auto-fill the role when the staff member has exactly one role; otherwise the
+  // scheduler must explicitly choose via the role selector.
   useEffect(() => {
     if (!schedule && initialStaffId) {
       const selected = staffList.find((s) => s._id === initialStaffId);
+      const selectedRoles = selected ? getUserRoles(selected) : [];
       setFormData((f) => ({
         ...f,
         staffId: initialStaffId,
-        role: selected?.role || f.role,
+        role: selectedRoles.length === 1 ? selectedRoles[0] : f.role,
       }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -495,7 +509,9 @@ export default function ScheduleForm({
 
             return (
               new Date(c.startTime) > now &&
-              (isRoleCompatible(selectedStaff.role, c.role) ||
+              (getUserRoles(selectedStaff).some((role) =>
+                isRoleCompatible(role, c.role),
+              ) ||
                 doesStaffHaveCompatibleFacilityRole(
                   selectedStaff,
                   c.role,
@@ -584,7 +600,9 @@ export default function ScheduleForm({
       const selectedStaff = staffList.find((s) => s._id === formData.staffId);
       const isCompatible =
         Boolean(selectedStaff) &&
-        (isRoleCompatible(selectedStaff?.role, activeCoverageContext?.role) ||
+        (getUserRoles(selectedStaff).some((role) =>
+          isRoleCompatible(role, activeCoverageContext?.role),
+        ) ||
           doesStaffHaveCompatibleFacilityRole(
             selectedStaff,
             activeCoverageContext?.role,
@@ -708,13 +726,20 @@ export default function ScheduleForm({
                     };
                   }
 
+                  const nextStaffMember = staffList.find(
+                    (s) => s._id === nextStaffId,
+                  );
+                  const nextRoles = nextStaffMember
+                    ? getUserRoles(nextStaffMember)
+                    : [];
+
                   return {
                     ...prev,
                     staffId: nextStaffId,
                     coverageId: "",
                     startTime: "",
                     endTime: "",
-                    role: "",
+                    role: nextRoles.length === 1 ? nextRoles[0] : "",
                     unitArea: "",
                     shiftType: "",
                     shiftTag: "",
@@ -725,7 +750,8 @@ export default function ScheduleForm({
             >
               {compatibleStaffOptions.map((s) => (
                 <MenuItem key={s._id} value={s._id}>
-                  {s.name} ({getRoleDisplayName(s.role)})
+                  {s.name} ({getUserRoles(s).map(getRoleDisplayName).join(", ")}
+                  )
                 </MenuItem>
               ))}
               {compatibleStaffOptions.length === 0 && (
@@ -733,6 +759,19 @@ export default function ScheduleForm({
                   No compatible staff for this coverage
                 </MenuItem>
               )}
+            </Select>
+          </FormControl>
+        )}
+
+        {needsRoleSelection && (
+          <FormControl fullWidth required>
+            <InputLabel>Role for this shift</InputLabel>
+            <Select name="role" value={formData.role} onChange={handleChange}>
+              {selectedStaffRoleOptions.map((role) => (
+                <MenuItem key={role} value={role}>
+                  {getRoleDisplayName(role)}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
         )}

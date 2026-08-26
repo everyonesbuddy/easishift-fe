@@ -78,12 +78,12 @@ import {
 } from "../../../constants/industryRoles";
 
 const SCHEDULE_STATUS_META = {
-  scheduled: { label: "Scheduled", color: "#fbc02d" },
-  in_progress: { label: "In Progress", color: "#3b82f6" },
-  completed: { label: "Completed", color: "#66bb6a" },
-  left_early: { label: "Left Early", color: "#f97316" },
-  no_show: { label: "No Show", color: "#6b7280" },
-  call_out: { label: "Call Out", color: "#ef5350" },
+  scheduled: { label: "Scheduled", color: "#fbc02d", bg: "#DBEAFE" },
+  in_progress: { label: "In Progress", color: "#3b82f6", bg: "#DBEAFE" },
+  completed: { label: "Completed", color: "#66bb6a", bg: "#DCFCE7" },
+  left_early: { label: "Left Early", color: "#f97316", bg: "#FFEDD5" },
+  no_show: { label: "No Show", color: "#6b7280", bg: "#FEE2E2" },
+  call_out: { label: "Call Out", color: "#ef5350", bg: "#FEE2E2" },
 };
 
 const SCHEDULE_STATUS_FILTER_OPTIONS = [
@@ -114,6 +114,9 @@ const getScheduleStatusLabel = (status) =>
   String(status || "unknown")
     .replace(/_/g, " ")
     .toUpperCase();
+
+// Weekend column tint; only shown on cells with no real assignment/coverage data
+const WEEKEND_BG = "#FEF9C3";
 
 export default function ScheduleList() {
   const { user, can, facilityPreferences } = useAuth();
@@ -163,6 +166,7 @@ export default function ScheduleList() {
   const [shiftTimeFilter, setShiftTimeFilter] = useState("");
   const [exportMenuAnchorEl, setExportMenuAnchorEl] = useState(null);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [coverageGaps, setCoverageGaps] = useState([]);
 
   const roleFilterOptions = useMemo(() => {
     const facilityRoleValues = getRoleOptionsFromFacilityPreferences(
@@ -310,6 +314,136 @@ export default function ScheduleList() {
   const getLocalDateKey = parseLocalDateKey;
 
   // ---------------------------
+  // Roster grouping / short-code helpers
+  // ---------------------------
+  const roundTimeToHour = (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    const rounded = new Date(date);
+    if (rounded.getMinutes() >= 30) rounded.setHours(rounded.getHours() + 1);
+    rounded.setMinutes(0, 0, 0);
+    return rounded;
+  };
+
+  const formatHourLabel = (date) =>
+    date.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+
+  const getShiftBlockKey = (schedule) => {
+    const start = roundTimeToHour(schedule?.startTime);
+    const end = roundTimeToHour(schedule?.endTime);
+    if (!start || !end) return "";
+    return `${start.getHours()}-${end.getHours()}`;
+  };
+
+  const getShiftBlockLabel = (schedule) => {
+    const start = roundTimeToHour(schedule?.startTime);
+    const end = roundTimeToHour(schedule?.endTime);
+    if (!start || !end) return "";
+    return `${formatHourLabel(start)}\u2013${formatHourLabel(end)}`;
+  };
+
+  const getDistinctBlockKeys = (memberSchedules) => {
+    const keys = new Set();
+    memberSchedules.forEach((schedule) => {
+      const key = getShiftBlockKey(schedule);
+      if (key) keys.add(key);
+    });
+    return keys;
+  };
+
+  // Every distinct shift-specific role worked this month, not a single guessed role
+  const getScheduleRolesLabel = (memberSchedules) => {
+    const roles = new Set();
+    memberSchedules.forEach((schedule) => {
+      if (schedule.role) roles.add(schedule.role);
+    });
+    return Array.from(roles)
+      .map((role) => getRoleDisplayName(role))
+      .join(", ");
+  };
+
+  const getDominantGroupInfo = (memberSchedules) => {
+    const groups = new Map();
+    memberSchedules.forEach((schedule) => {
+      const blockKey = getShiftBlockKey(schedule);
+      const key = `${schedule.unitArea || ""}||${blockKey}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          count: 0,
+          sample: schedule,
+          unitArea: schedule.unitArea || "",
+          blockKey,
+        });
+      }
+      groups.get(key).count += 1;
+    });
+
+    let best = null;
+    groups.forEach((value) => {
+      if (!best || value.count > best.count) best = value;
+    });
+
+    if (!best) {
+      return {
+        unitArea: "",
+        blockKey: "",
+        startHour: 0,
+        isRotating: false,
+        label: "Unassigned",
+      };
+    }
+
+    const isRotating = getDistinctBlockKeys(memberSchedules).size > 1;
+    const unitLabel = getUnitAreaDisplayName(best.unitArea) || "No unit";
+    const roundedStart = roundTimeToHour(best.sample.startTime);
+
+    return {
+      unitArea: best.unitArea,
+      blockKey: isRotating ? "ROTATING" : best.blockKey,
+      startHour: isRotating ? 99 : roundedStart ? roundedStart.getHours() : 0,
+      isRotating,
+      label: isRotating
+        ? `${unitLabel} \u2022 Rotating Shifts`
+        : `${unitLabel} \u2022 ${getShiftBlockLabel(best.sample)}`,
+    };
+  };
+
+  const getRoleInitials = (role) => {
+    const label = getRoleDisplayName(role) || String(role || "");
+    const words = label.split(/\s+/).filter(Boolean);
+    if (words.length === 0) return "?";
+    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+    return words
+      .map((word) => word[0])
+      .join("")
+      .slice(0, 3)
+      .toUpperCase();
+  };
+
+  const formatCompactHour = (date) => {
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const period = hours >= 12 ? "p" : "a";
+    const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+    return minutes === 0
+      ? `${hour12}${period}`
+      : `${hour12}:${String(minutes).padStart(2, "0")}${period}`;
+  };
+
+  const getShiftShortCode = (schedule) => {
+    const start = new Date(schedule?.startTime);
+    const end = new Date(schedule?.endTime);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return "-";
+    }
+    return `${getRoleInitials(schedule.role)} ${formatCompactHour(start)}-${formatCompactHour(end)}`;
+  };
+
+  // ---------------------------
   // Fetch staff
   // ---------------------------
 
@@ -334,9 +468,44 @@ export default function ScheduleList() {
     }
   };
 
+  // Facility-wide open coverage; only managers see this, never personal-schedule-only staff
+  const fetchCoverageGaps = async () => {
+    if (!canManageSchedules) {
+      setCoverageGaps([]);
+      return;
+    }
+    try {
+      const res = await api.get("/coverage/unfilled-auto");
+      const now = new Date();
+      const upcoming = (Array.isArray(res.data) ? res.data : [])
+        .filter((coverage) => new Date(coverage.endTime) >= now)
+        .map((coverage) => {
+          const requiredCount = Number(coverage.requiredCount) || 0;
+          const assignedCount = Number(coverage.assignedCount);
+          const directRemaining = Number(coverage.remaining);
+          const computedRemaining = Number.isFinite(assignedCount)
+            ? Math.max(0, requiredCount - assignedCount)
+            : Math.max(0, requiredCount);
+          return {
+            ...coverage,
+            requiredCount,
+            spotsRemaining: Number.isFinite(directRemaining)
+              ? Math.max(0, directRemaining)
+              : computedRemaining,
+          };
+        })
+        .filter((coverage) => coverage.spotsRemaining > 0);
+      setCoverageGaps(upcoming);
+    } catch (err) {
+      console.error("Failed to fetch coverage gaps", err);
+      setCoverageGaps([]);
+    }
+  };
+
   useEffect(() => {
     fetchStaff();
     fetchSchedules();
+    fetchCoverageGaps();
   }, []);
 
   useEffect(() => {
@@ -366,7 +535,10 @@ export default function ScheduleList() {
     setEditingSchedule(null);
     setScheduleFormMode("manual");
     setManualCoverageFromAuto(null);
-    if (refresh) fetchSchedules();
+    if (refresh) {
+      fetchSchedules();
+      fetchCoverageGaps();
+    }
   };
 
   const openManualFromCoverage = (coverage) => {
@@ -390,6 +562,7 @@ export default function ScheduleList() {
     try {
       await api.delete(`/schedules/${deleteId}`);
       fetchSchedules();
+      fetchCoverageGaps();
     } catch (err) {
       console.error("Failed to delete schedule", err);
     } finally {
@@ -428,6 +601,7 @@ export default function ScheduleList() {
         data: { ids: selectedScheduleIds },
       });
       await fetchSchedules();
+      await fetchCoverageGaps();
       setSelectedScheduleIds([]);
     } catch (err) {
       console.error("Failed to delete selected schedules", err);
@@ -820,12 +994,12 @@ export default function ScheduleList() {
         staffMap.set(staffId, {
           staffId,
           name: schedule?.staffId?.name || "Unknown",
-          role: schedule?.staffId?.role || schedule?.role || "",
         });
       }
     });
 
     const shiftsByStaffAndDay = new Map();
+    const schedulesByStaff = new Map();
     inMonthSchedules.forEach((schedule) => {
       const staffId = String(schedule?.staffId?._id || "");
       if (!staffId) return;
@@ -835,13 +1009,14 @@ export default function ScheduleList() {
         shiftsByStaffAndDay.set(key, []);
       }
       shiftsByStaffAndDay.get(key).push(schedule);
+
+      if (!schedulesByStaff.has(staffId)) {
+        schedulesByStaff.set(staffId, []);
+      }
+      schedulesByStaff.get(staffId).push(schedule);
     });
 
-    const sortedStaff = Array.from(staffMap.values()).sort((a, b) =>
-      String(a.name || "").localeCompare(String(b.name || "")),
-    );
-
-    return sortedStaff.map((member) => {
+    const rows = Array.from(staffMap.values()).map((member) => {
       const shiftsByDay = monthDays.reduce((acc, dayKey) => {
         const key = `${member.staffId}|${dayKey}`;
         acc[dayKey] = (shiftsByStaffAndDay.get(key) || []).sort(
@@ -851,12 +1026,92 @@ export default function ScheduleList() {
         return acc;
       }, {});
 
+      const memberSchedules = schedulesByStaff.get(member.staffId) || [];
+      const groupInfo = getDominantGroupInfo(memberSchedules);
+
       return {
         ...member,
+        rolesLabel: getScheduleRolesLabel(memberSchedules),
         shiftsByDay,
+        groupUnitArea: groupInfo.unitArea,
+        groupBlockKey: groupInfo.blockKey,
+        groupStartHour: groupInfo.startHour,
+        groupIsRotating: groupInfo.isRotating,
+        groupLabel: groupInfo.label,
       };
     });
+
+    return rows.sort((a, b) => {
+      const unitCompare = getUnitAreaDisplayName(a.groupUnitArea).localeCompare(
+        getUnitAreaDisplayName(b.groupUnitArea),
+      );
+      if (unitCompare !== 0) return unitCompare;
+      if (a.groupStartHour !== b.groupStartHour) {
+        return a.groupStartHour - b.groupStartHour;
+      }
+      return String(a.name || "").localeCompare(String(b.name || ""));
+    });
   }, [filteredSchedules, monthDate, monthDays]);
+
+  // Coverage gaps bucketed by the same unit+block+day key as the staff-row grouping
+  const coverageGapsByGroupAndDay = useMemo(() => {
+    const map = new Map();
+    coverageGaps.forEach((coverage) => {
+      const start = new Date(coverage.startTime);
+      if (
+        Number.isNaN(start.getTime()) ||
+        start.getFullYear() !== monthDate.getFullYear() ||
+        start.getMonth() !== monthDate.getMonth()
+      ) {
+        return;
+      }
+      const dayKey = getLocalDateKey(coverage.startTime);
+      const groupKey = `${coverage.unitArea || ""}|${getShiftBlockKey(coverage)}`;
+      const cellKey = `${groupKey}|${dayKey}`;
+      if (!map.has(cellKey)) map.set(cellKey, []);
+      map.get(cellKey).push(coverage);
+    });
+    return map;
+  }, [coverageGaps, monthDate]);
+
+  // Interleaves group-header rows into the sorted roster for on-screen rendering
+  const monthRosterGroupedRows = useMemo(() => {
+    const items = [];
+    let lastGroupKey = null;
+
+    const pushCoverageRowForGroup = (groupKey) => {
+      if (!groupKey) return;
+      const hasGap = monthDays.some((day) =>
+        coverageGapsByGroupAndDay.has(`${groupKey}|${day}`),
+      );
+      if (!hasGap) return;
+
+      const gapsByDay = {};
+      monthDays.forEach((day) => {
+        gapsByDay[day] =
+          coverageGapsByGroupAndDay.get(`${groupKey}|${day}`) || [];
+      });
+      items.push({ type: "coverage", key: `coverage-${groupKey}`, gapsByDay });
+    };
+
+    monthRosterStaffRows.forEach((member) => {
+      const groupKey = `${member.groupUnitArea}|${member.groupBlockKey}`;
+      if (groupKey !== lastGroupKey) {
+        if (lastGroupKey !== null) pushCoverageRowForGroup(lastGroupKey);
+        items.push({
+          type: "header",
+          key: `header-${groupKey}-${items.length}`,
+          label: member.groupLabel,
+        });
+        lastGroupKey = groupKey;
+      }
+      items.push({ type: "staff", key: member.staffId, member });
+    });
+
+    if (lastGroupKey !== null) pushCoverageRowForGroup(lastGroupKey);
+
+    return items;
+  }, [monthRosterStaffRows, coverageGapsByGroupAndDay, monthDays]);
 
   const triggerDownload = (blob, fileName) => {
     const href = URL.createObjectURL(blob);
@@ -1012,30 +1267,6 @@ export default function ScheduleList() {
         }),
       ];
 
-      const rows = monthRosterStaffRows.map((member) => {
-        const dayCells = monthDays.map((day) => {
-          const shifts = member.shiftsByDay?.[day] || [];
-          if (shifts.length === 0) return "";
-
-          return shifts
-            .map((shift) => {
-              const time = `${formatScheduleTimeRange(shift, {
-                withNextDayHint: false,
-              })}${isOvernightShift(shift) ? " (+1 day)" : ""}`;
-              const unit = getUnitAreaDisplayName(shift.unitArea) || "No unit";
-
-              return `${time}\n${unit}`;
-            })
-            .join("\n\n");
-        });
-
-        return [
-          member.name || "Unknown",
-          getRoleDisplayName(member.role) || "-",
-          ...dayCells,
-        ];
-      });
-
       sheet.addRow([`${monthYear} Roster`]);
       sheet.mergeCells(1, 1, 1, headers.length);
       sheet.getRow(1).height = 24;
@@ -1050,12 +1281,19 @@ export default function ScheduleList() {
 
       const headerRow = sheet.addRow(headers);
       headerRow.height = 22;
-      headerRow.eachCell((cell) => {
-        cell.font = { bold: true, color: { argb: "FFFFFF" } };
+      headerRow.eachCell((cell, colNumber) => {
+        const day = monthDays[colNumber - 3];
+        const isWeekendCol =
+          colNumber > 2 &&
+          [0, 6].includes(parseDateKeyToLocalDate(day).getDay());
+        cell.font = {
+          bold: true,
+          color: { argb: isWeekendCol ? "111827" : "0F172A" },
+        };
         cell.fill = {
           type: "pattern",
           pattern: "solid",
-          fgColor: { argb: "1F2937" },
+          fgColor: { argb: isWeekendCol ? "FEF9C3" : "BDD7EE" },
         };
         cell.alignment = {
           vertical: "middle",
@@ -1070,8 +1308,82 @@ export default function ScheduleList() {
         };
       });
 
-      rows.forEach((row) => {
-        const worksheetRow = sheet.addRow(row);
+      monthRosterGroupedRows.forEach((item) => {
+        if (item.type === "header") {
+          const groupRow = sheet.addRow([item.label]);
+          sheet.mergeCells(groupRow.number, 1, groupRow.number, headers.length);
+          groupRow.height = 20;
+          const groupCell = groupRow.getCell(1);
+          groupCell.font = { bold: true, color: { argb: "0F172A" } };
+          groupCell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "BDD7EE" },
+          };
+          groupCell.alignment = { vertical: "middle", horizontal: "left" };
+          return;
+        }
+
+        if (item.type === "coverage") {
+          const dayCells = monthDays.map((day) => {
+            const gaps = item.gapsByDay[day] || [];
+            return gaps
+              .map(
+                (gap) =>
+                  `${gap.spotsRemaining} open \u2022 ${getRoleDisplayName(gap.role)}`,
+              )
+              .join("\n");
+          });
+
+          const coverageRow = sheet.addRow(["Needs Coverage", "", ...dayCells]);
+          coverageRow.height = 30;
+          coverageRow.eachCell((cell, colNumber) => {
+            const isDayCell = colNumber > 2;
+            cell.alignment = {
+              vertical: isDayCell ? "top" : "middle",
+              horizontal: "left",
+              wrapText: true,
+            };
+            cell.border = {
+              top: { style: "thin", color: { argb: "E5E7EB" } },
+              left: { style: "thin", color: { argb: "E5E7EB" } },
+              bottom: { style: "thin", color: { argb: "E5E7EB" } },
+              right: { style: "thin", color: { argb: "E5E7EB" } },
+            };
+            if (colNumber === 1) {
+              cell.font = { bold: true, color: { argb: "111827" } };
+            }
+            if (isDayCell) {
+              const day = monthDays[colNumber - 3];
+              const gaps = item.gapsByDay[day] || [];
+              const isWeekendCol = [0, 6].includes(
+                parseDateKeyToLocalDate(day).getDay(),
+              );
+              const bg =
+                gaps.length > 0 ? "FECACA" : isWeekendCol ? "FEF9C3" : "FFFFFF";
+              cell.font = { color: { argb: "111827" } };
+              cell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: bg },
+              };
+            }
+          });
+          return;
+        }
+
+        const member = item.member;
+        const dayCells = monthDays.map((day) => {
+          const shifts = member.shiftsByDay?.[day] || [];
+          if (shifts.length === 0) return "";
+          return shifts.map((shift) => getShiftShortCode(shift)).join("\n");
+        });
+
+        const worksheetRow = sheet.addRow([
+          member.name || "Unknown",
+          member.rolesLabel || "-",
+          ...dayCells,
+        ]);
         worksheetRow.height = 34;
         worksheetRow.eachCell((cell, colNumber) => {
           const isDayCell = colNumber > 2;
@@ -1093,11 +1405,16 @@ export default function ScheduleList() {
             cell.font = { color: { argb: "475569" } };
           }
           if (isDayCell) {
+            const day = monthDays[colNumber - 3];
+            const isWeekendCol = [0, 6].includes(
+              parseDateKeyToLocalDate(day).getDay(),
+            );
+            const bg = isWeekendCol ? "FEF9C3" : "FFFFFF";
             cell.font = { color: { argb: "111827" } };
             cell.fill = {
               type: "pattern",
               pattern: "solid",
-              fgColor: { argb: "F8FAFC" },
+              fgColor: { argb: bg },
             };
           }
         });
@@ -1154,27 +1471,62 @@ export default function ScheduleList() {
         }),
       ];
 
-      const body = monthRosterStaffRows.map((member) => {
+      const isWeekendByDay = monthDays.map((day) =>
+        [0, 6].includes(parseDateKeyToLocalDate(day).getDay()),
+      );
+
+      const pdfBody = [];
+      const pdfBodyMeta = [];
+
+      monthRosterGroupedRows.forEach((item) => {
+        if (item.type === "header") {
+          pdfBody.push([
+            {
+              content: item.label,
+              colSpan: headers.length,
+              styles: { halign: "left", fontStyle: "bold" },
+            },
+          ]);
+          pdfBodyMeta.push({ type: "header" });
+          return;
+        }
+
+        if (item.type === "coverage") {
+          const dayCells = monthDays.map((day) => {
+            const gaps = item.gapsByDay[day] || [];
+            return gaps
+              .map(
+                (gap) =>
+                  `${gap.spotsRemaining} open \u2022 ${getRoleDisplayName(gap.role)}`,
+              )
+              .join("\n");
+          });
+          const dayHasGap = monthDays.map(
+            (day) => (item.gapsByDay[day] || []).length > 0,
+          );
+
+          pdfBody.push(["Needs Coverage", "", ...dayCells]);
+          pdfBodyMeta.push({ type: "coverage", dayHasGap });
+          return;
+        }
+
+        const member = item.member;
         const dayCells = monthDays.map((day) => {
           const shifts = member.shiftsByDay?.[day] || [];
           if (shifts.length === 0) return "";
-
-          return shifts
-            .map((shift) => {
-              const time = `${formatScheduleTimeRange(shift, {
-                withNextDayHint: false,
-              })}${isOvernightShift(shift) ? " (+1 day)" : ""}`;
-              const unit = getUnitAreaDisplayName(shift.unitArea) || "No unit";
-              return `${time}\n${unit}`;
-            })
-            .join("\n\n");
+          return shifts.map((shift) => getShiftShortCode(shift)).join("\n");
+        });
+        const dayStatuses = monthDays.map((day) => {
+          const shifts = member.shiftsByDay?.[day] || [];
+          return shifts[0]?.status || null;
         });
 
-        return [
+        pdfBody.push([
           member.name || "Unknown",
-          getRoleDisplayName(member.role) || "-",
+          member.rolesLabel || "-",
           ...dayCells,
-        ];
+        ]);
+        pdfBodyMeta.push({ type: "data", dayStatuses });
       });
 
       const drawRosterHeader = () => {
@@ -1199,7 +1551,7 @@ export default function ScheduleList() {
       autoTable(doc, {
         startY: 58,
         head: [headers],
-        body,
+        body: pdfBody,
         styles: {
           fontSize: 6.4,
           cellPadding: 3,
@@ -1209,8 +1561,8 @@ export default function ScheduleList() {
           lineWidth: 0.15,
         },
         headStyles: {
-          fillColor: [31, 41, 55],
-          textColor: [255, 255, 255],
+          fillColor: [189, 215, 238],
+          textColor: [15, 23, 42],
           fontStyle: "bold",
           halign: "center",
         },
@@ -1225,13 +1577,57 @@ export default function ScheduleList() {
         horizontalPageBreakRepeat: [0, 1],
         margin: { left: 18, right: 18, top: 62, bottom: 24 },
         didParseCell: (data) => {
-          if (data.section === "body" && data.column.index > 1) {
-            data.cell.styles.fillColor = [255, 255, 255];
+          if (data.section === "head") {
+            if (
+              data.column.index > 1 &&
+              isWeekendByDay[data.column.index - 2]
+            ) {
+              data.cell.styles.fillColor = [254, 249, 195];
+              data.cell.styles.textColor = [17, 24, 39];
+            }
+            return;
+          }
+
+          const meta = pdfBodyMeta[data.row.index];
+          if (!meta) return;
+
+          if (meta.type === "header") {
+            data.cell.styles.fillColor = [189, 215, 238];
             data.cell.styles.textColor = [15, 23, 42];
+            data.cell.styles.fontStyle = "bold";
+            data.cell.styles.halign = "left";
+            return;
+          }
+
+          if (meta.type === "coverage") {
+            if (data.column.index > 1) {
+              const hasGap = meta.dayHasGap[data.column.index - 2];
+              const isWeekendCol = isWeekendByDay[data.column.index - 2];
+              data.cell.styles.fillColor = hasGap
+                ? [254, 202, 202]
+                : isWeekendCol
+                  ? [254, 249, 195]
+                  : [255, 255, 255];
+              data.cell.styles.textColor = [17, 24, 39];
+              data.cell.styles.minCellHeight = 24;
+            } else if (data.column.index === 0) {
+              data.cell.styles.fillColor = [255, 255, 255];
+              data.cell.styles.textColor = [17, 24, 39];
+              data.cell.styles.fontStyle = "bold";
+            }
+            return;
+          }
+
+          if (data.column.index > 1) {
+            const isWeekendCol = isWeekendByDay[data.column.index - 2];
+            data.cell.styles.fillColor = isWeekendCol
+              ? [254, 249, 195]
+              : [255, 255, 255];
+            data.cell.styles.textColor = [17, 24, 39];
             data.cell.styles.minCellHeight = 24;
           }
 
-          if (data.section === "body" && data.column.index === 0) {
+          if (data.column.index === 0) {
             data.cell.styles.fillColor = [239, 246, 255];
             data.cell.styles.fontStyle = "bold";
           }
@@ -2227,7 +2623,7 @@ export default function ScheduleList() {
               }}
             >
               <TableHead>
-                <TableRow sx={{ background: "#f3f4f6" }}>
+                <TableRow sx={{ background: "#BDD7EE" }}>
                   <TableCell
                     sx={{
                       fontWeight: 700,
@@ -2237,7 +2633,8 @@ export default function ScheduleList() {
                       position: "sticky",
                       left: 0,
                       zIndex: 3,
-                      background: "#f3f4f6",
+                      background: "#BDD7EE",
+                      color: "#0F172A",
                       py: 0.7,
                     }}
                   >
@@ -2254,12 +2651,17 @@ export default function ScheduleList() {
                           fontWeight: 700,
                           minWidth: 140,
                           borderLeft: "1px solid #eef2f7",
-                          background: isWeekend ? "#eef2ff" : "#f8fafc",
+                          background: isWeekend ? "#FEF9C3" : "#BDD7EE",
+                          color: isWeekend ? "#111827" : "#0F172A",
                           py: 0.7,
                         }}
                       >
                         <Typography
-                          sx={{ fontSize: "0.64rem", fontWeight: 700 }}
+                          sx={{
+                            fontSize: "0.64rem",
+                            fontWeight: 700,
+                            color: "inherit",
+                          }}
                         >
                           {date.toLocaleDateString("default", {
                             month: "short",
@@ -2272,7 +2674,7 @@ export default function ScheduleList() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {monthRosterStaffRows.length === 0 ? (
+                {monthRosterGroupedRows.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={monthDays.length + 1}
@@ -2286,123 +2688,236 @@ export default function ScheduleList() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  monthRosterStaffRows.map((member) => (
-                    <TableRow
-                      key={member.staffId}
-                      sx={{
-                        "&:hover": { background: "#f8fbff" },
-                        "@media print": { pageBreakInside: "avoid" },
-                      }}
-                    >
-                      <TableCell
-                        sx={{
-                          borderRight: "1px solid #e5e7eb",
-                          verticalAlign: "top",
-                          position: "sticky",
-                          left: 0,
-                          zIndex: 2,
-                          background: "#fff",
-                          minWidth: 175,
-                          py: 0.65,
-                        }}
-                      >
-                        <Typography
-                          sx={{ fontSize: "0.68rem", fontWeight: 700 }}
-                        >
-                          {member.name}
-                        </Typography>
-                        <Typography
-                          sx={{
-                            fontSize: "0.58rem",
-                            color: "text.secondary",
-                            mt: 0,
-                          }}
-                        >
-                          {getRoleDisplayName(member.role) || "Role"}
-                        </Typography>
-                      </TableCell>
-
-                      {monthDays.map((day) => {
-                        const shifts = member.shiftsByDay[day] || [];
-                        const date = parseDateKeyToLocalDate(day);
-                        const isWeekend =
-                          date.getDay() === 0 || date.getDay() === 6;
-
-                        return (
+                  monthRosterGroupedRows.map((item) => {
+                    if (item.type === "header") {
+                      return (
+                        <TableRow key={item.key}>
                           <TableCell
-                            key={`${member.staffId}-${day}`}
+                            colSpan={monthDays.length + 1}
                             sx={{
-                              minWidth: 140,
-                              verticalAlign: "top",
-                              borderLeft: "1px solid #eef2f7",
-                              background: isWeekend ? "#fbfdff" : "#fff",
-                              py: 0.35,
+                              background: "#BDD7EE",
+                              color: "#0F172A",
+                              fontWeight: 700,
+                              fontSize: "0.68rem",
+                              py: 0.6,
+                              position: "sticky",
+                              left: 0,
                             }}
                           >
-                            {shifts.length === 0 ? (
-                              <Typography
-                                variant="caption"
+                            {item.label}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+
+                    if (item.type === "coverage") {
+                      return (
+                        <TableRow key={item.key}>
+                          <TableCell
+                            sx={{
+                              borderRight: "1px solid #e5e7eb",
+                              verticalAlign: "top",
+                              position: "sticky",
+                              left: 0,
+                              zIndex: 2,
+                              background: "#fff7ed",
+                              minWidth: 175,
+                              py: 0.65,
+                            }}
+                          >
+                            <Typography
+                              sx={{
+                                fontSize: "0.62rem",
+                                fontWeight: 700,
+                                color: "#9a3412",
+                              }}
+                            >
+                              Needs Coverage
+                            </Typography>
+                          </TableCell>
+
+                          {monthDays.map((day) => {
+                            const gaps = item.gapsByDay[day] || [];
+                            const date = parseDateKeyToLocalDate(day);
+                            const isWeekend =
+                              date.getDay() === 0 || date.getDay() === 6;
+                            return (
+                              <TableCell
+                                key={`${item.key}-${day}`}
                                 sx={{
-                                  color: "text.disabled",
-                                  fontStyle: "italic",
-                                  fontSize: "0.58rem",
+                                  minWidth: 140,
+                                  verticalAlign: "top",
+                                  borderLeft: "1px solid #eef2f7",
+                                  background:
+                                    gaps.length > 0
+                                      ? "#FECACA"
+                                      : isWeekend
+                                        ? "#FEF9C3"
+                                        : "#fff",
+                                  py: 0.35,
                                 }}
                               >
-                                -
-                              </Typography>
-                            ) : (
-                              <Stack spacing={0.35}>
-                                {shifts.map((shift) => (
-                                  <Box
-                                    key={shift._id}
-                                    sx={{
-                                      border: "1px solid #dbeafe",
-                                      borderLeft: `3px solid ${getRoleColor(shift.role)}`,
-                                      borderRadius: 1,
-                                      px: 0.5,
-                                      py: 0.32,
-                                      background: "#f8fbff",
-                                      "@media print": {
-                                        px: 0.35,
-                                        py: 0.22,
-                                      },
-                                    }}
-                                  >
-                                    <Typography
-                                      sx={{
-                                        fontSize: "0.57rem",
-                                        fontWeight: 700,
-                                        color: "#111827",
-                                        lineHeight: 1.1,
-                                      }}
+                                {gaps.length > 0 && (
+                                  <Stack spacing={0.35}>
+                                    {gaps.map((coverage, index) => (
+                                      <Box
+                                        key={coverage._id || index}
+                                        sx={{
+                                          border: "1px solid #EF4444",
+                                          borderRadius: 1,
+                                          px: 0.5,
+                                          py: 0.32,
+                                          background: "#FECACA",
+                                        }}
+                                      >
+                                        <Typography
+                                          sx={{
+                                            fontSize: "0.57rem",
+                                            fontWeight: 700,
+                                            color: "#111827",
+                                            lineHeight: 1.1,
+                                          }}
+                                        >
+                                          {coverage.spotsRemaining} open &bull;{" "}
+                                          {getRoleDisplayName(coverage.role)}
+                                        </Typography>
+                                      </Box>
+                                    ))}
+                                  </Stack>
+                                )}
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      );
+                    }
+
+                    const member = item.member;
+
+                    return (
+                      <TableRow
+                        key={member.staffId}
+                        sx={{
+                          "&:hover": { background: "#f8fbff" },
+                          "@media print": { pageBreakInside: "avoid" },
+                        }}
+                      >
+                        <TableCell
+                          sx={{
+                            borderRight: "1px solid #e5e7eb",
+                            verticalAlign: "top",
+                            position: "sticky",
+                            left: 0,
+                            zIndex: 2,
+                            background: "#fff",
+                            minWidth: 175,
+                            py: 0.65,
+                          }}
+                        >
+                          <Typography
+                            sx={{ fontSize: "0.68rem", fontWeight: 700 }}
+                          >
+                            {member.name}
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontSize: "0.58rem",
+                              color: member.groupIsRotating
+                                ? "#B45309"
+                                : "text.secondary",
+                              mt: 0,
+                            }}
+                          >
+                            {member.groupIsRotating
+                              ? "Rotating shifts"
+                              : member.rolesLabel || "Role"}
+                          </Typography>
+                        </TableCell>
+
+                        {monthDays.map((day) => {
+                          const shifts = member.shiftsByDay[day] || [];
+                          const date = parseDateKeyToLocalDate(day);
+                          const isWeekend =
+                            date.getDay() === 0 || date.getDay() === 6;
+
+                          return (
+                            <TableCell
+                              key={`${member.staffId}-${day}`}
+                              sx={{
+                                minWidth: 140,
+                                verticalAlign: "top",
+                                borderLeft: "1px solid #eef2f7",
+                                background: isWeekend ? WEEKEND_BG : "#fff",
+                                py: 0.35,
+                              }}
+                            >
+                              {shifts.length === 0 ? (
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: "text.disabled",
+                                    fontStyle: "italic",
+                                    fontSize: "0.58rem",
+                                  }}
+                                >
+                                  -
+                                </Typography>
+                              ) : (
+                                <Stack spacing={0.35}>
+                                  {shifts.map((shift) => (
+                                    <Tooltip
+                                      key={shift._id}
+                                      title={`${formatScheduleTimeRange(shift, {
+                                        withNextDayHint: true,
+                                      })} \u2022 ${getScheduleStatusLabel(shift.status)}`}
                                     >
-                                      {formatScheduleTimeRange(shift, {
-                                        withNextDayHint: false,
-                                      })}
-                                      {isOvernightShift(shift)
-                                        ? " (+1 day)"
-                                        : ""}
-                                    </Typography>
-                                    <Typography
-                                      sx={{
-                                        fontSize: "0.54rem",
-                                        color: "#475569",
-                                        lineHeight: 1.1,
-                                        mt: 0,
-                                      }}
-                                    >
-                                      {getUnitAreaDisplayName(shift.unitArea) ||
-                                        "No unit"}
-                                    </Typography>
-                                  </Box>
-                                ))}
-                              </Stack>
-                            )}
-                          </TableCell>
-                        );
-                      })}
-                    </TableRow>
-                  ))
+                                      <Box
+                                        sx={{
+                                          border: "1px solid #dbeafe",
+                                          borderLeft: `3px solid ${getRoleColor(shift.role)}`,
+                                          borderRadius: 1,
+                                          px: 0.5,
+                                          py: 0.32,
+                                          background: "transparent",
+                                          "@media print": {
+                                            px: 0.35,
+                                            py: 0.22,
+                                          },
+                                        }}
+                                      >
+                                        <Typography
+                                          sx={{
+                                            fontSize: "0.6rem",
+                                            fontWeight: 700,
+                                            color: "#111827",
+                                            lineHeight: 1.1,
+                                          }}
+                                        >
+                                          {getShiftShortCode(shift)}
+                                        </Typography>
+                                        <Typography
+                                          sx={{
+                                            fontSize: "0.54rem",
+                                            color: "#111827",
+                                            lineHeight: 1.1,
+                                            mt: 0,
+                                          }}
+                                        >
+                                          {getUnitAreaDisplayName(
+                                            shift.unitArea,
+                                          ) || "No unit"}
+                                        </Typography>
+                                      </Box>
+                                    </Tooltip>
+                                  ))}
+                                </Stack>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -3046,6 +3561,7 @@ export default function ScheduleList() {
             onOpenManualSchedule={openManualFromCoverage}
             onSuccess={() => {
               fetchSchedules();
+              fetchCoverageGaps();
             }}
           />
         </DialogContent>

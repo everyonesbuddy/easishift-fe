@@ -32,6 +32,7 @@ import {
   MdRepeat,
   MdSummarize,
 } from "react-icons/md";
+import { useNavigate } from "react-router-dom";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
@@ -193,8 +194,36 @@ const buildDatesFromPattern = (startDateStr, horizonDays, mode, weekdays) => {
   return dates;
 };
 
+const formatNlUnresolvedItem = (item) => {
+  if (typeof item === "string") return item;
+  if (item == null) return "Unknown issue";
+
+  if (typeof item === "object") {
+    const path = String(item.path || "").trim();
+    const message = String(item.message || "").trim();
+
+    if (path && message) return `${path}: ${message}`;
+    if (message) return message;
+    if (path) return path;
+
+    try {
+      return JSON.stringify(item);
+    } catch {
+      return "Unknown issue";
+    }
+  }
+
+  return String(item);
+};
+
+const normalizeNlUnresolvedList = (items) =>
+  (Array.isArray(items) ? items : [])
+    .map((item) => formatNlUnresolvedItem(item))
+    .filter(Boolean);
+
 export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   const { facilityPreferences, can } = useAuth();
+  const navigate = useNavigate();
   const canUseNlParser =
     typeof can === "function" ? can("coverage.manage") : false;
 
@@ -422,7 +451,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   const applyNlDraft = (draft) => {
     const shifts = Array.isArray(draft?.shifts) ? draft.shifts : [];
     const datePattern = draft?.datePattern || {};
-    const unresolved = Array.isArray(draft?.unresolved) ? draft.unresolved : [];
+    const unresolved = normalizeNlUnresolvedList(draft?.unresolved);
 
     if (datePattern.startDate) {
       setPlannerStartDate(datePattern.startDate);
@@ -513,9 +542,9 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
       // Facility setup gaps and AI-draft validation issues carry structured
       // lists — surface them the same way we show unresolved parse items.
       if (code === "facility_not_configured" && Array.isArray(data?.gaps)) {
-        setNlUnresolved(data.gaps);
+        setNlUnresolved(normalizeNlUnresolvedList(data.gaps));
       } else if (code === "invalid_draft" && Array.isArray(data?.errors)) {
-        setNlUnresolved(data.errors);
+        setNlUnresolved(normalizeNlUnresolvedList(data.errors));
       }
 
       if (code === "forbidden") {
@@ -744,6 +773,15 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
 
       setSuccess(message);
       toast.success(message);
+
+      if (draftWasGenerated) {
+        onSuccess?.();
+        // Short timeout allows the modal close animation to finish smoothly before route transition
+        setTimeout(() => {
+          navigate("/schedule", { state: { openDraftReview: true } });
+        }, 150);
+        return;
+      }
 
       setRequirements([{ ...defaultRequirement }]);
       setPlannerStartDate(today);
@@ -990,7 +1028,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                             component="li"
                             variant="caption"
                           >
-                            {item}
+                            {formatNlUnresolvedItem(item)}
                           </Typography>
                         ))}
                       </Box>

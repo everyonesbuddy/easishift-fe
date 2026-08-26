@@ -106,7 +106,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
     ...(can("timeoff.review")
       ? [
           {
-            id: "timeoff",
+            id: "timeoff-decisions",
             icon: MdSchedule,
             label: "Time Off Decisions",
             to: "/timeoff-decisions",
@@ -114,7 +114,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
         ]
       : []),
     {
-      id: "timeoff",
+      id: "timeoff-requests",
       icon: MdSchedule,
       label: "My Time Off Requests",
       to: "/timeoff-requests",

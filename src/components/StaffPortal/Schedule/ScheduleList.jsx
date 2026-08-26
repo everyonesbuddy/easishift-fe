@@ -62,7 +62,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Stack from "@mui/material/Stack";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import QrScannerDialog from "../../Shared/QrScannerDialog";
 import GuideVideoDialog from "../../Shared/GuideVideoDialog";
 import {
@@ -95,6 +95,9 @@ const SCHEDULE_STATUS_FILTER_OPTIONS = [
   "call_out",
 ];
 
+// Statuses that must stand out immediately (red), same precedence as coverage-gap cells
+const URGENT_SCHEDULE_STATUSES = new Set(["call_out", "no_show"]);
+
 const SCHEDULE_GUIDE_VIDEOS = [
   {
     id: "ai-generated-schedule",
@@ -125,6 +128,7 @@ export default function ScheduleList() {
   const hasSchedulableRole =
     getFacilityRolesFromUser(user, facilityPreferences).length > 0;
   const canUsePersonalSchedule = hasSchedulableRole;
+  const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
@@ -137,6 +141,7 @@ export default function ScheduleList() {
   const [scheduleFormMode, setScheduleFormMode] = useState("manual");
   const [manualCoverageFromAuto, setManualCoverageFromAuto] = useState(null);
   const [view, setView] = useState("table");
+  const [listGroupBy, setListGroupBy] = useState("date");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("");
 
@@ -513,6 +518,17 @@ export default function ScheduleList() {
       setStaffVisibility("all");
     }
   }, [canViewAllSchedules]);
+
+  useEffect(() => {
+    if (location.state?.openDraftReview) {
+      // Brief delay lets the page mount and layout settle before opening the modal
+      const timer = setTimeout(() => {
+        setOpenAutoModal(true);
+        navigate(location.pathname, { replace: true, state: {} });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [location.pathname, location.state, navigate]);
 
   // ---------------------------
   // Modals
@@ -917,6 +933,71 @@ export default function ScheduleList() {
     paginatedScheduleIds.length > 0 &&
     paginatedScheduleIds.every((id) => selectedScheduleIds.includes(id));
 
+  // Coverage gaps are a global staffing signal, so hide them in personal-only mode.
+  const showCoverageGaps =
+    canManageSchedules &&
+    !(canViewAllSchedules ? staffVisibility === "mine" : true);
+
+  // Groups the List view by employee or unit area (Roster's header/coverage-row pattern);
+  // "date" mode keeps the existing flat paginated behavior (returns null as a signal).
+  const listGroupedRows = useMemo(() => {
+    if (listGroupBy === "date") return null;
+
+    const sortedSchedules = [...filteredSchedules].sort(
+      (a, b) =>
+        new Date(b?.startTime).getTime() - new Date(a?.startTime).getTime(),
+    );
+
+    const groupKeyFor = (s) =>
+      listGroupBy === "employee"
+        ? s.staffId?.name || "Unknown"
+        : getUnitAreaDisplayName(s.unitArea) || "No Unit Area";
+
+    const groupsMap = new Map();
+    sortedSchedules.forEach((s) => {
+      const key = groupKeyFor(s);
+      if (!groupsMap.has(key)) groupsMap.set(key, []);
+      groupsMap.get(key).push(s);
+    });
+
+    const gapsByUnit = new Map();
+    if (listGroupBy === "unitArea" && showCoverageGaps) {
+      coverageGaps.forEach((coverage) => {
+        const key = getUnitAreaDisplayName(coverage.unitArea) || "No Unit Area";
+        if (!gapsByUnit.has(key)) gapsByUnit.set(key, []);
+        gapsByUnit.get(key).push(coverage);
+      });
+    }
+
+    const sortedGroupKeys = Array.from(
+      new Set([...groupsMap.keys(), ...gapsByUnit.keys()]),
+    ).sort((a, b) => a.localeCompare(b));
+
+    const items = [];
+    sortedGroupKeys.forEach((key) => {
+      const groupSchedules = groupsMap.get(key) || [];
+      items.push({
+        type: "header",
+        key: `header-${key}`,
+        label: key,
+        count: groupSchedules.length,
+      });
+      groupSchedules.forEach((s) => {
+        items.push({ type: "schedule", key: s._id, schedule: s });
+      });
+
+      (gapsByUnit.get(key) || []).forEach((coverage) => {
+        items.push({
+          type: "coverage",
+          key: `coverage-${coverage._id}`,
+          coverage,
+        });
+      });
+    });
+
+    return items;
+  }, [filteredSchedules, listGroupBy, coverageGaps, showCoverageGaps]);
+
   // Reset page when filters change or filtered length shrinks
   useEffect(() => {
     setPage(0);
@@ -1055,6 +1136,8 @@ export default function ScheduleList() {
 
   // Coverage gaps bucketed by the same unit+block+day key as the staff-row grouping
   const coverageGapsByGroupAndDay = useMemo(() => {
+    if (!showCoverageGaps) return new Map();
+
     const map = new Map();
     coverageGaps.forEach((coverage) => {
       const start = new Date(coverage.startTime);
@@ -1072,7 +1155,7 @@ export default function ScheduleList() {
       map.get(cellKey).push(coverage);
     });
     return map;
-  }, [coverageGaps, monthDate]);
+  }, [coverageGaps, monthDate, showCoverageGaps]);
 
   // Interleaves group-header rows into the sorted roster for on-screen rendering
   const monthRosterGroupedRows = useMemo(() => {
@@ -1224,6 +1307,38 @@ export default function ScheduleList() {
     }
     return weeks;
   }, [filteredSchedules, visibleCalendarDays]);
+
+  // Coverage gaps within the calendar's visible date range, styled like Roster's "Needs Coverage" cells
+  const calendarCoverageGapEvents = useMemo(() => {
+    if (!showCoverageGaps) return [];
+    if (!calendarRange.start || !calendarRange.end) return [];
+    const rangeStartMs = new Date(calendarRange.start).getTime();
+    const rangeEndMs = new Date(calendarRange.end).getTime();
+    if (Number.isNaN(rangeStartMs) || Number.isNaN(rangeEndMs)) return [];
+
+    return coverageGaps
+      .filter((coverage) => {
+        const startMs = new Date(coverage.startTime).getTime();
+        return (
+          !Number.isNaN(startMs) &&
+          startMs >= rangeStartMs &&
+          startMs < rangeEndMs
+        );
+      })
+      .map((coverage) => ({
+        id: `coverage-gap-${coverage._id}`,
+        title: `${coverage.spotsRemaining} open \u2022 ${getRoleDisplayName(coverage.role)}`,
+        start: coverage.startTime,
+        end: coverage.endTime,
+        backgroundColor: "#FECACA",
+        borderColor: "#EF4444",
+        textColor: "#111827",
+        extendedProps: {
+          type: "coverage-gap",
+          coverage,
+        },
+      }));
+  }, [coverageGaps, calendarRange, showCoverageGaps]);
 
   const openExportMenu = (event) => {
     setExportMenuAnchorEl(event.currentTarget);
@@ -1749,6 +1864,220 @@ export default function ScheduleList() {
     }
   };
 
+  // Shared desktop List-view row, used for both the flat "Date" order and grouped modes
+  const renderScheduleTableRow = (s) => (
+    <TableRow key={s._id} sx={{ "&:hover": { background: "#f3f4f6" } }}>
+      {canManageSchedules && (
+        <TableCell padding="checkbox">
+          <Checkbox
+            size="small"
+            checked={selectedScheduleIds.includes(s._id)}
+            onChange={() => toggleScheduleSelection(s._id)}
+          />
+        </TableCell>
+      )}
+      <TableCell sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}>
+        <Box display="flex" alignItems="center" gap={1}>
+          <Box
+            sx={{
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              backgroundColor: getRoleColor(s.role),
+            }}
+          />
+          <Box sx={{ fontSize: "0.7rem", fontWeight: 600, lineHeight: 1.2 }}>
+            {s.staffId?.name || "Unknown"}
+          </Box>
+        </Box>
+      </TableCell>
+      <TableCell sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}>
+        <Box component="span" sx={getRoleChipStyles(s.role)}>
+          {getRoleDisplayName(s.role)}
+        </Box>
+      </TableCell>
+      <TableCell sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}>
+        <Typography
+          sx={{ fontSize: "0.72rem", fontWeight: 600, lineHeight: 1.2 }}
+        >
+          {formatCompactDateTime(s.startTime).date}
+        </Typography>
+        <Typography
+          variant="caption"
+          sx={{ fontSize: "0.66rem", color: "text.secondary", lineHeight: 1.1 }}
+        >
+          {formatCompactDateTime(s.startTime).time}
+        </Typography>
+      </TableCell>
+      <TableCell sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}>
+        <Typography
+          sx={{ fontSize: "0.72rem", fontWeight: 600, lineHeight: 1.2 }}
+        >
+          {formatCompactDateTime(s.endTime).date}
+        </Typography>
+        <Typography
+          variant="caption"
+          sx={{ fontSize: "0.66rem", color: "text.secondary", lineHeight: 1.1 }}
+        >
+          {formatCompactDateTime(s.endTime).time}
+        </Typography>
+      </TableCell>
+      <TableCell sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}>
+        {getUnitAreaDisplayName(s.unitArea)}
+      </TableCell>
+      <TableCell sx={{ py: 0.75 }}>
+        <Box
+          component="span"
+          sx={{
+            display: "inline-block",
+            px: 1,
+            py: 0.3,
+            borderRadius: 1,
+            border: `1px solid ${getScheduleStatusColor(s.status)}`,
+            color: getScheduleStatusColor(s.status),
+            fontWeight: 700,
+            fontSize: "0.64rem",
+            background: "#fff",
+            letterSpacing: 0.2,
+          }}
+        >
+          {getScheduleStatusLabel(s.status)}
+        </Box>
+      </TableCell>
+      <TableCell sx={{ whiteSpace: "nowrap", py: 0.75 }}>
+        <Tooltip title="View details">
+          <IconButton
+            size="small"
+            onClick={() => openDetailsModal(s)}
+            sx={{ mr: 0.5, color: "#475569" }}
+          >
+            <FiEye />
+          </IconButton>
+        </Tooltip>
+        {canOpenTimeEntryForSchedule(s) && (
+          <Tooltip title="Time entry">
+            <IconButton
+              size="small"
+              onClick={() => openTimeEntryModal(s)}
+              sx={{ mr: 0.5, color: "#0f766e" }}
+            >
+              <FiClock />
+            </IconButton>
+          </Tooltip>
+        )}
+        {canManageSchedule(s) && (
+          <Tooltip title="Edit schedule">
+            <IconButton
+              size="small"
+              color="info"
+              onClick={() => openEdit(s)}
+              sx={{ mr: 0.5 }}
+            >
+              <FiEdit />
+            </IconButton>
+          </Tooltip>
+        )}
+        {canUsePersonalSchedule &&
+          isCurrentUserSchedule(s) &&
+          s.status === "scheduled" && (
+            <Tooltip title="Swap shift">
+              <IconButton
+                size="small"
+                onClick={() => openSwapRequestModal(s)}
+                sx={{ mr: 0.5, color: "#7c3aed" }}
+              >
+                <FiRepeat />
+              </IconButton>
+            </Tooltip>
+          )}
+        {canManageSchedules && (
+          <Tooltip title="Delete schedule">
+            <IconButton
+              size="small"
+              color="error"
+              onClick={() => askDelete(s._id)}
+            >
+              <FiDelete />
+            </IconButton>
+          </Tooltip>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+
+  // "Needs Coverage" row for the List view, styled like Roster's coverage-gap cells
+  const renderCoverageTableRow = (coverage) => (
+    <TableRow
+      key={`coverage-${coverage._id}`}
+      sx={{ background: "#FECACA", "&:hover": { background: "#FCA5A5" } }}
+    >
+      {canManageSchedules && <TableCell padding="checkbox" />}
+      <TableCell sx={{ py: 0.75 }} colSpan={2}>
+        <Typography
+          sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#111827" }}
+        >
+          Needs Coverage
+        </Typography>
+        <Typography sx={{ fontSize: "0.68rem", color: "#111827" }}>
+          {coverage.spotsRemaining} open &bull;{" "}
+          {getRoleDisplayName(coverage.role)}
+        </Typography>
+      </TableCell>
+      <TableCell sx={{ color: "#111827", fontSize: "0.72rem", py: 0.75 }}>
+        {formatCompactDateTime(coverage.startTime).date}
+        <Typography
+          variant="caption"
+          sx={{ display: "block", color: "#111827" }}
+        >
+          {formatCompactDateTime(coverage.startTime).time}
+        </Typography>
+      </TableCell>
+      <TableCell sx={{ color: "#111827", fontSize: "0.72rem", py: 0.75 }}>
+        {formatCompactDateTime(coverage.endTime).date}
+        <Typography
+          variant="caption"
+          sx={{ display: "block", color: "#111827" }}
+        >
+          {formatCompactDateTime(coverage.endTime).time}
+        </Typography>
+      </TableCell>
+      <TableCell sx={{ color: "#111827", fontSize: "0.72rem", py: 0.75 }}>
+        {getUnitAreaDisplayName(coverage.unitArea)}
+      </TableCell>
+      <TableCell sx={{ py: 0.75 }}>
+        <Box
+          component="span"
+          sx={{
+            display: "inline-block",
+            px: 1,
+            py: 0.3,
+            borderRadius: 1,
+            border: "1px solid #EF4444",
+            color: "#111827",
+            fontWeight: 700,
+            fontSize: "0.64rem",
+            background: "#fff",
+          }}
+        >
+          Unfilled
+        </Box>
+      </TableCell>
+      <TableCell sx={{ whiteSpace: "nowrap", py: 0.75 }}>
+        {canManageSchedules && (
+          <Tooltip title="Open manual scheduler for this coverage">
+            <IconButton
+              size="small"
+              onClick={() => openManualFromCoverage(coverage)}
+              sx={{ color: "#B91C1C" }}
+            >
+              <FiPlus />
+            </IconButton>
+          </Tooltip>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+
   return (
     <Container sx={{ mt: 4, px: { xs: 2, sm: 3 } }}>
       <GlobalStyles
@@ -2137,6 +2466,40 @@ export default function ScheduleList() {
         </Box>
       </Paper>
 
+      {view === "table" && !isCompact && (
+        <Box
+          display="flex"
+          alignItems="center"
+          gap={1.5}
+          sx={{ mt: 1.5, flexWrap: "wrap" }}
+        >
+          <Typography
+            color="text.secondary"
+            sx={{ fontSize: "0.78rem", minWidth: 70 }}
+          >
+            Group by:
+          </Typography>
+          <ToggleButtonGroup
+            value={listGroupBy}
+            exclusive
+            onChange={(e, next) => next && setListGroupBy(next)}
+            size="small"
+            sx={{
+              backgroundColor: "#f3f4f6",
+              borderRadius: 2,
+              "& .MuiToggleButton-root": {
+                textTransform: "none",
+                px: 1.5,
+              },
+            }}
+          >
+            <ToggleButton value="date">Date</ToggleButton>
+            <ToggleButton value="employee">Employee</ToggleButton>
+            <ToggleButton value="unitArea">Unit Area</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+      )}
+
       {/* TABLE VIEW */}
       {view === "table" ? (
         isCompact ? (
@@ -2355,196 +2718,60 @@ export default function ScheduleList() {
               </TableHead>
 
               <TableBody>
-                {paginatedSchedules.map((s) => (
-                  <TableRow
-                    key={s._id}
-                    sx={{ "&:hover": { background: "#f3f4f6" } }}
-                  >
-                    {canManageSchedules && (
-                      <TableCell padding="checkbox">
-                        <Checkbox
-                          size="small"
-                          checked={selectedScheduleIds.includes(s._id)}
-                          onChange={() => toggleScheduleSelection(s._id)}
-                        />
-                      </TableCell>
-                    )}
-                    <TableCell
-                      sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}
-                    >
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <Box
-                          sx={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: "50%",
-                            backgroundColor: getRoleColor(s.role),
-                          }}
-                        />
-                        <Box
-                          sx={{
-                            fontSize: "0.7rem",
-                            fontWeight: 600,
-                            lineHeight: 1.2,
-                          }}
-                        >
-                          {s.staffId?.name || "Unknown"}
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell
-                      sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}
-                    >
-                      <Box component="span" sx={getRoleChipStyles(s.role)}>
-                        {getRoleDisplayName(s.role)}
-                      </Box>
-                    </TableCell>
-                    <TableCell
-                      sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}
-                    >
-                      <Typography
-                        sx={{
-                          fontSize: "0.72rem",
-                          fontWeight: 600,
-                          lineHeight: 1.2,
-                        }}
-                      >
-                        {formatCompactDateTime(s.startTime).date}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          fontSize: "0.66rem",
-                          color: "text.secondary",
-                          lineHeight: 1.1,
-                        }}
-                      >
-                        {formatCompactDateTime(s.startTime).time}
-                      </Typography>
-                    </TableCell>
-                    <TableCell
-                      sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}
-                    >
-                      <Typography
-                        sx={{
-                          fontSize: "0.72rem",
-                          fontWeight: 600,
-                          lineHeight: 1.2,
-                        }}
-                      >
-                        {formatCompactDateTime(s.endTime).date}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          fontSize: "0.66rem",
-                          color: "text.secondary",
-                          lineHeight: 1.1,
-                        }}
-                      >
-                        {formatCompactDateTime(s.endTime).time}
-                      </Typography>
-                    </TableCell>
-                    <TableCell
-                      sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}
-                    >
-                      {getUnitAreaDisplayName(s.unitArea)}
-                    </TableCell>
-                    <TableCell sx={{ py: 0.75 }}>
-                      <Box
-                        component="span"
-                        sx={{
-                          display: "inline-block",
-                          px: 1,
-                          py: 0.3,
-                          borderRadius: 1,
-                          border: `1px solid ${getScheduleStatusColor(s.status)}`,
-                          color: getScheduleStatusColor(s.status),
-                          fontWeight: 700,
-                          fontSize: "0.64rem",
-                          background: "#fff",
-                          letterSpacing: 0.2,
-                        }}
-                      >
-                        {getScheduleStatusLabel(s.status)}
-                      </Box>
-                    </TableCell>
-                    <TableCell sx={{ whiteSpace: "nowrap", py: 0.75 }}>
-                      <Tooltip title="View details">
-                        <IconButton
-                          size="small"
-                          onClick={() => openDetailsModal(s)}
-                          sx={{ mr: 0.5, color: "#475569" }}
-                        >
-                          <FiEye />
-                        </IconButton>
-                      </Tooltip>
-                      {canOpenTimeEntryForSchedule(s) && (
-                        <Tooltip title="Time entry">
-                          <IconButton
-                            size="small"
-                            onClick={() => openTimeEntryModal(s)}
-                            sx={{ mr: 0.5, color: "#0f766e" }}
-                          >
-                            <FiClock />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      {canManageSchedule(s) && (
-                        <Tooltip title="Edit schedule">
-                          <IconButton
-                            size="small"
-                            color="info"
-                            onClick={() => openEdit(s)}
-                            sx={{ mr: 0.5 }}
-                          >
-                            <FiEdit />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      {canUsePersonalSchedule &&
-                        isCurrentUserSchedule(s) &&
-                        s.status === "scheduled" && (
-                          <Tooltip title="Swap shift">
-                            <IconButton
-                              size="small"
-                              onClick={() => openSwapRequestModal(s)}
-                              sx={{ mr: 0.5, color: "#7c3aed" }}
+                {listGroupBy === "date"
+                  ? paginatedSchedules.map((s) => renderScheduleTableRow(s))
+                  : (listGroupedRows || []).map((item) => {
+                      if (item.type === "header") {
+                        return (
+                          <TableRow key={item.key}>
+                            <TableCell
+                              colSpan={canManageSchedules ? 8 : 7}
+                              sx={{
+                                background: "#e2e8f0",
+                                color: "#0f172a",
+                                fontWeight: 700,
+                                fontSize: "0.72rem",
+                                py: 0.6,
+                              }}
                             >
-                              <FiRepeat />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                      {canManageSchedules && (
-                        <Tooltip title="Delete schedule">
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => askDelete(s._id)}
-                          >
-                            <FiDelete />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                              {item.label} ({item.count})
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
+
+                      if (item.type === "coverage") {
+                        return renderCoverageTableRow(item.coverage);
+                      }
+
+                      return renderScheduleTableRow(item.schedule);
+                    })}
               </TableBody>
             </Table>
 
-            <TablePagination
-              component="div"
-              count={filteredSchedules.length}
-              page={page}
-              onPageChange={(e, newPage) => setPage(newPage)}
-              rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={(e) => {
-                setRowsPerPage(parseInt(e.target.value, 10));
-                setPage(0);
-              }}
-              rowsPerPageOptions={[5, 10, 25]}
-              sx={{ mt: 1 }}
-            />
+            {listGroupBy === "date" ? (
+              <TablePagination
+                component="div"
+                count={filteredSchedules.length}
+                page={page}
+                onPageChange={(e, newPage) => setPage(newPage)}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={(e) => {
+                  setRowsPerPage(parseInt(e.target.value, 10));
+                  setPage(0);
+                }}
+                rowsPerPageOptions={[5, 10, 25]}
+                sx={{ mt: 1 }}
+              />
+            ) : (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mt: 1, textAlign: "right" }}
+              >
+                Showing all {filteredSchedules.length} schedule(s), grouped
+              </Typography>
+            )}
           </>
         )
       ) : view === "month" ? (
@@ -3031,6 +3258,9 @@ export default function ScheduleList() {
               ".fc .fc-daygrid-day.fc-day-today": {
                 backgroundColor: "#EFF6FF",
               },
+              ".fc .fc-daygrid-day.weekend-day-cell:not(.fc-day-today)": {
+                backgroundColor: WEEKEND_BG,
+              },
               ".fc .fc-day-other .fc-daygrid-day-top": {
                 opacity: 0.5,
               },
@@ -3106,6 +3336,10 @@ export default function ScheduleList() {
             dayHeaderFormat={{
               weekday: "short",
             }}
+            dayCellClassNames={(arg) => {
+              const day = arg.date.getDay();
+              return day === 0 || day === 6 ? ["weekend-day-cell"] : [];
+            }}
             dayCellContent={(arg) => (
               <Box sx={{ px: 0.35, pt: 0.2 }}>
                 <Typography
@@ -3121,6 +3355,47 @@ export default function ScheduleList() {
             )}
             moreLinkContent={(args) => `+${args.num} more`}
             eventContent={(arg) => {
+              const props = arg.event.extendedProps || {};
+
+              if (props.type === "coverage-gap") {
+                return (
+                  <Box
+                    sx={{
+                      px: 0.62,
+                      py: 0.48,
+                      borderRadius: 1.1,
+                      height: "100%",
+                      background: "#FECACA",
+                      border: "1px solid #EF4444",
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        color: "#111827",
+                        fontWeight: 700,
+                        fontSize: "0.62rem",
+                        lineHeight: 1.1,
+                      }}
+                    >
+                      Needs Coverage
+                    </Typography>
+                    <Typography
+                      sx={{
+                        color: "#111827",
+                        fontWeight: 600,
+                        fontSize: "0.58rem",
+                        lineHeight: 1.1,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {arg.event.title}
+                    </Typography>
+                  </Box>
+                );
+              }
+
               const start = new Date(arg.event.start);
               const end = new Date(arg.event.end);
               const spansMultipleDays =
@@ -3134,6 +3409,7 @@ export default function ScheduleList() {
               const dateMarker = spansMultipleDays
                 ? `${start.toLocaleDateString(undefined, { month: "short", day: "numeric" })} - ${end.toLocaleDateString(undefined, { month: "short", day: "numeric" })} • Overnight`
                 : "";
+              const isUrgent = props.isUrgentStatus;
 
               return (
                 <Box
@@ -3145,10 +3421,39 @@ export default function ScheduleList() {
                     display: "grid",
                     gridTemplateColumns: "1fr",
                     gap: 0.08,
+                    position: "relative",
                     background:
                       "linear-gradient(140deg, rgba(15,23,42,0.18) 0%, rgba(15,23,42,0.3) 100%)",
                   }}
                 >
+                  {isUrgent ? (
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        top: 2,
+                        right: 3,
+                        fontSize: "0.6rem",
+                        lineHeight: 1,
+                      }}
+                      aria-label={props.status}
+                    >
+                      ⚠
+                    </Box>
+                  ) : (
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        top: 4,
+                        right: 4,
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        backgroundColor: getScheduleStatusColor(props.status),
+                        border: "1px solid rgba(255,255,255,0.7)",
+                      }}
+                    />
+                  )}
+
                   <Typography
                     sx={{
                       color: "#F8FAFC",
@@ -3158,9 +3463,10 @@ export default function ScheduleList() {
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
+                      pr: 1,
                     }}
                   >
-                    {arg.event.extendedProps?.staffName || "Unknown"}
+                    {props.staffName || "Unknown"}
                   </Typography>
 
                   <Typography
@@ -3201,25 +3507,47 @@ export default function ScheduleList() {
                       lineHeight: 1.1,
                     }}
                   >
-                    {arg.event.extendedProps?.roleName || "Role"}
+                    {props.roleName || "Role"}
                   </Typography>
                 </Box>
               );
             }}
-            events={filteredSchedules.map((s) => ({
-              id: s._id,
-              title: s.staffId?.name,
-              start: s.startTime,
-              end: s.endTime,
-              backgroundColor: getScheduleStatusColor(s.status),
-              borderColor: getScheduleStatusColor(s.status),
-              textColor: "#fff",
-              extendedProps: {
-                staffName: s.staffId?.name,
-                roleName: getRoleDisplayName(s.role),
-              },
-            }))}
+            events={[
+              ...filteredSchedules.map((s) => {
+                const isUrgentStatus = URGENT_SCHEDULE_STATUSES.has(
+                  String(s.status || "").toLowerCase(),
+                );
+                const roleColor = getRoleColor(s.role);
+
+                return {
+                  id: s._id,
+                  title: s.staffId?.name,
+                  start: s.startTime,
+                  end: s.endTime,
+                  backgroundColor: isUrgentStatus ? "#EF4444" : roleColor,
+                  borderColor: isUrgentStatus ? "#EF4444" : roleColor,
+                  textColor: "#fff",
+                  extendedProps: {
+                    type: "schedule",
+                    staffName: s.staffId?.name,
+                    roleName: getRoleDisplayName(s.role),
+                    status: s.status,
+                    isUrgentStatus,
+                  },
+                };
+              }),
+              ...calendarCoverageGapEvents,
+            ]}
             eventClick={(info) => {
+              const props = info.event.extendedProps || {};
+
+              if (props.type === "coverage-gap") {
+                if (canManageSchedules) {
+                  openManualFromCoverage(props.coverage);
+                }
+                return;
+              }
+
               const clicked = filteredSchedules.find(
                 (a) => a._id === info.event.id,
               );

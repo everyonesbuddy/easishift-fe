@@ -98,6 +98,103 @@ const formatShortDate = (dateValue) => {
   });
 };
 
+const normalizeTag = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase();
+
+const isScheduleMatchingCoverage = (schedule, coverage) => {
+  if (!schedule || !coverage) return false;
+  if (normalizeTag(schedule.status) === "call_out") return false;
+
+  const scheduleStartMs = new Date(schedule.startTime).getTime();
+  const scheduleEndMs = new Date(schedule.endTime).getTime();
+  const coverageStartMs = new Date(coverage.startTime).getTime();
+  const coverageEndMs = new Date(coverage.endTime).getTime();
+  if (
+    [scheduleStartMs, scheduleEndMs, coverageStartMs, coverageEndMs].some(
+      Number.isNaN,
+    )
+  ) {
+    return false;
+  }
+  if (scheduleStartMs !== coverageStartMs || scheduleEndMs !== coverageEndMs) {
+    return false;
+  }
+  if (!isRoleCompatible(schedule.role, coverage.role)) return false;
+
+  const coverageUnit = normalizeTag(coverage.unitArea);
+  if (coverageUnit && coverageUnit !== normalizeTag(schedule.unitArea)) {
+    return false;
+  }
+
+  const coverageShiftType = normalizeTag(coverage.shiftType);
+  if (
+    coverageShiftType &&
+    coverageShiftType !== normalizeTag(schedule.shiftType)
+  ) {
+    return false;
+  }
+
+  const coverageShiftTag = normalizeTag(coverage.shiftTag);
+  if (
+    coverageShiftTag &&
+    coverageShiftTag !== normalizeTag(schedule.shiftTag)
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
+const getFillStatus = (coverage, schedules = []) => {
+  const required = Number(coverage?.requiredCount) || 0;
+
+  const liveAssignedCount = schedules.filter((s) =>
+    isScheduleMatchingCoverage(s, coverage),
+  ).length;
+
+  const reportedAssigned = Number(coverage?.assignedCount);
+  const assigned = Math.max(
+    Number.isFinite(reportedAssigned) ? reportedAssigned : 0,
+    liveAssignedCount,
+  );
+  const remaining = Math.max(0, required - assigned);
+
+  if (required === 0) return { assigned, required, remaining, status: "none" };
+  if (remaining <= 0)
+    return { assigned, required, remaining: 0, status: "full" };
+  if (assigned > 0) return { assigned, required, remaining, status: "partial" };
+  return { assigned, required, remaining, status: "unfilled" };
+};
+
+const FILL_STATUS_META = {
+  full: {
+    label: "Fully staffed",
+    bg: "#DCFCE7",
+    border: "#22C55E",
+    text: "#166534",
+  },
+  partial: {
+    label: "Partially staffed",
+    bg: "#FEF3C7",
+    border: "#F59E0B",
+    text: "#92400E",
+  },
+  unfilled: {
+    label: "Needs coverage",
+    bg: "#FECACA",
+    border: "#EF4444",
+    text: "#111827",
+  },
+  none: {
+    label: "No staff required",
+    bg: "#F1F5F9",
+    border: "#CBD5E1",
+    text: "#64748B",
+  },
+};
+
 export default function CoveragePlanningPage() {
   const { can, facilityPreferences } = useAuth();
   const isAdmin = can("coverage.manage");
@@ -105,9 +202,11 @@ export default function CoveragePlanningPage() {
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
   const [coverages, setCoverages] = useState([]);
+  const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("table");
   const [selectedRole, setSelectedRole] = useState("all");
+  const [selectedFillStatus, setSelectedFillStatus] = useState("all");
 
   const [openAdd, setOpenAdd] = useState(false);
   const [editingCoverage, setEditingCoverage] = useState(null);
@@ -147,6 +246,38 @@ export default function CoveragePlanningPage() {
     };
   };
 
+  const renderFillStatusBadge = (coverage) => {
+    const fill = getFillStatus(coverage, schedules);
+    const meta = FILL_STATUS_META[fill.status];
+
+    return (
+      <Box
+        sx={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 0.6,
+          px: 1,
+          py: 0.35,
+          borderRadius: 1.5,
+          background: meta.bg,
+          border: `1px solid ${meta.border}`,
+          flexWrap: "wrap",
+        }}
+      >
+        <Typography
+          sx={{ fontSize: "0.78rem", fontWeight: 800, color: meta.text }}
+        >
+          {fill.assigned}/{fill.required}
+        </Typography>
+        <Typography
+          sx={{ fontSize: "0.62rem", fontWeight: 700, color: meta.text }}
+        >
+          {meta.label}
+        </Typography>
+      </Box>
+    );
+  };
+
   const getCoverageDayKey = (coverageDate) => {
     if (!coverageDate) return "";
 
@@ -177,9 +308,14 @@ export default function CoveragePlanningPage() {
   const fetchCoverages = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/coverage");
-      const nextCoverages = res.data || [];
+      const [coverageRes, schedulesRes] = await Promise.all([
+        api.get("/coverage"),
+        api.get("/schedules"),
+      ]);
+      const nextCoverages = coverageRes.data || [];
+      const nextSchedules = schedulesRes.data || [];
       setCoverages(nextCoverages);
+      setSchedules(nextSchedules);
       setSelectedCoverageIds((prev) =>
         prev.filter((id) =>
           nextCoverages.some((coverage) => coverage._id === id),
@@ -356,10 +492,15 @@ export default function CoveragePlanningPage() {
   const calendarEvents = useMemo(() => {
     return coverages
       .filter(
-        (c) => selectedRole === "all" || isRoleCompatible(c.role, selectedRole),
+        (c) =>
+          (selectedRole === "all" || isRoleCompatible(c.role, selectedRole)) &&
+          (selectedFillStatus === "all" ||
+            getFillStatus(c, schedules).status === selectedFillStatus),
       )
       .map((c) => {
         const roleColor = getRoleColor(c.role) || "#2563EB";
+        const fill = getFillStatus(c, schedules);
+        const fillMeta = FILL_STATUS_META[fill.status];
 
         return {
           id: c._id,
@@ -369,7 +510,7 @@ export default function CoveragePlanningPage() {
           start: c.startTime,
           end: c.endTime,
           backgroundColor: roleColor,
-          borderColor: roleColor,
+          borderColor: fillMeta.border,
           textColor: "#fff",
           extendedProps: {
             id: c._id,
@@ -378,18 +519,23 @@ export default function CoveragePlanningPage() {
             shiftType: c.shiftType,
             shiftTag: c.shiftTag,
             requiredCount: c.requiredCount,
+            assignedCount: c.assignedCount,
             note: c.note,
             date: c.date || c.startTime,
             remaining: c.remaining,
+            fillStatus: fill,
             spansOvernight: spansOvernight(c),
           },
         };
       });
-  }, [coverages, selectedRole]);
+  }, [coverages, schedules, selectedRole, selectedFillStatus]);
 
   const displayedCoverages = useMemo(() => {
     const filtered = coverages.filter(
-      (c) => selectedRole === "all" || isRoleCompatible(c.role, selectedRole),
+      (c) =>
+        (selectedRole === "all" || isRoleCompatible(c.role, selectedRole)) &&
+        (selectedFillStatus === "all" ||
+          getFillStatus(c, schedules).status === selectedFillStatus),
     );
     return filtered.sort((a, b) => {
       const da = getCoverageDayKey(a.date);
@@ -397,7 +543,7 @@ export default function CoveragePlanningPage() {
       if (db !== da) return db.localeCompare(da);
       return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
     });
-  }, [coverages, selectedRole]);
+  }, [coverages, schedules, selectedRole, selectedFillStatus]);
 
   const paginated = displayedCoverages.slice(
     page * rowsPerPage,
@@ -575,7 +721,7 @@ export default function CoveragePlanningPage() {
             display="flex"
             alignItems="center"
             gap={2}
-            sx={{ width: { xs: "100%", lg: "auto" } }}
+            sx={{ width: { xs: "100%", lg: "auto" }, flexWrap: "wrap" }}
           >
             <Typography
               color="text.secondary"
@@ -602,6 +748,23 @@ export default function CoveragePlanningPage() {
                     {getRoleDisplayName(role)}
                   </MenuItem>
                 ))}
+              </Select>
+            </FormControl>
+
+            <FormControl
+              size="small"
+              sx={{ minWidth: { xs: "100%", sm: 220 } }}
+            >
+              <InputLabel>Staffing status</InputLabel>
+              <Select
+                value={selectedFillStatus}
+                label="Staffing status"
+                onChange={(e) => setSelectedFillStatus(e.target.value)}
+              >
+                <MenuItem value="all">All</MenuItem>
+                <MenuItem value="unfilled">Unfilled</MenuItem>
+                <MenuItem value="partial">Partially staffed</MenuItem>
+                <MenuItem value="full">Fully staffed</MenuItem>
               </Select>
             </FormControl>
           </Box>
@@ -650,15 +813,7 @@ export default function CoveragePlanningPage() {
                     )}
                   </Box>
                   <Stack spacing={1}>
-                    <Typography
-                      sx={{
-                        fontSize: 12,
-                        color: "text.secondary",
-                        textAlign: "right",
-                      }}
-                    >
-                      {c.requiredCount} needed
-                    </Typography>
+                    {renderFillStatusBadge(c)}
                     <Button
                       size="small"
                       variant="outlined"
@@ -772,6 +927,15 @@ export default function CoveragePlanningPage() {
                       fontSize: "0.72rem",
                     }}
                   >
+                    Staffing
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: "#0F172A",
+                      fontSize: "0.72rem",
+                    }}
+                  >
                     Unit Area
                   </TableCell>
                   <TableCell
@@ -855,6 +1019,9 @@ export default function CoveragePlanningPage() {
                       >
                         needed
                       </Typography>
+                    </TableCell>
+                    <TableCell sx={{ py: 1 }}>
+                      {renderFillStatusBadge(c)}
                     </TableCell>
                     <TableCell sx={{ color: "black", fontSize: "0.78rem" }}>
                       {getUnitAreaDisplayName(c.unitArea)}
@@ -1080,6 +1247,13 @@ export default function CoveragePlanningPage() {
             eventContent={(arg) => {
               const role = getRoleDisplayName(arg.event.extendedProps?.role);
               const required = arg.event.extendedProps?.requiredCount ?? 0;
+              const fill = arg.event.extendedProps?.fillStatus || {
+                assigned: 0,
+                required,
+                remaining: required,
+                status: "unfilled",
+              };
+              const fillMeta = FILL_STATUS_META[fill.status];
               const start = toLocal(arg.event.start);
               const end = toLocal(arg.event.end);
 
@@ -1106,6 +1280,7 @@ export default function CoveragePlanningPage() {
                     gap: 0.08,
                     background:
                       "linear-gradient(140deg, rgba(15,23,42,0.18) 0%, rgba(15,23,42,0.3) 100%)",
+                    borderLeft: `3px solid ${fillMeta.border}`,
                   }}
                 >
                   <Typography
@@ -1161,6 +1336,17 @@ export default function CoveragePlanningPage() {
                     }}
                   >
                     Need {required}
+                  </Typography>
+
+                  <Typography
+                    sx={{
+                      fontSize: "0.58rem",
+                      fontWeight: 800,
+                      lineHeight: 1.1,
+                      color: fill.status === "unfilled" ? "#FCA5A5" : "#BBF7D0",
+                    }}
+                  >
+                    {fill.assigned}/{fill.required} filled
                   </Typography>
                 </Box>
               );

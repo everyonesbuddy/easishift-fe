@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Autocomplete,
   Alert,
@@ -21,11 +21,14 @@ import CloseIcon from "@mui/icons-material/Close";
 import {
   MdAccessTime,
   MdAdd,
+  MdAutoAwesome,
   MdDelete,
   MdGroups2,
   MdExpandMore,
   MdExpandLess,
   MdCalendarMonth,
+  MdMic,
+  MdMicOff,
   MdRepeat,
   MdSummarize,
 } from "react-icons/md";
@@ -49,6 +52,14 @@ const weekdayOptions = [
 ];
 
 const horizonOptions = [1, 2, 3, 7, 14, 28, 42, 56];
+
+// Maps the NL-parse API's repeatMode values to this form's local ones
+const REPEAT_MODE_FROM_API = {
+  daily: "everyday",
+  weekdays: "weekdays",
+  weekends: "weekends",
+  custom: "custom",
+};
 
 const defaultRequirement = {
   role: "",
@@ -183,7 +194,9 @@ const buildDatesFromPattern = (startDateStr, horizonDays, mode, weekdays) => {
 };
 
 export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
-  const { facilityPreferences } = useAuth();
+  const { facilityPreferences, can } = useAuth();
+  const canUseNlParser =
+    typeof can === "function" ? can("coverage.manage") : false;
 
   const shiftTypeDefinitions = useMemo(() => {
     const defs = Array.isArray(facilityPreferences?.shiftTypeDefinitions)
@@ -251,6 +264,90 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   const [repeatOpen, setRepeatOpen] = useState(false);
   const [datesOpen, setDatesOpen] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(true);
+  const [nlMessage, setNlMessage] = useState("");
+  const [nlLoading, setNlLoading] = useState(false);
+  const [nlError, setNlError] = useState("");
+  const [nlUnresolved, setNlUnresolved] = useState([]);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+  const nlMessageBeforeListeningRef = useRef("");
+
+  const speechSupported =
+    typeof window !== "undefined" &&
+    Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  // Sets up the Web Speech API recognizer once; browser support is Chrome/Edge only
+  useEffect(() => {
+    if (!speechSupported) return undefined;
+
+    const SpeechRecognitionCtor =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognitionCtor();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+
+    recognition.onresult = (event) => {
+      let finalTranscript = "";
+      let interimTranscript = "";
+
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+
+      const base = nlMessageBeforeListeningRef.current;
+      const combinedFinal = finalTranscript
+        ? `${base}${base && !base.endsWith(" ") ? " " : ""}${finalTranscript}`
+        : base;
+
+      if (finalTranscript) {
+        nlMessageBeforeListeningRef.current = combinedFinal;
+      }
+
+      setNlMessage(
+        interimTranscript
+          ? `${combinedFinal}${combinedFinal && !combinedFinal.endsWith(" ") ? " " : ""}${interimTranscript}`
+          : combinedFinal,
+      );
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+      toast.error("Couldn't hear that. Check mic permissions and try again.");
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      recognition.stop();
+    };
+  }, [speechSupported]);
+
+  const handleToggleListening = () => {
+    if (!recognitionRef.current) return;
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      return;
+    }
+
+    nlMessageBeforeListeningRef.current = nlMessage;
+    setIsListening(true);
+    recognitionRef.current.start();
+  };
 
   const generatedDates = useMemo(
     () =>
@@ -319,6 +416,122 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
     if (mode === "weekdays") setSelectedWeekdays([1, 2, 3, 4, 5]);
     if (mode === "weekends") setSelectedWeekdays([6, 0]);
     if (mode === "everyday") setSelectedWeekdays([0, 1, 2, 3, 4, 5, 6]);
+  };
+
+  // Pre-fills the date pattern + requirement templates from a successful NL-parse draft
+  const applyNlDraft = (draft) => {
+    const shifts = Array.isArray(draft?.shifts) ? draft.shifts : [];
+    const datePattern = draft?.datePattern || {};
+    const unresolved = Array.isArray(draft?.unresolved) ? draft.unresolved : [];
+
+    if (datePattern.startDate) {
+      setPlannerStartDate(datePattern.startDate);
+    }
+
+    const horizon = Number(datePattern.horizonDays);
+    if (Number.isFinite(horizon) && horizon > 0) {
+      setHorizonDays(horizon);
+    }
+
+    const mappedMode =
+      REPEAT_MODE_FROM_API[datePattern.repeatMode] || "weekdays";
+    setRepeatMode(mappedMode);
+
+    if (mappedMode === "custom") {
+      setSelectedWeekdays(
+        Array.isArray(datePattern.customWeekdays) &&
+          datePattern.customWeekdays.length
+          ? datePattern.customWeekdays
+          : [1, 2, 3, 4, 5],
+      );
+    } else if (mappedMode === "everyday") {
+      setSelectedWeekdays([0, 1, 2, 3, 4, 5, 6]);
+    } else if (mappedMode === "weekends") {
+      setSelectedWeekdays([6, 0]);
+    } else {
+      setSelectedWeekdays([1, 2, 3, 4, 5]);
+    }
+
+    if (shifts.length) {
+      setRequirements(
+        shifts.map((shift) => ({
+          role: shift?.role || "",
+          requiredCount: Number(shift?.requiredCount) || 1,
+          startTime: shift?.startTime || defaultRequirement.startTime,
+          endTime: shift?.endTime || defaultRequirement.endTime,
+          unitArea: shift?.unitArea || "",
+          shiftType: shift?.shiftType || "",
+          shiftTag: shift?.shiftTag || "",
+          requiredCertificationTags: dedupeStrings(
+            shift?.requiredCertificationTags,
+          ),
+        })),
+      );
+    }
+
+    setNlUnresolved(unresolved);
+  };
+
+  const handleNlParse = async () => {
+    const trimmedMessage = nlMessage.trim();
+    if (!trimmedMessage) {
+      setNlError("Describe the coverage you need first.");
+      return;
+    }
+
+    setNlLoading(true);
+    setNlError("");
+    setNlUnresolved([]);
+
+    try {
+      const res = await api.post("/nl/parse", {
+        formType: "coverage",
+        message: trimmedMessage,
+        currentFormState: {
+          plannerStartDate,
+          horizonDays,
+          repeatMode,
+          selectedWeekdays,
+          requirements,
+        },
+      });
+
+      if (res.status !== 200 || !res.data?.draft) {
+        throw new Error("No draft returned.");
+      }
+
+      applyNlDraft(res.data.draft);
+      toast.success(
+        "Form filled from your description. Review before submitting.",
+      );
+    } catch (err) {
+      const data = err?.response?.data;
+      const code = data?.code;
+      let message =
+        data?.message || "Couldn't understand that. Try rephrasing.";
+
+      // Facility setup gaps and AI-draft validation issues carry structured
+      // lists — surface them the same way we show unresolved parse items.
+      if (code === "facility_not_configured" && Array.isArray(data?.gaps)) {
+        setNlUnresolved(data.gaps);
+      } else if (code === "invalid_draft" && Array.isArray(data?.errors)) {
+        setNlUnresolved(data.errors);
+      }
+
+      if (code === "forbidden") {
+        message =
+          data?.message ||
+          "You don't have permission to use the AI coverage parser.";
+      } else if (code === "form_type_not_implemented") {
+        message =
+          data?.message || "AI parsing isn't available for this form yet.";
+      }
+
+      setNlError(message);
+      toast.error(message);
+    } finally {
+      setNlLoading(false);
+    }
   };
 
   const handleRequirementChange = (index, field, value) => {
@@ -673,6 +886,138 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
       <Stack spacing={1.75}>
         {error && <Alert severity="error">{error}</Alert>}
         {success && <Alert severity="success">{success}</Alert>}
+
+        {/* ── SECTION 0: Describe with AI ────────────────────────────── */}
+        {canUseNlParser && (
+          <Paper
+            variant="outlined"
+            sx={{
+              borderRadius: 2.5,
+              overflow: "hidden",
+              borderColor: "#FDE68A",
+            }}
+          >
+            <AccordionHeader
+              icon={<MdAutoAwesome size={17} />}
+              title="Describe with AI"
+              subtitle="Type a plain-English request and let AI draft the form"
+              open={aiOpen}
+              onToggle={() => setAiOpen((v) => !v)}
+              accentColor="#D97706"
+            />
+            <Collapse in={aiOpen}>
+              <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 1, pb: 1.5 }}>
+                <Stack spacing={1}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    minRows={2}
+                    size="small"
+                    placeholder="e.g. Assisted Living needs 3 Care Partners and 1 Med Tech, 6am to 2pm, weekdays, starting next Monday for a month"
+                    value={nlMessage}
+                    onChange={(e) => setNlMessage(e.target.value)}
+                    InputProps={{
+                      endAdornment: speechSupported ? (
+                        <InputAdornment
+                          position="end"
+                          sx={{ alignSelf: "flex-end", mb: 0.5 }}
+                        >
+                          <IconButton
+                            size="small"
+                            onClick={handleToggleListening}
+                            aria-label={
+                              isListening ? "Stop dictation" : "Start dictation"
+                            }
+                            sx={{
+                              color: isListening ? "#DC2626" : "#D97706",
+                              animation: isListening
+                                ? "pulse 1.4s ease-in-out infinite"
+                                : "none",
+                              "@keyframes pulse": {
+                                "0%": { opacity: 1 },
+                                "50%": { opacity: 0.4 },
+                                "100%": { opacity: 1 },
+                              },
+                            }}
+                          >
+                            {isListening ? (
+                              <MdMicOff size={18} />
+                            ) : (
+                              <MdMic size={18} />
+                            )}
+                          </IconButton>
+                        </InputAdornment>
+                      ) : null,
+                    }}
+                  />
+
+                  {isListening && (
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "#D97706", fontWeight: 600 }}
+                    >
+                      Listening... tap the mic again to stop.
+                    </Typography>
+                  )}
+
+                  {!speechSupported && (
+                    <Typography variant="caption" color="text.secondary">
+                      Voice dictation isn't supported in this browser. Try
+                      Chrome or Edge, or type your request.
+                    </Typography>
+                  )}
+
+                  {nlError && (
+                    <Alert severity="error" onClose={() => setNlError("")}>
+                      {nlError}
+                    </Alert>
+                  )}
+
+                  {nlUnresolved.length > 0 && (
+                    <Alert severity={nlError ? "error" : "warning"}>
+                      <Typography
+                        variant="caption"
+                        sx={{ fontWeight: 700, display: "block", mb: 0.3 }}
+                      >
+                        {nlError
+                          ? "Details:"
+                          : "Double-check these before submitting:"}
+                      </Typography>
+                      <Box component="ul" sx={{ pl: 2, m: 0 }}>
+                        {nlUnresolved.map((item, index) => (
+                          <Typography
+                            key={index}
+                            component="li"
+                            variant="caption"
+                          >
+                            {item}
+                          </Typography>
+                        ))}
+                      </Box>
+                    </Alert>
+                  )}
+
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={handleNlParse}
+                    disabled={nlLoading || !nlMessage.trim()}
+                    startIcon={<MdAutoAwesome size={16} />}
+                    sx={{
+                      alignSelf: "flex-start",
+                      textTransform: "none",
+                      fontWeight: 700,
+                      background:
+                        "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)",
+                    }}
+                  >
+                    {nlLoading ? "Parsing..." : "Fill Form with AI"}
+                  </Button>
+                </Stack>
+              </Box>
+            </Collapse>
+          </Paper>
+        )}
 
         {/* ── SECTION 1: Date Pattern ─────────────────────────────────── */}
         <Paper

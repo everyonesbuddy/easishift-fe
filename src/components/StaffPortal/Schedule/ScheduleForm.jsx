@@ -11,8 +11,6 @@ import {
   Paper,
   Stack,
   IconButton,
-  FormControlLabel,
-  Switch,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useAuth } from "../../../context/AuthContext";
@@ -79,11 +77,6 @@ const toNormalizedSet = (values) =>
       .filter(Boolean),
   );
 
-const getCoverageId = (coverage) =>
-  String(
-    coverage?.coverageId?._id || coverage?.coverageId || coverage?._id || "",
-  );
-
 const SCHEDULE_STATUS_OPTIONS = [
   { value: "scheduled", label: "Scheduled", adminOnly: false },
   { value: "in_progress", label: "In Progress", adminOnly: true },
@@ -92,24 +85,6 @@ const SCHEDULE_STATUS_OPTIONS = [
   { value: "no_show", label: "No Show", adminOnly: true },
   { value: "call_out", label: "Call Out", adminOnly: false },
 ];
-
-const buildCoverageSignature = (coverage) => {
-  const startRaw = coverage?.startTime || coverage?.windowStart;
-  const endRaw = coverage?.endTime || coverage?.windowEnd;
-  const startMs = new Date(startRaw).getTime();
-  const endMs = new Date(endRaw).getTime();
-
-  if (Number.isNaN(startMs) || Number.isNaN(endMs)) return "";
-
-  return [
-    String(startMs),
-    String(endMs),
-    normalizeTag(coverage?.role),
-    normalizeTag(coverage?.unitArea),
-    normalizeTag(coverage?.shiftType),
-    normalizeTag(coverage?.shiftTag),
-  ].join("|");
-};
 
 function doesCoverageMatchStaffTags(staff, coverage) {
   const allowedAreas = toNormalizedSet(staff?.allowedAreas);
@@ -212,23 +187,34 @@ export default function ScheduleForm({
 
   const [coverageOptions, setCoverageOptions] = useState([]);
   const [message, setMessage] = useState("");
-  const [includeDraftCoverages, setIncludeDraftCoverages] = useState(false);
-  const [draftCoverageIds, setDraftCoverageIds] = useState([]);
-  const [draftCoverageSignatures, setDraftCoverageSignatures] = useState([]);
-  const [hasLoadedDraftCoverageRefs, setHasLoadedDraftCoverageRefs] =
-    useState(false);
-  const [draftCoverageFetchFailed, setDraftCoverageFetchFailed] =
-    useState(false);
 
-  const activeCoverageContext = !isEditing
-    ? initialCoverage ||
+  const activeCoverageContext = isEditing
+    ? {
+        role: formData.role,
+        unitArea: formData.unitArea,
+        shiftType: formData.shiftType,
+        shiftTag: formData.shiftTag,
+        requiredCertificationTags: formData.certificationTags,
+      }
+    : initialCoverage ||
       coverageOptions.find(
         (coverage) => coverage._id === formData.coverageId,
       ) ||
-      null
-    : null;
+      null;
+
+  const editingStaffId = isEditing
+    ? String(schedule?.staffId?._id || formData.staffId || "")
+    : "";
 
   const compatibleStaffOptions = staffList.filter((member) => {
+    if (
+      isEditing &&
+      editingStaffId &&
+      String(member._id || "") === editingStaffId
+    ) {
+      return true;
+    }
+
     if (!activeCoverageContext) return true;
 
     const isCompatibleRole =
@@ -313,106 +299,6 @@ export default function ScheduleForm({
     }));
   }, [initialCoverage, isEditing]);
 
-  // Load draft coverage references so manual scheduling can avoid draft collisions.
-  useEffect(() => {
-    if (isEditing || isPickup || !canManageSchedules) {
-      setHasLoadedDraftCoverageRefs(true);
-      setDraftCoverageFetchFailed(false);
-      return;
-    }
-
-    let isMounted = true;
-
-    async function loadDraftCoverageReferences() {
-      setHasLoadedDraftCoverageRefs(false);
-      setDraftCoverageFetchFailed(false);
-
-      try {
-        const res = await api.get("/schedules/draft-schedules", {
-          params: { status: "all", limit: 50 },
-        });
-
-        const drafts = Array.isArray(res.data) ? res.data : [];
-        const activeDrafts = drafts.filter((draft) =>
-          ["draft", "partially_published"].includes(
-            String(draft?.status || "").toLowerCase(),
-          ),
-        );
-
-        const idSet = new Set();
-        const signatureSet = new Set();
-
-        activeDrafts.forEach((draft) => {
-          const draftCoverages = [
-            ...(Array.isArray(draft?.coverageSnapshot)
-              ? draft.coverageSnapshot
-              : []),
-            ...(Array.isArray(draft?.coverages) ? draft.coverages : []),
-            ...(Array.isArray(draft?.sourceCoverages)
-              ? draft.sourceCoverages
-              : []),
-            ...(Array.isArray(draft?.inputCoverages)
-              ? draft.inputCoverages
-              : []),
-            ...(Array.isArray(draft?.requestedCoverages)
-              ? draft.requestedCoverages
-              : []),
-          ];
-
-          draftCoverages.forEach((coverage) => {
-            const coverageId = getCoverageId(coverage);
-            if (coverageId) idSet.add(coverageId);
-
-            const signature = buildCoverageSignature(coverage);
-            if (signature) signatureSet.add(signature);
-          });
-
-          [
-            ...(Array.isArray(draft?.coverageIds) ? draft.coverageIds : []),
-            ...(Array.isArray(draft?.sourceCoverageIds)
-              ? draft.sourceCoverageIds
-              : []),
-            ...(Array.isArray(draft?.inputCoverageIds)
-              ? draft.inputCoverageIds
-              : []),
-          ].forEach((coverageId) => {
-            const normalized = String(coverageId || "");
-            if (normalized) idSet.add(normalized);
-          });
-
-          (Array.isArray(draft?.assignments) ? draft.assignments : []).forEach(
-            (assignment) => {
-              const assignmentCoverageId = String(
-                assignment?.coverageId?._id || assignment?.coverageId || "",
-              );
-              if (assignmentCoverageId) idSet.add(assignmentCoverageId);
-            },
-          );
-        });
-
-        if (!isMounted) return;
-        setDraftCoverageIds(Array.from(idSet));
-        setDraftCoverageSignatures(Array.from(signatureSet));
-      } catch (err) {
-        console.error(err);
-        if (!isMounted) return;
-        setDraftCoverageIds([]);
-        setDraftCoverageSignatures([]);
-        setDraftCoverageFetchFailed(true);
-      } finally {
-        if (isMounted) {
-          setHasLoadedDraftCoverageRefs(true);
-        }
-      }
-    }
-
-    loadDraftCoverageReferences();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [canManageSchedules, isEditing, isPickup]);
-
   // Load available coverage when staff changes
   useEffect(() => {
     async function loadCoverage() {
@@ -437,18 +323,6 @@ export default function ScheduleForm({
             err?.response?.data?.message || "Unable to load open shifts",
           );
         }
-        return;
-      }
-
-      const excludeDraftCoverages =
-        !canManageSchedules || !includeDraftCoverages;
-      if (excludeDraftCoverages && !hasLoadedDraftCoverageRefs) {
-        setCoverageOptions([]);
-        return;
-      }
-
-      if (excludeDraftCoverages && draftCoverageFetchFailed) {
-        setCoverageOptions([]);
         return;
       }
 
@@ -489,24 +363,8 @@ export default function ScheduleForm({
           }).length;
         };
 
-        const draftCoverageIdSet = new Set(draftCoverageIds);
-        const draftCoverageSignatureSet = new Set(draftCoverageSignatures);
-
         const validShifts = (coverageRes.data || [])
           .filter((c) => {
-            if (excludeDraftCoverages) {
-              const coverageId = getCoverageId(c);
-              const coverageSignature = buildCoverageSignature(c);
-              const isDraftLinked =
-                (coverageId && draftCoverageIdSet.has(coverageId)) ||
-                (coverageSignature &&
-                  draftCoverageSignatureSet.has(coverageSignature));
-
-              if (isDraftLinked) {
-                return false;
-              }
-            }
-
             return (
               new Date(c.startTime) > now &&
               (getUserRoles(selectedStaff).some((role) =>
@@ -548,12 +406,7 @@ export default function ScheduleForm({
 
     loadCoverage();
   }, [
-    draftCoverageFetchFailed,
-    draftCoverageIds,
-    draftCoverageSignatures,
     formData.staffId,
-    hasLoadedDraftCoverageRefs,
-    includeDraftCoverages,
     canManageSchedules,
     isEditing,
     isPickup,
@@ -709,7 +562,7 @@ export default function ScheduleForm({
           <FormControl
             fullWidth
             required
-            disabled={isEditing || disableStaffSelect}
+            disabled={(isEditing && !canManageSchedules) || disableStaffSelect}
           >
             <InputLabel>Staff</InputLabel>
             <Select
@@ -719,7 +572,7 @@ export default function ScheduleForm({
                 setFormData((prev) => {
                   const nextStaffId = e.target.value;
 
-                  if (initialCoverage && !isEditing) {
+                  if (isEditing || initialCoverage) {
                     return {
                       ...prev,
                       staffId: nextStaffId,
@@ -795,28 +648,6 @@ export default function ScheduleForm({
 
         {!isEditing && !initialCoverage && (
           <>
-            {canManageSchedules && !isPickup && (
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={includeDraftCoverages}
-                    onChange={(e) => setIncludeDraftCoverages(e.target.checked)}
-                    size="small"
-                  />
-                }
-                label="Include draft-flow coverages"
-              />
-            )}
-
-            {!isPickup &&
-              !includeDraftCoverages &&
-              draftCoverageFetchFailed && (
-                <Alert severity="warning">
-                  Unable to verify draft coverages right now. To prevent
-                  conflicts, draft-linked shifts are hidden.
-                </Alert>
-              )}
-
             <FormControl fullWidth required>
               <InputLabel>
                 {isPickup ? "Available Open Shifts" : "Select Shift"}

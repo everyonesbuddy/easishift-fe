@@ -221,6 +221,11 @@ const normalizeNlUnresolvedList = (items) =>
     .map((item) => formatNlUnresolvedItem(item))
     .filter(Boolean);
 
+// Mirrors the server's copy-request syntax so history can be sent on the first
+// call instead of after a rejected one. The server does the strict matching.
+const COVERAGE_COPY_PATTERN =
+  /(?:copy|repeat|reuse|duplicate)\s+(?:coverage|staffing|shifts?)\s+from\s+/i;
+
 export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   const { facilityPreferences, can } = useAuth();
   const navigate = useNavigate();
@@ -276,6 +281,45 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   const roleOptions = useMemo(() => {
     return getRoleOptionsFromFacilityPreferences(facilityPreferences);
   }, [facilityPreferences]);
+
+  // Clickable starter prompts, seeded with this facility's own roles, units and
+  // configured shift windows. Copy prompts use the parser's "from X to Y" syntax.
+  const nlSuggestions = useMemo(() => {
+    const sampleRole = roleOptions[0]?.label || "staff";
+    const unitAreas = Array.isArray(facilityPreferences?.unitAreas)
+      ? facilityPreferences.unitAreas
+      : [];
+    const sampleUnit = unitAreas[0] ? getUnitAreaDisplayName(unitAreas[0]) : "";
+
+    const allSlots = shiftTypeDefinitions.flatMap((def) => def.timeSlots);
+    const slotPhrase = (slot) =>
+      `${to12HourTime(slot.startLocalTime)} to ${to12HourTime(slot.endLocalTime)}`;
+
+    const now = new Date();
+    const monthName = (offset) =>
+      new Date(
+        now.getFullYear(),
+        now.getMonth() + offset,
+        1,
+      ).toLocaleDateString(undefined, { month: "long" });
+    const isoMonthStart = (offset) => {
+      const date = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
+    };
+
+    const unitPart = sampleUnit ? ` for ${sampleUnit}` : "";
+
+    return [
+      allSlots[0] &&
+        `Need 1 ${sampleRole}${unitPart}, ${slotPhrase(allSlots[0])}, weekdays for the next 2 weeks`,
+      allSlots[1] &&
+        `Need 1 ${sampleRole}${unitPart}, ${slotPhrase(allSlots[1])}, weekends only, starting next Monday`,
+      `Need 1 ${sampleRole}`,
+      "Copy coverage from last week to this week",
+      `Copy coverage from ${monthName(0)} to ${monthName(1)}`,
+      `Copy coverage from ${isoMonthStart(0)} to ${isoMonthStart(1)}`,
+    ].filter(Boolean);
+  }, [roleOptions, facilityPreferences?.unitAreas, shiftTypeDefinitions]);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -482,23 +526,69 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
     }
 
     if (shifts.length) {
+      // The parser may return values in a different case than the facility
+      // stores them; match back to the configured option so selects populate.
+      const unitAreaValues = Array.isArray(facilityPreferences?.unitAreas)
+        ? facilityPreferences.unitAreas
+        : [];
+      const roleValues = roleOptions.map((option) => option.value);
+      const certValues = Array.isArray(facilityPreferences?.certificationTags)
+        ? facilityPreferences.certificationTags
+        : [];
+
+      const matchConfigured = (value, options) => {
+        const token = normalizeToken(value);
+        if (!token) return "";
+        return options.find((option) => normalizeToken(option) === token) || "";
+      };
+
       setRequirements(
         shifts.map((shift) => ({
-          role: shift?.role || "",
+          role: matchConfigured(shift?.role, roleValues) || shift?.role || "",
           requiredCount: Number(shift?.requiredCount) || 1,
           startTime: shift?.startTime || defaultRequirement.startTime,
           endTime: shift?.endTime || defaultRequirement.endTime,
-          unitArea: shift?.unitArea || "",
-          shiftType: shift?.shiftType || "",
-          shiftTag: shift?.shiftTag || "",
+          unitArea: matchConfigured(shift?.unitArea, unitAreaValues),
+          shiftType: normalizeToken(shift?.shiftType),
+          shiftTag: normalizeToken(shift?.shiftTag),
           requiredCertificationTags: dedupeStrings(
-            shift?.requiredCertificationTags,
+            (Array.isArray(shift?.requiredCertificationTags)
+              ? shift.requiredCertificationTags
+              : []
+            ).map((tag) => matchConfigured(tag, certValues) || tag),
           ),
         })),
       );
     }
 
     setNlUnresolved(unresolved);
+  };
+
+  // Copy-from-last-week/month requests are resolved server-side from prior
+  // coverage, so the parser needs history sent along with the message.
+  const fetchCoverageHistory = async () => {
+    const res = await api.get("/coverage");
+    const list = Array.isArray(res.data)
+      ? res.data
+      : Array.isArray(res.data?.coverage)
+        ? res.data.coverage
+        : [];
+
+    return list
+      .map((entry) => ({
+        role: entry?.role || "",
+        unitArea: entry?.unitArea || null,
+        shiftType: entry?.shiftType || null,
+        shiftTag: entry?.shiftTag || null,
+        requiredCount: Number(entry?.requiredCount) || 1,
+        requiredCertificationTags: dedupeStrings(
+          entry?.requiredCertificationTags,
+        ),
+        date: entry?.date || entry?.startTime || null,
+        startTime: entry?.startTime || null,
+        endTime: entry?.endTime || null,
+      }))
+      .filter((entry) => entry.role && (entry.date || entry.startTime));
   };
 
   const handleNlParse = async () => {
@@ -512,18 +602,32 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
     setNlError("");
     setNlUnresolved([]);
 
+    const basePayload = {
+      formType: "coverage",
+      message: trimmedMessage,
+      currentFormState: {
+        plannerStartDate,
+        horizonDays,
+        repeatMode,
+        selectedWeekdays,
+        requirements,
+      },
+    };
+
     try {
-      const res = await api.post("/nl/parse", {
-        formType: "coverage",
-        message: trimmedMessage,
-        currentFormState: {
-          plannerStartDate,
-          horizonDays,
-          repeatMode,
-          selectedWeekdays,
-          requirements,
-        },
-      });
+      let res;
+
+      if (COVERAGE_COPY_PATTERN.test(trimmedMessage)) {
+        const coverageHistory = await fetchCoverageHistory().catch(() => []);
+        res = await api.post(
+          "/nl/parse",
+          coverageHistory.length
+            ? { ...basePayload, coverageHistory }
+            : basePayload,
+        );
+      } else {
+        res = await api.post("/nl/parse", basePayload);
+      }
 
       if (res.status !== 200 || !res.data?.draft) {
         throw new Error("No draft returned.");
@@ -531,7 +635,9 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
 
       applyNlDraft(res.data.draft);
       toast.success(
-        "Form filled from your description. Review before submitting.",
+        res.data?.meta?.source === "coverage-copy"
+          ? "Copied your previous coverage into the form. Review before submitting."
+          : "Form filled from your description. Review before submitting.",
       );
     } catch (err) {
       const data = err?.response?.data;
@@ -554,6 +660,13 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
       } else if (code === "form_type_not_implemented") {
         message =
           data?.message || "AI parsing isn't available for this form yet.";
+      } else if (code === "missing_coverage_history") {
+        message =
+          "There's no previous coverage to copy from yet. Create some coverage first, or describe the shifts you need.";
+      } else if (code === "invalid_coverage_copy_request") {
+        message =
+          data?.message ||
+          "Couldn't work out which period to copy. Try 'copy coverage from last week' or 'copy coverage from March to April'.";
       }
 
       setNlError(message);
@@ -775,11 +888,13 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
       toast.success(message);
 
       if (draftWasGenerated) {
+        navigate("/schedule", { state: { openDraftReview: true } });
+        return;
+      }
+
+      if (!shouldGenerateDraft) {
         onSuccess?.();
-        // Short timeout allows the modal close animation to finish smoothly before route transition
-        setTimeout(() => {
-          navigate("/schedule", { state: { openDraftReview: true } });
-        }, 150);
+        navigate("/schedule", { state: { openView: "month" } });
         return;
       }
 
@@ -951,7 +1066,11 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                     multiline
                     minRows={2}
                     size="small"
-                    placeholder="e.g. Assisted Living needs 3 Care Partners and 1 Med Tech, 6am to 2pm, weekdays, starting next Monday for a month"
+                    placeholder={
+                      nlSuggestions[0]
+                        ? `e.g. ${nlSuggestions[0]}`
+                        : "Describe the coverage you need"
+                    }
                     value={nlMessage}
                     onChange={(e) => setNlMessage(e.target.value)}
                     InputProps={{
@@ -997,6 +1116,55 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                       Listening... tap the mic again to stop.
                     </Typography>
                   )}
+
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "text.secondary",
+                        display: "block",
+                        mb: 0.6,
+                      }}
+                    >
+                      Try one of these:
+                    </Typography>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 0.6,
+                      }}
+                    >
+                      {nlSuggestions.map((suggestion) => (
+                        <Chip
+                          key={suggestion}
+                          label={suggestion}
+                          size="small"
+                          variant="outlined"
+                          clickable
+                          disabled={nlLoading}
+                          onClick={() => {
+                            setNlMessage(suggestion);
+                            setNlError("");
+                          }}
+                          sx={{
+                            height: "auto",
+                            maxWidth: "100%",
+                            borderColor: "#FDE68A",
+                            color: "#92400E",
+                            backgroundColor: "#FFFBEB",
+                            fontSize: "0.68rem",
+                            "& .MuiChip-label": {
+                              whiteSpace: "normal",
+                              py: 0.5,
+                              lineHeight: 1.35,
+                            },
+                            "&:hover": { backgroundColor: "#FEF3C7" },
+                          }}
+                        />
+                      ))}
+                    </Box>
+                  </Box>
 
                   {!speechSupported && (
                     <Typography variant="caption" color="text.secondary">

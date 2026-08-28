@@ -289,8 +289,8 @@ export default function CoverageEditCountForm({
       const payload = { requiredCount: nextCount };
 
       if (!metadataLocked) {
-        payload.role = role;
-        payload.unitArea = unitArea || null;
+        payload.role = normalizeToken(role) || role;
+        payload.unitArea = normalizeToken(unitArea) || null;
         payload.requiredCertificationTags = normalizeStringArray(
           requiredCertificationTags,
         );

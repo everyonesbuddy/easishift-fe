@@ -828,11 +828,11 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
             }
 
             const shiftPayload = {
-              role: req.role,
+              role: normalizeToken(req.role) || req.role,
               requiredCount: Number(req.requiredCount) || 0,
-              unitArea: req.unitArea || null,
-              shiftType: req.shiftType || null,
-              shiftTag: req.shiftTag || null,
+              unitArea: normalizeToken(req.unitArea) || null,
+              shiftType: normalizeToken(req.shiftType) || null,
+              shiftTag: normalizeToken(req.shiftTag) || null,
               startTime: toUTCISOString(date, startTime),
               endTime: toUTCISOString(endDate, endTime),
               requiredCertificationTags: dedupeStrings(

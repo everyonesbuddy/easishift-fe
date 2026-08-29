@@ -175,8 +175,6 @@ export default function SignupTenant() {
         termsVersion: TERMS_VERSION,
         termsAcceptedAt: new Date().toISOString(),
       });
-
-      console.log("Tenant created:", res.data);
       navigate("/login");
     } catch (err) {
       console.error("Signup error:", err);

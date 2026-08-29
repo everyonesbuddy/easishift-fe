@@ -108,6 +108,30 @@ const normalizePermissions = (user) => {
   );
 };
 
+const parseJwt = (token) => {
+  try {
+    const base64Url = token.split(".")[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(""),
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+};
+
+const isTokenExpired = (token) => {
+  if (!token) return true;
+  const decoded = parseJwt(token);
+  if (!decoded || !decoded.exp) return false;
+  return decoded.exp * 1000 < Date.now();
+};
+
 const normalizeUser = (user) => {
   if (!user) return null;
   const roles = normalizeRoles(user);
@@ -127,38 +151,84 @@ export const AuthProvider = ({ children }) => {
   const [tenant, setTenant] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const logout = useCallback(() => {
+    setUser(null);
+    setRole("");
+    setTenant(null);
+    setFacilityPreferences(null);
+    localStorage.removeItem("user");
+    localStorage.removeItem("role");
+    try {
+      localStorage.removeItem("token");
+      delete api.defaults.headers.common["Authorization"];
+    } catch (err) {}
+  }, []);
+
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
-    // If a token exists from previous login, attach it to api defaults
+    let existingToken = null;
     try {
-      const existingToken = localStorage.getItem("token");
-      if (existingToken)
-        api.defaults.headers.common["Authorization"] =
-          `Bearer ${existingToken}`;
-    } catch (err) {
-      // ignore storage errors
+      existingToken = localStorage.getItem("token");
+    } catch (err) {}
+
+    // Check if stored token is already expired
+    if (existingToken && isTokenExpired(existingToken)) {
+      logout();
+      setLoading(false);
+      return;
     }
+
+    if (existingToken) {
+      api.defaults.headers.common["Authorization"] = `Bearer ${existingToken}`;
+    }
+
     if (savedUser) {
-      const parsedUser = normalizeUser(JSON.parse(savedUser));
-      setUser(parsedUser);
-      setRole(parsedUser.role || parsedUser.roles?.[0] || "staff"); // ✅ always a string
-      // try to fetch tenant if available
-      if (parsedUser.tenantId) {
-        (async () => {
-          try {
-            const res = await api.get(`/tenants/${parsedUser.tenantId}`);
-            // Normalize: API may return { tenant: {...} } or raw tenant
-            setTenant(res.data?.tenant || res.data || null);
-            await fetchFacilityPreferences();
-          } catch (err) {
-            // swallow — tenant can be fetched later
-            console.error("Failed to fetch tenant in AuthProvider", err);
-          }
-        })();
+      try {
+        const parsedUser = normalizeUser(JSON.parse(savedUser));
+        setUser(parsedUser);
+        setRole(parsedUser.role || parsedUser.roles?.[0] || "staff"); // ✅ always a string
+        // try to fetch tenant if available
+        if (parsedUser.tenantId) {
+          (async () => {
+            try {
+              const res = await api.get(`/tenants/${parsedUser.tenantId}`);
+              // Normalize: API may return { tenant: {...} } or raw tenant
+              setTenant(res.data?.tenant || res.data || null);
+              await fetchFacilityPreferences();
+            } catch (err) {
+              // swallow — tenant can be fetched later
+              console.error("Failed to fetch tenant in AuthProvider", err);
+            }
+          })();
+        }
+      } catch (err) {
+        console.error("Failed to parse saved user", err);
+        logout();
       }
     }
     setLoading(false);
-  }, []);
+  }, [logout]);
+
+  // Set up axios interceptor: only log out if the token is genuinely expired or missing
+  useEffect(() => {
+    const interceptor = api.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          const currentToken = localStorage.getItem("token");
+          // Only log out if the token is missing or has actually passed its expiration timestamp
+          if (!currentToken || isTokenExpired(currentToken)) {
+            logout();
+          }
+        }
+        return Promise.reject(error);
+      },
+    );
+
+    return () => {
+      api.interceptors.response.eject(interceptor);
+    };
+  }, [logout]);
 
   useEffect(() => {}, [role, user]);
 
@@ -255,19 +325,6 @@ export const AuthProvider = ({ children }) => {
       }
       return nextUser;
     });
-  }, []);
-
-  const logout = useCallback(() => {
-    setUser(null);
-    setRole("");
-    setTenant(null);
-    setFacilityPreferences(null);
-    localStorage.removeItem("user");
-    localStorage.removeItem("role");
-    try {
-      localStorage.removeItem("token");
-      delete api.defaults.headers.common["Authorization"];
-    } catch (err) {}
   }, []);
 
   const normalizedRole = String(role || "").toLowerCase();

@@ -27,6 +27,10 @@ import {
   Alert,
   IconButton,
   Tooltip,
+  TextField,
+  InputAdornment,
+  Chip,
+  ListItemText,
 } from "@mui/material";
 
 import FullCalendar from "@fullcalendar/react";
@@ -42,6 +46,9 @@ import {
   FiEdit2,
   FiEye,
   FiPlayCircle,
+  FiSearch,
+  FiX,
+  FiFilter,
 } from "react-icons/fi";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import { useAuth } from "../../../context/AuthContext";
@@ -195,18 +202,71 @@ const FILL_STATUS_META = {
   },
 };
 
+const FILL_STATUS_FILTER_OPTIONS = ["unfilled", "partial", "full"];
+
 export default function CoveragePlanningPage() {
-  const { can, facilityPreferences } = useAuth();
+  const { user, can, facilityPreferences } = useAuth();
   const isAdmin = can("coverage.manage");
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
+
+  const userScopeId = user?._id || user?.id || user?.tenantId || "default";
+  const COVERAGE_FILTERS_STORAGE_KEY = `wisershifts_coverage_filters_${userScopeId}`;
+
+  const savedFilters = useMemo(() => {
+    try {
+      const stored =
+        localStorage.getItem(COVERAGE_FILTERS_STORAGE_KEY) ||
+        localStorage.getItem(`easishift_coverage_filters_${userScopeId}`);
+      return stored ? JSON.parse(stored) : null;
+    } catch (e) {
+      console.error("Failed to read coverage filters from localStorage", e);
+      return null;
+    }
+  }, [COVERAGE_FILTERS_STORAGE_KEY, userScopeId]);
 
   const [coverages, setCoverages] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("table");
-  const [selectedRole, setSelectedRole] = useState("all");
-  const [selectedFillStatus, setSelectedFillStatus] = useState("all");
+  const [selectedRoles, setSelectedRoles] = useState(() =>
+    Array.isArray(savedFilters?.roles) ? savedFilters.roles : [],
+  );
+  const [selectedFillStatuses, setSelectedFillStatuses] = useState(() =>
+    Array.isArray(savedFilters?.fillStatuses) ? savedFilters.fillStatuses : [],
+  );
+  const [selectedUnitAreas, setSelectedUnitAreas] = useState(() =>
+    Array.isArray(savedFilters?.unitAreas) ? savedFilters.unitAreas : [],
+  );
+  const [searchQuery, setSearchQuery] = useState(() =>
+    typeof savedFilters?.searchQuery === "string"
+      ? savedFilters.searchQuery
+      : "",
+  );
+
+  // Sync coverage filters to localStorage whenever they change
+  useEffect(() => {
+    try {
+      const filterState = {
+        roles: selectedRoles,
+        fillStatuses: selectedFillStatuses,
+        unitAreas: selectedUnitAreas,
+        searchQuery,
+      };
+      localStorage.setItem(
+        COVERAGE_FILTERS_STORAGE_KEY,
+        JSON.stringify(filterState),
+      );
+    } catch (e) {
+      console.error("Failed to save coverage filters to localStorage", e);
+    }
+  }, [
+    selectedRoles,
+    selectedFillStatuses,
+    selectedUnitAreas,
+    searchQuery,
+    COVERAGE_FILTERS_STORAGE_KEY,
+  ]);
 
   const [openAdd, setOpenAdd] = useState(false);
   const [editingCoverage, setEditingCoverage] = useState(null);
@@ -231,6 +291,27 @@ export default function CoveragePlanningPage() {
     const industryRoles = roleOptions.map((item) => item.value);
     return Array.from(new Set([...industryRoles, ...existingRoles]));
   }, [coverages, roleOptions]);
+
+  const unitAreaFilterOptions = useMemo(() => {
+    const prefUnits = Array.isArray(facilityPreferences?.unitAreas)
+      ? facilityPreferences.unitAreas
+      : [];
+    const coverageUnits = coverages.map((c) => c.unitArea).filter(Boolean);
+    return Array.from(new Set([...prefUnits, ...coverageUnits])).sort();
+  }, [facilityPreferences?.unitAreas, coverages]);
+
+  const hasActiveFilters =
+    selectedRoles.length > 0 ||
+    selectedFillStatuses.length > 0 ||
+    selectedUnitAreas.length > 0 ||
+    searchQuery.trim().length > 0;
+
+  const resetAllFilters = () => {
+    setSelectedRoles([]);
+    setSelectedFillStatuses([]);
+    setSelectedUnitAreas([]);
+    setSearchQuery("");
+  };
 
   const getRoleChipStyles = (role) => {
     const roleColor = getRoleColor(role);
@@ -489,61 +570,113 @@ export default function CoveragePlanningPage() {
     return tags.length ? tags.join(", ") : "—";
   }
 
-  const calendarEvents = useMemo(() => {
-    return coverages
-      .filter(
-        (c) =>
-          (selectedRole === "all" || isRoleCompatible(c.role, selectedRole)) &&
-          (selectedFillStatus === "all" ||
-            getFillStatus(c, schedules).status === selectedFillStatus),
-      )
-      .map((c) => {
-        const roleColor = getRoleColor(c.role) || "#2563EB";
-        const fill = getFillStatus(c, schedules);
-        const fillMeta = FILL_STATUS_META[fill.status];
+  const matchesCoverageFilters = (c) => {
+    // Role filter
+    if (selectedRoles.length > 0) {
+      const matchRole = selectedRoles.some(
+        (r) => isRoleCompatible(c.role, r) || c.role === r,
+      );
+      if (!matchRole) return false;
+    }
 
-        return {
+    // Fill status filter
+    if (selectedFillStatuses.length > 0) {
+      const fill = getFillStatus(c, schedules);
+      if (!selectedFillStatuses.includes(fill.status)) return false;
+    }
+
+    // Unit area filter
+    if (selectedUnitAreas.length > 0) {
+      if (!selectedUnitAreas.includes(c.unitArea || "")) return false;
+    }
+
+    // Search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.trim().toLowerCase();
+      const roleName = getRoleDisplayName(c.role).toLowerCase();
+      const unitName = (getUnitAreaDisplayName(c.unitArea) || "").toLowerCase();
+      const shiftTypeName = (
+        getShiftTypeDisplayName(c.shiftType) || ""
+      ).toLowerCase();
+      const shiftTagName = (
+        getShiftTagDisplayName(c.shiftTag) || ""
+      ).toLowerCase();
+      const note = (c.note || "").toLowerCase();
+      if (
+        !roleName.includes(query) &&
+        !unitName.includes(query) &&
+        !shiftTypeName.includes(query) &&
+        !shiftTagName.includes(query) &&
+        !note.includes(query)
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const calendarEvents = useMemo(() => {
+    return coverages.filter(matchesCoverageFilters).map((c) => {
+      const roleColor = getRoleColor(c.role) || "#2563EB";
+      const fill = getFillStatus(c, schedules);
+      const fillMeta = FILL_STATUS_META[fill.status];
+
+      return {
+        id: c._id,
+        title: `${getRoleDisplayName(c.role)} (${c.requiredCount || 1})${
+          c.unitArea ? ` • ${getUnitAreaDisplayName(c.unitArea)}` : ""
+        }${c.shiftType ? ` • ${getShiftTypeDisplayName(c.shiftType)}` : ""}${c.shiftTag ? ` • ${getShiftTagDisplayName(c.shiftTag)}` : ""}`,
+        start: c.startTime,
+        end: c.endTime,
+        backgroundColor: roleColor,
+        borderColor: fillMeta.border,
+        textColor: "#fff",
+        extendedProps: {
           id: c._id,
-          title: `${getRoleDisplayName(c.role)} (${c.requiredCount || 1})${
-            c.unitArea ? ` • ${getUnitAreaDisplayName(c.unitArea)}` : ""
-          }${c.shiftType ? ` • ${getShiftTypeDisplayName(c.shiftType)}` : ""}${c.shiftTag ? ` • ${getShiftTagDisplayName(c.shiftTag)}` : ""}`,
-          start: c.startTime,
-          end: c.endTime,
-          backgroundColor: roleColor,
-          borderColor: fillMeta.border,
-          textColor: "#fff",
-          extendedProps: {
-            id: c._id,
-            role: c.role,
-            unitArea: c.unitArea,
-            shiftType: c.shiftType,
-            shiftTag: c.shiftTag,
-            requiredCount: c.requiredCount,
-            assignedCount: c.assignedCount,
-            note: c.note,
-            date: c.date || c.startTime,
-            remaining: c.remaining,
-            fillStatus: fill,
-            spansOvernight: spansOvernight(c),
-          },
-        };
-      });
-  }, [coverages, schedules, selectedRole, selectedFillStatus]);
+          role: c.role,
+          unitArea: c.unitArea,
+          shiftType: c.shiftType,
+          shiftTag: c.shiftTag,
+          requiredCount: c.requiredCount,
+          assignedCount: c.assignedCount,
+          note: c.note,
+          date: c.date || c.startTime,
+          remaining: c.remaining,
+          fillStatus: fill,
+          spansOvernight: spansOvernight(c),
+        },
+      };
+    });
+  }, [
+    coverages,
+    schedules,
+    selectedRoles,
+    selectedFillStatuses,
+    selectedUnitAreas,
+    searchQuery,
+  ]);
 
   const displayedCoverages = useMemo(() => {
-    const filtered = coverages.filter(
-      (c) =>
-        (selectedRole === "all" || isRoleCompatible(c.role, selectedRole)) &&
-        (selectedFillStatus === "all" ||
-          getFillStatus(c, schedules).status === selectedFillStatus),
-    );
+    const filtered = coverages.filter(matchesCoverageFilters);
     return filtered.sort((a, b) => {
       const da = getCoverageDayKey(a.date);
       const db = getCoverageDayKey(b.date);
       if (db !== da) return db.localeCompare(da);
       return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
     });
-  }, [coverages, schedules, selectedRole, selectedFillStatus]);
+  }, [
+    coverages,
+    schedules,
+    selectedRoles,
+    selectedFillStatuses,
+    selectedUnitAreas,
+    searchQuery,
+  ]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [selectedRoles, selectedFillStatuses, selectedUnitAreas, searchQuery]);
 
   const paginated = displayedCoverages.slice(
     page * rowsPerPage,
@@ -710,67 +843,486 @@ export default function CoveragePlanningPage() {
         </Alert>
       )}
 
-      <Paper sx={{ bgcolor: "white", borderRadius: 2, p: 2, mb: 3 }}>
+      {/* FILTER BAR */}
+      <Paper
+        elevation={0}
+        sx={{
+          mt: 3,
+          p: 2,
+          mb: 3,
+          border: "1px solid #e5e7eb",
+          borderRadius: 2,
+          backgroundColor: "#fff",
+        }}
+      >
+        {/* Filter Bar Header */}
         <Box
           display="flex"
-          flexDirection={{ xs: "column", lg: "row" }}
+          justifyContent="space-between"
           alignItems="center"
-          gap={2}
+          flexWrap="wrap"
+          gap={1}
+          sx={{ mb: 1.5 }}
         >
-          <Box
-            display="flex"
-            alignItems="center"
-            gap={2}
-            sx={{ width: { xs: "100%", lg: "auto" }, flexWrap: "wrap" }}
-          >
+          <Box display="flex" alignItems="center" gap={1}>
+            <FiFilter color="#4b5563" size={16} />
             <Typography
-              color="text.secondary"
-              sx={{
-                fontSize: { xs: "0.78rem", lg: "0.875rem" },
-                minWidth: { xs: "auto", lg: "auto" },
-              }}
+              variant="subtitle2"
+              sx={{ fontWeight: 600, color: "#1f2937" }}
             >
-              Filter by role:
+              Filter Coverage Requirements
             </Typography>
-            <FormControl
+            <Chip
               size="small"
-              sx={{ minWidth: { xs: "100%", sm: 220 } }}
-            >
-              <InputLabel>Role</InputLabel>
-              <Select
-                value={selectedRole}
-                label="Role"
-                onChange={(e) => setSelectedRole(e.target.value)}
-              >
-                <MenuItem value="all">All Roles</MenuItem>
-                {filterRoleOptions.map((role) => (
-                  <MenuItem key={role} value={role}>
-                    {getRoleDisplayName(role)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl
-              size="small"
-              sx={{ minWidth: { xs: "100%", sm: 220 } }}
-            >
-              <InputLabel>Staffing status</InputLabel>
-              <Select
-                value={selectedFillStatus}
-                label="Staffing status"
-                onChange={(e) => setSelectedFillStatus(e.target.value)}
-              >
-                <MenuItem value="all">All</MenuItem>
-                <MenuItem value="unfilled">Unfilled</MenuItem>
-                <MenuItem value="partial">Partially staffed</MenuItem>
-                <MenuItem value="full">Fully staffed</MenuItem>
-              </Select>
-            </FormControl>
+              label={`${displayedCoverages.length} match${
+                displayedCoverages.length === 1 ? "" : "es"
+              }`}
+              sx={{
+                height: 20,
+                fontSize: "0.72rem",
+                fontWeight: 600,
+                backgroundColor: "#f3f4f6",
+                color: "#4b5563",
+              }}
+            />
           </Box>
 
-          <Box>{/* placeholder for future controls */}</Box>
+          {hasActiveFilters && (
+            <Button
+              size="small"
+              onClick={resetAllFilters}
+              sx={{
+                textTransform: "none",
+                fontSize: "0.75rem",
+                py: 0.25,
+                px: 1,
+                color: "#6b7280",
+                "&:hover": { color: "#ef4444", backgroundColor: "#fee2e2" },
+              }}
+            >
+              Clear all
+            </Button>
+          )}
         </Box>
+
+        {/* Filter Controls */}
+        <Box
+          display="flex"
+          flexDirection={{ xs: "column", md: "row" }}
+          gap={1.5}
+          alignItems={{ xs: "stretch", md: "center" }}
+          flexWrap="wrap"
+        >
+          {/* Search Field */}
+          <TextField
+            size="small"
+            placeholder="Search role, unit, note..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            sx={{
+              minWidth: { xs: "100%", sm: 220 },
+              flex: { sm: 1, md: "initial" },
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <FiSearch color="#9ca3af" size={15} />
+                </InputAdornment>
+              ),
+              endAdornment: searchQuery ? (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    onClick={() => setSearchQuery("")}
+                    edge="end"
+                  >
+                    <FiX size={14} />
+                  </IconButton>
+                </InputAdornment>
+              ) : null,
+            }}
+          />
+
+          {/* Roles Multi-Select */}
+          <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 200 } }}>
+            <InputLabel id="coverage-role-filter-label">Roles</InputLabel>
+            <Select
+              labelId="coverage-role-filter-label"
+              multiple
+              value={selectedRoles}
+              label="Roles"
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedRoles(
+                  typeof val === "string" ? val.split(",") : val,
+                );
+              }}
+              renderValue={(selected) => {
+                if (selected.length === 0) return "All Roles";
+                if (selected.length === 1) {
+                  return getRoleDisplayName(selected[0]);
+                }
+                return `${selected.length} Roles selected`;
+              }}
+            >
+              <Box
+                sx={{
+                  px: 1.5,
+                  py: 0.5,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  borderBottom: "1px solid #e5e7eb",
+                }}
+              >
+                <Button
+                  size="small"
+                  sx={{ textTransform: "none", p: 0, fontSize: "0.75rem" }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedRoles(filterRoleOptions);
+                  }}
+                >
+                  Select All
+                </Button>
+                <Button
+                  size="small"
+                  color="inherit"
+                  sx={{
+                    textTransform: "none",
+                    p: 0,
+                    fontSize: "0.75rem",
+                    color: "text.secondary",
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedRoles([]);
+                  }}
+                >
+                  Clear
+                </Button>
+              </Box>
+              {filterRoleOptions.map((role) => {
+                const isChecked = selectedRoles.includes(role);
+                return (
+                  <MenuItem key={role} value={role} sx={{ py: 0.5 }}>
+                    <Checkbox
+                      checked={isChecked}
+                      size="small"
+                      sx={{ p: 0.5, mr: 1 }}
+                    />
+                    <Box
+                      sx={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        backgroundColor: getRoleColor(role),
+                        mr: 1,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <ListItemText
+                      primary={getRoleDisplayName(role)}
+                      primaryTypographyProps={{ fontSize: "0.85rem" }}
+                    />
+                  </MenuItem>
+                );
+              })}
+            </Select>
+          </FormControl>
+
+          {/* Staffing Status Multi-Select */}
+          <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 200 } }}>
+            <InputLabel id="coverage-status-filter-label">
+              Staffing status
+            </InputLabel>
+            <Select
+              labelId="coverage-status-filter-label"
+              multiple
+              value={selectedFillStatuses}
+              label="Staffing status"
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedFillStatuses(
+                  typeof val === "string" ? val.split(",") : val,
+                );
+              }}
+              renderValue={(selected) => {
+                if (selected.length === 0) return "All Statuses";
+                if (selected.length === 1) {
+                  return FILL_STATUS_META[selected[0]]?.label || selected[0];
+                }
+                return `${selected.length} Statuses selected`;
+              }}
+            >
+              <Box
+                sx={{
+                  px: 1.5,
+                  py: 0.5,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  borderBottom: "1px solid #e5e7eb",
+                }}
+              >
+                <Button
+                  size="small"
+                  sx={{ textTransform: "none", p: 0, fontSize: "0.75rem" }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedFillStatuses(FILL_STATUS_FILTER_OPTIONS);
+                  }}
+                >
+                  Select All
+                </Button>
+                <Button
+                  size="small"
+                  color="inherit"
+                  sx={{
+                    textTransform: "none",
+                    p: 0,
+                    fontSize: "0.75rem",
+                    color: "text.secondary",
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedFillStatuses([]);
+                  }}
+                >
+                  Clear
+                </Button>
+              </Box>
+              {FILL_STATUS_FILTER_OPTIONS.map((statusKey) => {
+                const isChecked = selectedFillStatuses.includes(statusKey);
+                const meta = FILL_STATUS_META[statusKey];
+                return (
+                  <MenuItem key={statusKey} value={statusKey} sx={{ py: 0.5 }}>
+                    <Checkbox
+                      checked={isChecked}
+                      size="small"
+                      sx={{ p: 0.5, mr: 1 }}
+                    />
+                    <Box
+                      sx={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        backgroundColor: meta?.border || "#9e9e9e",
+                        mr: 1,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <ListItemText
+                      primary={meta?.label || statusKey}
+                      primaryTypographyProps={{ fontSize: "0.85rem" }}
+                    />
+                  </MenuItem>
+                );
+              })}
+            </Select>
+          </FormControl>
+
+          {/* Unit Area Multi-Select */}
+          {unitAreaFilterOptions.length > 0 && (
+            <FormControl
+              size="small"
+              sx={{ minWidth: { xs: "100%", sm: 180 } }}
+            >
+              <InputLabel id="coverage-unit-filter-label">Unit Area</InputLabel>
+              <Select
+                labelId="coverage-unit-filter-label"
+                multiple
+                value={selectedUnitAreas}
+                label="Unit Area"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedUnitAreas(
+                    typeof val === "string" ? val.split(",") : val,
+                  );
+                }}
+                renderValue={(selected) => {
+                  if (selected.length === 0) return "All Units";
+                  if (selected.length === 1) {
+                    return getUnitAreaDisplayName(selected[0]);
+                  }
+                  return `${selected.length} Units selected`;
+                }}
+              >
+                <Box
+                  sx={{
+                    px: 1.5,
+                    py: 0.5,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    borderBottom: "1px solid #e5e7eb",
+                  }}
+                >
+                  <Button
+                    size="small"
+                    sx={{ textTransform: "none", p: 0, fontSize: "0.75rem" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedUnitAreas(unitAreaFilterOptions);
+                    }}
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    size="small"
+                    color="inherit"
+                    sx={{
+                      textTransform: "none",
+                      p: 0,
+                      fontSize: "0.75rem",
+                      color: "text.secondary",
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedUnitAreas([]);
+                    }}
+                  >
+                    Clear
+                  </Button>
+                </Box>
+                {unitAreaFilterOptions.map((unit) => {
+                  const isChecked = selectedUnitAreas.includes(unit);
+                  return (
+                    <MenuItem key={unit} value={unit} sx={{ py: 0.5 }}>
+                      <Checkbox
+                        checked={isChecked}
+                        size="small"
+                        sx={{ p: 0.5, mr: 1 }}
+                      />
+                      <ListItemText
+                        primary={getUnitAreaDisplayName(unit)}
+                        primaryTypographyProps={{ fontSize: "0.85rem" }}
+                      />
+                    </MenuItem>
+                  );
+                })}
+              </Select>
+            </FormControl>
+          )}
+        </Box>
+
+        {/* Active Filters Chips Tray */}
+        {hasActiveFilters && (
+          <Box
+            sx={{
+              mt: 1.5,
+              pt: 1.5,
+              borderTop: "1px dashed #e5e7eb",
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              flexWrap: "wrap",
+            }}
+          >
+            <Typography
+              variant="caption"
+              sx={{ color: "text.secondary", fontWeight: 600, mr: 0.5 }}
+            >
+              Active filters:
+            </Typography>
+
+            {searchQuery.trim() && (
+              <Chip
+                size="small"
+                label={`Search: "${searchQuery}"`}
+                onDelete={() => setSearchQuery("")}
+                sx={{ fontSize: "0.75rem", backgroundColor: "#f3f4f6" }}
+              />
+            )}
+
+            {selectedRoles.map((role) => (
+              <Chip
+                key={role}
+                size="small"
+                label={`Role: ${getRoleDisplayName(role)}`}
+                onDelete={() =>
+                  setSelectedRoles((prev) => prev.filter((r) => r !== role))
+                }
+                avatar={
+                  <Box
+                    sx={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      backgroundColor: getRoleColor(role),
+                      ml: 1,
+                    }}
+                  />
+                }
+                sx={{
+                  fontSize: "0.75rem",
+                  backgroundColor: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                }}
+              />
+            ))}
+
+            {selectedFillStatuses.map((statusKey) => {
+              const meta = FILL_STATUS_META[statusKey];
+              return (
+                <Chip
+                  key={statusKey}
+                  size="small"
+                  label={`Status: ${meta?.label || statusKey}`}
+                  onDelete={() =>
+                    setSelectedFillStatuses((prev) =>
+                      prev.filter((s) => s !== statusKey),
+                    )
+                  }
+                  avatar={
+                    <Box
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        backgroundColor: meta?.border || "#9e9e9e",
+                        ml: 1,
+                      }}
+                    />
+                  }
+                  sx={{
+                    fontSize: "0.75rem",
+                    backgroundColor: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                  }}
+                />
+              );
+            })}
+
+            {selectedUnitAreas.map((unit) => (
+              <Chip
+                key={unit}
+                size="small"
+                label={`Unit: ${getUnitAreaDisplayName(unit)}`}
+                onDelete={() =>
+                  setSelectedUnitAreas((prev) => prev.filter((u) => u !== unit))
+                }
+                sx={{
+                  fontSize: "0.75rem",
+                  backgroundColor: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                }}
+              />
+            ))}
+
+            <Button
+              size="small"
+              color="inherit"
+              onClick={resetAllFilters}
+              sx={{
+                textTransform: "none",
+                fontSize: "0.75rem",
+                color: "#ef4444",
+                ml: "auto",
+                "&:hover": { backgroundColor: "#fee2e2" },
+              }}
+            >
+              Reset all
+            </Button>
+          </Box>
+        )}
       </Paper>
 
       {view === "table" ? (

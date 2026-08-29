@@ -77,7 +77,10 @@ export default function App() {
       >
         <Navbar onMobileOpen={() => setMobileOpen(true)} />
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route
+            path="/"
+            element={user ? <Navigate to="/dashboard" replace /> : <Home />}
+          />
           <Route path="/calculators" element={<Calculators />} />
           <Route
             path="/turnover-roi-calculator"
@@ -94,9 +97,17 @@ export default function App() {
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/eula" element={<EndUserLicenseAgreement />} />
           <Route path="/contact" element={<ContactPage />} />
-          <Route path="/login" element={<Login />} />
+          <Route
+            path="/login"
+            element={user ? <Navigate to="/dashboard" replace /> : <Login />}
+          />
           <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/signup-tenant" element={<SignupTenant />} />
+          <Route
+            path="/signup-tenant"
+            element={
+              user ? <Navigate to="/dashboard" replace /> : <SignupTenant />
+            }
+          />
           <Route path="/billing" element={<ManageSubscription />} />
           <Route path="/billing/success" element={<BillingSuccess />} />
           <Route path="/billing/cancel" element={<BillingCancel />} />

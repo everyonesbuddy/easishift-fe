@@ -28,6 +28,9 @@ import {
   IconButton,
   TextField,
   Tooltip,
+  Chip,
+  ListItemText,
+  InputAdornment,
 } from "@mui/material";
 
 import FullCalendar from "@fullcalendar/react";
@@ -52,7 +55,11 @@ import {
   FiClock,
   FiPlayCircle,
   FiMove,
+  FiSearch,
+  FiX,
+  FiFilter,
 } from "react-icons/fi";
+import { MdDragIndicator } from "react-icons/md";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
@@ -146,8 +153,42 @@ export default function ScheduleList() {
   const [manualCoverageFromAuto, setManualCoverageFromAuto] = useState(null);
   const [view, setView] = useState("table");
   const [listGroupBy, setListGroupBy] = useState("date");
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("");
+
+  // Scoped storage keys for individual user preferences
+  const userScopeId = user?._id || user?.id || user?.tenantId || "default";
+  const ROSTER_ORDER_STORAGE_KEY = `wisershifts_roster_order_${userScopeId}`;
+  const SCHEDULE_FILTERS_STORAGE_KEY = `wisershifts_schedule_filters_${userScopeId}`;
+
+  // Initial filter state from localStorage (with fallback to legacy key if needed)
+  const savedFilters = useMemo(() => {
+    try {
+      const stored =
+        localStorage.getItem(SCHEDULE_FILTERS_STORAGE_KEY) ||
+        localStorage.getItem(`easishift_schedule_filters_${userScopeId}`);
+      return stored ? JSON.parse(stored) : null;
+    } catch (e) {
+      console.error("Failed to read schedule filters from localStorage", e);
+      return null;
+    }
+  }, [SCHEDULE_FILTERS_STORAGE_KEY, userScopeId]);
+
+  const [selectedRoles, setSelectedRoles] = useState(() =>
+    Array.isArray(savedFilters?.roles) ? savedFilters.roles : [],
+  );
+  const [selectedStatuses, setSelectedStatuses] = useState(() =>
+    Array.isArray(savedFilters?.statuses) ? savedFilters.statuses : [],
+  );
+  const [selectedUnitAreas, setSelectedUnitAreas] = useState(() =>
+    Array.isArray(savedFilters?.unitAreas) ? savedFilters.unitAreas : [],
+  );
+  const [selectedShiftTimes, setSelectedShiftTimes] = useState(() =>
+    Array.isArray(savedFilters?.shiftTimes) ? savedFilters.shiftTimes : [],
+  );
+  const [searchQuery, setSearchQuery] = useState(() =>
+    typeof savedFilters?.searchQuery === "string"
+      ? savedFilters.searchQuery
+      : "",
+  );
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
@@ -166,19 +207,80 @@ export default function ScheduleList() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [monthDate, setMonthDate] = useState(new Date());
+
+  const currentMonthKey = useMemo(() => {
+    const month = String(monthDate.getMonth() + 1).padStart(2, "0");
+    const year = monthDate.getFullYear();
+    return `${year}-${month}`;
+  }, [monthDate]);
+
   const [calendarRange, setCalendarRange] = useState({
     start: null,
     end: null,
     title: "",
   });
-  const [staffVisibility, setStaffVisibility] = useState("mine");
-  const [shiftTimeFilter, setShiftTimeFilter] = useState("");
+  const [staffVisibility, setStaffVisibility] = useState(
+    () => savedFilters?.staffVisibility || "mine",
+  );
   const [exportMenuAnchorEl, setExportMenuAnchorEl] = useState(null);
   const [guideOpen, setGuideOpen] = useState(false);
   const [coverageGaps, setCoverageGaps] = useState([]);
+
   // Manual per-group staff ordering set by dragging Roster rows; keyed by unit/shift-block group
-  const [staffOrderByGroup, setStaffOrderByGroup] = useState({});
+  const [staffOrderByGroup, setStaffOrderByGroup] = useState(() => {
+    try {
+      const stored =
+        localStorage.getItem(ROSTER_ORDER_STORAGE_KEY) ||
+        localStorage.getItem(`easishift_roster_order_${userScopeId}`);
+      return stored ? JSON.parse(stored) : {};
+    } catch (e) {
+      console.error("Failed to read roster order from localStorage", e);
+      return {};
+    }
+  });
   const dragStaffRef = useRef(null);
+
+  // Sync filters to localStorage whenever they change
+  useEffect(() => {
+    try {
+      const filterState = {
+        roles: selectedRoles,
+        statuses: selectedStatuses,
+        unitAreas: selectedUnitAreas,
+        shiftTimes: selectedShiftTimes,
+        searchQuery,
+        staffVisibility,
+      };
+      localStorage.setItem(
+        SCHEDULE_FILTERS_STORAGE_KEY,
+        JSON.stringify(filterState),
+      );
+    } catch (e) {
+      console.error("Failed to save schedule filters to localStorage", e);
+    }
+  }, [
+    selectedRoles,
+    selectedStatuses,
+    selectedUnitAreas,
+    selectedShiftTimes,
+    searchQuery,
+    staffVisibility,
+    SCHEDULE_FILTERS_STORAGE_KEY,
+  ]);
+
+  // Sync custom roster ordering to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      if (Object.keys(staffOrderByGroup).length > 0) {
+        localStorage.setItem(
+          ROSTER_ORDER_STORAGE_KEY,
+          JSON.stringify(staffOrderByGroup),
+        );
+      }
+    } catch (e) {
+      console.error("Failed to save roster order to localStorage", e);
+    }
+  }, [staffOrderByGroup, ROSTER_ORDER_STORAGE_KEY]);
 
   const roleFilterOptions = useMemo(() => {
     const facilityRoleValues = getRoleOptionsFromFacilityPreferences(
@@ -186,18 +288,38 @@ export default function ScheduleList() {
     ).map((option) => option.value);
     const scheduleRoles = schedules.map((s) => s.role).filter(Boolean);
     const staffRoles = staff.flatMap((member) => getUserRoles(member));
-    return [
-      "all",
-      ...Array.from(
-        new Set([...facilityRoleValues, ...scheduleRoles, ...staffRoles]),
-      ),
-    ];
+    return Array.from(
+      new Set([...facilityRoleValues, ...scheduleRoles, ...staffRoles]),
+    ).filter(Boolean);
   }, [schedules, staff, facilityPreferences]);
 
-  const legendRoles = useMemo(
-    () => roleFilterOptions.filter((role) => role !== "all"),
-    [roleFilterOptions],
-  );
+  const legendRoles = roleFilterOptions;
+
+  const unitAreaFilterOptions = useMemo(() => {
+    const prefUnits = Array.isArray(facilityPreferences?.unitAreas)
+      ? facilityPreferences.unitAreas
+      : [];
+    const scheduleUnits = schedules.map((s) => s.unitArea).filter(Boolean);
+    const gapUnits = coverageGaps.map((c) => c.unitArea).filter(Boolean);
+    return Array.from(new Set([...prefUnits, ...scheduleUnits, ...gapUnits]))
+      .filter(Boolean)
+      .sort();
+  }, [facilityPreferences?.unitAreas, schedules, coverageGaps]);
+
+  const hasActiveFilters =
+    selectedRoles.length > 0 ||
+    selectedStatuses.length > 0 ||
+    selectedUnitAreas.length > 0 ||
+    selectedShiftTimes.length > 0 ||
+    searchQuery.trim().length > 0;
+
+  const resetAllFilters = () => {
+    setSelectedRoles([]);
+    setSelectedStatuses([]);
+    setSelectedUnitAreas([]);
+    setSelectedShiftTimes([]);
+    setSearchQuery("");
+  };
 
   const getRoleChipStyles = (role) => ({
     px: 1,
@@ -532,8 +654,6 @@ export default function ScheduleList() {
         })
         .filter((coverage) => coverage.spotsRemaining > 0);
       setCoverageGaps(upcoming);
-      // TODO: remove after confirming Roster reflects fresh coverage gaps
-      console.log("coverageGaps", upcoming);
     } catch (err) {
       console.error("Failed to fetch coverage gaps", err);
       setCoverageGaps([]);
@@ -920,32 +1040,66 @@ export default function ScheduleList() {
   // Filtered schedules
   // ---------------------------
   const filteredSchedules = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
     return schedules.filter((s) => {
       const shouldShowMineOnly = canViewAllSchedules
         ? staffVisibility === "mine"
         : true;
 
       if (shouldShowMineOnly && !isCurrentUserSchedule(s)) return false;
-      // roleFilter is 'all' to allow all roles
-      if (roleFilter && roleFilter !== "all" && s.role !== roleFilter)
+
+      // Multi-select Role
+      if (selectedRoles.length > 0 && !selectedRoles.includes(s.role)) {
         return false;
-      if (statusFilter && statusFilter !== "" && s.status !== statusFilter)
-        return false;
-      if (shiftTimeFilter) {
-        const [startKey, endKey] = shiftTimeFilter.split("|");
-        if (
-          getTimeKey(s.startTime) !== startKey ||
-          getTimeKey(s.endTime) !== endKey
-        )
-          return false;
       }
+
+      // Multi-select Status
+      if (selectedStatuses.length > 0 && !selectedStatuses.includes(s.status)) {
+        return false;
+      }
+
+      // Multi-select Unit Area
+      if (
+        selectedUnitAreas.length > 0 &&
+        !selectedUnitAreas.includes(s.unitArea || "")
+      ) {
+        return false;
+      }
+
+      // Multi-select Shift Time
+      if (selectedShiftTimes.length > 0) {
+        const shiftKey = `${getTimeKey(s.startTime)}|${getTimeKey(s.endTime)}`;
+        if (!selectedShiftTimes.includes(shiftKey)) return false;
+      }
+
+      // Search Query (Staff name, notes, role display name, unit area)
+      if (query) {
+        const staffName = (s.staffId?.name || "").toLowerCase();
+        const roleName = getRoleDisplayName(s.role).toLowerCase();
+        const unitName = (
+          getUnitAreaDisplayName(s.unitArea) || ""
+        ).toLowerCase();
+        const notes = (s.notes || "").toLowerCase();
+        if (
+          !staffName.includes(query) &&
+          !roleName.includes(query) &&
+          !unitName.includes(query) &&
+          !notes.includes(query)
+        ) {
+          return false;
+        }
+      }
+
       return true;
     });
   }, [
     schedules,
-    roleFilter,
-    statusFilter,
-    shiftTimeFilter,
+    selectedRoles,
+    selectedStatuses,
+    selectedUnitAreas,
+    selectedShiftTimes,
+    searchQuery,
     canViewAllSchedules,
     staffVisibility,
     user,
@@ -975,6 +1129,47 @@ export default function ScheduleList() {
     canManageSchedules &&
     !(canViewAllSchedules ? staffVisibility === "mine" : true);
 
+  // Filtered coverage gaps respecting active role, unit area, time, and search filters
+  const filteredCoverageGaps = useMemo(() => {
+    if (!showCoverageGaps) return [];
+    if (selectedStatuses.length > 0) return [];
+
+    return coverageGaps.filter((coverage) => {
+      if (selectedRoles.length > 0 && !selectedRoles.includes(coverage.role)) {
+        return false;
+      }
+      if (
+        selectedUnitAreas.length > 0 &&
+        !selectedUnitAreas.includes(coverage.unitArea || "")
+      ) {
+        return false;
+      }
+      if (selectedShiftTimes.length > 0) {
+        const shiftKey = `${getTimeKey(coverage.startTime)}|${getTimeKey(coverage.endTime)}`;
+        if (!selectedShiftTimes.includes(shiftKey)) return false;
+      }
+      if (searchQuery.trim()) {
+        const query = searchQuery.trim().toLowerCase();
+        const roleName = getRoleDisplayName(coverage.role).toLowerCase();
+        const unitName = (
+          getUnitAreaDisplayName(coverage.unitArea) || ""
+        ).toLowerCase();
+        if (!roleName.includes(query) && !unitName.includes(query)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [
+    coverageGaps,
+    showCoverageGaps,
+    selectedRoles,
+    selectedStatuses,
+    selectedUnitAreas,
+    selectedShiftTimes,
+    searchQuery,
+  ]);
+
   // Groups the List view by employee or unit area (Roster's header/coverage-row pattern);
   // "date" mode keeps the existing flat paginated behavior (returns null as a signal).
   const listGroupedRows = useMemo(() => {
@@ -999,7 +1194,7 @@ export default function ScheduleList() {
 
     const gapsByUnit = new Map();
     if (listGroupBy === "unitArea" && showCoverageGaps) {
-      coverageGaps.forEach((coverage) => {
+      filteredCoverageGaps.forEach((coverage) => {
         const key = getUnitAreaDisplayName(coverage.unitArea) || "No Unit Area";
         if (!gapsByUnit.has(key)) gapsByUnit.set(key, []);
         gapsByUnit.get(key).push(coverage);
@@ -1033,12 +1228,19 @@ export default function ScheduleList() {
     });
 
     return items;
-  }, [filteredSchedules, listGroupBy, coverageGaps, showCoverageGaps]);
+  }, [filteredSchedules, listGroupBy, filteredCoverageGaps, showCoverageGaps]);
 
   // Reset page when filters change or filtered length shrinks
   useEffect(() => {
     setPage(0);
-  }, [roleFilter, statusFilter, staffVisibility, shiftTimeFilter]);
+  }, [
+    selectedRoles,
+    selectedStatuses,
+    selectedUnitAreas,
+    selectedShiftTimes,
+    searchQuery,
+    staffVisibility,
+  ]);
 
   // ---------------------------
   // Month view helpers
@@ -1195,7 +1397,7 @@ export default function ScheduleList() {
     if (!showCoverageGaps) return new Map();
 
     const map = new Map();
-    coverageGaps.forEach((coverage) => {
+    filteredCoverageGaps.forEach((coverage) => {
       const start = new Date(coverage.startTime);
       if (
         Number.isNaN(start.getTime()) ||
@@ -1220,14 +1422,14 @@ export default function ScheduleList() {
       }
     });
     return map;
-  }, [coverageGaps, monthDate, showCoverageGaps]);
+  }, [filteredCoverageGaps, monthDate, showCoverageGaps]);
 
   // Group info for unit/shift-block combos that only exist in coverage gaps (no staff assigned yet)
   const coverageGapGroupInfoByKey = useMemo(() => {
     const map = new Map();
     if (!showCoverageGaps) return map;
 
-    coverageGaps.forEach((coverage) => {
+    filteredCoverageGaps.forEach((coverage) => {
       const start = new Date(coverage.startTime);
       if (
         Number.isNaN(start.getTime()) ||
@@ -1254,14 +1456,14 @@ export default function ScheduleList() {
     });
 
     return map;
-  }, [coverageGaps, monthDate, showCoverageGaps]);
+  }, [filteredCoverageGaps, monthDate, showCoverageGaps]);
 
   // One row key per unit+block+role combo, so each role gets its own dedicated coverage row
   const coverageRowInfoByRowKey = useMemo(() => {
     const map = new Map();
     if (!showCoverageGaps) return map;
 
-    coverageGaps.forEach((coverage) => {
+    filteredCoverageGaps.forEach((coverage) => {
       const start = new Date(coverage.startTime);
       if (
         Number.isNaN(start.getTime()) ||
@@ -1283,7 +1485,7 @@ export default function ScheduleList() {
     });
 
     return map;
-  }, [coverageGaps, monthDate, showCoverageGaps]);
+  }, [filteredCoverageGaps, monthDate, showCoverageGaps]);
 
   // Coverage row keys bucketed per group, sorted alphabetically by role for stable ordering
   const coverageRowKeysByGroupKey = useMemo(() => {
@@ -1327,23 +1529,30 @@ export default function ScheduleList() {
       ...coverageGapGroupInfoByKey.keys(),
     ]);
 
+    const monthOrderOverride =
+      staffOrderByGroup[currentMonthKey] ||
+      (!Object.keys(staffOrderByGroup).some((k) => /^\d{4}-\d{2}$/.test(k))
+        ? staffOrderByGroup
+        : {});
+
     const groupEntries = Array.from(allGroupKeys).map((groupKey) => {
       const staffGroup = staffGroupsByKey.get(groupKey);
       const gapGroupInfo = coverageGapGroupInfoByKey.get(groupKey);
-      const orderOverride = staffOrderByGroup[groupKey];
+      const orderOverride = monthOrderOverride[groupKey];
       let members = staffGroup?.members || [];
       if (orderOverride && orderOverride.length > 0) {
         const orderIndex = new Map(
           orderOverride.map((staffId, idx) => [staffId, idx]),
         );
         members = [...members].sort((a, b) => {
-          const aIndex = orderIndex.has(a.staffId)
-            ? orderIndex.get(a.staffId)
-            : Number.MAX_SAFE_INTEGER;
-          const bIndex = orderIndex.has(b.staffId)
-            ? orderIndex.get(b.staffId)
-            : Number.MAX_SAFE_INTEGER;
-          return aIndex - bIndex;
+          const hasA = orderIndex.has(a.staffId);
+          const hasB = orderIndex.has(b.staffId);
+          if (hasA && hasB) {
+            return orderIndex.get(a.staffId) - orderIndex.get(b.staffId);
+          }
+          if (hasA) return -1;
+          if (hasB) return 1;
+          return String(a.name || "").localeCompare(String(b.name || ""));
         });
       }
       return {
@@ -1429,6 +1638,7 @@ export default function ScheduleList() {
     coverageGapCellsByRowAndDay,
     monthDays,
     staffOrderByGroup,
+    currentMonthKey,
   ]);
 
   // Current staffId order per group, derived from the rendered rows, used to compute drag/drop reordering
@@ -1442,25 +1652,58 @@ export default function ScheduleList() {
     return map;
   }, [monthRosterGroupedRows]);
 
-  const handleStaffDragStart = (member, groupKey) => {
+  const handleStaffDragStart = (e, member, groupKey) => {
     dragStaffRef.current = { staffId: member.staffId, groupKey };
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", member.staffId);
+    }
   };
 
-  const handleStaffDropOnRow = (targetMember, groupKey) => {
+  const handleStaffDragEnd = () => {
+    dragStaffRef.current = null;
+  };
+
+  const handleStaffDropOnRow = (e, targetMember, groupKey) => {
+    e.preventDefault();
     const dragged = dragStaffRef.current;
     dragStaffRef.current = null;
+
     if (!dragged || dragged.groupKey !== groupKey) return;
     if (dragged.staffId === targetMember.staffId) return;
 
-    const currentOrder = groupStaffIdsByGroupKey.get(groupKey) || [];
-    const fromIndex = currentOrder.indexOf(dragged.staffId);
-    const toIndex = currentOrder.indexOf(targetMember.staffId);
-    if (fromIndex === -1 || toIndex === -1) return;
+    setStaffOrderByGroup((prev) => {
+      const monthOrder = prev[currentMonthKey] || {};
+      const existingOrder = monthOrder[groupKey] || [];
+      const visibleOrder = groupStaffIdsByGroupKey.get(groupKey) || [];
 
-    const reordered = [...currentOrder];
-    reordered.splice(fromIndex, 1);
-    reordered.splice(toIndex, 0, dragged.staffId);
-    setStaffOrderByGroup((prev) => ({ ...prev, [groupKey]: reordered }));
+      // Create a master list that contains all known IDs in order + any visible IDs not yet in the list
+      const masterList = [...existingOrder];
+      visibleOrder.forEach((id) => {
+        if (!masterList.includes(id)) {
+          masterList.push(id);
+        }
+      });
+
+      const fromIndex = masterList.indexOf(dragged.staffId);
+      const toIndex = masterList.indexOf(targetMember.staffId);
+      if (fromIndex === -1 || toIndex === -1) return prev;
+
+      // Move dragged item to the target position
+      const reordered = [...masterList];
+      reordered.splice(fromIndex, 1);
+      const insertAt = reordered.indexOf(targetMember.staffId);
+      if (insertAt === -1) return prev;
+      reordered.splice(insertAt, 0, dragged.staffId);
+
+      return {
+        ...prev,
+        [currentMonthKey]: {
+          ...monthOrder,
+          [groupKey]: reordered,
+        },
+      };
+    });
   };
 
   const triggerDownload = (blob, fileName) => {
@@ -1583,7 +1826,7 @@ export default function ScheduleList() {
     const rangeEndMs = new Date(calendarRange.end).getTime();
     if (Number.isNaN(rangeStartMs) || Number.isNaN(rangeEndMs)) return [];
 
-    return coverageGaps
+    return filteredCoverageGaps
       .filter((coverage) => {
         const startMs = new Date(coverage.startTime).getTime();
         return (
@@ -1605,7 +1848,7 @@ export default function ScheduleList() {
           coverage,
         },
       }));
-  }, [coverageGaps, calendarRange, showCoverageGaps]);
+  }, [filteredCoverageGaps, calendarRange, showCoverageGaps]);
 
   const openExportMenu = (event) => {
     setExportMenuAnchorEl(event.currentTarget);
@@ -1627,8 +1870,8 @@ export default function ScheduleList() {
     try {
       closeExportMenu();
       const workbook = new ExcelJS.Workbook();
-      workbook.creator = "Easishift";
-      workbook.lastModifiedBy = "Easishift";
+      workbook.creator = "Wisershifts";
+      workbook.lastModifiedBy = "Wisershifts";
       workbook.created = new Date();
       workbook.modified = new Date();
 
@@ -2801,112 +3044,615 @@ export default function ScheduleList() {
         </Box>
       </Box>
 
-      {/* FILTER BAR (updated to match Figma) */}
-      <Paper sx={{ mt: 3, p: 2 }}>
+      {/* FILTER BAR */}
+      <Paper
+        elevation={0}
+        sx={{
+          mt: 3,
+          p: 2,
+          border: "1px solid #e5e7eb",
+          borderRadius: 2,
+          backgroundColor: "#fff",
+        }}
+      >
+        {/* Filter Bar Header / Presets */}
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          flexWrap="wrap"
+          gap={1}
+          sx={{ mb: 1.5 }}
+        >
+          <Box display="flex" alignItems="center" gap={1}>
+            <FiFilter color="#4b5563" size={16} />
+            <Typography
+              variant="subtitle2"
+              sx={{ fontWeight: 600, color: "#1f2937" }}
+            >
+              Filter Schedules
+            </Typography>
+            <Chip
+              size="small"
+              label={`${filteredSchedules.length} match${
+                filteredSchedules.length === 1 ? "" : "es"
+              }`}
+              sx={{
+                height: 20,
+                fontSize: "0.72rem",
+                fontWeight: 600,
+                backgroundColor: "#f3f4f6",
+                color: "#4b5563",
+              }}
+            />
+          </Box>
+
+          {hasActiveFilters && (
+            <Button
+              size="small"
+              onClick={resetAllFilters}
+              sx={{
+                textTransform: "none",
+                fontSize: "0.75rem",
+                py: 0.25,
+                px: 1,
+                color: "#6b7280",
+                "&:hover": { color: "#ef4444", backgroundColor: "#fee2e2" },
+              }}
+            >
+              Clear all
+            </Button>
+          )}
+        </Box>
+
+        {/* Filter Controls */}
         <Box
           display="flex"
           flexDirection={{ xs: "column", md: "row" }}
-          alignItems={{ xs: "stretch", md: "center" }}
           gap={1.5}
+          alignItems={{ xs: "stretch", md: "center" }}
+          flexWrap="wrap"
         >
-          <Typography
-            color="text.secondary"
+          {/* Search Field */}
+          <TextField
+            size="small"
+            placeholder="Search staff, role, note..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             sx={{
-              fontSize: { xs: "0.78rem", md: "0.875rem" },
-              minWidth: { md: 44 },
+              minWidth: { xs: "100%", sm: 220 },
+              flex: { sm: 1, md: "initial" },
             }}
-          >
-            Filter:
-          </Typography>
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <FiSearch color="#9ca3af" size={15} />
+                </InputAdornment>
+              ),
+              endAdornment: searchQuery ? (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    onClick={() => setSearchQuery("")}
+                    edge="end"
+                  >
+                    <FiX size={14} />
+                  </IconButton>
+                </InputAdornment>
+              ) : null,
+            }}
+          />
 
-          <Box
-            display="flex"
-            flexDirection={{ xs: "column", sm: "row" }}
-            gap={1.5}
-            alignItems={{ xs: "stretch", sm: "center" }}
-            sx={{ width: { xs: "100%", md: "auto" } }}
-          >
-            {canViewAllSchedules && canUsePersonalSchedule && (
-              <ToggleButtonGroup
-                value={staffVisibility}
-                exclusive
-                onChange={(e, next) => next && setStaffVisibility(next)}
-                size="small"
-                sx={{
-                  backgroundColor: "#f3f4f6",
-                  borderRadius: 2,
-                  "& .MuiToggleButton-root": {
-                    textTransform: "none",
-                    px: 1.5,
-                  },
+          {canViewAllSchedules && canUsePersonalSchedule && (
+            <ToggleButtonGroup
+              value={staffVisibility}
+              exclusive
+              onChange={(e, next) => next && setStaffVisibility(next)}
+              size="small"
+              sx={{
+                backgroundColor: "#f3f4f6",
+                borderRadius: 2,
+                "& .MuiToggleButton-root": {
+                  textTransform: "none",
+                  px: 1.5,
+                  fontSize: "0.8rem",
+                },
+              }}
+            >
+              <ToggleButton value="mine">My Schedule</ToggleButton>
+              <ToggleButton value="all">Everyone</ToggleButton>
+            </ToggleButtonGroup>
+          )}
+
+          {/* Roles Multi-Select */}
+          {canViewAllSchedules && (
+            <FormControl
+              size="small"
+              sx={{ minWidth: { xs: "100%", sm: 200 } }}
+            >
+              <InputLabel id="role-filter-label">Roles</InputLabel>
+              <Select
+                labelId="role-filter-label"
+                multiple
+                value={selectedRoles}
+                label="Roles"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedRoles(
+                    typeof val === "string" ? val.split(",") : val,
+                  );
+                }}
+                renderValue={(selected) => {
+                  if (selected.length === 0) return "All Roles";
+                  if (selected.length === 1) {
+                    return getRoleDisplayName(selected[0]);
+                  }
+                  return `${selected.length} Roles selected`;
                 }}
               >
-                <ToggleButton value="mine">My Schedule</ToggleButton>
-                <ToggleButton value="all">Everyone</ToggleButton>
-              </ToggleButtonGroup>
-            )}
-
-            {canViewAllSchedules && (
-              <FormControl
-                size="small"
-                sx={{ minWidth: { xs: "100%", sm: 220 } }}
-              >
-                <InputLabel>Role</InputLabel>
-                <Select
-                  value={roleFilter}
-                  label="Role"
-                  onChange={(e) => setRoleFilter(e.target.value)}
+                <Box
+                  sx={{
+                    px: 1.5,
+                    py: 0.5,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    borderBottom: "1px solid #e5e7eb",
+                  }}
                 >
-                  {roleFilterOptions.map((r) => (
-                    <MenuItem key={r} value={r}>
-                      {r === "all" ? "All Roles" : getRoleDisplayName(r)}
+                  <Button
+                    size="small"
+                    sx={{ textTransform: "none", p: 0, fontSize: "0.75rem" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedRoles(roleFilterOptions);
+                    }}
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    size="small"
+                    color="inherit"
+                    sx={{
+                      textTransform: "none",
+                      p: 0,
+                      fontSize: "0.75rem",
+                      color: "text.secondary",
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedRoles([]);
+                    }}
+                  >
+                    Clear
+                  </Button>
+                </Box>
+                {roleFilterOptions.map((r) => {
+                  const isChecked = selectedRoles.includes(r);
+                  return (
+                    <MenuItem key={r} value={r} sx={{ py: 0.5 }}>
+                      <Checkbox
+                        checked={isChecked}
+                        size="small"
+                        sx={{ p: 0.5, mr: 1 }}
+                      />
+                      <Box
+                        sx={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          backgroundColor: getRoleColor(r),
+                          mr: 1,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <ListItemText
+                        primary={getRoleDisplayName(r)}
+                        primaryTypographyProps={{ fontSize: "0.85rem" }}
+                      />
                     </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
+                  );
+                })}
+              </Select>
+            </FormControl>
+          )}
 
+          {/* Status Multi-Select */}
+          <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 180 } }}>
+            <InputLabel id="status-filter-label">Status</InputLabel>
+            <Select
+              labelId="status-filter-label"
+              multiple
+              value={selectedStatuses}
+              label="Status"
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedStatuses(
+                  typeof val === "string" ? val.split(",") : val,
+                );
+              }}
+              renderValue={(selected) => {
+                if (selected.length === 0) return "All Statuses";
+                if (selected.length === 1) {
+                  return getScheduleStatusLabel(selected[0]);
+                }
+                return `${selected.length} Statuses selected`;
+              }}
+            >
+              <Box
+                sx={{
+                  px: 1.5,
+                  py: 0.5,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  borderBottom: "1px solid #e5e7eb",
+                }}
+              >
+                <Button
+                  size="small"
+                  sx={{ textTransform: "none", p: 0, fontSize: "0.75rem" }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedStatuses(SCHEDULE_STATUS_FILTER_OPTIONS);
+                  }}
+                >
+                  Select All
+                </Button>
+                <Button
+                  size="small"
+                  color="inherit"
+                  sx={{
+                    textTransform: "none",
+                    p: 0,
+                    fontSize: "0.75rem",
+                    color: "text.secondary",
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedStatuses([]);
+                  }}
+                >
+                  Clear
+                </Button>
+              </Box>
+              {SCHEDULE_STATUS_FILTER_OPTIONS.map((statusValue) => {
+                const isChecked = selectedStatuses.includes(statusValue);
+                return (
+                  <MenuItem
+                    key={statusValue}
+                    value={statusValue}
+                    sx={{ py: 0.5 }}
+                  >
+                    <Checkbox
+                      checked={isChecked}
+                      size="small"
+                      sx={{ p: 0.5, mr: 1 }}
+                    />
+                    <Box
+                      sx={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        backgroundColor: getScheduleStatusColor(statusValue),
+                        mr: 1,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <ListItemText
+                      primary={getScheduleStatusLabel(statusValue)}
+                      primaryTypographyProps={{ fontSize: "0.85rem" }}
+                    />
+                  </MenuItem>
+                );
+              })}
+            </Select>
+          </FormControl>
+
+          {/* Unit Area Multi-Select */}
+          {unitAreaFilterOptions.length > 0 && (
             <FormControl
               size="small"
               sx={{ minWidth: { xs: "100%", sm: 180 } }}
             >
-              <InputLabel>Status</InputLabel>
+              <InputLabel id="unit-filter-label">Unit Area</InputLabel>
               <Select
-                value={statusFilter}
-                label="Status"
-                onChange={(e) => setStatusFilter(e.target.value)}
+                labelId="unit-filter-label"
+                multiple
+                value={selectedUnitAreas}
+                label="Unit Area"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedUnitAreas(
+                    typeof val === "string" ? val.split(",") : val,
+                  );
+                }}
+                renderValue={(selected) => {
+                  if (selected.length === 0) return "All Units";
+                  if (selected.length === 1) {
+                    return getUnitAreaDisplayName(selected[0]);
+                  }
+                  return `${selected.length} Units selected`;
+                }}
               >
-                <MenuItem value="">All</MenuItem>
-                {SCHEDULE_STATUS_FILTER_OPTIONS.map((statusValue) => (
-                  <MenuItem key={statusValue} value={statusValue}>
-                    {getScheduleStatusLabel(statusValue)}
-                  </MenuItem>
-                ))}
+                <Box
+                  sx={{
+                    px: 1.5,
+                    py: 0.5,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    borderBottom: "1px solid #e5e7eb",
+                  }}
+                >
+                  <Button
+                    size="small"
+                    sx={{ textTransform: "none", p: 0, fontSize: "0.75rem" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedUnitAreas(unitAreaFilterOptions);
+                    }}
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    size="small"
+                    color="inherit"
+                    sx={{
+                      textTransform: "none",
+                      p: 0,
+                      fontSize: "0.75rem",
+                      color: "text.secondary",
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedUnitAreas([]);
+                    }}
+                  >
+                    Clear
+                  </Button>
+                </Box>
+                {unitAreaFilterOptions.map((unit) => {
+                  const isChecked = selectedUnitAreas.includes(unit);
+                  return (
+                    <MenuItem key={unit} value={unit} sx={{ py: 0.5 }}>
+                      <Checkbox
+                        checked={isChecked}
+                        size="small"
+                        sx={{ p: 0.5, mr: 1 }}
+                      />
+                      <ListItemText
+                        primary={getUnitAreaDisplayName(unit)}
+                        primaryTypographyProps={{ fontSize: "0.85rem" }}
+                      />
+                    </MenuItem>
+                  );
+                })}
               </Select>
             </FormControl>
+          )}
 
-            {uniqueShiftTimes.length > 0 && (
-              <FormControl
-                size="small"
-                sx={{ minWidth: { xs: "100%", sm: 200 } }}
+          {/* Shift Time Multi-Select */}
+          {uniqueShiftTimes.length > 0 && (
+            <FormControl
+              size="small"
+              sx={{ minWidth: { xs: "100%", sm: 200 } }}
+            >
+              <InputLabel id="shift-time-filter-label">Shift Time</InputLabel>
+              <Select
+                labelId="shift-time-filter-label"
+                multiple
+                value={selectedShiftTimes}
+                label="Shift Time"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedShiftTimes(
+                    typeof val === "string" ? val.split(",") : val,
+                  );
+                }}
+                renderValue={(selected) => {
+                  if (selected.length === 0) return "All Shift Times";
+                  if (selected.length === 1) {
+                    const opt = uniqueShiftTimes.find(
+                      (t) => t.key === selected[0],
+                    );
+                    return opt ? opt.label : selected[0];
+                  }
+                  return `${selected.length} Times selected`;
+                }}
               >
-                <InputLabel>Shift Time</InputLabel>
-                <Select
-                  value={shiftTimeFilter}
-                  label="Shift Time"
-                  onChange={(e) => setShiftTimeFilter(e.target.value)}
+                <Box
+                  sx={{
+                    px: 1.5,
+                    py: 0.5,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    borderBottom: "1px solid #e5e7eb",
+                  }}
                 >
-                  <MenuItem value="">All Times</MenuItem>
-                  {uniqueShiftTimes.map((t) => (
-                    <MenuItem key={t.key} value={t.key}>
-                      {t.label}
+                  <Button
+                    size="small"
+                    sx={{ textTransform: "none", p: 0, fontSize: "0.75rem" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedShiftTimes(uniqueShiftTimes.map((t) => t.key));
+                    }}
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    size="small"
+                    color="inherit"
+                    sx={{
+                      textTransform: "none",
+                      p: 0,
+                      fontSize: "0.75rem",
+                      color: "text.secondary",
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedShiftTimes([]);
+                    }}
+                  >
+                    Clear
+                  </Button>
+                </Box>
+                {uniqueShiftTimes.map((t) => {
+                  const isChecked = selectedShiftTimes.includes(t.key);
+                  return (
+                    <MenuItem key={t.key} value={t.key} sx={{ py: 0.5 }}>
+                      <Checkbox
+                        checked={isChecked}
+                        size="small"
+                        sx={{ p: 0.5, mr: 1 }}
+                      />
+                      <ListItemText
+                        primary={t.label}
+                        primaryTypographyProps={{ fontSize: "0.85rem" }}
+                      />
                     </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
-          </Box>
+                  );
+                })}
+              </Select>
+            </FormControl>
+          )}
         </Box>
+
+        {/* Active Filters Chips Tray */}
+        {hasActiveFilters && (
+          <Box
+            sx={{
+              mt: 1.5,
+              pt: 1.5,
+              borderTop: "1px dashed #e5e7eb",
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              flexWrap: "wrap",
+            }}
+          >
+            <Typography
+              variant="caption"
+              sx={{ color: "text.secondary", fontWeight: 600, mr: 0.5 }}
+            >
+              Active filters:
+            </Typography>
+
+            {searchQuery.trim() && (
+              <Chip
+                size="small"
+                label={`Search: "${searchQuery}"`}
+                onDelete={() => setSearchQuery("")}
+                sx={{ fontSize: "0.75rem", backgroundColor: "#f3f4f6" }}
+              />
+            )}
+
+            {selectedRoles.map((role) => (
+              <Chip
+                key={role}
+                size="small"
+                label={`Role: ${getRoleDisplayName(role)}`}
+                onDelete={() =>
+                  setSelectedRoles((prev) => prev.filter((r) => r !== role))
+                }
+                avatar={
+                  <Box
+                    sx={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      backgroundColor: getRoleColor(role),
+                      ml: 1,
+                    }}
+                  />
+                }
+                sx={{
+                  fontSize: "0.75rem",
+                  backgroundColor: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                }}
+              />
+            ))}
+
+            {selectedStatuses.map((status) => (
+              <Chip
+                key={status}
+                size="small"
+                label={`Status: ${getScheduleStatusLabel(status)}`}
+                onDelete={() =>
+                  setSelectedStatuses((prev) =>
+                    prev.filter((s) => s !== status),
+                  )
+                }
+                avatar={
+                  <Box
+                    sx={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      backgroundColor: getScheduleStatusColor(status),
+                      ml: 1,
+                    }}
+                  />
+                }
+                sx={{
+                  fontSize: "0.75rem",
+                  backgroundColor: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                }}
+              />
+            ))}
+
+            {selectedUnitAreas.map((unit) => (
+              <Chip
+                key={unit}
+                size="small"
+                label={`Unit: ${getUnitAreaDisplayName(unit)}`}
+                onDelete={() =>
+                  setSelectedUnitAreas((prev) => prev.filter((u) => u !== unit))
+                }
+                sx={{
+                  fontSize: "0.75rem",
+                  backgroundColor: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                }}
+              />
+            ))}
+
+            {selectedShiftTimes.map((key) => {
+              const opt = uniqueShiftTimes.find((t) => t.key === key);
+              return (
+                <Chip
+                  key={key}
+                  size="small"
+                  label={`Time: ${opt ? opt.label : key}`}
+                  onDelete={() =>
+                    setSelectedShiftTimes((prev) =>
+                      prev.filter((k) => k !== key),
+                    )
+                  }
+                  sx={{
+                    fontSize: "0.75rem",
+                    backgroundColor: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                  }}
+                />
+              );
+            })}
+
+            <Button
+              size="small"
+              color="inherit"
+              onClick={resetAllFilters}
+              sx={{
+                textTransform: "none",
+                fontSize: "0.75rem",
+                color: "#ef4444",
+                ml: "auto",
+                "&:hover": { backgroundColor: "#fee2e2" },
+              }}
+            >
+              Reset all
+            </Button>
+          </Box>
+        )}
       </Paper>
 
       {view === "table" && !isCompact && (
@@ -3525,20 +4271,24 @@ export default function ScheduleList() {
                       <TableRow
                         key={member.staffId}
                         draggable={canManageSchedules}
-                        onDragStart={() =>
-                          handleStaffDragStart(member, item.groupKey)
+                        onDragStart={(e) =>
+                          handleStaffDragStart(e, member, item.groupKey)
                         }
                         onDragOver={(e) => {
                           if (canManageSchedules) e.preventDefault();
                         }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          handleStaffDropOnRow(member, item.groupKey);
-                        }}
+                        onDragEnd={handleStaffDragEnd}
+                        onDrop={(e) =>
+                          handleStaffDropOnRow(e, member, item.groupKey)
+                        }
                         sx={{
+                          userSelect: "none",
                           "&:hover": { background: "#f8fbff" },
                           "@media print": { pageBreakInside: "avoid" },
                           cursor: canManageSchedules ? "grab" : "default",
+                          "&:active": {
+                            cursor: canManageSchedules ? "grabbing" : "default",
+                          },
                         }}
                       >
                         <TableCell
@@ -3556,19 +4306,38 @@ export default function ScheduleList() {
                           <Box
                             sx={{
                               display: "flex",
-                              alignItems: "flex-start",
-                              gap: 0.5,
+                              alignItems: "center",
+                              gap: 0.75,
                             }}
                           >
                             {canManageSchedules && (
-                              <FiMove
-                                size={11}
-                                style={{
-                                  color: "#94a3b8",
-                                  marginTop: 2,
-                                  flexShrink: 0,
-                                }}
-                              />
+                              <Tooltip
+                                title="Drag to reorder"
+                                arrow
+                                placement="top"
+                              >
+                                <Box
+                                  component="span"
+                                  sx={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "#94a3b8",
+                                    cursor: "grab",
+                                    p: 0.25,
+                                    borderRadius: 1,
+                                    "&:hover": {
+                                      color: "#2563eb",
+                                      backgroundColor: "#eff6ff",
+                                    },
+                                    "&:active": {
+                                      cursor: "grabbing",
+                                    },
+                                  }}
+                                >
+                                  <MdDragIndicator size={16} />
+                                </Box>
+                              </Tooltip>
                             )}
                             <Box>
                               <Typography

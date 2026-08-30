@@ -23,11 +23,38 @@ import {
 import { FiEye, FiSearch, FiPlus, FiMail, FiSend } from "react-icons/fi";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
+import { useGuideTour } from "../../../context/GuideTourContext";
 import MessageComposer from "./MessageComposer";
+import GuideHelpButton from "../../Shared/GuideHelpButton";
 import { getRoleColor } from "../../../constants/industryRoles";
+
+const MESSAGES_TOUR_STEPS = [
+  {
+    target: "guide-messages-new-btn",
+    title: "Send a new message",
+    body: "Pick a colleague and start a conversation \u2014 messages are scoped to your facility only.",
+  },
+  {
+    target: "guide-messages-tabs",
+    title: "Inbox and Sent",
+    body: "Switch between messages you've received and messages you've sent.",
+  },
+  {
+    target: "guide-messages-search",
+    title: "Search conversations",
+    body: "Quickly find a message by sender name or subject.",
+  },
+];
 
 export default function MessageList() {
   const { user } = useAuth();
+  const { startTourIfUnseen } = useGuideTour();
+
+  useEffect(() => {
+    startTourIfUnseen("messages", MESSAGES_TOUR_STEPS);
+    // Only ever auto-launched once per user via localStorage — intentionally no deps beyond mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [inboxMessages, setInboxMessages] = useState([]);
   const [sentMessages, setSentMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -167,9 +194,18 @@ export default function MessageList() {
         <Box>
           <Typography
             variant="h5"
-            sx={{ fontSize: { xs: "1.1rem", md: "1.5rem" } }}
+            sx={{
+              fontSize: { xs: "1.1rem", md: "1.5rem" },
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+            }}
           >
             Messages
+            <GuideHelpButton
+              tourId="messages"
+              tourSteps={MESSAGES_TOUR_STEPS}
+            />
           </Typography>
           <Typography
             color="text.secondary"
@@ -179,22 +215,27 @@ export default function MessageList() {
           </Typography>
         </Box>
 
-        <Button
-          startIcon={<FiPlus />}
-          variant="contained"
-          onClick={handleNewMessage}
-          sx={{
-            textTransform: "none",
-            borderRadius: 2,
-            px: 3,
-            bgcolor: "#2563EB",
-            color: "#fff",
-            width: { xs: "100%", md: "auto" },
-            "&:hover": { bgcolor: "#1D4ED8" },
-          }}
+        <Box
+          sx={{ display: "flex", gap: 1, width: { xs: "100%", md: "auto" } }}
         >
-          New Message
-        </Button>
+          <Button
+            startIcon={<FiPlus />}
+            variant="contained"
+            onClick={handleNewMessage}
+            data-guide-id="guide-messages-new-btn"
+            sx={{
+              textTransform: "none",
+              borderRadius: 2,
+              px: 3,
+              bgcolor: "#2563EB",
+              color: "#fff",
+              width: { xs: "100%", md: "auto" },
+              "&:hover": { bgcolor: "#1D4ED8" },
+            }}
+          >
+            New Message
+          </Button>
+        </Box>
       </Box>
 
       {/* Stats */}
@@ -246,6 +287,7 @@ export default function MessageList() {
               value={mainTab}
               onChange={handleMainTabChange}
               variant="fullWidth"
+              data-guide-id="guide-messages-tabs"
             >
               <Tab label={`Inbox (${inboxMessages.length})`} value="inbox" />
               <Tab label={`Sent (${sentMessages.length})`} value="sent" />
@@ -259,6 +301,7 @@ export default function MessageList() {
               placeholder="Search messages..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              data-guide-id="guide-messages-search"
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">

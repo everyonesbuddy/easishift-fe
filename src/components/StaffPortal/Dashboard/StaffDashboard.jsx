@@ -21,10 +21,25 @@ import {
 import StatCard from "./StatCard";
 import ScheduleAndCoverageCharts from "./ScheduleAndCoverageCharts";
 import { toast } from "react-toastify";
+import { useGuideTour } from "../../../context/GuideTourContext";
+import GuideHelpButton from "../../Shared/GuideHelpButton";
 import {
   getFacilityRolesFromUser,
   getRoleDisplayName,
 } from "../../../constants/industryRoles";
+
+const DASHBOARD_TOUR_STEPS = [
+  {
+    target: "guide-dashboard-profile-btn",
+    title: "Add your profile picture",
+    body: "Upload a photo here so teammates can recognize you across the schedule and roster views.",
+  },
+  {
+    target: "guide-dashboard-charts",
+    title: "Your at-a-glance summary",
+    body: "These charts track scheduled hours and coverage over time \u2014 the numbers update automatically as schedules change.",
+  },
+];
 
 export default function StaffDashboard() {
   const { user, roles, can, facilityPreferences, updateCurrentUser } =
@@ -41,6 +56,13 @@ export default function StaffDashboard() {
 
   const [uploadingProfile, setUploadingProfile] = useState(false);
   const profileInputRef = useRef(null);
+  const { startTourIfUnseen } = useGuideTour();
+
+  useEffect(() => {
+    startTourIfUnseen("staff-dashboard", DASHBOARD_TOUR_STEPS);
+    // Only ever auto-launched once per user via localStorage — intentionally no deps beyond mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Extracted loader so we can refresh after modal actions
   async function loadDashboardData() {
@@ -277,6 +299,13 @@ export default function StaffDashboard() {
 
   return (
     <Container sx={{ mt: 4, mb: 5 }}>
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1.5 }}>
+        <GuideHelpButton
+          tourId="staff-dashboard"
+          tourSteps={DASHBOARD_TOUR_STEPS}
+        />
+      </Box>
+
       {/* Welcome Banner */}
       <Box
         sx={{
@@ -375,6 +404,7 @@ export default function StaffDashboard() {
               onClick={handleProfileButtonClick}
               disabled={uploadingProfile}
               startIcon={<FiUpload size={13} />}
+              data-guide-id="guide-dashboard-profile-btn"
               sx={{
                 textTransform: "none",
                 fontSize: "0.72rem",
@@ -418,11 +448,13 @@ export default function StaffDashboard() {
 
       {/* Charts */}
       {/* 🔥 CHARTS STILL USE SCHEDULES + COVERAGE DIRECTLY — NOTHING TO CHANGE */}
-      <ScheduleAndCoverageCharts
-        userId={user._id}
-        canViewOperations={canViewOperations}
-        canUsePersonalSchedule={canUsePersonalSchedule}
-      />
+      <Box data-guide-id="guide-dashboard-charts">
+        <ScheduleAndCoverageCharts
+          userId={user._id}
+          canViewOperations={canViewOperations}
+          canUsePersonalSchedule={canUsePersonalSchedule}
+        />
+      </Box>
     </Container>
   );
 }

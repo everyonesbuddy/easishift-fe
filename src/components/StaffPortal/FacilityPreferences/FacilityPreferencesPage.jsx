@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Typography,
@@ -17,36 +17,21 @@ import {
   FormControlLabel,
   Stack,
   Alert,
+  Autocomplete,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogContentText,
   DialogActions,
 } from "@mui/material";
-import {
-  FiSave,
-  FiInfo,
-  FiRotateCcw,
-  FiChevronDown,
-  FiPlayCircle,
-} from "react-icons/fi";
+import { FiSave, FiInfo, FiRotateCcw, FiChevronDown } from "react-icons/fi";
 import { FiX, FiPlus } from "react-icons/fi";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
+import { useGuideTour } from "../../../context/GuideTourContext";
 import { Navigate, useNavigate } from "react-router-dom";
-import GuideVideoDialog from "../../Shared/GuideVideoDialog";
-
-const FACILITY_PREFERENCES_GUIDE_VIDEOS = [
-  {
-    id: "facility-preferences",
-    label: "Facility preferences",
-    title: "Facility Preferences Guide",
-    description:
-      "Learn how to configure facility rules used across scheduling.",
-    embedUrl: "https://www.youtube.com/embed/fI3JscDuFkk",
-  },
-];
+import GuideHelpButton from "../../Shared/GuideHelpButton";
 
 const SCHEDULING_PATTERNS = [
   { value: "balance", label: "Balance (fairness-based)" },
@@ -64,6 +49,11 @@ const TAXONOMY_FIELDS = [
   "shiftTypes",
   "certificationTags",
 ];
+
+const IANA_TIMEZONES =
+  typeof Intl.supportedValuesOf === "function"
+    ? Intl.supportedValuesOf("timeZone")
+    : ["UTC"];
 
 const TIME_TRACKING_DEFAULTS = {
   enabled: false,
@@ -211,8 +201,6 @@ const normalizeTaxonomyPrefs = (inputPrefs) => {
   const safePrefs = inputPrefs || {};
   const next = { ...safePrefs };
 
-  delete next.facilityTimezone;
-
   TAXONOMY_FIELDS.forEach((field) => {
     next[field] = normalizeArrayValues(safePrefs[field]);
   });
@@ -273,6 +261,47 @@ const normalizeTaxonomyPrefs = (inputPrefs) => {
   return next;
 };
 
+// Steps differ by permission since view-only staff can't edit or save anything here.
+const getFacilityPreferencesTourSteps = ({ canManageFacilityPreferences }) => {
+  if (!canManageFacilityPreferences) {
+    return [
+      {
+        target: "guide-facility-scheduling-pattern",
+        title: "Scheduling pattern",
+        body: "This is the rotation pattern your facility uses for shift assignments, set by an admin.",
+      },
+      {
+        target: "guide-facility-timezone",
+        title: "Facility timezone",
+        body: "Once an admin confirms a timezone here, shift-slot times across the app resolve against it.",
+      },
+    ];
+  }
+
+  return [
+    {
+      target: "guide-facility-scheduling-pattern",
+      title: "Scheduling pattern",
+      body: "Choose the rotation pattern auto-generate should follow when assigning shifts.",
+    },
+    {
+      target: "guide-facility-timezone",
+      title: "Set your facility timezone",
+      body: "Pick and save a real timezone here so shift-slot times resolve correctly, instead of relying on each device's local time.",
+    },
+    {
+      target: "guide-facility-taxonomy",
+      title: "Define roles, areas, and shift types",
+      body: "This taxonomy powers role options across coverage, scheduling, and staff profiles facility-wide.",
+    },
+    {
+      target: "guide-facility-save-btn",
+      title: "Save your changes",
+      body: "Nothing here takes effect until you save \u2014 including the timezone selection above.",
+    },
+  ];
+};
+
 export default function FacilityPreferencesPage() {
   const { tenant, logout, can } = useAuth();
   const navigate = useNavigate();
@@ -287,7 +316,19 @@ export default function FacilityPreferencesPage() {
   const [resetting, setResetting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingTenant, setDeletingTenant] = useState(false);
-  const [videoOpen, setVideoOpen] = useState(false);
+  const { startTourIfUnseen } = useGuideTour();
+  const facilityTourSteps = useMemo(
+    () => getFacilityPreferencesTourSteps({ canManageFacilityPreferences }),
+    [canManageFacilityPreferences],
+  );
+
+  useEffect(() => {
+    // Wait for the loading gate to clear so target elements actually exist in the DOM.
+    if (loading || !canViewFacilityPreferences) return;
+    startTourIfUnseen("facility-preferences", facilityTourSteps);
+    // Only ever auto-launched once per user via localStorage — intentionally minimal deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, canViewFacilityPreferences]);
 
   // UI state for adding new items to arrays
   const [arrayInputs, setArrayInputs] = useState({
@@ -603,35 +644,25 @@ export default function FacilityPreferencesPage() {
         <Box>
           <Typography
             variant="h4"
-            sx={{ fontSize: { xs: "1.35rem", md: "1.7rem" }, fontWeight: 700 }}
+            sx={{
+              fontSize: { xs: "1.35rem", md: "1.7rem" },
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+            }}
           >
             Facility Preferences
+            <GuideHelpButton
+              tourId="facility-preferences"
+              tourSteps={facilityTourSteps}
+            />
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Configure facility-level scheduling policy and rules
           </Typography>
         </Box>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
-          <Button
-            variant="outlined"
-            startIcon={<FiPlayCircle size={16} />}
-            onClick={() => setVideoOpen(true)}
-            sx={{
-              borderRadius: 2,
-              textTransform: "none",
-              borderColor: "#cbd5e1",
-              color: "#334155",
-              bgcolor: "#f8fafc",
-              fontWeight: 700,
-              "&:hover": {
-                borderColor: "#2563EB",
-                bgcolor: "#eff6ff",
-                color: "#1D4ED8",
-              },
-            }}
-          >
-            Watch guide
-          </Button>
           {canManageFacilityPreferences && (
             <Button
               variant="outlined"
@@ -693,7 +724,11 @@ export default function FacilityPreferencesPage() {
         }}
       >
         {/* ── Scheduling Pattern ── */}
-        <Accordion disableGutters sx={ACCORDION_BASE_SX}>
+        <Accordion
+          disableGutters
+          sx={ACCORDION_BASE_SX}
+          data-guide-id="guide-facility-scheduling-pattern"
+        >
           <AccordionSummary
             expandIcon={<FiChevronDown size={18} />}
             sx={ACCORDION_SUMMARY_SX}
@@ -728,8 +763,69 @@ export default function FacilityPreferencesPage() {
           </AccordionDetails>
         </Accordion>
 
+        {/* ── Facility Timezone ── */}
+        <Accordion
+          disableGutters
+          sx={ACCORDION_BASE_SX}
+          data-guide-id="guide-facility-timezone"
+        >
+          <AccordionSummary
+            expandIcon={<FiChevronDown size={18} />}
+            sx={ACCORDION_SUMMARY_SX}
+          >
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Facility Timezone
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                The timezone shift-slot times (e.g. "7:00 AM") are resolved
+                against
+              </Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails sx={ACCORDION_DETAILS_SX}>
+            <Alert
+              severity={prefs.facilityTimezoneConfirmed ? "success" : "warning"}
+              sx={{ mb: 2 }}
+            >
+              {prefs.facilityTimezoneConfirmed
+                ? `Confirmed. Shift-slot times resolve using ${prefs.facilityTimezone}.`
+                : "Not yet confirmed. Until you save a timezone here, coverage and schedule forms fall back to each device's own local time to avoid mis-scheduled shifts."}
+            </Alert>
+            <Autocomplete
+              options={IANA_TIMEZONES}
+              value={prefs.facilityTimezone || "UTC"}
+              onChange={(_, value) =>
+                handleChange("facilityTimezone", value || "UTC")
+              }
+              disableClearable
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Timezone"
+                  placeholder="e.g. America/New_York"
+                />
+              )}
+              sx={{ maxWidth: 420 }}
+            />
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mt: 1.5, display: "block" }}
+            >
+              Saving this here marks it as confirmed and lets shift-slot based
+              coverage trust it directly instead of relying on each device's
+              local clock.
+            </Typography>
+          </AccordionDetails>
+        </Accordion>
+
         {/* ── Facility Taxonomy ── */}
-        <Accordion disableGutters sx={ACCORDION_BASE_SX}>
+        <Accordion
+          disableGutters
+          sx={ACCORDION_BASE_SX}
+          data-guide-id="guide-facility-taxonomy"
+        >
           <AccordionSummary
             expandIcon={<FiChevronDown size={18} />}
             sx={ACCORDION_SUMMARY_SX}
@@ -1459,14 +1555,6 @@ export default function FacilityPreferencesPage() {
               helperText="How many hours before a shift staff receive a reminder"
               sx={{ maxWidth: 320 }}
             />
-
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ mt: 2, display: "block" }}
-            >
-              Timezone is fixed to UTC and converted to local time in the app.
-            </Typography>
           </AccordionDetails>
         </Accordion>
 
@@ -1527,6 +1615,7 @@ export default function FacilityPreferencesPage() {
               }
               onClick={handleSave}
               disabled={saving}
+              data-guide-id="guide-facility-save-btn"
               sx={{ borderRadius: 2, textTransform: "none", px: 3, py: 1.25 }}
             >
               {saving ? "Saving…" : "Save Preferences"}
@@ -1534,13 +1623,6 @@ export default function FacilityPreferencesPage() {
           </Box>
         )}
       </Stack>
-
-      <GuideVideoDialog
-        open={videoOpen}
-        onClose={() => setVideoOpen(false)}
-        title="Facility Preferences Guide Videos"
-        videos={FACILITY_PREFERENCES_GUIDE_VIDEOS}
-      />
 
       {/* Reset confirmation dialog */}
       <Dialog

@@ -11,10 +11,14 @@ import {
   Paper,
   Stack,
   IconButton,
+  Box,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { useAuth } from "../../../context/AuthContext";
+import { useGuideTour } from "../../../context/GuideTourContext";
+import GuideHelpButton from "../../Shared/GuideHelpButton";
 import api from "../../../config/api";
+import { getLocalTimeZoneAbbreviation } from "../../../utils/timeZone";
 import { toast } from "react-toastify";
 import {
   getFacilityRolesFromUser,
@@ -62,7 +66,9 @@ function formatShiftLabel(coverage) {
     minute: "2-digit",
   });
 
-  return `${dateLabel} — ${startLabel} - ${endLabel}`;
+  const zone = getLocalTimeZoneAbbreviation(start);
+
+  return `${dateLabel} — ${startLabel} - ${endLabel} ${zone}`;
 }
 
 const normalizeTag = (value) =>
@@ -154,6 +160,39 @@ function doesStaffHaveCompatibleFacilityRole(
   return facilityRoles.some((role) => isRoleCompatible(role, coverageRole));
 }
 
+// Steps depend on mode since pickup, manual-create, and edit show different fields.
+const getScheduleFormTourSteps = ({ isEditing, isPickup }) => {
+  const steps = [];
+
+  if (!isPickup) {
+    steps.push({
+      target: "guide-schedule-form-staff",
+      title: "Choose a staff member",
+      body: "Pick who this shift is for. Only staff with a compatible role are shown as eligible for a selected shift.",
+    });
+  }
+
+  if (!isEditing) {
+    steps.push({
+      target: "guide-schedule-form-shift",
+      title: isPickup ? "Pick an open shift" : "Select a shift",
+      body: isPickup
+        ? "These are open coverage slots you're eligible for based on your role, area, and shift type."
+        : "Choose from open coverage requirements, or coverage already tied to this staff member.",
+    });
+  }
+
+  steps.push({
+    target: "guide-schedule-form-submit",
+    title: isPickup ? "Claim the shift" : "Save the schedule",
+    body: isPickup
+      ? "Once submitted, this shift is yours \u2014 it's checked for conflicts with your existing schedule and time off."
+      : "The system checks for scheduling conflicts before saving.",
+  });
+
+  return steps;
+};
+
 export default function ScheduleForm({
   onSuccess,
   onClose,
@@ -169,6 +208,22 @@ export default function ScheduleForm({
 
   const { can, facilityPreferences } = useAuth();
   const canManageSchedules = can("schedule.manage");
+  const { startTourIfUnseen } = useGuideTour();
+  const scheduleFormTourId = isPickup
+    ? "schedule-form-pickup"
+    : isEditing
+      ? "schedule-form-edit"
+      : "schedule-form-create";
+  const scheduleFormTourSteps = getScheduleFormTourSteps({
+    isEditing,
+    isPickup,
+  });
+
+  useEffect(() => {
+    startTourIfUnseen(scheduleFormTourId, scheduleFormTourSteps);
+    // Only ever auto-launched once per user via localStorage — intentionally no deps beyond mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [formData, setFormData] = useState({
     staffId: "",
@@ -488,6 +543,10 @@ export default function ScheduleForm({
       timezone: formData.timezone,
     };
 
+    if (!isEditing && formData.coverageId) {
+      payload.coverageId = formData.coverageId;
+    }
+
     if (!canManageSchedules && isEditing) {
       payload.status = formData.status;
       delete payload.staffId;
@@ -544,13 +603,29 @@ export default function ScheduleForm({
         </IconButton>
       )}
       <Stack spacing={2}>
-        <Typography variant="h6">
-          {isEditing
-            ? "Edit Schedule"
-            : isPickup
-              ? "Pick Up an Open Shift"
-              : "Create New Schedule"}
-        </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 1,
+          }}
+        >
+          <Typography
+            variant="h6"
+            sx={{ display: "flex", alignItems: "center", gap: 1 }}
+          >
+            {isEditing
+              ? "Edit Schedule"
+              : isPickup
+                ? "Pick Up an Open Shift"
+                : "Create New Schedule"}
+            <GuideHelpButton
+              tourId={scheduleFormTourId}
+              tourSteps={scheduleFormTourSteps}
+            />
+          </Typography>
+        </Box>
 
         {message && (
           <Alert severity={message.includes("❌") ? "error" : "success"}>
@@ -563,6 +638,7 @@ export default function ScheduleForm({
             fullWidth
             required
             disabled={(isEditing && !canManageSchedules) || disableStaffSelect}
+            data-guide-id="guide-schedule-form-staff"
           >
             <InputLabel>Staff</InputLabel>
             <Select
@@ -648,7 +724,11 @@ export default function ScheduleForm({
 
         {!isEditing && !initialCoverage && (
           <>
-            <FormControl fullWidth required>
+            <FormControl
+              fullWidth
+              required
+              data-guide-id="guide-schedule-form-shift"
+            >
               <InputLabel>
                 {isPickup ? "Available Open Shifts" : "Select Shift"}
               </InputLabel>
@@ -750,7 +830,11 @@ export default function ScheduleForm({
           </FormControl>
         )}
 
-        <Button variant="contained" type="submit">
+        <Button
+          variant="contained"
+          type="submit"
+          data-guide-id="guide-schedule-form-submit"
+        >
           {isEditing
             ? "Update Schedule"
             : isPickup

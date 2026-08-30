@@ -33,7 +33,10 @@ import interactionPlugin from "@fullcalendar/interaction";
 import { toast } from "react-toastify";
 
 import api from "../../../config/api";
+import { getLocalTimeZoneAbbreviation } from "../../../utils/timeZone";
 import { useAuth } from "../../../context/AuthContext";
+import { useGuideTour } from "../../../context/GuideTourContext";
+import GuideHelpButton from "../../Shared/GuideHelpButton";
 import {
   getCertificationTagDisplayName,
   getRoleDisplayName,
@@ -260,7 +263,7 @@ const getLocalDayKey = (value) => {
 };
 
 const formatDateTimeWindow = (startTime, endTime) =>
-  `${formatDatePart(startTime)} | ${formatTimePart(startTime)} - ${formatTimePart(endTime)}`;
+  `${formatDatePart(startTime)} | ${formatTimePart(startTime)} - ${formatTimePart(endTime)} ${startTime ? getLocalTimeZoneAbbreviation(new Date(startTime)) : ""}`;
 
 const toDateTimeLocalInput = (value) => {
   const date = new Date(value);
@@ -362,53 +365,6 @@ const doesCoverageMatchStaffTags = (staff, coverage) => {
   return true;
 };
 
-const isLiveScheduleMatchingCoverage = (schedule, coverage) => {
-  if (!schedule || !coverage) return false;
-  if (String(schedule.status || "").toLowerCase() === "call_out") return false;
-
-  const scheduleStartMs = new Date(schedule.startTime).getTime();
-  const scheduleEndMs = new Date(schedule.endTime).getTime();
-  const coverageStartMs = new Date(coverage.startTime).getTime();
-  const coverageEndMs = new Date(coverage.endTime).getTime();
-
-  if (
-    Number.isNaN(scheduleStartMs) ||
-    Number.isNaN(scheduleEndMs) ||
-    Number.isNaN(coverageStartMs) ||
-    Number.isNaN(coverageEndMs)
-  ) {
-    return false;
-  }
-
-  if (scheduleStartMs !== coverageStartMs || scheduleEndMs !== coverageEndMs) {
-    return false;
-  }
-
-  if (!isRoleCompatible(schedule.role, coverage.role)) {
-    return false;
-  }
-
-  const coverageUnit = normalizeTag(coverage.unitArea);
-  const scheduleUnit = normalizeTag(schedule.unitArea);
-  if (coverageUnit && coverageUnit !== scheduleUnit) {
-    return false;
-  }
-
-  const coverageShiftType = normalizeTag(coverage.shiftType);
-  const scheduleShiftType = normalizeTag(schedule.shiftType);
-  if (coverageShiftType && coverageShiftType !== scheduleShiftType) {
-    return false;
-  }
-
-  const coverageShiftTag = normalizeTag(coverage.shiftTag);
-  const scheduleShiftTag = normalizeTag(schedule.shiftTag);
-  if (coverageShiftTag && coverageShiftTag !== scheduleShiftTag) {
-    return false;
-  }
-
-  return true;
-};
-
 const buildCoverageSignature = (coverage) => {
   const startMs = new Date(
     coverage?.startTime || coverage?.windowStart,
@@ -453,6 +409,24 @@ const getWarningChips = (assignment, thresholdHours) => {
   return chips;
 };
 
+const AUTO_GENERATE_TOUR_STEPS = [
+  {
+    target: "guide-auto-legend",
+    title: "Live vs. open vs. publishable",
+    body: "These counts summarize published schedules, open coverage still needing staff, and AI-proposed assignments ready to publish.",
+  },
+  {
+    target: "guide-auto-calendar",
+    title: "Visual draft review",
+    body: "See live schedules, open coverage, and AI proposals side by side on the calendar before you commit to anything.",
+  },
+  {
+    target: "guide-auto-draft-workspace",
+    title: "Review and publish",
+    body: "Select individual assignments or publish everything at once \u2014 nothing reaches the live schedule until you publish.",
+  },
+];
+
 export default function AutoGenerateScheduleForm({
   onSuccess,
   onClose,
@@ -460,6 +434,13 @@ export default function AutoGenerateScheduleForm({
   onOpenManualSchedule,
 }) {
   useAuth();
+  const { startTourIfUnseen } = useGuideTour();
+
+  useEffect(() => {
+    startTourIfUnseen("auto-generate-form", AUTO_GENERATE_TOUR_STEPS);
+    // Only ever auto-launched once per user via localStorage — intentionally no deps beyond mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [coverages, setCoverages] = useState([]);
 
@@ -953,6 +934,31 @@ export default function AutoGenerateScheduleForm({
     [liveSchedules, staffById],
   );
 
+  // Bucketed once by coverageId (falling back to signature for pre-backfill
+  // schedules with no coverageId link) instead of rescanning liveSchedules per coverage.
+  const liveAssignedCountMaps = useMemo(() => {
+    const byCoverageId = new Map();
+    const bySignature = new Map();
+
+    liveSchedules.forEach((schedule) => {
+      if (String(schedule?.status || "").toLowerCase() === "call_out") return;
+
+      const rawCoverageId = schedule?.coverageId?._id || schedule?.coverageId;
+      if (rawCoverageId) {
+        const key = String(rawCoverageId);
+        byCoverageId.set(key, (byCoverageId.get(key) || 0) + 1);
+        return;
+      }
+
+      const signature = buildCoverageSignature(schedule);
+      if (signature) {
+        bySignature.set(signature, (bySignature.get(signature) || 0) + 1);
+      }
+    });
+
+    return { byCoverageId, bySignature };
+  }, [liveSchedules]);
+
   const openCoverageEvents = useMemo(
     () =>
       coverages
@@ -971,9 +977,12 @@ export default function AutoGenerateScheduleForm({
         .map((coverage) => {
           const coverageId = getCoverageId(coverage);
           const requiredCount = Number(coverage?.requiredCount) || 0;
-          const liveAssignedCount = liveSchedules.filter((schedule) =>
-            isLiveScheduleMatchingCoverage(schedule, coverage),
-          ).length;
+          const liveAssignedCount =
+            liveAssignedCountMaps.byCoverageId.get(coverageId) ??
+            liveAssignedCountMaps.bySignature.get(
+              buildCoverageSignature(coverage),
+            ) ??
+            0;
           const reportedAssignedCount = Number(coverage?.assignedCount);
           const assignedCount = Number.isFinite(reportedAssignedCount)
             ? Math.max(reportedAssignedCount, liveAssignedCount)
@@ -1025,7 +1034,12 @@ export default function AutoGenerateScheduleForm({
             }) === index
           );
         }),
-    [coverages, draftCoverageIdSet, draftCoverageSignatureSet, liveSchedules],
+    [
+      coverages,
+      draftCoverageIdSet,
+      draftCoverageSignatureSet,
+      liveAssignedCountMaps,
+    ],
   );
 
   const draftCalendarEvents = useMemo(
@@ -1723,8 +1737,21 @@ export default function AutoGenerateScheduleForm({
       )}
 
       <Box sx={{ mb: 1.5, pr: onClose ? 4 : 0 }}>
-        <Typography variant="h6" sx={{ mb: 0.25, fontWeight: 800 }}>
+        <Typography
+          variant="h6"
+          sx={{
+            mb: 0.25,
+            fontWeight: 800,
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}
+        >
           Schedule Workspace
+          <GuideHelpButton
+            tourId="auto-generate-form"
+            tourSteps={AUTO_GENERATE_TOUR_STEPS}
+          />
         </Typography>
         <Typography variant="body2" color="text.secondary">
           Review generated schedules, adjust assignments, and publish approved
@@ -1743,7 +1770,13 @@ export default function AutoGenerateScheduleForm({
       </Box>
 
       <Stack spacing={2}>
-        <Stack direction="row" spacing={1} alignItems="center" useFlexGap>
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="center"
+          useFlexGap
+          data-guide-id="guide-auto-legend"
+        >
           <Chip
             size="small"
             variant="outlined"
@@ -1774,6 +1807,7 @@ export default function AutoGenerateScheduleForm({
 
         <Paper
           variant="outlined"
+          data-guide-id="guide-auto-draft-workspace"
           sx={{
             p: 1.5,
             borderRadius: 2.5,
@@ -2053,6 +2087,7 @@ export default function AutoGenerateScheduleForm({
 
               {draftViewMode === "calendar" && (
                 <Box
+                  data-guide-id="guide-auto-calendar"
                   sx={{
                     background:
                       "linear-gradient(135deg, rgba(248,250,252,0.96) 0%, rgba(239,246,255,0.92) 100%)",
@@ -2461,7 +2496,14 @@ export default function AutoGenerateScheduleForm({
                                                         -{" "}
                                                         {formatTimePart(
                                                           coverage.endTime,
-                                                        )}
+                                                        )}{" "}
+                                                        {coverage.startTime
+                                                          ? getLocalTimeZoneAbbreviation(
+                                                              new Date(
+                                                                coverage.startTime,
+                                                              ),
+                                                            )
+                                                          : ""}
                                                       </Typography>
                                                       <Typography
                                                         sx={{

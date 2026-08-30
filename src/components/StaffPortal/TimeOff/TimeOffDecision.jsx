@@ -19,6 +19,9 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import api from "../../../config/api";
+import { useGuideTour } from "../../../context/GuideTourContext";
+import GuideHelpButton from "../../Shared/GuideHelpButton";
+import { getLocalTimeZoneAbbreviation } from "../../../utils/timeZone";
 import { FiCheck, FiX, FiCalendar, FiClock } from "react-icons/fi";
 
 function statusColor(status) {
@@ -57,6 +60,19 @@ function AvatarGradient({ name, color = "#6B7280", sx = {} }) {
   );
 }
 
+const TIMEOFF_DECISION_TOUR_STEPS = [
+  {
+    target: "guide-timeoff-decision-filters",
+    title: "Filter by status",
+    body: "Jump straight to pending requests that need a decision, or review past approvals and denials.",
+  },
+  {
+    target: "guide-timeoff-decision-list",
+    title: "Review a request",
+    body: "Click Review on any pending request to approve or deny it, with an optional note for the staff member.",
+  },
+];
+
 export default function TimeOffDecision() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -65,6 +81,13 @@ export default function TimeOffDecision() {
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [error, setError] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const { startTourIfUnseen } = useGuideTour();
+
+  useEffect(() => {
+    startTourIfUnseen("timeoff-decision", TIMEOFF_DECISION_TOUR_STEPS);
+    // Only ever auto-launched once per user via localStorage — intentionally no deps beyond mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchRequests = async () => {
     try {
@@ -143,7 +166,16 @@ export default function TimeOffDecision() {
         }}
       >
         <div>
-          <Typography variant="h6">Time Off Approvals</Typography>
+          <Typography
+            variant="h6"
+            sx={{ display: "flex", alignItems: "center", gap: 1 }}
+          >
+            Time Off Approvals
+            <GuideHelpButton
+              tourId="timeoff-decision"
+              tourSteps={TIMEOFF_DECISION_TOUR_STEPS}
+            />
+          </Typography>
           <Typography color="text.secondary">
             Review and manage time off requests
           </Typography>
@@ -210,7 +242,11 @@ export default function TimeOffDecision() {
       </Box>
 
       {/* Filters */}
-      <Paper sx={{ p: 2, mb: 2 }} elevation={1}>
+      <Paper
+        sx={{ p: 2, mb: 2 }}
+        elevation={1}
+        data-guide-id="guide-timeoff-decision-filters"
+      >
         <Box display="flex" gap={1} alignItems="center">
           <Typography color="text.secondary" sx={{ mr: 1 }}>
             Filter by status:
@@ -229,7 +265,11 @@ export default function TimeOffDecision() {
       </Paper>
 
       {/* Requests List */}
-      <Paper sx={{ borderRadius: 2, overflow: "hidden" }} elevation={1}>
+      <Paper
+        sx={{ borderRadius: 2, overflow: "hidden" }}
+        elevation={1}
+        data-guide-id="guide-timeoff-decision-list"
+      >
         {loading ? (
           <Box sx={{ p: 6, textAlign: "center" }}>
             <CircularProgress />
@@ -351,7 +391,8 @@ export default function TimeOffDecision() {
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {new Date(selected.startTime).toLocaleString()} —{" "}
-                    {new Date(selected.endTime).toLocaleString()}
+                    {new Date(selected.endTime).toLocaleString()}{" "}
+                    {getLocalTimeZoneAbbreviation(new Date(selected.startTime))}
                   </Typography>
                 </Box>
               </Box>

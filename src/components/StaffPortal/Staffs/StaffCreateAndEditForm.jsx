@@ -8,6 +8,9 @@ import {
   Button,
   Typography,
   MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
   Box,
   Paper,
   Stack,
@@ -382,6 +385,15 @@ export default function StaffCreateAndEditForm({
     allowedShiftTypes: [],
     certificationTags: [],
     preferredDaysOfWeek: [],
+    avoidDaysOfWeek: [],
+    preferredShiftTypes: [],
+    targetHoursPerWeek: "",
+    maxShiftsPerWeek: "",
+    maxConsecutiveDays: "",
+    wantsOvertime: false,
+    rotationCadence: "none",
+    rotationScope: "all_days",
+    rotationAnchorDate: "",
     emailNotificationsEnabled: true,
     smsNotificationsEnabled: true,
     roles: [],
@@ -393,6 +405,13 @@ export default function StaffCreateAndEditForm({
     () => Array.from(new Set(facilityPreferences?.unitAreas || [])),
     [facilityPreferences?.unitAreas],
   );
+
+  const preferenceShiftTypeOptions = useMemo(() => {
+    const configured = Array.from(
+      new Set((facilityPreferences?.shiftTypes || []).filter(Boolean)),
+    );
+    return configured.length ? configured : ["day", "evening", "night"];
+  }, [facilityPreferences?.shiftTypes]);
 
   const certificationTagOptions = useMemo(
     () =>
@@ -509,6 +528,28 @@ export default function StaffCreateAndEditForm({
       setForm((prev) => ({
         ...prev,
         preferredDaysOfWeek: normalizeNumberArray(data.preferredDaysOfWeek),
+        avoidDaysOfWeek: normalizeNumberArray(data.avoidDaysOfWeek),
+        preferredShiftTypes: normalizeStringArray(data.preferredShiftTypes),
+        targetHoursPerWeek:
+          data.targetHoursPerWeek === null ||
+          data.targetHoursPerWeek === undefined
+            ? ""
+            : data.targetHoursPerWeek,
+        maxShiftsPerWeek:
+          data.maxShiftsPerWeek === null || data.maxShiftsPerWeek === undefined
+            ? ""
+            : data.maxShiftsPerWeek,
+        maxConsecutiveDays:
+          data.maxConsecutiveDays === null ||
+          data.maxConsecutiveDays === undefined
+            ? ""
+            : data.maxConsecutiveDays,
+        wantsOvertime: !!data.wantsOvertime,
+        rotationCadence: data.rotationCadence || "none",
+        rotationScope: data.rotationScope || "all_days",
+        rotationAnchorDate: data.rotationAnchorDate
+          ? String(data.rotationAnchorDate).slice(0, 10)
+          : "",
         emailNotificationsEnabled: data.emailNotificationsEnabled ?? true,
         smsNotificationsEnabled: data.smsNotificationsEnabled ?? true,
       }));
@@ -546,6 +587,15 @@ export default function StaffCreateAndEditForm({
         allowedShiftTypes: normalizeStringArray(staff.allowedShiftTypes),
         certificationTags: normalizeStringArray(staff.certificationTags),
         preferredDaysOfWeek: [],
+        avoidDaysOfWeek: [],
+        preferredShiftTypes: [],
+        targetHoursPerWeek: "",
+        maxShiftsPerWeek: "",
+        maxConsecutiveDays: "",
+        wantsOvertime: false,
+        rotationCadence: "none",
+        rotationScope: "all_days",
+        rotationAnchorDate: "",
         emailNotificationsEnabled: true,
         smsNotificationsEnabled: true,
         roles: getUserRoles(staff),
@@ -640,6 +690,27 @@ export default function StaffCreateAndEditForm({
 
       const preferencesPayload = {
         preferredDaysOfWeek: normalizedPreferredDays,
+        avoidDaysOfWeek: normalizeNumberArray(form.avoidDaysOfWeek),
+        preferredShiftTypes: normalizeStringArray(form.preferredShiftTypes),
+        targetHoursPerWeek:
+          form.targetHoursPerWeek === "" || form.targetHoursPerWeek == null
+            ? null
+            : Number(form.targetHoursPerWeek),
+        maxShiftsPerWeek:
+          form.maxShiftsPerWeek === "" || form.maxShiftsPerWeek == null
+            ? null
+            : Number(form.maxShiftsPerWeek),
+        maxConsecutiveDays:
+          form.maxConsecutiveDays === "" || form.maxConsecutiveDays == null
+            ? null
+            : Number(form.maxConsecutiveDays),
+        wantsOvertime: !!form.wantsOvertime,
+        rotationCadence: form.rotationCadence || "none",
+        rotationScope: form.rotationScope || "all_days",
+        rotationAnchorDate:
+          form.rotationCadence === "biweekly" && form.rotationAnchorDate
+            ? form.rotationAnchorDate
+            : null,
         emailNotificationsEnabled: !!form.emailNotificationsEnabled,
         smsNotificationsEnabled: !!form.smsNotificationsEnabled,
       };
@@ -1084,6 +1155,234 @@ export default function StaffCreateAndEditForm({
                   );
                 })}
               </ToggleButtonGroup>
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                Days to Avoid
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mb: 1 }}
+              >
+                Days this staff member would rather not work, if avoidable
+              </Typography>
+              <ToggleButtonGroup
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, minmax(42px, 1fr))",
+                  gap: 1,
+                }}
+              >
+                {DAYS.map((day, index) => {
+                  const isAvoided = form.avoidDaysOfWeek.includes(index);
+                  return (
+                    <ToggleButton
+                      key={day}
+                      value={day}
+                      selected={isAvoided}
+                      onClick={() => {
+                        const nextValues = isAvoided
+                          ? form.avoidDaysOfWeek.filter(
+                              (item) => item !== index,
+                            )
+                          : [...form.avoidDaysOfWeek, index];
+
+                        setForm({
+                          ...form,
+                          avoidDaysOfWeek: normalizeNumberArray(nextValues),
+                        });
+                      }}
+                      sx={{
+                        borderRadius: 2,
+                        minHeight: 40,
+                        fontWeight: 600,
+                        bgcolor: isAvoided
+                          ? "error.lighter"
+                          : "background.paper",
+                        color: isAvoided ? "error.dark" : "text.primary",
+                        border: isAvoided ? "2px solid" : "1px solid",
+                        borderColor: isAvoided ? "error.main" : "divider",
+                        "&:hover": { borderColor: "error.light" },
+                      }}
+                    >
+                      {day}
+                    </ToggleButton>
+                  );
+                })}
+              </ToggleButtonGroup>
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                Preferred Shift Types
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mb: 1 }}
+              >
+                Shift types this staff member would prefer
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {preferenceShiftTypeOptions.map((shiftType) => {
+                  const isSelected =
+                    form.preferredShiftTypes.includes(shiftType);
+                  return (
+                    <Chip
+                      key={shiftType}
+                      label={toDisplayLabel(shiftType)}
+                      clickable
+                      color={isSelected ? "primary" : "default"}
+                      variant={isSelected ? "filled" : "outlined"}
+                      onClick={() => {
+                        const nextValues = isSelected
+                          ? form.preferredShiftTypes.filter(
+                              (item) => item !== shiftType,
+                            )
+                          : [...form.preferredShiftTypes, shiftType];
+
+                        setForm({
+                          ...form,
+                          preferredShiftTypes: normalizeStringArray(nextValues),
+                        });
+                      }}
+                    />
+                  );
+                })}
+              </Stack>
+            </Box>
+
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                bgcolor: "grey.50",
+                border: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <FormControlLabel
+                sx={{ m: 0, width: "100%" }}
+                control={
+                  <Switch
+                    checked={!!form.wantsOvertime}
+                    onChange={(e) =>
+                      setForm({ ...form, wantsOvertime: e.target.checked })
+                    }
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography>Open to Overtime</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Projected overtime won't count against this staff member
+                      when ranking assignments
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Box>
+
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField
+                fullWidth
+                type="number"
+                label="Target Hours / Week"
+                value={form.targetHoursPerWeek ?? ""}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    targetHoursPerWeek:
+                      e.target.value === "" ? "" : Number(e.target.value),
+                  })
+                }
+                inputProps={{ min: 0, max: 168 }}
+              />
+              <TextField
+                fullWidth
+                type="number"
+                label="Max Shifts / Week"
+                value={form.maxShiftsPerWeek ?? ""}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    maxShiftsPerWeek:
+                      e.target.value === "" ? "" : Number(e.target.value),
+                  })
+                }
+                inputProps={{ min: 1, max: 7 }}
+              />
+              <TextField
+                fullWidth
+                type="number"
+                label="Max Consecutive Days"
+                value={form.maxConsecutiveDays ?? ""}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    maxConsecutiveDays:
+                      e.target.value === "" ? "" : Number(e.target.value),
+                  })
+                }
+                inputProps={{ min: 1, max: 31 }}
+              />
+            </Stack>
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Rotation
+              </Typography>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <FormControl fullWidth>
+                  <InputLabel>Cadence</InputLabel>
+                  <Select
+                    label="Cadence"
+                    value={form.rotationCadence || "none"}
+                    onChange={(e) =>
+                      setForm({ ...form, rotationCadence: e.target.value })
+                    }
+                  >
+                    <MenuItem value="none">None</MenuItem>
+                    <MenuItem value="weekly">Weekly</MenuItem>
+                    <MenuItem value="biweekly">Biweekly</MenuItem>
+                  </Select>
+                </FormControl>
+
+                {form.rotationCadence && form.rotationCadence !== "none" && (
+                  <FormControl fullWidth>
+                    <InputLabel>Scope</InputLabel>
+                    <Select
+                      label="Scope"
+                      value={form.rotationScope || "all_days"}
+                      onChange={(e) =>
+                        setForm({ ...form, rotationScope: e.target.value })
+                      }
+                    >
+                      <MenuItem value="all_days">Every day</MenuItem>
+                      <MenuItem value="weekends_only">Weekends only</MenuItem>
+                    </Select>
+                  </FormControl>
+                )}
+
+                {form.rotationCadence === "biweekly" && (
+                  <TextField
+                    fullWidth
+                    type="date"
+                    label="Anchor Date"
+                    InputLabelProps={{ shrink: true }}
+                    value={form.rotationAnchorDate || ""}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        rotationAnchorDate: e.target.value,
+                      })
+                    }
+                    helperText="Defines which week is the 'on' week"
+                  />
+                )}
+              </Stack>
             </Box>
 
             <Box>

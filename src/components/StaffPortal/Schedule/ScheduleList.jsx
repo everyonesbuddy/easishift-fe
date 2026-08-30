@@ -39,6 +39,8 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
 import api from "../../../config/api";
+import { getLocalTimeZoneAbbreviation } from "../../../utils/timeZone";
+import { useGuideTour } from "../../../context/GuideTourContext";
 import { toast } from "react-toastify";
 import {
   FiCalendar,
@@ -53,7 +55,6 @@ import {
   FiDownload,
   FiChevronDown,
   FiClock,
-  FiPlayCircle,
   FiMove,
   FiSearch,
   FiX,
@@ -73,7 +74,7 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import Stack from "@mui/material/Stack";
 import { useLocation, useNavigate } from "react-router-dom";
 import QrScannerDialog from "../../Shared/QrScannerDialog";
-import GuideVideoDialog from "../../Shared/GuideVideoDialog";
+import GuideHelpButton from "../../Shared/GuideHelpButton";
 import {
   getRoleColor,
   getRoleDisplayName,
@@ -107,17 +108,6 @@ const SCHEDULE_STATUS_FILTER_OPTIONS = [
 // Statuses that must stand out immediately (red), same precedence as coverage-gap cells
 const URGENT_SCHEDULE_STATUSES = new Set(["call_out", "no_show"]);
 
-const SCHEDULE_GUIDE_VIDEOS = [
-  {
-    id: "ai-generated-schedule",
-    label: "AI-generated schedule",
-    title: "AI-Generated Schedule Guide",
-    description:
-      "Learn how to review AI-generated draft schedules before publishing.",
-    embedUrl: "https://www.youtube.com/embed/r8kQbvdqWpA",
-  },
-];
-
 const getScheduleStatusColor = (status) =>
   SCHEDULE_STATUS_META[String(status || "").toLowerCase()]?.color || "#9e9e9e";
 
@@ -130,6 +120,48 @@ const getScheduleStatusLabel = (status) =>
 // Weekend column tint; only shown on cells with no real assignment/coverage data
 const WEEKEND_BG = "#FEF9C3";
 
+// Steps differ by permission since managers/staff see different action buttons.
+const getScheduleTourSteps = ({
+  canManageSchedules,
+  canUsePersonalSchedule,
+}) => {
+  const steps = [
+    {
+      target: "guide-schedule-view-toggle",
+      title: "List, Calendar, or Roster",
+      body: "Switch how shifts are displayed: a sortable table, a month calendar, or a printable roster grid grouped by staff.",
+    },
+  ];
+
+  if (canManageSchedules) {
+    steps.push({
+      target: "guide-schedule-ai-drafts",
+      title: "Review AI-generated drafts",
+      body: "See draft schedules the AI proposed from open coverage, then edit assignments and publish selectively.",
+    });
+  }
+
+  if (canManageSchedules || canUsePersonalSchedule) {
+    steps.push({
+      target: "guide-schedule-add-btn",
+      title: canManageSchedules
+        ? "Schedule a shift manually"
+        : "Pick up an open shift",
+      body: canManageSchedules
+        ? "Create a one-off shift for a specific staff member, outside the AI draft flow."
+        : "Browse open coverage you are eligible for and claim a shift yourself.",
+    });
+  }
+
+  steps.push({
+    target: "guide-schedule-filters",
+    title: "Filter and search",
+    body: "Select multiple roles, statuses, unit areas, or shift times at once. Your filters are remembered next time you visit.",
+  });
+
+  return steps;
+};
+
 export default function ScheduleList() {
   const { user, can, facilityPreferences } = useAuth();
   const canManageSchedules = can("schedule.manage");
@@ -141,6 +173,17 @@ export default function ScheduleList() {
   const navigate = useNavigate();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
+  const { startTourIfUnseen } = useGuideTour();
+  const scheduleTourSteps = useMemo(
+    () => getScheduleTourSteps({ canManageSchedules, canUsePersonalSchedule }),
+    [canManageSchedules, canUsePersonalSchedule],
+  );
+
+  useEffect(() => {
+    startTourIfUnseen("schedule-list", scheduleTourSteps);
+    // Only ever auto-launched once per user via localStorage — intentionally no deps beyond mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [schedules, setSchedules] = useState([]);
   const [staff, setStaff] = useState([]);
@@ -223,7 +266,6 @@ export default function ScheduleList() {
     () => savedFilters?.staffVisibility || "mine",
   );
   const [exportMenuAnchorEl, setExportMenuAnchorEl] = useState(null);
-  const [guideOpen, setGuideOpen] = useState(false);
   const [coverageGaps, setCoverageGaps] = useState([]);
 
   // Manual per-group staff ordering set by dragging Roster rows; keyed by unit/shift-block group
@@ -374,8 +416,9 @@ export default function ScheduleList() {
     });
     const overnightHint =
       options.withNextDayHint && isOvernightShift(schedule) ? " (+1 day)" : "";
+    const zone = getLocalTimeZoneAbbreviation(start);
 
-    return `${startTime} - ${endTime}${overnightHint}`;
+    return `${startTime} - ${endTime} ${zone}${overnightHint}`;
   };
 
   const formatCompactDateTime = (value) => {
@@ -395,6 +438,7 @@ export default function ScheduleList() {
         minute: "2-digit",
         hour12: true,
       }),
+      zone: getLocalTimeZoneAbbreviation(date),
     };
   };
 
@@ -2594,7 +2638,8 @@ export default function ScheduleList() {
           variant="caption"
           sx={{ fontSize: "0.66rem", color: "text.secondary", lineHeight: 1.1 }}
         >
-          {formatCompactDateTime(s.endTime).time}
+          {formatCompactDateTime(s.endTime).time}{" "}
+          {formatCompactDateTime(s.endTime).zone}
         </Typography>
       </TableCell>
       <TableCell sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}>
@@ -2713,7 +2758,8 @@ export default function ScheduleList() {
           variant="caption"
           sx={{ display: "block", color: "#111827" }}
         >
-          {formatCompactDateTime(coverage.endTime).time}
+          {formatCompactDateTime(coverage.endTime).time}{" "}
+          {formatCompactDateTime(coverage.endTime).zone}
         </Typography>
       </TableCell>
       <TableCell sx={{ color: "#111827", fontSize: "0.72rem", py: 0.75 }}>
@@ -2804,9 +2850,18 @@ export default function ScheduleList() {
       >
         <Typography
           variant="h5"
-          sx={{ fontSize: { xs: "1.1rem", md: "1.25rem" } }}
+          sx={{
+            fontSize: { xs: "1.1rem", md: "1.25rem" },
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}
         >
           Staff Scheduling
+          <GuideHelpButton
+            tourId="schedule-list"
+            tourSteps={scheduleTourSteps}
+          />
         </Typography>
 
         <Box
@@ -2824,6 +2879,7 @@ export default function ScheduleList() {
             value={view}
             exclusive
             onChange={(e, next) => next && setView(next)}
+            data-guide-id="guide-schedule-view-toggle"
             sx={{
               backgroundColor: "#f3f4f6",
               borderRadius: 2,
@@ -2865,38 +2921,10 @@ export default function ScheduleList() {
           {canManageSchedules && (
             <Button
               size="small"
-              variant="outlined"
-              startIcon={<FiPlayCircle />}
-              onClick={() => setGuideOpen(true)}
-              sx={{
-                textTransform: "none",
-                borderRadius: 2,
-                px: 1.5,
-                py: 0.55,
-                minHeight: 32,
-                fontSize: "0.78rem",
-                width: { xs: "100%", md: "auto" },
-                borderColor: "#cbd5e1",
-                color: "#334155",
-                bgcolor: "#f8fafc",
-                fontWeight: 700,
-                "&:hover": {
-                  borderColor: "#2563EB",
-                  bgcolor: "#eff6ff",
-                  color: "#1D4ED8",
-                },
-              }}
-            >
-              Watch Guide
-            </Button>
-          )}
-
-          {canManageSchedules && (
-            <Button
-              size="small"
               variant="contained"
               startIcon={<FiPlus />}
               onClick={() => setOpenAutoModal(true)}
+              data-guide-id="guide-schedule-ai-drafts"
               sx={{
                 textTransform: "none",
                 borderRadius: 2,
@@ -2970,6 +2998,7 @@ export default function ScheduleList() {
                   setOpen(true);
                 }
               }}
+              data-guide-id="guide-schedule-add-btn"
               sx={{
                 textTransform: "none",
                 borderRadius: 2,
@@ -3047,6 +3076,7 @@ export default function ScheduleList() {
       {/* FILTER BAR */}
       <Paper
         elevation={0}
+        data-guide-id="guide-schedule-filters"
         sx={{
           mt: 3,
           p: 2,
@@ -5283,13 +5313,6 @@ export default function ScheduleList() {
           />
         </DialogContent>
       </Dialog>
-
-      <GuideVideoDialog
-        open={guideOpen}
-        onClose={() => setGuideOpen(false)}
-        title="Schedule Guide Videos"
-        videos={SCHEDULE_GUIDE_VIDEOS}
-      />
 
       <ConfirmDialog
         open={confirmOpen}

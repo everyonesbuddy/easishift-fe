@@ -25,6 +25,7 @@ import {
 } from "@mui/material";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
+import { useGuideTour } from "../../../context/GuideTourContext";
 import {
   FiUserPlus,
   FiMail,
@@ -33,14 +34,13 @@ import {
   FiUsers,
   FiEdit,
   FiDelete,
-  FiPlayCircle,
   FiKey,
 } from "react-icons/fi";
 import { useAuth } from "../../../context/AuthContext";
 import StaffCreateAndEditForm from "./StaffCreateAndEditForm";
 import BulkStaffModal from "./BulkStaffModal";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
-import GuideVideoDialog from "../../Shared/GuideVideoDialog";
+import GuideHelpButton from "../../Shared/GuideHelpButton";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { Stack } from "@mui/material";
@@ -54,15 +54,37 @@ import {
   getRoleOptionsFromFacilityPreferences,
 } from "../../../constants/industryRoles";
 
-const STAFF_MANAGEMENT_GUIDE_VIDEOS = [
-  {
-    id: "staff-management",
-    label: "Staff management",
-    title: "Staff Management Guide",
-    description: "Learn how to add, edit, filter, and import staff profiles.",
-    embedUrl: "https://www.youtube.com/embed/GEzs9F-LysY",
-  },
-];
+// Steps differ by permission since only managers see add/import actions.
+const getStaffListTourSteps = ({ canManageStaff }) => {
+  const steps = [];
+
+  if (canManageStaff) {
+    steps.push({
+      target: "guide-staff-add-btn",
+      title: "Add a staff member",
+      body: "Create a staff profile with role, allowed areas, shift types, and certification tags.",
+    });
+    steps.push({
+      target: "guide-staff-bulk-btn",
+      title: "Bulk import via CSV",
+      body: "Already have a staff roster in a spreadsheet? Import everyone at once instead of adding people one by one.",
+    });
+  }
+
+  steps.push({
+    target: "guide-staff-search",
+    title: "Search and filter",
+    body: "Find staff quickly by name, email, or role.",
+  });
+
+  steps.push({
+    target: "guide-staff-table",
+    title: "Staff directory",
+    body: "Every profile shows role, contact info, and quick actions for editing or resetting a password.",
+  });
+
+  return steps;
+};
 
 export default function StaffList() {
   const { can, facilityPreferences } = useAuth();
@@ -73,7 +95,6 @@ export default function StaffList() {
 
   const [open, setOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [videoOpen, setVideoOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
 
   const [page, setPage] = useState(0);
@@ -235,6 +256,17 @@ export default function StaffList() {
   const resetTargetId = resetTargetStaff?._id || resetTargetStaff?.id;
   const canManageStaff = can("staff.manage");
   const canResetPassword = can("staff.reset_password");
+  const { startTourIfUnseen } = useGuideTour();
+  const staffListTourSteps = useMemo(
+    () => getStaffListTourSteps({ canManageStaff }),
+    [canManageStaff],
+  );
+
+  useEffect(() => {
+    startTourIfUnseen("staff-list", staffListTourSteps);
+    // Only ever auto-launched once per user via localStorage — intentionally no deps beyond mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const compactActionButtonSx = {
     borderRadius: 1.5,
     textTransform: "none",
@@ -255,41 +287,27 @@ export default function StaffList() {
     <Container sx={{ mt: 4 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center">
         <Box>
-          <Typography variant="h5">Staff Management</Typography>
+          <Typography
+            variant="h5"
+            sx={{ display: "flex", alignItems: "center", gap: 1 }}
+          >
+            Staff Management
+            <GuideHelpButton
+              tourId="staff-list"
+              tourSteps={staffListTourSteps}
+            />
+          </Typography>
           <Typography color="text.secondary">Manage your team</Typography>
         </Box>
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<FiPlayCircle />}
-            onClick={() => setVideoOpen(true)}
-            sx={{
-              textTransform: "none",
-              borderRadius: 2,
-              px: 2.25,
-              width: { xs: "100%", sm: "auto" },
-              borderColor: "#cbd5e1",
-              color: "#334155",
-              bgcolor: "#f8fafc",
-              fontWeight: 700,
-              "&:hover": {
-                borderColor: "#2563EB",
-                bgcolor: "#eff6ff",
-                color: "#1D4ED8",
-              },
-            }}
-          >
-            Watch guide
-          </Button>
-
           {canManageStaff && (
             <>
               <Button
                 size="small"
                 variant="outlined"
                 onClick={() => setBulkOpen(true)}
+                data-guide-id="guide-staff-bulk-btn"
                 sx={{
                   textTransform: "none",
                   borderRadius: 2,
@@ -307,6 +325,7 @@ export default function StaffList() {
                   setEditingStaff(null);
                   setOpen(true);
                 }}
+                data-guide-id="guide-staff-add-btn"
                 sx={{
                   textTransform: "none",
                   borderRadius: 2,
@@ -335,6 +354,7 @@ export default function StaffList() {
               variant="outlined"
               size="small"
               fullWidth
+              data-guide-id="guide-staff-search"
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -499,7 +519,7 @@ export default function StaffList() {
         </Box>
       ) : (
         <Paper sx={{ mt: 3, overflow: "hidden" }}>
-          <Table size="small">
+          <Table size="small" data-guide-id="guide-staff-table">
             <TableHead sx={{ background: "#F8FAFC" }}>
               <TableRow>
                 <TableCell
@@ -745,13 +765,6 @@ export default function StaffList() {
           />
         </DialogContent>
       </Dialog>
-
-      <GuideVideoDialog
-        open={videoOpen}
-        onClose={() => setVideoOpen(false)}
-        title="Staff Management Guide Videos"
-        videos={STAFF_MANAGEMENT_GUIDE_VIDEOS}
-      />
 
       <Dialog
         open={Boolean(resetTargetStaff)}

@@ -18,6 +18,12 @@ import api from "../../../config/api";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 
+// Convert datetime-local's timezone-less string (browser-local wall clock) to a UTC instant.
+function toUTC(dateString) {
+  if (!dateString) return "";
+  return new Date(dateString).toISOString();
+}
+
 export default function TimeOffRequestModal({ open, onClose, onSuccess }) {
   const { user } = useAuth();
   const [startTime, setStartTime] = useState("");
@@ -40,8 +46,8 @@ export default function TimeOffRequestModal({ open, onClose, onSuccess }) {
       //   { withCredentials: true },
       // );
       await api.post("/timeoff", {
-        startTime: startTime,
-        endTime: endTime,
+        startTime: toUTC(startTime),
+        endTime: toUTC(endTime),
         reason: reason,
       });
       setStartTime("");

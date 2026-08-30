@@ -38,6 +38,7 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
 import api from "../../../config/api";
+import { getLocalTimeZoneAbbreviation } from "../../../utils/timeZone";
 import {
   FiCalendar,
   FiList,
@@ -52,9 +53,10 @@ import {
 } from "react-icons/fi";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import { useAuth } from "../../../context/AuthContext";
+import { useGuideTour } from "../../../context/GuideTourContext";
+import GuideHelpButton from "../../Shared/GuideHelpButton";
 import CoverageCreateForm from "./CoverageCreateForm";
 import CoverageEditCountForm from "./CoverageEditCountForm";
-import GuideVideoDialog from "../../Shared/GuideVideoDialog";
 import {
   getRoleDisplayName,
   getRoleColor,
@@ -66,22 +68,26 @@ import {
   isRoleCompatible,
 } from "../../../constants/industryRoles";
 
-const COVERAGE_GUIDE_VIDEOS = [
+const COVERAGE_TOUR_STEPS = [
   {
-    id: "requirements",
-    label: "Save requirements only",
-    title: "Create and Save Requirements",
-    description:
-      "Learn how to add coverage requirements without generating a draft schedule.",
-    embedUrl: "https://www.youtube.com/embed/-7mv6I-eqG0",
+    target: "guide-coverage-view-toggle",
+    title: "Switch between List and Calendar",
+    body: "Table view is best for bulk editing; Calendar view shows coverage laid out across the month.",
   },
   {
-    id: "ai-draft",
-    label: "AI-generate draft",
-    title: "Create and AI-Generate a Draft",
-    description:
-      "Learn how to create coverage and generate a draft schedule in the same flow.",
-    embedUrl: "https://www.youtube.com/embed/qJpZoB-dL7A",
+    target: "guide-coverage-add-btn",
+    title: "Add a coverage requirement",
+    body: "Define how many staff you need for a role, shift, and date range. You can save it alone or generate an AI draft schedule right away.",
+  },
+  {
+    target: "guide-coverage-filters",
+    title: "Filter what you see",
+    body: "Narrow the list by role, fill status, or unit area — select multiple values at once and your choices are remembered next time you visit.",
+  },
+  {
+    target: "guide-coverage-list",
+    title: "Track fill status at a glance",
+    body: "Each row shows assigned vs. required headcount, color-coded so unfilled and partially staffed shifts stand out immediately.",
   },
 ];
 
@@ -105,67 +111,11 @@ const formatShortDate = (dateValue) => {
   });
 };
 
-const normalizeTag = (value) =>
-  String(value || "")
-    .trim()
-    .toLowerCase();
-
-const isScheduleMatchingCoverage = (schedule, coverage) => {
-  if (!schedule || !coverage) return false;
-  if (normalizeTag(schedule.status) === "call_out") return false;
-
-  const scheduleStartMs = new Date(schedule.startTime).getTime();
-  const scheduleEndMs = new Date(schedule.endTime).getTime();
-  const coverageStartMs = new Date(coverage.startTime).getTime();
-  const coverageEndMs = new Date(coverage.endTime).getTime();
-  if (
-    [scheduleStartMs, scheduleEndMs, coverageStartMs, coverageEndMs].some(
-      Number.isNaN,
-    )
-  ) {
-    return false;
-  }
-  if (scheduleStartMs !== coverageStartMs || scheduleEndMs !== coverageEndMs) {
-    return false;
-  }
-  if (!isRoleCompatible(schedule.role, coverage.role)) return false;
-
-  const coverageUnit = normalizeTag(coverage.unitArea);
-  if (coverageUnit && coverageUnit !== normalizeTag(schedule.unitArea)) {
-    return false;
-  }
-
-  const coverageShiftType = normalizeTag(coverage.shiftType);
-  if (
-    coverageShiftType &&
-    coverageShiftType !== normalizeTag(schedule.shiftType)
-  ) {
-    return false;
-  }
-
-  const coverageShiftTag = normalizeTag(coverage.shiftTag);
-  if (
-    coverageShiftTag &&
-    coverageShiftTag !== normalizeTag(schedule.shiftTag)
-  ) {
-    return false;
-  }
-
-  return true;
-};
-
-const getFillStatus = (coverage, schedules = []) => {
+// requiredCount/assignedCount/remaining now come pre-computed from the
+// backend (GET /coverage), so fill status is a pure lookup, not an aggregation.
+const getFillStatus = (coverage) => {
   const required = Number(coverage?.requiredCount) || 0;
-
-  const liveAssignedCount = schedules.filter((s) =>
-    isScheduleMatchingCoverage(s, coverage),
-  ).length;
-
-  const reportedAssigned = Number(coverage?.assignedCount);
-  const assigned = Math.max(
-    Number.isFinite(reportedAssigned) ? reportedAssigned : 0,
-    liveAssignedCount,
-  );
+  const assigned = Number(coverage?.assignedCount) || 0;
   const remaining = Math.max(0, required - assigned);
 
   if (required === 0) return { assigned, required, remaining, status: "none" };
@@ -226,7 +176,6 @@ export default function CoveragePlanningPage() {
   }, [COVERAGE_FILTERS_STORAGE_KEY, userScopeId]);
 
   const [coverages, setCoverages] = useState([]);
-  const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("table");
   const [selectedRoles, setSelectedRoles] = useState(() =>
@@ -276,7 +225,13 @@ export default function CoveragePlanningPage() {
   const [deleteId, setDeleteId] = useState(null);
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [selectedCoverageIds, setSelectedCoverageIds] = useState([]);
-  const [guideOpen, setGuideOpen] = useState(false);
+  const { startTourIfUnseen } = useGuideTour();
+
+  useEffect(() => {
+    startTourIfUnseen("coverage-planning", COVERAGE_TOUR_STEPS);
+    // Only ever auto-launched once per user via localStorage — intentionally no deps beyond mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -328,7 +283,7 @@ export default function CoveragePlanningPage() {
   };
 
   const renderFillStatusBadge = (coverage) => {
-    const fill = getFillStatus(coverage, schedules);
+    const fill = getFillStatus(coverage);
     const meta = FILL_STATUS_META[fill.status];
 
     return (
@@ -389,14 +344,9 @@ export default function CoveragePlanningPage() {
   const fetchCoverages = async () => {
     setLoading(true);
     try {
-      const [coverageRes, schedulesRes] = await Promise.all([
-        api.get("/coverage"),
-        api.get("/schedules"),
-      ]);
+      const coverageRes = await api.get("/coverage");
       const nextCoverages = coverageRes.data || [];
-      const nextSchedules = schedulesRes.data || [];
       setCoverages(nextCoverages);
-      setSchedules(nextSchedules);
       setSelectedCoverageIds((prev) =>
         prev.filter((id) =>
           nextCoverages.some((coverage) => coverage._id === id),
@@ -558,8 +508,9 @@ export default function CoveragePlanningPage() {
       hour: "numeric",
       minute: "2-digit",
     });
+    const zone = getLocalTimeZoneAbbreviation(start);
 
-    return `${startDateLabel} ${startLabel} - ${endDateLabel} ${endLabel}`;
+    return `${startDateLabel} ${startLabel} - ${endDateLabel} ${endLabel} ${zone}`;
   }
 
   function formatRequiredCertTags(coverage) {
@@ -581,7 +532,7 @@ export default function CoveragePlanningPage() {
 
     // Fill status filter
     if (selectedFillStatuses.length > 0) {
-      const fill = getFillStatus(c, schedules);
+      const fill = getFillStatus(c);
       if (!selectedFillStatuses.includes(fill.status)) return false;
     }
 
@@ -619,7 +570,7 @@ export default function CoveragePlanningPage() {
   const calendarEvents = useMemo(() => {
     return coverages.filter(matchesCoverageFilters).map((c) => {
       const roleColor = getRoleColor(c.role) || "#2563EB";
-      const fill = getFillStatus(c, schedules);
+      const fill = getFillStatus(c);
       const fillMeta = FILL_STATUS_META[fill.status];
 
       return {
@@ -650,7 +601,6 @@ export default function CoveragePlanningPage() {
     });
   }, [
     coverages,
-    schedules,
     selectedRoles,
     selectedFillStatuses,
     selectedUnitAreas,
@@ -667,7 +617,6 @@ export default function CoveragePlanningPage() {
     });
   }, [
     coverages,
-    schedules,
     selectedRoles,
     selectedFillStatuses,
     selectedUnitAreas,
@@ -698,12 +647,21 @@ export default function CoveragePlanningPage() {
         sx={{ flexDirection: { xs: "column", md: "row" }, gap: 2 }}
       >
         <Box>
-          <Typography
-            variant="h5"
-            sx={{ fontWeight: 700, fontSize: { xs: "1.1rem", md: "1.25rem" } }}
-          >
-            Coverage Planning
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: 700,
+                fontSize: { xs: "1.1rem", md: "1.25rem" },
+              }}
+            >
+              Coverage Planning
+            </Typography>
+            <GuideHelpButton
+              tourId="coverage-planning"
+              tourSteps={COVERAGE_TOUR_STEPS}
+            />
+          </Box>
           <Typography
             variant="body2"
             color="text.secondary"
@@ -723,30 +681,6 @@ export default function CoveragePlanningPage() {
             flexDirection: { xs: "column", md: "row" },
           }}
         >
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<FiPlayCircle />}
-            onClick={() => setGuideOpen(true)}
-            sx={{
-              textTransform: "none",
-              borderRadius: 2,
-              px: 2.25,
-              width: { xs: "100%", md: "auto" },
-              borderColor: "#cbd5e1",
-              color: "#334155",
-              bgcolor: "#f8fafc",
-              fontWeight: 700,
-              "&:hover": {
-                borderColor: "#2563EB",
-                bgcolor: "#eff6ff",
-                color: "#1D4ED8",
-              },
-            }}
-          >
-            Watch guides
-          </Button>
-
           <Stack
             direction="row"
             spacing={0}
@@ -761,6 +695,7 @@ export default function CoveragePlanningPage() {
               value={view}
               exclusive
               onChange={(e, next) => next && setView(next)}
+              data-guide-id="guide-coverage-view-toggle"
               sx={{
                 width: { xs: "100%", md: "auto" },
                 "& .MuiToggleButton-root": {
@@ -821,6 +756,7 @@ export default function CoveragePlanningPage() {
                 variant="contained"
                 startIcon={<FiPlus />}
                 onClick={() => setOpenAdd(true)}
+                data-guide-id="guide-coverage-add-btn"
                 sx={{
                   textTransform: "none",
                   borderRadius: 2,
@@ -846,6 +782,7 @@ export default function CoveragePlanningPage() {
       {/* FILTER BAR */}
       <Paper
         elevation={0}
+        data-guide-id="guide-coverage-filters"
         sx={{
           mt: 3,
           p: 2,
@@ -1420,7 +1357,11 @@ export default function CoveragePlanningPage() {
           </Box>
         ) : (
           <>
-            <Table sx={{ mt: 2, background: "white" }} size="small">
+            <Table
+              sx={{ mt: 2, background: "white" }}
+              size="small"
+              data-guide-id="guide-coverage-list"
+            >
               <TableHead>
                 <TableRow sx={{ background: "#F8FAFC" }}>
                   {isAdmin && (
@@ -1551,7 +1492,10 @@ export default function CoveragePlanningPage() {
                         {toLocal(c.endTime)?.toLocaleTimeString([], {
                           hour: "numeric",
                           minute: "2-digit",
-                        }) || "-"}
+                        }) || "-"}{" "}
+                        {toLocal(c.endTime)
+                          ? getLocalTimeZoneAbbreviation(toLocal(c.endTime))
+                          : ""}
                         {spansOvernight(c) ? " (+1 day)" : ""}
                       </Typography>
                     </TableCell>
@@ -2083,13 +2027,6 @@ export default function CoveragePlanningPage() {
           ) : null}
         </DialogContent>
       </Dialog>
-
-      <GuideVideoDialog
-        open={guideOpen}
-        onClose={() => setGuideOpen(false)}
-        title="Coverage Planning Guide Videos"
-        videos={COVERAGE_GUIDE_VIDEOS}
-      />
 
       <Dialog
         open={Boolean(editingCoverage)}

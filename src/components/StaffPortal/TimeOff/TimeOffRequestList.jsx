@@ -12,7 +12,9 @@ import {
 } from "@mui/material";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
+import { useGuideTour } from "../../../context/GuideTourContext";
 import TimeOffRequestModal from "./TimeOffRequestModal";
+import GuideHelpButton from "../../Shared/GuideHelpButton";
 import {
   FiCheck,
   FiX,
@@ -28,8 +30,28 @@ const STATUS_COLORS = {
   denied: "error",
 };
 
+const TIMEOFF_LIST_TOUR_STEPS = [
+  {
+    target: "guide-timeoff-add-btn",
+    title: "Request time off",
+    body: "Submit a start/end date and an optional reason. Your request goes to an admin for approval.",
+  },
+  {
+    target: "guide-timeoff-list",
+    title: "Track your requests",
+    body: "See the status of every request you've submitted, along with any admin response notes.",
+  },
+];
+
 export default function TimeOffRequestList() {
   const { user, can } = useAuth();
+  const { startTourIfUnseen } = useGuideTour();
+
+  useEffect(() => {
+    startTourIfUnseen("timeoff-list", TIMEOFF_LIST_TOUR_STEPS);
+    // Only ever auto-launched once per user via localStorage — intentionally no deps beyond mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [openModal, setOpenModal] = useState(false);
@@ -113,7 +135,16 @@ export default function TimeOffRequestList() {
           gap: { xs: 1, sm: 0 },
         }}
       >
-        <Typography variant="h6">Time Off Requests</Typography>
+        <Typography
+          variant="h6"
+          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+        >
+          Time Off Requests
+          <GuideHelpButton
+            tourId="timeoff-list"
+            tourSteps={TIMEOFF_LIST_TOUR_STEPS}
+          />
+        </Typography>
         <Box
           sx={{
             display: "flex",
@@ -141,6 +172,7 @@ export default function TimeOffRequestList() {
           <Button
             variant="contained"
             onClick={() => setOpenModal(true)}
+            data-guide-id="guide-timeoff-add-btn"
             sx={{
               textTransform: "none",
               borderRadius: 2,
@@ -212,7 +244,12 @@ export default function TimeOffRequestList() {
             </Box>
 
             {/* Cards list */}
-            <Box display="flex" flexDirection="column" gap={2}>
+            <Box
+              display="flex"
+              flexDirection="column"
+              gap={2}
+              data-guide-id="guide-timeoff-list"
+            >
               {myRequests.length === 0 ? (
                 <Paper sx={{ p: 6, textAlign: "center" }}>
                   <Box mb={1}>

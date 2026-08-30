@@ -34,6 +34,9 @@ import {
 } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import api from "../../../config/api";
+import { getLocalTimeZoneAbbreviation } from "../../../utils/timeZone";
+import { useGuideTour } from "../../../context/GuideTourContext";
+import GuideHelpButton from "../../Shared/GuideHelpButton";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 import {
@@ -164,7 +167,7 @@ const formatShiftPreview = (dateValue, startTime, endTime) => {
   })} ${end.toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
-  })}`;
+  })} ${getLocalTimeZoneAbbreviation(start)}`;
 };
 
 const buildDatesFromPattern = (startDateStr, horizonDays, mode, weekdays) => {
@@ -226,11 +229,51 @@ const normalizeNlUnresolvedList = (items) =>
 const COVERAGE_COPY_PATTERN =
   /(?:copy|repeat|reuse|duplicate)\s+(?:coverage|staffing|shifts?)\s+from\s+/i;
 
+const getCoverageFormTourSteps = ({ canUseNlParser }) => {
+  const steps = [];
+
+  if (canUseNlParser) {
+    steps.push({
+      target: "guide-coverage-form-ai",
+      title: "Describe it in plain English",
+      body: 'Type or dictate a request like "3 RNs every weekday night next month" and AI drafts the date pattern and requirements below for you to review.',
+    });
+  }
+
+  steps.push(
+    {
+      target: "guide-coverage-form-date-pattern",
+      title: "Choose your date pattern",
+      body: "Pick a start date and how many days to repeat across — every active day gets the requirements defined below.",
+    },
+    {
+      target: "guide-coverage-form-requirements",
+      title: "Define staffing requirements",
+      body: "Add one or more role/shift combinations. Each one applies to every active date in your pattern.",
+    },
+    {
+      target: "guide-coverage-form-submit",
+      title: "Save, or save and generate a draft",
+      body: "Save requirements only if you'll schedule manually, or let AI immediately draft a schedule from available staff.",
+    },
+  );
+
+  return steps;
+};
+
 export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   const { facilityPreferences, can } = useAuth();
+  const { startTourIfUnseen } = useGuideTour();
   const navigate = useNavigate();
   const canUseNlParser =
     typeof can === "function" ? can("coverage.manage") : false;
+  const coverageFormTourSteps = getCoverageFormTourSteps({ canUseNlParser });
+
+  useEffect(() => {
+    startTourIfUnseen("coverage-create-form", coverageFormTourSteps);
+    // Only ever auto-launched once per user via localStorage — intentionally no deps beyond mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const shiftTypeDefinitions = useMemo(() => {
     const defs = Array.isArray(facilityPreferences?.shiftTypeDefinitions)
@@ -322,6 +365,8 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   }, [roleOptions, facilityPreferences?.unitAreas, shiftTypeDefinitions]);
 
   const today = new Date().toISOString().slice(0, 10);
+  const deviceTimezone =
+    Intl.DateTimeFormat().resolvedOptions().timeZone || "your local time";
 
   const [plannerStartDate, setPlannerStartDate] = useState(today);
   const [horizonDays, setHorizonDays] = useState(14);
@@ -815,10 +860,13 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
         activeDates.map((date) => {
           const shifts = requirements.map((req) => {
             const selectedSlot = getSelectedSlot(req);
+            // facilityTimezone is never configurable by tenants (always
+            // defaults to "UTC"), so the backend's timezone-aware window
+            // builder can't be trusted — always resolve using this browser's
+            // local time, for both slot-based and manual entries.
             const startTime = selectedSlot?.startLocalTime || req.startTime;
             const endTime = selectedSlot?.endLocalTime || req.endTime;
 
-            // For overnight shifts (end <= start), the end falls on the next calendar day
             const isOvernight = isOvernightTimeRange(startTime, endTime);
             let endDate = date;
             if (isOvernight) {
@@ -1015,8 +1063,20 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
       )}
 
       <Box sx={{ mb: 2, pr: onClose ? 5 : 0 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+        <Typography
+          variant="h6"
+          sx={{
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}
+        >
           Coverage Planner
+          <GuideHelpButton
+            tourId="coverage-create-form"
+            tourSteps={coverageFormTourSteps}
+          />
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.3 }}>
           Define your date pattern and requirements. When you create coverage,
@@ -1044,6 +1104,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
         {canUseNlParser && (
           <Paper
             variant="outlined"
+            data-guide-id="guide-coverage-form-ai"
             sx={{
               borderRadius: 2.5,
               overflow: "hidden",
@@ -1228,6 +1289,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
         {/* ── SECTION 1: Date Pattern ─────────────────────────────────── */}
         <Paper
           variant="outlined"
+          data-guide-id="guide-coverage-form-date-pattern"
           sx={{ borderRadius: 2.5, overflow: "hidden", borderColor: "#BFDBFE" }}
         >
           {/* Always-visible core: start date + horizon */}
@@ -1302,6 +1364,20 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                 ))}
               </TextField>
             </Stack>
+
+            <Typography
+              variant="caption"
+              sx={{
+                display: "block",
+                mt: 1,
+                color: "#1E3A8A",
+                opacity: 0.75,
+              }}
+            >
+              Shift times use your device's current timezone ({deviceTimezone}
+              ). If you're scheduling for a facility in a different timezone,
+              switch your device's timezone/region first.
+            </Typography>
           </Box>
 
           {/* Repeat mode accordion */}
@@ -1432,6 +1508,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
         {/* ── SECTION 2: Coverage Requirements ───────────────────────── */}
         <Paper
           variant="outlined"
+          data-guide-id="guide-coverage-form-requirements"
           sx={{ borderRadius: 2.5, overflow: "hidden", borderColor: "#C4B5FD" }}
         >
           <Box
@@ -1896,7 +1973,11 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
         />
 
         {/* Submit */}
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1}
+          data-guide-id="guide-coverage-form-submit"
+        >
           <Button
             type="button"
             variant="outlined"

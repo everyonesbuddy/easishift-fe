@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Typography,
@@ -14,6 +14,12 @@ import {
   FormControlLabel,
   Stack,
   Alert,
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Chip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -24,10 +30,32 @@ import { FiSave, FiInfo, FiChevronDown } from "react-icons/fi";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
+import { useGuideTour } from "../../../context/GuideTourContext";
+import GuideHelpButton from "../../Shared/GuideHelpButton";
 import { Navigate, useNavigate } from "react-router-dom";
 import { getFacilityRolesFromUser } from "../../../constants/industryRoles";
 
+const PREFERENCES_TOUR_STEPS = [
+  {
+    target: "guide-preferences-days",
+    title: "Preferred work days",
+    body: "Select the days you'd prefer to be scheduled. Auto-generate takes this into account when assigning shifts.",
+  },
+  {
+    target: "guide-preferences-save-btn",
+    title: "Save your preferences",
+    body: "Changes here only apply once you save.",
+  },
+];
+
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const DEFAULT_SHIFT_TYPES = ["day", "evening", "night"];
+
+const toDisplayLabel = (value) =>
+  String(value || "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 
 const ACCORDION_BASE_SX = {
   borderRadius: 3,
@@ -87,6 +115,20 @@ export default function PreferencesPage() {
   const [error, setError] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const { startTourIfUnseen } = useGuideTour();
+  const shiftTypeOptions = useMemo(() => {
+    const configured = Array.from(
+      new Set((facilityPreferences?.shiftTypes || []).filter(Boolean)),
+    );
+    return configured.length ? configured : DEFAULT_SHIFT_TYPES;
+  }, [facilityPreferences?.shiftTypes]);
+
+  useEffect(() => {
+    if (loading) return;
+    startTourIfUnseen("preferences", PREFERENCES_TOUR_STEPS);
+    // Only ever auto-launched once per user via localStorage — intentionally minimal deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   useEffect(() => {
     if (!hasSchedulableRole) {
@@ -138,6 +180,31 @@ export default function PreferencesPage() {
         preferredDaysOfWeek: Array.isArray(prefs.preferredDaysOfWeek)
           ? prefs.preferredDaysOfWeek
           : [],
+        avoidDaysOfWeek: Array.isArray(prefs.avoidDaysOfWeek)
+          ? prefs.avoidDaysOfWeek
+          : [],
+        preferredShiftTypes: Array.isArray(prefs.preferredShiftTypes)
+          ? prefs.preferredShiftTypes
+          : [],
+        targetHoursPerWeek:
+          prefs.targetHoursPerWeek === "" || prefs.targetHoursPerWeek == null
+            ? null
+            : Number(prefs.targetHoursPerWeek),
+        maxShiftsPerWeek:
+          prefs.maxShiftsPerWeek === "" || prefs.maxShiftsPerWeek == null
+            ? null
+            : Number(prefs.maxShiftsPerWeek),
+        maxConsecutiveDays:
+          prefs.maxConsecutiveDays === "" || prefs.maxConsecutiveDays == null
+            ? null
+            : Number(prefs.maxConsecutiveDays),
+        wantsOvertime: !!prefs.wantsOvertime,
+        rotationCadence: prefs.rotationCadence || "none",
+        rotationScope: prefs.rotationScope || "all_days",
+        rotationAnchorDate:
+          prefs.rotationCadence === "biweekly" && prefs.rotationAnchorDate
+            ? prefs.rotationAnchorDate
+            : null,
         emailNotificationsEnabled: prefs.emailNotificationsEnabled ?? true,
         smsNotificationsEnabled: prefs.smsNotificationsEnabled ?? true,
       };
@@ -195,9 +262,19 @@ export default function PreferencesPage() {
       <Box mb={3.5}>
         <Typography
           variant="h4"
-          sx={{ fontSize: { xs: "1.35rem", md: "1.7rem" }, fontWeight: 700 }}
+          sx={{
+            fontSize: { xs: "1.35rem", md: "1.7rem" },
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}
         >
           My Preferences
+          <GuideHelpButton
+            tourId="preferences"
+            tourSteps={PREFERENCES_TOUR_STEPS}
+          />
         </Typography>
         <Typography variant="body2" color="text.secondary">
           Set your availability and work style preferences
@@ -243,7 +320,11 @@ export default function PreferencesPage() {
       </Paper>
 
       <Stack sx={{ gap: { xs: 2, md: 3 } }}>
-        <Accordion disableGutters sx={ACCORDION_BASE_SX}>
+        <Accordion
+          disableGutters
+          sx={ACCORDION_BASE_SX}
+          data-guide-id="guide-preferences-days"
+        >
           <AccordionSummary
             expandIcon={<FiChevronDown size={18} />}
             sx={ACCORDION_SUMMARY_SX}
@@ -293,6 +374,236 @@ export default function PreferencesPage() {
                 );
               })}
             </ToggleButtonGroup>
+          </AccordionDetails>
+        </Accordion>
+
+        <Accordion disableGutters sx={ACCORDION_BASE_SX}>
+          <AccordionSummary
+            expandIcon={<FiChevronDown size={18} />}
+            sx={ACCORDION_SUMMARY_SX}
+          >
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Scheduling Preferences
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                These are soft preferences — auto-generate weighs them but they
+                never block an assignment.
+              </Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails sx={ACCORDION_DETAILS_SX}>
+            <Stack spacing={3}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                  Days to Avoid
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block", mb: 1 }}
+                >
+                  Days you'd rather not work, if it can be avoided
+                </Typography>
+                <ToggleButtonGroup
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(7, minmax(42px, 1fr))",
+                    gap: 1,
+                  }}
+                >
+                  {DAYS.map((d, i) => {
+                    const isAvoided = hasPref(prefs.avoidDaysOfWeek, i);
+                    return (
+                      <ToggleButton
+                        key={i}
+                        value={d}
+                        selected={isAvoided}
+                        onClick={() => toggleArrayItem("avoidDaysOfWeek", i)}
+                        sx={{
+                          borderRadius: 2,
+                          minHeight: 44,
+                          fontWeight: 600,
+                          bgcolor: isAvoided
+                            ? "error.lighter"
+                            : "background.paper",
+                          color: isAvoided ? "error.dark" : "text.primary",
+                          border: isAvoided ? "2px solid" : "1px solid",
+                          borderColor: isAvoided ? "error.main" : "divider",
+                          "&:hover": { borderColor: "error.light" },
+                        }}
+                      >
+                        {d}
+                      </ToggleButton>
+                    );
+                  })}
+                </ToggleButtonGroup>
+              </Box>
+
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
+                  Preferred Shift Types
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block", mb: 1 }}
+                >
+                  Shift types you'd prefer to be scheduled for
+                </Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  {shiftTypeOptions.map((shiftType) => {
+                    const isSelected = (
+                      prefs.preferredShiftTypes || []
+                    ).includes(shiftType);
+                    return (
+                      <Chip
+                        key={shiftType}
+                        label={toDisplayLabel(shiftType)}
+                        clickable
+                        color={isSelected ? "primary" : "default"}
+                        variant={isSelected ? "filled" : "outlined"}
+                        onClick={() =>
+                          toggleArrayItem("preferredShiftTypes", shiftType)
+                        }
+                      />
+                    );
+                  })}
+                </Stack>
+              </Box>
+
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderRadius: 2,
+                  bgcolor: "grey.50",
+                  border: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                <FormControlLabel
+                  sx={{ m: 0, width: "100%" }}
+                  control={
+                    <Switch
+                      checked={!!prefs.wantsOvertime}
+                      onChange={(e) =>
+                        handleChange("wantsOvertime", e.target.checked)
+                      }
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography>Open to Overtime</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Projected overtime won't count against you when ranking
+                        assignments
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Target Hours / Week"
+                  value={prefs.targetHoursPerWeek ?? ""}
+                  onChange={(e) =>
+                    handleChange(
+                      "targetHoursPerWeek",
+                      e.target.value === "" ? "" : Number(e.target.value),
+                    )
+                  }
+                  inputProps={{ min: 0, max: 168 }}
+                />
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Max Shifts / Week"
+                  value={prefs.maxShiftsPerWeek ?? ""}
+                  onChange={(e) =>
+                    handleChange(
+                      "maxShiftsPerWeek",
+                      e.target.value === "" ? "" : Number(e.target.value),
+                    )
+                  }
+                  inputProps={{ min: 1, max: 7 }}
+                />
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Max Consecutive Days"
+                  value={prefs.maxConsecutiveDays ?? ""}
+                  onChange={(e) =>
+                    handleChange(
+                      "maxConsecutiveDays",
+                      e.target.value === "" ? "" : Number(e.target.value),
+                    )
+                  }
+                  inputProps={{ min: 1, max: 31 }}
+                />
+              </Stack>
+
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Rotation
+                </Typography>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                  <FormControl fullWidth>
+                    <InputLabel>Cadence</InputLabel>
+                    <Select
+                      label="Cadence"
+                      value={prefs.rotationCadence || "none"}
+                      onChange={(e) =>
+                        handleChange("rotationCadence", e.target.value)
+                      }
+                    >
+                      <MenuItem value="none">None</MenuItem>
+                      <MenuItem value="weekly">Weekly</MenuItem>
+                      <MenuItem value="biweekly">Biweekly</MenuItem>
+                    </Select>
+                  </FormControl>
+
+                  {prefs.rotationCadence &&
+                    prefs.rotationCadence !== "none" && (
+                      <FormControl fullWidth>
+                        <InputLabel>Scope</InputLabel>
+                        <Select
+                          label="Scope"
+                          value={prefs.rotationScope || "all_days"}
+                          onChange={(e) =>
+                            handleChange("rotationScope", e.target.value)
+                          }
+                        >
+                          <MenuItem value="all_days">Every day</MenuItem>
+                          <MenuItem value="weekends_only">
+                            Weekends only
+                          </MenuItem>
+                        </Select>
+                      </FormControl>
+                    )}
+
+                  {prefs.rotationCadence === "biweekly" && (
+                    <TextField
+                      fullWidth
+                      type="date"
+                      label="Anchor Date"
+                      InputLabelProps={{ shrink: true }}
+                      value={
+                        prefs.rotationAnchorDate
+                          ? String(prefs.rotationAnchorDate).slice(0, 10)
+                          : ""
+                      }
+                      onChange={(e) =>
+                        handleChange("rotationAnchorDate", e.target.value)
+                      }
+                      helperText="Defines which week is the 'on' week"
+                    />
+                  )}
+                </Stack>
+              </Box>
+            </Stack>
           </AccordionDetails>
         </Accordion>
 
@@ -428,6 +739,7 @@ export default function PreferencesPage() {
             startIcon={<FiSave />}
             onClick={handleSave}
             disabled={saving}
+            data-guide-id="guide-preferences-save-btn"
             sx={{
               textTransform: "none",
               borderRadius: 2.5,

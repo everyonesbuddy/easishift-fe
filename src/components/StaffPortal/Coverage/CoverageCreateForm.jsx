@@ -267,6 +267,9 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   const navigate = useNavigate();
   const canUseNlParser =
     typeof can === "function" ? can("coverage.manage") : false;
+  const canTrustFacilityTimezone = Boolean(
+    facilityPreferences?.facilityTimezoneConfirmed,
+  );
   const coverageFormTourSteps = getCoverageFormTourSteps({ canUseNlParser });
 
   useEffect(() => {
@@ -855,50 +858,69 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
 
     try {
       const createdCoverages = [];
-
-      const createResponses = await Promise.all(
-        activeDates.map((date) => {
-          const shifts = requirements.map((req) => {
-            const selectedSlot = getSelectedSlot(req);
-            // facilityTimezone is never configurable by tenants (always
-            // defaults to "UTC"), so the backend's timezone-aware window
-            // builder can't be trusted — always resolve using this browser's
-            // local time, for both slot-based and manual entries.
-            const startTime = selectedSlot?.startLocalTime || req.startTime;
-            const endTime = selectedSlot?.endLocalTime || req.endTime;
-
-            const isOvernight = isOvernightTimeRange(startTime, endTime);
-            let endDate = date;
-            if (isOvernight) {
-              const d = new Date(`${date}T00:00:00`);
-              d.setDate(d.getDate() + 1);
-              endDate = d.toISOString().slice(0, 10);
-            }
-
-            const shiftPayload = {
-              role: normalizeToken(req.role) || req.role,
-              requiredCount: Number(req.requiredCount) || 0,
-              unitArea: normalizeToken(req.unitArea) || null,
-              shiftType: normalizeToken(req.shiftType) || null,
-              shiftTag: normalizeToken(req.shiftTag) || null,
-              startTime: toUTCISOString(date, startTime),
-              endTime: toUTCISOString(endDate, endTime),
-              requiredCertificationTags: dedupeStrings(
-                req.requiredCertificationTags,
-              ),
-              note,
-            };
-
-            return shiftPayload;
-          });
-
-          return api.post("/coverage", {
-            tenantId,
-            dates: [date],
-            shifts,
-          });
-        }),
+      const allRequirementsUseSlots = requirements.every((req) =>
+        Boolean(getSelectedSlot(req)),
       );
+
+      const createResponses =
+        canTrustFacilityTimezone && allRequirementsUseSlots
+          ? [
+              await api.post("/coverage", {
+                tenantId,
+                dates: activeDates,
+                shifts: requirements.map((req) => ({
+                  role: normalizeToken(req.role) || req.role,
+                  requiredCount: Number(req.requiredCount) || 0,
+                  unitArea: normalizeToken(req.unitArea) || null,
+                  shiftType: normalizeToken(req.shiftType) || null,
+                  shiftTag: normalizeToken(req.shiftTag) || null,
+                  requiredCertificationTags: dedupeStrings(
+                    req.requiredCertificationTags,
+                  ),
+                  note,
+                })),
+              }),
+            ]
+          : await Promise.all(
+              activeDates.map((date) => {
+                const shifts = requirements.map((req) => {
+                  const selectedSlot = getSelectedSlot(req);
+                  const startTime =
+                    selectedSlot?.startLocalTime || req.startTime;
+                  const endTime = selectedSlot?.endLocalTime || req.endTime;
+
+                  const isOvernight = isOvernightTimeRange(startTime, endTime);
+                  let endDate = date;
+                  if (isOvernight) {
+                    const d = new Date(`${date}T00:00:00`);
+                    d.setDate(d.getDate() + 1);
+                    endDate = d.toISOString().slice(0, 10);
+                  }
+
+                  const shiftPayload = {
+                    role: normalizeToken(req.role) || req.role,
+                    requiredCount: Number(req.requiredCount) || 0,
+                    unitArea: normalizeToken(req.unitArea) || null,
+                    shiftType: normalizeToken(req.shiftType) || null,
+                    shiftTag: normalizeToken(req.shiftTag) || null,
+                    startTime: toUTCISOString(date, startTime),
+                    endTime: toUTCISOString(endDate, endTime),
+                    requiredCertificationTags: dedupeStrings(
+                      req.requiredCertificationTags,
+                    ),
+                    note,
+                  };
+
+                  return shiftPayload;
+                });
+
+                return api.post("/coverage", {
+                  tenantId,
+                  dates: [date],
+                  shifts,
+                });
+              }),
+            );
 
       createResponses.forEach((response) => {
         const createdForDate = Array.isArray(response.data)
@@ -1374,9 +1396,9 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                 opacity: 0.75,
               }}
             >
-              Shift times use your device's current timezone ({deviceTimezone}
-              ). If you're scheduling for a facility in a different timezone,
-              switch your device's timezone/region first.
+              {canTrustFacilityTimezone
+                ? `Configured shift slots resolve in the confirmed facility timezone (${facilityPreferences?.facilityTimezone}). Manual times use your device timezone (${deviceTimezone}).`
+                : `Shift times use your device's current timezone (${deviceTimezone}). If you're scheduling for a facility in a different timezone, switch your device's timezone/region first.`}
             </Typography>
           </Box>
 

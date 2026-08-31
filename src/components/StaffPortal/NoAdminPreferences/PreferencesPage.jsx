@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -14,12 +14,6 @@ import {
   FormControlLabel,
   Stack,
   Alert,
-  TextField,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Chip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -49,13 +43,6 @@ const PREFERENCES_TOUR_STEPS = [
 ];
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-const DEFAULT_SHIFT_TYPES = ["day", "evening", "night"];
-
-const toDisplayLabel = (value) =>
-  String(value || "")
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
 
 const ACCORDION_BASE_SX = {
   borderRadius: 3,
@@ -116,12 +103,6 @@ export default function PreferencesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const { startTourIfUnseen } = useGuideTour();
-  const shiftTypeOptions = useMemo(() => {
-    const configured = Array.from(
-      new Set((facilityPreferences?.shiftTypes || []).filter(Boolean)),
-    );
-    return configured.length ? configured : DEFAULT_SHIFT_TYPES;
-  }, [facilityPreferences?.shiftTypes]);
 
   useEffect(() => {
     if (loading) return;
@@ -183,28 +164,7 @@ export default function PreferencesPage() {
         avoidDaysOfWeek: Array.isArray(prefs.avoidDaysOfWeek)
           ? prefs.avoidDaysOfWeek
           : [],
-        preferredShiftTypes: Array.isArray(prefs.preferredShiftTypes)
-          ? prefs.preferredShiftTypes
-          : [],
-        targetHoursPerWeek:
-          prefs.targetHoursPerWeek === "" || prefs.targetHoursPerWeek == null
-            ? null
-            : Number(prefs.targetHoursPerWeek),
-        maxShiftsPerWeek:
-          prefs.maxShiftsPerWeek === "" || prefs.maxShiftsPerWeek == null
-            ? null
-            : Number(prefs.maxShiftsPerWeek),
-        maxConsecutiveDays:
-          prefs.maxConsecutiveDays === "" || prefs.maxConsecutiveDays == null
-            ? null
-            : Number(prefs.maxConsecutiveDays),
         wantsOvertime: !!prefs.wantsOvertime,
-        rotationCadence: prefs.rotationCadence || "none",
-        rotationScope: prefs.rotationScope || "all_days",
-        rotationAnchorDate:
-          prefs.rotationCadence === "biweekly" && prefs.rotationAnchorDate
-            ? prefs.rotationAnchorDate
-            : null,
         emailNotificationsEnabled: prefs.emailNotificationsEnabled ?? true,
         smsNotificationsEnabled: prefs.smsNotificationsEnabled ?? true,
       };
@@ -218,7 +178,7 @@ export default function PreferencesPage() {
       });
     } catch (err) {
       console.error(err);
-      setError("Failed to save preferences");
+      setError(err?.response?.data?.message || "Failed to save preferences");
     } finally {
       setSaving(false);
     }
@@ -440,38 +400,6 @@ export default function PreferencesPage() {
                 </ToggleButtonGroup>
               </Box>
 
-              <Box>
-                <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-                  Preferred Shift Types
-                </Typography>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ display: "block", mb: 1 }}
-                >
-                  Shift types you'd prefer to be scheduled for
-                </Typography>
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                  {shiftTypeOptions.map((shiftType) => {
-                    const isSelected = (
-                      prefs.preferredShiftTypes || []
-                    ).includes(shiftType);
-                    return (
-                      <Chip
-                        key={shiftType}
-                        label={toDisplayLabel(shiftType)}
-                        clickable
-                        color={isSelected ? "primary" : "default"}
-                        variant={isSelected ? "filled" : "outlined"}
-                        onClick={() =>
-                          toggleArrayItem("preferredShiftTypes", shiftType)
-                        }
-                      />
-                    );
-                  })}
-                </Stack>
-              </Box>
-
               <Box
                 sx={{
                   p: 1.5,
@@ -501,107 +429,6 @@ export default function PreferencesPage() {
                     </Box>
                   }
                 />
-              </Box>
-
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="Target Hours / Week"
-                  value={prefs.targetHoursPerWeek ?? ""}
-                  onChange={(e) =>
-                    handleChange(
-                      "targetHoursPerWeek",
-                      e.target.value === "" ? "" : Number(e.target.value),
-                    )
-                  }
-                  inputProps={{ min: 0, max: 168 }}
-                />
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="Max Shifts / Week"
-                  value={prefs.maxShiftsPerWeek ?? ""}
-                  onChange={(e) =>
-                    handleChange(
-                      "maxShiftsPerWeek",
-                      e.target.value === "" ? "" : Number(e.target.value),
-                    )
-                  }
-                  inputProps={{ min: 1, max: 7 }}
-                />
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="Max Consecutive Days"
-                  value={prefs.maxConsecutiveDays ?? ""}
-                  onChange={(e) =>
-                    handleChange(
-                      "maxConsecutiveDays",
-                      e.target.value === "" ? "" : Number(e.target.value),
-                    )
-                  }
-                  inputProps={{ min: 1, max: 31 }}
-                />
-              </Stack>
-
-              <Box>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Rotation
-                </Typography>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                  <FormControl fullWidth>
-                    <InputLabel>Cadence</InputLabel>
-                    <Select
-                      label="Cadence"
-                      value={prefs.rotationCadence || "none"}
-                      onChange={(e) =>
-                        handleChange("rotationCadence", e.target.value)
-                      }
-                    >
-                      <MenuItem value="none">None</MenuItem>
-                      <MenuItem value="weekly">Weekly</MenuItem>
-                      <MenuItem value="biweekly">Biweekly</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  {prefs.rotationCadence &&
-                    prefs.rotationCadence !== "none" && (
-                      <FormControl fullWidth>
-                        <InputLabel>Scope</InputLabel>
-                        <Select
-                          label="Scope"
-                          value={prefs.rotationScope || "all_days"}
-                          onChange={(e) =>
-                            handleChange("rotationScope", e.target.value)
-                          }
-                        >
-                          <MenuItem value="all_days">Every day</MenuItem>
-                          <MenuItem value="weekends_only">
-                            Weekends only
-                          </MenuItem>
-                        </Select>
-                      </FormControl>
-                    )}
-
-                  {prefs.rotationCadence === "biweekly" && (
-                    <TextField
-                      fullWidth
-                      type="date"
-                      label="Anchor Date"
-                      InputLabelProps={{ shrink: true }}
-                      value={
-                        prefs.rotationAnchorDate
-                          ? String(prefs.rotationAnchorDate).slice(0, 10)
-                          : ""
-                      }
-                      onChange={(e) =>
-                        handleChange("rotationAnchorDate", e.target.value)
-                      }
-                      helperText="Defines which week is the 'on' week"
-                    />
-                  )}
-                </Stack>
               </Box>
             </Stack>
           </AccordionDetails>

@@ -10,24 +10,30 @@ WiserShifts is a **multi-tenant workforce scheduling and management SaaS** built
 2. [Project Structure](#project-structure)
 3. [Getting Started](#getting-started)
 4. [Environment & API Configuration](#environment--api-configuration)
-5. [Authentication Flow](#authentication-flow)
+5. [Authentication & Session Lifecycle](#authentication--session-lifecycle)
 6. [Role System](#role-system)
-7. [App Entry Point & Routing](#app-entry-point--routing)
-8. [Paywall / Billing Guard](#paywall--billing-guard)
-9. [Feature Areas](#feature-areas)
-   - [Dashboard](#dashboard)
-   - [Coverage Planning](#coverage-planning)
-   - [Schedule Builder](#schedule-builder)
-   - [Staff Management](#staff-management)
-   - [Time Off](#time-off)
-   - [Shift Swaps](#shift-swaps)
-   - [Messages](#messages)
-   - [Preferences](#preferences)
-   - [Billing / Subscription](#billing--subscription)
-10. [Shared Components](#shared-components)
-11. [Key Developer Patterns](#key-developer-patterns)
-12. [Recent Major Changes](#recent-major-changes)
-13. [Deployment](#deployment)
+7. [Date & Timezone Architecture](#date--timezone-architecture)
+8. [App Entry Point & Routing](#app-entry-point--routing)
+9. [Paywall / Billing Guard](#paywall--billing-guard)
+10. [Feature Areas](#feature-areas)
+
+- [Facility Preferences & Timezone](#facility-preferences--timezone)
+- [Dashboard](#dashboard)
+- [Coverage Planning](#coverage-planning)
+- [Schedule Builder & Roster](#schedule-builder--roster)
+- [Staff Management](#staff-management)
+- [Time Off](#time-off)
+- [Shift Swaps](#shift-swaps)
+- [Messages](#messages)
+- [Staff Preferences](#staff-preferences)
+- [Billing / Subscription](#billing--subscription)
+
+11. [Interactive Guide Tours](#interactive-guide-tours)
+12. [Shared Components](#shared-components)
+13. [Key Developer Patterns](#key-developer-patterns)
+14. [Performance Optimizations](#performance-optimizations)
+15. [Recent Major Changes](#recent-major-changes)
+16. [Deployment](#deployment)
 
 ---
 
@@ -170,28 +176,33 @@ If you need to override the backend at build time, extend `api.js` to read `impo
 
 ---
 
-## Authentication Flow
+## Authentication & Session Lifecycle
 
 **File:** `src/context/AuthContext.jsx`
 
 `AuthProvider` wraps the entire app in `main.jsx`. It manages:
 
-| Export            | Type           | Description                                                                  |
-| ----------------- | -------------- | ---------------------------------------------------------------------------- |
-| `user`            | object \| null | Parsed user from `localStorage`                                              |
-| `role`            | string         | `"admin"`, `"superadmin"`, or `"staff"`                                      |
-| `tenant`          | object \| null | Tenant document fetched from the API                                         |
-| `loading`         | boolean        | `true` while hydrating from localStorage on first mount                      |
-| `isAdmin`         | boolean        | Derived: `role === "admin" \|\| role === "superadmin"`                       |
-| `login(data)`     | function       | Normalises API response, sets user/role state + localStorage, fetches tenant |
-| `logout()`        | function       | Clears all state and localStorage                                            |
-| `refreshTenant()` | function       | Re-fetches tenant data and updates state                                     |
+| Export                | Type           | Description                                                                  |
+| --------------------- | -------------- | ---------------------------------------------------------------------------- |
+| `user`                | object \| null | Parsed user from `localStorage`                                              |
+| `role`                | string         | `"admin"`, `"superadmin"`, or `"staff"`                                      |
+| `tenant`              | object \| null | Tenant document fetched from the API                                         |
+| `facilityPreferences` | object \| null | Facility-level configuration and policy                                      |
+| `loading`             | boolean        | `true` while hydrating from localStorage on first mount                      |
+| `isAdmin`             | boolean        | Derived: `role === "admin" \|\| role === "superadmin"`                       |
+| `login(data)`         | function       | Normalises API response, sets user/role state + localStorage, fetches tenant |
+| `logout()`            | function       | Clears all state, active tokens, and localStorage                            |
+| `refreshTenant()`     | function       | Re-fetches tenant data and updates state                                     |
+| `can(permission)`     | function       | Granular permission check helper                                             |
 
-**Session persistence:**
-On mount, `AuthProvider` reads `user` and `token` from `localStorage`. If a token is found it is immediately set as the Axios default header, so the very first API calls made by any child component are already authenticated without waiting for a login action.
+**Session persistence & JWT Validation:**
+
+- On mount, `AuthProvider` validates stored JWT expiration (`isTokenExpired`) using client-side decoding (`parseJwt`). Expired sessions trigger an immediate clean logout.
+- If a valid token is found, it is immediately attached as the Axios default `Authorization` header so all child components are authenticated on initial render.
+- An Axios response interceptor monitors 401 Unauthorized responses. It checks whether the stored token is genuinely expired/missing before logging out, preventing false-positive logouts from unrelated permission-denied errors.
 
 **Route guarding:**
-`PrivateRoute` (`src/components/Shared/PrivateRoute.jsx`) redirects to `/login` for unauthenticated users. It waits for `loading === false` before evaluating, preventing false redirects on hard refresh while state hydrates.
+`PrivateRoute` (`src/components/Shared/PrivateRoute.jsx`) redirects unauthenticated users to `/login`. It waits for `loading === false` before evaluating to avoid false redirects on hard refresh. Authenticated users landing on `/`, `/login`, or `/signup-tenant` are automatically routed to `/dashboard`.
 
 ---
 
@@ -204,7 +215,37 @@ Two role categories control what a user sees and can do:
 | `"admin"` / `"superadmin"` | `true`    | Admin menu: staff mgmt, coverage, schedule builder, time-off decisions, billing, messages |
 | `"staff"` (or any other)   | `false`   | Staff menu: my schedule, preferences, my time-off requests, shift swaps, messages         |
 
-Role is stored in the `role` field on the user object returned by the backend. It is mirrored in `localStorage` for persistence. Components consume it via `const { role, isAdmin } = useAuth()`.
+Role is stored in the `role` field on the user object returned by the backend. It is mirrored in `localStorage` for persistence. Components consume it via `const { role, isAdmin, can } = useAuth()`.
+
+---
+
+## Date & Timezone Architecture
+
+WiserShifts uses a strict, unambiguous timezone architecture designed for multi-facility operations where administrators, schedulers, and healthcare staff may work in different timezones.
+
+### The Storage Invariant: UTC Instants
+
+All timestamps across MongoDB models (`Coverage`, `Schedule`, `TimeOff`, `TimeTracking`) are persisted exclusively as absolute **UTC Date instants** (ISO 8601 strings over the API, e.g. `2026-09-01T11:00:00.000Z`). Database storage is completely timezone-agnostic.
+
+### Write-Time: Local Clock to UTC Instant
+
+When human users define shifts (e.g. "7:00 AM – 3:00 PM"), that clock time must be interpreted in a specific timezone to compute the absolute UTC instant:
+
+1. **Confirmed Facility Timezone (Primary / Optimal Path):**
+   - When an admin configures and confirms an IANA timezone in Facility Preferences (e.g., `America/New_York` or `America/Chicago`), `facilityTimezoneConfirmed: true` is set.
+   - For slot-based coverage requirements (`shiftType` + `shiftTag`), `CoverageCreateForm` sends an array of dates (`dates: activeDates`) along with the shift taxonomy.
+   - The backend resolves the slot's `startLocalTime`/`endLocalTime` against the facility's confirmed timezone using Luxon. A 7:00 AM shift in `America/New_York` becomes `11:00:00.000Z` in summer (EDT) and `12:00:00.000Z` in winter (EST), handling DST transitions automatically.
+   - This ensures that a corporate scheduler in California creating shifts for a facility in Georgia produces the exact 7:00 AM local start time needed at the Georgia facility.
+
+2. **Device-Local Fallback (Unconfirmed / Manual Time Entry):**
+   - If the facility timezone has not been confirmed (`facilityTimezoneConfirmed: false`), or if the scheduler manually enters custom start/end clock times without a shift slot, the frontend uses `toUTCISOString` / `toUTC`.
+   - The browser calculates the absolute UTC instant using the device's local clock (`Intl.DateTimeFormat().resolvedOptions().timeZone`) and sends per-date requests with explicit UTC timestamps.
+
+### Read-Time & UI Display: Dynamic Timezone Labeling
+
+- **Client-Side Rendering:** All viewing components (`ScheduleList`, `CoveragePlanningPage`, `AutoGenerateScheduleForm`, `ScheduleForm`, `TimeOffDecision`) parse the stored UTC instant via `new Date(utcString)` and format it locally using standard browser localization (`toLocaleTimeString` / `toLocaleDateString`).
+- **Dynamic Timezone Abbreviations:** Using the `getLocalTimeZoneAbbreviation` utility (`src/utils/timeZone.js`), displayed shift ranges explicitly show the active DST-aware zone abbreviation (e.g. `7:00 AM - 3:00 PM EDT` or `6:00 AM - 2:00 PM CDT`).
+- **Backend Notifications:** Email and SMS alerts format timestamps in the facility's configured timezone using `timezoneUtils.js` (`formatRangeInFacilityZone`), avoiding UTC label confusion in operational messages.
 
 ---
 
@@ -263,27 +304,16 @@ While paywalled, the entire app collapses to a single `/billing` route served by
 
 ## Feature Areas
 
-### Facility Preferences
+### Facility Preferences & Timezone
 
-`FacilityPreferencesPage` now drives the app taxonomy model used by staff, coverage, and scheduling:
+`FacilityPreferencesPage` drives the central taxonomy and operational rules:
 
-- `roleFamilies`
-- `unitAreas`
-- `shiftTypes`
-- `shiftTypeDefinitions` (shift type + time-slot definitions)
-- `certificationTags`
+- **Facility Timezone Picker:** Full IANA timezone autocomplete (`Intl.supportedValuesOf('timeZone')`). Saving a timezone sets `facilityTimezoneConfirmed: true` in MongoDB, enabling clean multi-date coverage generation and facility-accurate time resolution.
+- **Taxonomy Model:** `roleFamilies`, `unitAreas`, `shiftTypes`, `shiftTypeDefinitions` (with time slots e.g. `day_am 07:00-15:00`), and `certificationTags`.
+- **Scheduling Policy & Workload:** Configures rotation patterns (`balance`, `4_on_4_off`, `2_2_3`, `panama`, `fixed_5_2`, `rotating_3`, `custom`), weekly overtime thresholds, and fairness lookback windows.
+- **Time Tracking:** Supports open or QR-code based attendance with clock in/out grace minutes and rounding intervals.
 
-Values are normalized to `snake_case` for storage/reference and displayed as human-friendly words in UI.
-
-Timezone behavior:
-
-- Facility timezone is fixed to UTC in persisted configuration.
-- Frontend handles local-time conversion for display/input.
-
-Examples:
-
-- `memory_care` is displayed as `Memory Care`
-- typing `Memory Care` is saved as `memory_care`
+Values are normalized to `snake_case` for database persistence and rendered as human-friendly labels in the UI.
 
 ---
 
@@ -295,141 +325,69 @@ Examples:
 - **`ScheduleAndCoverageCharts`** — Bar/line charts showing scheduled hours vs coverage requirements.
 - **Profile section** — Avatar + self-service profile picture upload.
 
-The dashboard is visible to both admins and staff, but admin sees the full summary (org-wide) while staff sees their personal snapshot.
+The dashboard is visible to both admins and staff, with operational metrics for managers and personal metrics for staff.
 
 ---
 
 ### Coverage Planning
 
-**`CoveragePlanningPage`** lets admins define minimum staffing levels per role per time window (e.g. "3 RNs needed on the night shift, Mon–Fri").
+**`CoveragePlanningPage`** lets admins define minimum staffing levels per role per time window (e.g. "3 RNs needed on the day shift, Mon–Fri").
 
-- **List view** — paginated table of all coverage records with edit/delete.
-- **Calendar view** — FullCalendar time-grid showing coverage blocks as events.
-- **`CoverageCreateForm`** — planner-style creation flow with start date, horizon, repeat mode, generated dates, and templates.
-- **`CoverageEditCountForm`** — quick edit to change the headcount on an existing slot.
-
-Coverage now supports taxonomy-aware fields:
-
-- `unitArea` (optional)
-- `shiftType` (optional)
-- `shiftTag` (optional, tied to shift definition time slots)
-- `requiredCertificationTags` (optional)
-
-UI notes:
-
-- Coverage creation uses `Shift Definition` options generated from facility `shiftTypeDefinitions` and stores both `shiftType` and `shiftTag`.
-- Time Slot is a searchable inline select (type to filter by time, label, or shift name).
-- Selecting a definition auto-populates start/end time from the selected slot.
-- Time entry is slot-definition-first; users must choose an existing slot from Facility Preferences.
-- If no shift definitions are configured, the shift-definition field remains visible but disabled with guidance text.
-- Coverage list/cards now display unit area, shift type, shift slot, and required cert tags.
-- Coverage planner now has two submission paths: **Save Requirement Only** or **Save Requirements and Generate Draft Schedule**.
-
-API endpoints used: `GET /api/v1/coverage`, `POST /api/v1/coverage`, `PATCH /api/v1/coverage/:id`, `DELETE /api/v1/coverage/:id`.
+- **List view** — Paginated table with multi-select filtering across Roles, Fill Statuses, and Unit Areas, plus live text search.
+- **Calendar view** — FullCalendar view showing coverage blocks color-coded by role and staffing status.
+- **`CoverageCreateForm`** — Planner-style creation flow:
+  - Supports start date, horizon, and repeat patterns (every day, weekdays, custom days).
+  - Natural Language ("Describe with AI") dictation/text parser to generate requirements.
+  - Generates coverage via a single bulk `POST /coverage` call when the facility timezone is confirmed, with a fallback to per-date browser resolution for custom times.
+  - Offers **Save Requirement Only** or **Save Requirements and Generate Draft Schedule**.
+- **`CoverageEditCountForm`** — Quick dialog to edit required headcount for an existing slot.
 
 ---
 
-### Schedule Builder
+### Schedule Builder & Roster
 
-**`ScheduleList`** is a dual-mode shift management page.
+**`ScheduleList`** is a multi-mode shift management and roster planning page.
 
-- **Table view** — paginated list with columns for staff name, role, shift window, status, plus taxonomy details.
-- **Calendar view** — FullCalendar month view with colour-coded events by role.
-
-List behavior note:
-
-- Table/list rows are sorted newest-to-oldest by shift start time.
-
-Schedule rows now include:
-
-- `unitArea`
-- `shiftType`
-- `shiftTag`
-- `certificationTags`
+- **Table view** — Paginated list with multi-select filters (Roles, Statuses, Unit Areas, Shift Times), persistent active-filter chips, and newest-first ordering.
+- **Calendar view** — FullCalendar month grid with color-coded shift blocks.
+- **Roster view** — Interactive grid grouped by staff and unit/shift. Supports smooth native HTML5 drag-and-drop staff reordering. The reordered roster sequence is saved in `localStorage` keyed by month (`YYYY-MM`) and scoped per user.
+- **PDF & Excel Exports** — Export calendar summaries, monthly roster grids, or open shift sign-up sheets.
 
 **Creating / editing shifts:**
 
-- `ScheduleForm` — single shift create/edit dialog.
-- `AutoGenerateScheduleForm` — draft-first AI scheduling board with controlled review and publish workflow.
-
-Draft scheduling workflow now includes:
-
-- Open-coverage intake from `GET /api/v1/coverage/unfilled-auto` with role filtering and multi-select.
-- Coverage cards that show taxonomy metadata and headcount context (`required / scheduled`).
-- Draft creation from selected coverage IDs via `POST /api/v1/schedules/auto-generate`.
-- Open coverage cards include a direct **Create draft** action for one-click draft generation from a single coverage item.
-- Active draft list and detail loading from draft schedule endpoints.
-- Assignment-level editing in draft (staff, start/end time, notes, state, force override).
-- Unfilled draft assignments include a direct **Fill with AI** action using `POST /api/v1/schedules/draft-schedules/:draftId/assignments/:assignmentId/fill-ai`.
-- Quick state transitions (`proposed`, `locked`, `removed`) and overtime/consecutive-day warning chips.
-- Selective publish or publish-all actions from draft.
-- Draft discard action and refresh behavior that re-syncs coverage + draft state.
-- Calendar workspace is always visible, even when no draft is selected, and still overlays live schedules and open coverage.
-- Calendar toolbar is simplified to month navigation (no week switch).
-- Publish actions remain available but are disabled when no publishable assignments exist.
-- Legend is intentionally minimal for scanability: live schedule, open coverage (manual), AI proposed, and AI unfilled.
-
-Manual scheduling safeguards:
-
-- `ScheduleForm` excludes draft-linked coverages by default to avoid collisions.
-- Admins can toggle inclusion of draft-flow coverages when needed.
-- Non-admin users always have draft-linked coverages excluded and do not see the toggle.
-
-**Shift swaps (staff):** Any staff member can open `ShiftSwapRequestModal` on a shift they are scheduled for to request a swap with a colleague. The swap request then appears in `ShiftSwapRequestsPage`.
+- `ScheduleForm` — Single shift creation/editing. Includes `coverageId` linking to open coverage slots, role compatibility checks, and overlap conflict detection. Supports staff self-service pickup mode.
+- `AutoGenerateScheduleForm` — Draft schedule workspace with AI candidate ranking, assignment overrides, conflict warnings, and selective/bulk publishing.
 
 ---
 
 ### Staff Management
 
-**`StaffList`** is admin-only. It provides:
+**`StaffList`** provides:
 
-- Full-text search across name and email.
+- Full-text search across name, email, and roles.
 - Role filter dropdown.
-- Create / edit a staff member via `StaffCreateAndEditForm` (dialog form).
-- **Bulk import** — `BulkStaffModal` accepts a CSV file and posts all rows to the backend in a single request.
-- Delete with a `ConfirmDialog` prompt before the API call.
+- Single staff creation and editing via `StaffCreateAndEditForm`.
+- **Bulk import** — `BulkStaffModal` for CSV imports.
+- Direct password reset link dispatching for staff members.
 
-Staff capability model now includes:
+Staff capabilities & preferences managed by admin:
 
-- `allowedAreas`
-- `allowedShiftTags`
-- `allowedShiftTypes`
-- `certificationTags`
-
-Notes:
-
-- Staff create/edit uses shift-slot selection derived from facility shift definitions.
-- The shift-slot section remains visible even when definitions are not configured and shows guidance text directing admins to Facility Preferences.
-- `allowedShiftTypes` is still persisted for compatibility, and slot selections are mapped to slot-specific values when available.
-
-Profile picture flow update:
-
-- Staff list now displays profile pictures with initials fallback.
-- Profile picture is no longer managed in admin create/edit form.
-- Users manage profile pictures from the dashboard profile upload action.
-
-Staff records carry a `role` field that maps to the `ROLE_COLORS` lookup used across the schedule and coverage views.
+- Capabilities (hard constraints): `allowedAreas`, `allowedShiftTags`, `allowedShiftTypes`, and `certificationTags`.
+- Scheduling preferences (soft signals): `preferredDaysOfWeek`, `avoidDaysOfWeek`, `targetHoursPerWeek`, `maxShiftsPerWeek`, `maxConsecutiveDays`, `wantsOvertime`, and biweekly rotation (`worksEveryOtherWeek` + `rotationAnchorDate`).
 
 ---
 
 ### Time Off
 
-Three components make up the time-off feature:
+Three components manage the time-off workflow:
 
-| Component             | Used by    | Purpose                                                                                                                                   |
-| --------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `TimeOffRequestList`  | Everyone   | Lists the logged-in user's own requests grouped as Pending / Approved / Denied. Includes a "Request Time Off" button that opens the modal |
-| `TimeOffRequestModal` | Everyone   | Dialog with start datetime, end datetime, and optional reason. Posts to `POST /api/v1/timeoff`                                            |
-| `TimeOffDecision`     | Admin only | Shows all pending requests across the org. Admin can approve or deny each one                                                             |
+| Component             | Used by    | Purpose                                                                                                   |
+| --------------------- | ---------- | --------------------------------------------------------------------------------------------------------- |
+| `TimeOffRequestList`  | Everyone   | Lists the user's time-off requests (Pending / Approved / Denied) with status cards and days count.        |
+| `TimeOffRequestModal` | Everyone   | Dialog with start/end `datetime-local` inputs properly converted to UTC instants via `toUTC()`.           |
+| `TimeOffDecision`     | Admin only | Admin approval inbox to review, approve, or deny requests with reviewer notes and timezone-labeled times. |
 
-**Admin sidebar links:**
-
-- **Time Off Decisions** → `/timeoff-decisions` — org-wide approval queue
-- **My Time Off Requests** → `/timeoff-requests` — admin's own personal requests
-
-**Staff sidebar link:**
-
-- **My Time Off Requests** → `/timeoff-requests`
+Approved time-off records strictly prevent staff from being auto-scheduled or picking up overlapping shifts.
 
 ---
 
@@ -437,38 +395,41 @@ Three components make up the time-off feature:
 
 **`ShiftSwapRequestsPage`** has two tabs:
 
-- **Inbox** — swap requests sent to the current user. They can accept or deny each one.
-- **Sent** — requests the current user has initiated. They can cancel pending ones.
+- **Inbox** — Swap requests sent to the current user (accept or deny).
+- **Sent** — Requests the current user initiated (cancel pending).
 
-Admins see all requests org-wide. Staff see only requests they are a party to.
-
-A new swap is initiated via `ShiftSwapRequestModal`, which lets the requester pick a colleague and propose the time window.
-
-Status values: `pending`, `accepted`, `denied`, `cancelled`, `expired` — each maps to a MUI `Chip` colour via the `STATUS_COLOR` map.
+Admins see all requests org-wide. A new swap is initiated via `ShiftSwapRequestModal` on any scheduled shift.
 
 ---
 
-### Messages
+### Staff Preferences
 
-**`MessageList`** provides internal messaging within a tenant:
+**`PreferencesPage`** is the self-service portal for non-admin staff to set their availability:
 
-- Left panel: conversation list with search and unread badge counts.
-- Right panel: thread view with inline reply.
-- New message: `MessageComposer` modal — pick a recipient and write a message.
+- **Preferred Days** — Weekdays the staff member wants to work.
+- **Days to Avoid** — Weekdays the staff member prefers to have off.
+- **Open to Overtime** — Switch indicating willingness to take overtime hours without penalty in AI ranking.
+- **Notification Preferences** — Email and SMS alert toggles.
 
-All messages are scoped to the tenant so staff from different facilities never see each other's data.
+Internal administrative controls (target hours, max shifts, consecutive days, rotation) are strictly hidden from the staff view and managed exclusively by administrators in `StaffCreateAndEditForm`.
 
 ---
 
-### Preferences
+### Billing / Subscription
 
-**`PreferencesPage`** is visible only to non-admin staff. Staff declare:
+**`ManageSubscription`** handles Stripe plan upgrades, seat limits, and portal management with paywall protection.
 
-- Preferred days of the week.
+---
 
-Staff preferences payload is intentionally simplified to backend-supported fields (days + notification preferences) and no longer attempts to persist removed legacy preference fields.
+## Interactive Guide Tours
 
-These preferences are stored on the backend and consumed by the `AutoGenerateScheduleForm` when building schedules.
+WiserShifts features an in-app interactive tour system built on `GuideTourContext` and `GuideTourOverlay`:
+
+- **Zero External Dependencies:** Implemented using standard React context and dynamic DOM spotlight rendering.
+- **Smart Auto-Launch:** When a user visits a page or opens a form for the first time, the interactive tour automatically starts, introducing key actions step-by-step.
+- **Per-User Persistence:** Seen states are saved in `localStorage` under `wisershifts_guide_seen_<tourId>_<userScopeId>`, ensuring tours only auto-launch once per user per browser.
+- **Manual "Take tour" Button:** Embedded consistently across all 9 major views and 3 modal forms using the `GuideHelpButton` component for on-demand replay.
+- **Role-Aware Steps:** Step definitions dynamically adapt based on permissions (`canManageSchedules`, `canManageStaff`, etc.), so staff never see tour steps pointing to administrative actions they cannot access.
 
 ---
 
@@ -491,6 +452,8 @@ These preferences are stored on the backend and consumed by the `AutoGenerateSch
 | `Sidebar`             | Persistent left nav drawer. Renders `adminMenuItems` or `staffMenuItems` based on `user.role`. Bottom section shows user name/email and a `...` menu for Change Password. Permanent on `sm+`, temporary (overlay) on mobile |
 | `PrivateRoute`        | Wraps any route that requires auth. Renders `null` / loading text until `AuthContext.loading` settles, then redirects to `/login` if no user                                                                                |
 | `ConfirmDialog`       | Generic "Are you sure?" dialog used before any destructive API call (delete staff, delete shift, etc.)                                                                                                                      |
+| `GuideHelpButton`     | Consistent "Take tour" button triggering the interactive walkthrough for the active view/form.                                                                                                                              |
+| `GuideTourOverlay`    | Global spotlight overlay rendering step tooltips with back/next/skip controls. Mounted once in `App.jsx`.                                                                                                                   |
 | `ChangePasswordModal` | Auth modal accessible from the Sidebar footer menu                                                                                                                                                                          |
 
 ---
@@ -526,88 +489,64 @@ try {
 
 ### Role-aware rendering
 
-## Recent Major Changes
-
-The frontend has been migrated from hardcoded role assumptions to a facility-driven taxonomy model.
-
-Highlights:
-
-1. Dynamic roles and compatibility
-
-- Role options now derive from facility preferences when configured.
-- Compatibility checks are handled by shared role helper utilities.
-
-2. Coverage model expansion
-
-- Coverage creation/edit and display now include `unitArea`, `shiftType`, `shiftTag`, and `requiredCertificationTags`.
-- Coverage creation is now slot-definition-first via facility `shiftTypeDefinitions`; legacy auto-infer fallback has been removed.
-
-3. Schedule model expansion
-
-- Schedule form/list now include `unitArea`, `shiftType`, `shiftTag`, and `certificationTags`.
-
-4. Draft schedule board expansion
-
-- Auto-generation now follows a draft lifecycle (create, review, edit, publish/discard) instead of immediate schedule finalization.
-- Draft workspace supports assignment-level controls, warning visibility, selective publish, and bulk publish.
-- Draft sourcing and publish operations are wired to dedicated draft schedule endpoints.
-
-5. Staff capability model
-
-- Staff create/edit and list support `allowedAreas`, `allowedShiftTags`, `allowedShiftTypes`, and `certificationTags`.
-
-6. Profile picture responsibility
-
-- Profile image upload moved to self-service dashboard flow; removed from admin staff create/edit form.
-
-7. Facility taxonomy normalization
-
-- Facility taxonomy entries are normalized to `snake_case` for storage and shown as readable labels in UI.
-
-8. Staff preferences simplification
-
-- Preferences now submit only backend-supported fields to prevent schema mismatch.
-
-9. Dashboard simplification
-
-- Dashboard quick-action modal block was removed to keep the dashboard lightweight and focused on operational visibility.
-
-10. Coverage create flow split actions
-
-- Coverage planner now supports a save-only path in addition to save-and-generate-draft.
-
-11. Manual scheduling draft-safety
-
-- Manual shift creation now protects against scheduling into draft-linked coverages by default.
-
-12. Schedule list ordering
-
-- Table/list schedule rows now default to newest-first ordering.
-
-13. Auto-generate workspace visibility and calendar controls
-
-- Schedule workspace calendar now renders even with no active draft selected.
-- Calendar view controls were simplified to month navigation only.
-
-14. Coverage slot-select UX hardening
-
-- Coverage planning now enforces existing slot selection via a searchable Time Slot select.
-- Invalid free-typed values are not persisted; users must pick a configured slot.
-
-15. Draft workspace contextual actions
-
-- Open coverage cards can now create a draft directly from the card.
-- Unfilled draft cards can now trigger AI refill on a single assignment slot.
-
-Components check `isAdmin` or `role` from `useAuth()` to show/hide UI sections rather than maintaining separate pages. For example, `TimeOffRequestList` shows admin approve/deny actions inline when `isAdmin === true`.
+Components check `isAdmin`, `role`, or `can(permission)` from `useAuth()` to show/hide UI sections rather than maintaining separate pages.
 
 ### Modal-first UX
 
 Forms (create staff, create shift, request time off, compose message, etc.) are all rendered as MUI `<Dialog>` components triggered by local state (`openModal`). This avoids full page navigations for common CRUD actions.
 
-### Inline pagination
+### Multi-Select & Filter Persistence
 
-List pages use MUI `<TablePagination>` with local `page` / `rowsPerPage` state. Data is fetched in full and sliced client-side. No cursor or server-side pagination is implemented yet.
+- Filter states across `ScheduleList` and `CoveragePlanningPage` are multi-select enabled.
+- State is persisted to `localStorage` scoped per user (`wisershifts_<feature>_filters_<userId>`) with legacy key fallback.
+
+---
+
+## Performance Optimizations
+
+1. **Server-Side Coverage Aggregation:**
+   - The backend `GET /coverage` endpoint attaches pre-calculated `assignedCount` and `remaining` using an indexed MongoDB `$group` aggregation (`countAssignmentsByCoverage`).
+   - `CoveragePlanningPage` no longer fetches all schedules just to count fill levels, eliminating extra network load and client-side nested aggregation loops.
+
+2. **Foreign Key Slot Linking (`coverageId`):**
+   - Shift schedules store the direct `coverageId` FK of the coverage slot they fulfill.
+   - Schedule and coverage matching is $O(1)$ via Map lookups in memory with graceful signature fallback for legacy records.
+
+3. **Multi-Date Bulk Creation:**
+   - For confirmed facilities, `CoverageCreateForm` creates full recurring coverage patterns across all active dates in a single `POST /coverage` request instead of looping per-date requests.
+
+4. **Client-Side Memoization:**
+   - Heavy calendar day matrices, roster staff rows, and filter chains use targeted `useMemo` dependencies to prevent re-computations on unrelated state updates.
+
+---
+
+## Recent Major Changes
+
+1. **Timezone Correctness & Dynamic Labeling:**
+   - Established facility timezone confirmation flow with strict UTC instant database invariants and client-side dynamic timezone abbreviations (e.g. `EDT`, `CDT`).
+   - Hardened `TimeOffRequestModal` with `toUTC` conversion to prevent wall-clock skew on time-off submissions.
+
+2. **Interactive Guide Tour System:**
+   - Built a lightweight, custom tour engine (`GuideTourContext`, `GuideTourOverlay`, `GuideHelpButton`) deployed across 9 major portal pages and 3 core forms.
+   - Replaced standalone video dialogs with clean, inline interactive tours that auto-launch once per user and support on-demand replay.
+
+3. **Coverage Planning Performance & Headcount Alignment:**
+   - Removed duplicate `/schedules` fetch from `CoveragePlanningPage`, switching to direct backend-computed `assignedCount` and `remaining`.
+   - Enabled single-request multi-date coverage generation for confirmed facilities.
+
+4. **Preferences & Scheduling Expansion:**
+   - Added support for `avoidDaysOfWeek`, `wantsOvertime`, `targetHoursPerWeek`, `maxShiftsPerWeek`, `maxConsecutiveDays`, and biweekly rotation (`worksEveryOtherWeek` + `rotationAnchorDate`).
+   - Refactored `PreferencesPage` for staff self-service by exposing only personal availability preferences (preferred days, days to avoid, overtime switch) while keeping administrative policy controls in `StaffCreateAndEditForm`.
+
+5. **Session & Security Hardening:**
+   - Added client-side JWT expiration validation on mount to cleanly expire stale sessions.
+   - Implemented an intelligent Axios 401 response interceptor that only logs out when tokens are genuinely expired or missing.
+   - Added authenticated redirects preventing logged-in users from viewing public landing pages inside the app shell.
+
+6. **Roster Drag-and-Drop & Multi-Select Filters:**
+   - Multi-select filters for roles, statuses, unit areas, and shift times with active-chip removal.
+   - Native HTML5 drag-and-drop roster reordering with month-keyed (`YYYY-MM`) and user-scoped `localStorage` persistence.
+   - Complete rebrand of storage keys to `wisershifts_*` with backward-compatible legacy key fallbacks.
 
 ---
 

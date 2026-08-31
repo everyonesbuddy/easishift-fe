@@ -413,47 +413,43 @@ export default function ManageSubscription() {
                       }}
                     >
                       <Box>
-                        <Stack
-                          direction="row"
-                          justifyContent="space-between"
-                          alignItems="flex-start"
-                          spacing={1}
-                          sx={{ mb: 1.5 }}
+                        {p.highlight && (
+                          <Chip
+                            label="Most popular"
+                            color="primary"
+                            size="small"
+                            sx={{
+                              fontWeight: 700,
+                              fontSize: "0.65rem",
+                              height: 20,
+                              mb: 1,
+                              "& .MuiChip-label": { px: 1 },
+                            }}
+                          />
+                        )}
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 900,
+                            lineHeight: 1.15,
+                            fontSize: { xs: "1.05rem", md: "1.1rem" },
+                          }}
                         >
-                          <Box>
-                            <Typography
-                              variant="h6"
-                              sx={{
-                                fontWeight: 900,
-                                lineHeight: 1.15,
-                                fontSize: { xs: "1.05rem", md: "1.1rem" },
-                              }}
-                            >
-                              {p.name}
-                            </Typography>
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                color: "text.secondary",
-                                mt: 0.35,
-                                fontSize: { xs: "0.76rem", md: "0.78rem" },
-                              }}
-                            >
-                              {p.isEnterprise
-                                ? "Custom package"
-                                : `Per facility / ${p.interval === "month" ? "month" : "year"}`}
-                            </Typography>
-                          </Box>
-
-                          {p.highlight && (
-                            <Chip
-                              label="Most popular"
-                              color="primary"
-                              size="small"
-                              sx={{ fontWeight: 800, height: 26 }}
-                            />
-                          )}
-                        </Stack>
+                          {p.name}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: "text.secondary",
+                            mt: 0.35,
+                            mb: 1.5,
+                            fontSize: { xs: "0.76rem", md: "0.78rem" },
+                          }}
+                        >
+                          {p.isEnterprise
+                            ? "Custom package"
+                            : `Per facility / ${p.interval === "month" ? "month" : "year"}`}
+                        </Typography>
                         <Typography
                           variant="h5"
                           sx={{

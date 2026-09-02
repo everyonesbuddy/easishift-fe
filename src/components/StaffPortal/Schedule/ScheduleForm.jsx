@@ -547,19 +547,16 @@ export default function ScheduleForm({
       payload.coverageId = formData.coverageId;
     }
 
-    if (!canManageSchedules && isEditing) {
-      payload.status = formData.status;
-      delete payload.staffId;
-      delete payload.role;
-      delete payload.startTime;
-      delete payload.endTime;
-      delete payload.notes;
-      delete payload.timezone;
-    }
-
     try {
       if (isEditing) {
-        await api.put(`/schedules/${schedule._id}`, payload);
+        // Staff without schedule.manage may only change their own shift status.
+        if (canManageSchedules) {
+          await api.put(`/schedules/${schedule._id}`, payload);
+        } else {
+          await api.patch(`/schedules/${schedule._id}/status`, {
+            status: formData.status,
+          });
+        }
         toast.success("Schedule updated", {
           position: "top-right",
           autoClose: 2500,

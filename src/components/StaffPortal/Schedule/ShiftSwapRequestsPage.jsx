@@ -67,7 +67,10 @@ export default function ShiftSwapRequestsPage() {
 
   const loadStaff = async () => {
     try {
-      const res = await api.get("/auth/users");
+      // Staff without staff.view get the scoped swap directory instead.
+      const res = await api.get(
+        can("staff.view") ? "/auth/users" : "/auth/users/directory",
+      );
       setStaffList(res.data || []);
     } catch (err) {
       console.error("Failed to fetch staff list", err);

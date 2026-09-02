@@ -46,9 +46,9 @@ export default function ContactPage() {
                 <Typography
                   sx={{ color: "text.secondary", mt: 1.5, maxWidth: 620 }}
                 >
-                  Whether you are exploring Easishift for the first time or want
-                  to improve an existing rollout, our team can help you find the
-                  right next step.
+                  Whether you are exploring Wisershifts for the first time or
+                  want to improve an existing rollout, our team can help you
+                  find the right next step.
                 </Typography>
               </Box>
 

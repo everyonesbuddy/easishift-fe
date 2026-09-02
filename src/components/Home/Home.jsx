@@ -469,7 +469,7 @@ export default function Home() {
                   </Typography>
                   <Typography sx={{ color: "text.secondary", mt: 0.5 }}>
                     Compare turnover and labor cost leakage in one place, with
-                    projected Easishift savings.
+                    projected Wisershifts savings.
                   </Typography>
                 </Box>
 

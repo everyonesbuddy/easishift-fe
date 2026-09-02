@@ -165,15 +165,13 @@ export default function CoveragePlanningPage() {
 
   const savedFilters = useMemo(() => {
     try {
-      const stored =
-        localStorage.getItem(COVERAGE_FILTERS_STORAGE_KEY) ||
-        localStorage.getItem(`easishift_coverage_filters_${userScopeId}`);
+      const stored = localStorage.getItem(COVERAGE_FILTERS_STORAGE_KEY);
       return stored ? JSON.parse(stored) : null;
     } catch (e) {
       console.error("Failed to read coverage filters from localStorage", e);
       return null;
     }
-  }, [COVERAGE_FILTERS_STORAGE_KEY, userScopeId]);
+  }, [COVERAGE_FILTERS_STORAGE_KEY]);
 
   const [coverages, setCoverages] = useState([]);
   const [loading, setLoading] = useState(true);

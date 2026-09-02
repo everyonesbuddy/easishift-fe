@@ -202,18 +202,15 @@ export default function ScheduleList() {
   const ROSTER_ORDER_STORAGE_KEY = `wisershifts_roster_order_${userScopeId}`;
   const SCHEDULE_FILTERS_STORAGE_KEY = `wisershifts_schedule_filters_${userScopeId}`;
 
-  // Initial filter state from localStorage (with fallback to legacy key if needed)
   const savedFilters = useMemo(() => {
     try {
-      const stored =
-        localStorage.getItem(SCHEDULE_FILTERS_STORAGE_KEY) ||
-        localStorage.getItem(`easishift_schedule_filters_${userScopeId}`);
+      const stored = localStorage.getItem(SCHEDULE_FILTERS_STORAGE_KEY);
       return stored ? JSON.parse(stored) : null;
     } catch (e) {
       console.error("Failed to read schedule filters from localStorage", e);
       return null;
     }
-  }, [SCHEDULE_FILTERS_STORAGE_KEY, userScopeId]);
+  }, [SCHEDULE_FILTERS_STORAGE_KEY]);
 
   const [selectedRoles, setSelectedRoles] = useState(() =>
     Array.isArray(savedFilters?.roles) ? savedFilters.roles : [],
@@ -271,9 +268,7 @@ export default function ScheduleList() {
   // Manual per-group staff ordering set by dragging Roster rows; keyed by unit/shift-block group
   const [staffOrderByGroup, setStaffOrderByGroup] = useState(() => {
     try {
-      const stored =
-        localStorage.getItem(ROSTER_ORDER_STORAGE_KEY) ||
-        localStorage.getItem(`easishift_roster_order_${userScopeId}`);
+      const stored = localStorage.getItem(ROSTER_ORDER_STORAGE_KEY);
       return stored ? JSON.parse(stored) : {};
     } catch (e) {
       console.error("Failed to read roster order from localStorage", e);
@@ -318,6 +313,8 @@ export default function ScheduleList() {
           ROSTER_ORDER_STORAGE_KEY,
           JSON.stringify(staffOrderByGroup),
         );
+      } else {
+        localStorage.removeItem(ROSTER_ORDER_STORAGE_KEY);
       }
     } catch (e) {
       console.error("Failed to save roster order to localStorage", e);
@@ -654,8 +651,11 @@ export default function ScheduleList() {
   // ---------------------------
   const fetchStaff = async () => {
     try {
-      const res = await api.get("/auth/users");
-      setStaff(res.data);
+      // Staff without staff.view get the scoped swap directory instead.
+      const res = await api.get(
+        can("staff.view") ? "/auth/users" : "/auth/users/directory",
+      );
+      setStaff(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Failed to fetch staff", err);
     }

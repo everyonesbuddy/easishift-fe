@@ -116,14 +116,20 @@ export default function Navbar({ onMobileOpen }) {
                   fontWeight: 700,
                   boxShadow: "0 10px 24px rgba(37, 99, 235, 0.22)",
                   "&:hover": {
-                    bgcolor: "#1D4ED8",
+                    bgcolor: "#0F172A",
+                    color: "#fff",
+                    boxShadow: "0 12px 28px rgba(15, 23, 42, 0.24)",
                   },
                 }}
               >
-                Book demo
+                Book a Scheduling Audit
               </Button>
-              <Button component={Link} to="/login" sx={{ color: "black" }}>
-                Login
+              <Button
+                component={Link}
+                to="/login"
+                sx={{ color: "black", textTransform: "none" }}
+              >
+                Log In
               </Button>
             </>
           ) : (

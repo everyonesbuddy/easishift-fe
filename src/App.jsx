@@ -5,6 +5,7 @@ import ResetPassword from "./components/Auth/ResetPassword";
 import StaffDashboard from "./components/StaffPortal/Dashboard/StaffDashboard";
 import SignupTenant from "./components/Auth/SignupTenant";
 import Home from "./components/Home/Home";
+import PricingPage from "./components/Home/PricingPage";
 import Calculators from "./components/Home/Calculators";
 import TurnoverRoiCalculator from "./components/Home/TurnoverRoiCalculator";
 import CostLeakCalculator from "./components/Home/CostLeakCalculator";
@@ -82,6 +83,7 @@ export default function App() {
             path="/"
             element={user ? <Navigate to="/dashboard" replace /> : <Home />}
           />
+          <Route path="/pricing" element={<PricingPage />} />
           <Route path="/calculators" element={<Calculators />} />
           <Route
             path="/turnover-roi-calculator"

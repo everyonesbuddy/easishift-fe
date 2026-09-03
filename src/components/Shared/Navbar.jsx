@@ -40,7 +40,7 @@ export default function Navbar({ onMobileOpen }) {
         zIndex: 30,
       }}
     >
-      <Toolbar sx={{ px: 4, height: 72, minHeight: 72 }}>
+      <Toolbar sx={{ px: { xs: 1, sm: 4 }, height: 72, minHeight: 72 }}>
         <Box sx={{ flex: 1, display: "flex", alignItems: "center" }}>
           {!user ? (
             <>
@@ -61,10 +61,11 @@ export default function Navbar({ onMobileOpen }) {
                   alt="Wisershifts logo"
                   aria-label="Wisershifts"
                   sx={{
-                    width: 220,
+                    width: { xs: 190, sm: 220 },
                     height: 40,
                     display: "block",
                     objectFit: "contain",
+                    transform: { xs: "translateX(-8px)", sm: "none" },
                   }}
                 />
               </Box>
@@ -107,6 +108,7 @@ export default function Navbar({ onMobileOpen }) {
                 rel="noopener noreferrer"
                 startIcon={<FiPhoneCall size={16} />}
                 sx={{
+                  display: { xs: "none", sm: "inline-flex" },
                   color: "#fff",
                   bgcolor: "#2563EB",
                   borderRadius: 999,

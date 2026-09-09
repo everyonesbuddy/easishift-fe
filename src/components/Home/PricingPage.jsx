@@ -20,8 +20,8 @@ const YEARLY_PLANS = [
   {
     name: "Starter",
     billingLabel: "Per facility / year",
-    price: "$4,000/yr",
-    subPrice: "Equivalent to $333/mo billed annually",
+    price: "$4,800/yr",
+    subPrice: "Equivalent to $400/mo billed annually",
     employeeLimit: "Up to 50 active employees",
     features: [
       "Standard support",
@@ -39,8 +39,8 @@ const YEARLY_PLANS = [
   {
     name: "Growth",
     billingLabel: "Per facility / year",
-    price: "$7,000/yr",
-    subPrice: "Equivalent to $583/mo billed annually",
+    price: "$7,700/yr",
+    subPrice: "Equivalent to $641.67/mo billed annually",
     employeeLimit: "Up to 100 active employees",
     features: [
       "Standard support",
@@ -57,8 +57,8 @@ const YEARLY_PLANS = [
   {
     name: "Premium",
     billingLabel: "Per facility / year",
-    price: "$9,000/yr",
-    subPrice: "Equivalent to $750/mo billed annually",
+    price: "$9,600/yr",
+    subPrice: "Equivalent to $800/mo billed annually",
     employeeLimit: "Up to 150 active employees",
     features: [
       "Priority support",

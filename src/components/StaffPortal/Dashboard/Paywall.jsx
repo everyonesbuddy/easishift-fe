@@ -121,7 +121,7 @@ export default function Paywall({ tenant }) {
     <Container maxWidth="lg" sx={{ mt: 6, mb: 6, pb: 8, px: { xs: 2, sm: 3 } }}>
       <Box sx={{ textAlign: "center", mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 900 }}>
-          Activate your clinic
+          Activate your facility
         </Typography>
         <Typography sx={{ color: "text.secondary", mt: 1 }}>
           Select a plan to unlock staff seats and activate your subscription.

@@ -39,7 +39,11 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
 import api from "../../../config/api";
-import { getLocalTimeZoneAbbreviation } from "../../../utils/timeZone";
+import {
+  formatInTimeZone,
+  getDisplayTimeZone,
+  getTimeZoneAbbreviation,
+} from "../../../utils/timeZone";
 import { useGuideTour } from "../../../context/GuideTourContext";
 import { toast } from "react-toastify";
 import {
@@ -164,6 +168,7 @@ const getScheduleTourSteps = ({
 
 export default function ScheduleList() {
   const { user, can, facilityPreferences } = useAuth();
+  const displayTimeZone = getDisplayTimeZone(facilityPreferences);
   const canManageSchedules = can("schedule.manage");
   const canViewAllSchedules = can("schedule.view");
   const hasSchedulableRole =
@@ -413,7 +418,7 @@ export default function ScheduleList() {
     });
     const overnightHint =
       options.withNextDayHint && isOvernightShift(schedule) ? " (+1 day)" : "";
-    const zone = getLocalTimeZoneAbbreviation(start);
+    const zone = getTimeZoneAbbreviation(start, displayTimeZone);
 
     return `${startTime} - ${endTime} ${zone}${overnightHint}`;
   };
@@ -429,13 +434,15 @@ export default function ScheduleList() {
         month: "short",
         day: "numeric",
         year: "numeric",
+        ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
       }),
       time: date.toLocaleTimeString(undefined, {
         hour: "numeric",
         minute: "2-digit",
         hour12: true,
+        ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
       }),
-      zone: getLocalTimeZoneAbbreviation(date),
+      zone: getTimeZoneAbbreviation(date, displayTimeZone),
     };
   };
 
@@ -450,11 +457,13 @@ export default function ScheduleList() {
       month: "short",
       day: "numeric",
       year: "numeric",
+      ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
     });
     const endDate = end.toLocaleDateString(undefined, {
       month: "short",
       day: "numeric",
       year: "numeric",
+      ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
     });
 
     return startDate === endDate ? startDate : `${startDate} - ${endDate}`;
@@ -1837,6 +1846,7 @@ export default function ScheduleList() {
               hour: "numeric",
               minute: "2-digit",
               hour12: true,
+              ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
             });
         const endTime = Number.isNaN(end.getTime())
           ? ""
@@ -1844,6 +1854,7 @@ export default function ScheduleList() {
               hour: "numeric",
               minute: "2-digit",
               hour12: true,
+              ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
             });
         const unit = getUnitAreaDisplayName(shift.unitArea) || "No unit";
         return `${shift.staffId?.name || "Unknown"} (${startTime}-${endTime}, ${unit})`;
@@ -1930,10 +1941,12 @@ export default function ScheduleList() {
           const date = parseDateKeyToLocalDate(day);
           const weekday = date.toLocaleDateString(undefined, {
             weekday: "short",
+            ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
           });
           const monthDay = date.toLocaleDateString(undefined, {
             month: "short",
             day: "numeric",
+            ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
           });
           return `${monthDay} (${weekday})`;
         }),
@@ -4739,6 +4752,7 @@ export default function ScheduleList() {
 
           <FullCalendar
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+            timeZone={displayTimeZone || "local"}
             initialView="dayGridMonth"
             editable={canManageSchedules}
             selectable={canManageSchedules}
@@ -4826,7 +4840,7 @@ export default function ScheduleList() {
               const endLabel = formatCompactDateTime(end).time;
               const timeLabel = `${startLabel} - ${endLabel}`;
               const dateMarker = spansMultipleDays
-                ? `${start.toLocaleDateString(undefined, { month: "short", day: "numeric" })} - ${end.toLocaleDateString(undefined, { month: "short", day: "numeric" })} • Overnight`
+                ? `${start.toLocaleDateString(undefined, { month: "short", day: "numeric", ...(displayTimeZone ? { timeZone: displayTimeZone } : {}) })} - ${end.toLocaleDateString(undefined, { month: "short", day: "numeric", ...(displayTimeZone ? { timeZone: displayTimeZone } : {}) })} • Overnight`
                 : "";
               const isUrgent = props.isUrgentStatus;
 
@@ -5206,15 +5220,21 @@ export default function ScheduleList() {
                 <Stack spacing={1}>
                   <Alert severity="info">
                     You already have an active time entry from{" "}
-                    {new Date(activeTimeEntry.clockInAt).toLocaleString()}. Use
-                    Clock Out to complete it.
+                    {formatInTimeZone(
+                      activeTimeEntry.clockInAt,
+                      {},
+                      displayTimeZone,
+                    )}
+                    . Use Clock Out to complete it.
                   </Alert>
                   {getOpenBreak(activeTimeEntry) ? (
                     <Alert severity="warning">
                       Active break started at{" "}
-                      {new Date(
+                      {formatInTimeZone(
                         getOpenBreak(activeTimeEntry).startAt,
-                      ).toLocaleString()}
+                        {},
+                        displayTimeZone,
+                      )}
                       .
                     </Alert>
                   ) : null}

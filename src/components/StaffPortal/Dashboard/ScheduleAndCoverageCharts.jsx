@@ -1,5 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import api from "../../../config/api";
+import { useAuth } from "../../../context/AuthContext";
+import { getDisplayTimeZone, getTimeZoneDayKey } from "../../../utils/timeZone";
 import {
   Paper,
   Typography,
@@ -50,27 +52,27 @@ function getWeekDays() {
   });
 }
 
-function formatDayLabel(date) {
+function formatDayLabel(date, timeZone) {
   if (!date) return "";
-  return new Date(date).toLocaleDateString(undefined, { weekday: "short" });
+  return new Date(date).toLocaleDateString(undefined, {
+    weekday: "short",
+    ...(timeZone ? { timeZone } : {}),
+  });
 }
 
-// Local YYYY-MM-DD (en-CA) day key (reflects local timezone)
-function getLocalDayKey(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d.toLocaleDateString("en-CA");
+function getLocalDayKey(date, timeZone) {
+  return getTimeZoneDayKey(date, timeZone);
 }
 
 // split shift across days if it spans midnight - uses local times created from supplied Date objects
-function splitShiftByDay(shift) {
+function splitShiftByDay(shift, timeZone) {
   const start = new Date(shift.startTime);
   const end = new Date(shift.endTime);
   const result = [];
   let current = new Date(start);
 
   while (current < end) {
-    const dayKey = getLocalDayKey(current);
+    const dayKey = getLocalDayKey(current, timeZone);
     const dayEnd = new Date(current);
     dayEnd.setHours(23, 59, 59, 999);
     const shiftEnd = end < dayEnd ? end : dayEnd;
@@ -86,13 +88,14 @@ function splitShiftByDay(shift) {
 }
 
 // format times consistently
-function formatTime(d) {
+function formatTime(d, timeZone) {
   if (!d) return "";
   return new Date(d)
     .toLocaleTimeString([], {
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
+      ...(timeZone ? { timeZone } : {}),
     })
     .replace(/\s?/g, "");
 }
@@ -153,6 +156,8 @@ export default function ScheduleAndCoverageCharts({
   canUsePersonalSchedule = false,
   userId,
 }) {
+  const { facilityPreferences } = useAuth();
+  const displayTimeZone = getDisplayTimeZone(facilityPreferences);
   const [schedules, setSchedules] = useState([]);
   const [coverage, setCoverage] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -194,11 +199,14 @@ export default function ScheduleAndCoverageCharts({
   const coverageNormalized = useMemo(() => {
     return coverage.flatMap((c) => {
       if (!c.startTime || !c.endTime) return [];
-      const splitShifts = splitShiftByDay({
-        ...c,
-        startTime: new Date(c.startTime),
-        endTime: new Date(c.endTime),
-      });
+      const splitShifts = splitShiftByDay(
+        {
+          ...c,
+          startTime: new Date(c.startTime),
+          endTime: new Date(c.endTime),
+        },
+        displayTimeZone,
+      );
       return splitShifts.map((s) => ({
         ...s,
         role: c.role,
@@ -208,17 +216,20 @@ export default function ScheduleAndCoverageCharts({
         endTime: s.end,
       }));
     });
-  }, [coverage]);
+  }, [coverage, displayTimeZone]);
 
   // schedulesNormalized: split multi-day schedules into per-day segments
   const schedulesNormalized = useMemo(() => {
     return schedules.flatMap((s) => {
       if (!s.startTime || !s.endTime) return [];
-      const splitShifts = splitShiftByDay({
-        ...s,
-        startTime: new Date(s.startTime),
-        endTime: new Date(s.endTime),
-      });
+      const splitShifts = splitShiftByDay(
+        {
+          ...s,
+          startTime: new Date(s.startTime),
+          endTime: new Date(s.endTime),
+        },
+        displayTimeZone,
+      );
       return splitShifts.map((part) => ({
         ...part,
         // Prefer the shift-specific role over the staff profile's singular role
@@ -228,7 +239,7 @@ export default function ScheduleAndCoverageCharts({
         end: part.end,
       }));
     });
-  }, [schedules]);
+  }, [schedules, displayTimeZone]);
 
   const personalSchedulesNormalized = useMemo(() => {
     return schedulesNormalized.filter((schedule) => {
@@ -252,19 +263,23 @@ export default function ScheduleAndCoverageCharts({
     const firstLabel = first.toLocaleDateString(undefined, {
       weekday: "short",
       ...opts,
+      ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
     });
     const lastLabel = last.toLocaleDateString(undefined, {
       weekday: "short",
       ...opts,
+      ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
     });
     return `${firstLabel} – ${lastLabel}`;
-  }, [weekDays]);
+  }, [weekDays, displayTimeZone]);
 
   useEffect(() => {
     if (!weekDays.length) return;
-    if (!coverageStartDate) setCoverageStartDate(getLocalDayKey(weekDays[0]));
-    if (!coverageEndDate) setCoverageEndDate(getLocalDayKey(weekDays[6]));
-  }, [weekDays, coverageStartDate, coverageEndDate]);
+    if (!coverageStartDate)
+      setCoverageStartDate(getLocalDayKey(weekDays[0], displayTimeZone));
+    if (!coverageEndDate)
+      setCoverageEndDate(getLocalDayKey(weekDays[6], displayTimeZone));
+  }, [weekDays, coverageStartDate, coverageEndDate, displayTimeZone]);
 
   // -------------------
   // Roles & role selector (only roles that actually have coverage)
@@ -290,7 +305,9 @@ export default function ScheduleAndCoverageCharts({
   const weeklyOvertimeData = useMemo(() => {
     if (!canViewOperations) return [];
 
-    const weekDayKeys = new Set(weekDays.map((d) => getLocalDayKey(d)));
+    const weekDayKeys = new Set(
+      weekDays.map((d) => getLocalDayKey(d, displayTimeZone)),
+    );
     const totals = new Map();
 
     schedulesNormalized
@@ -340,7 +357,7 @@ export default function ScheduleAndCoverageCharts({
         };
       })
       .sort((a, b) => b.hours - a.hours);
-  }, [canViewOperations, schedulesNormalized, weekDays]);
+  }, [canViewOperations, schedulesNormalized, weekDays, displayTimeZone]);
 
   const filteredWeeklyOvertimeData = useMemo(() => {
     if (!canViewOperations) return [];
@@ -466,7 +483,7 @@ export default function ScheduleAndCoverageCharts({
   //               Staff -> Today's Shift & Upcoming Shifts
   // -------------------
 
-  const todayKey = getLocalDayKey(new Date());
+  const todayKey = getLocalDayKey(new Date(), displayTimeZone);
 
   // small helpers
   function getRoleDisplayName(role) {
@@ -503,15 +520,17 @@ export default function ScheduleAndCoverageCharts({
       if (!d) return "";
       // If value is a YYYY-MM-DD dayKey (from getLocalDayKey), parse as local midnight
       if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
-        return new Date(d + "T00:00:00").toLocaleDateString(undefined, {
+        return new Date(d + "T12:00:00").toLocaleDateString(undefined, {
           month: "short",
           day: "numeric",
+          ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
         });
       }
 
       return new Date(d).toLocaleDateString(undefined, {
         month: "short",
         day: "numeric",
+        ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
       });
     } catch (e) {
       return d;
@@ -528,7 +547,11 @@ export default function ScheduleAndCoverageCharts({
     if (diff === 0) return "Today";
     if (diff === 1) return "Tomorrow";
     if (diff > 1 && diff < 7) return `${diff} days`;
-    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return d.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
+    });
   }
 
   function formatDurationHours(start, end) {
@@ -723,8 +746,8 @@ export default function ScheduleAndCoverageCharts({
                             </Typography>
                           </Box>
                           <Typography variant="body2" sx={{ color: "#334155" }}>
-                            {formatTime(cov.shiftStart)} -{" "}
-                            {formatTime(cov.shiftEnd)}
+                            {formatTime(cov.shiftStart, displayTimeZone)} -{" "}
+                            {formatTime(cov.shiftEnd, displayTimeZone)}
                           </Typography>
                           {cov.unitArea ? (
                             <Typography
@@ -1016,8 +1039,8 @@ export default function ScheduleAndCoverageCharts({
                 >
                   <FiClock />
                   <Typography variant="body2" component="span">
-                    {formatTime(todayShift.start)} -{" "}
-                    {formatTime(todayShift.end)}
+                    {formatTime(todayShift.start, displayTimeZone)} -{" "}
+                    {formatTime(todayShift.end, displayTimeZone)}
                   </Typography>
                 </Box>
                 {todayShift.notes && (
@@ -1131,8 +1154,8 @@ export default function ScheduleAndCoverageCharts({
                       >
                         <FiClock />
                         <Typography variant="body2" component="span">
-                          {formatTime(shift.shiftStart)} -{" "}
-                          {formatTime(shift.shiftEnd)}
+                          {formatTime(shift.shiftStart, displayTimeZone)} -{" "}
+                          {formatTime(shift.shiftEnd, displayTimeZone)}
                         </Typography>
                         <Typography variant="caption" sx={{ color: "#64748B" }}>
                           (

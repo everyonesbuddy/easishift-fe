@@ -17,6 +17,7 @@ import {
 import { toast } from "react-toastify";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
+import { formatInTimeZone, getDisplayTimeZone } from "../../../utils/timeZone";
 import {
   getFacilityRolesFromUser,
   getRoleDisplayName,
@@ -24,10 +25,9 @@ import {
   isRoleCompatible,
 } from "../../../constants/industryRoles";
 
-const formatWindow = (startTime, endTime) => {
-  const start = new Date(startTime);
-  const end = new Date(endTime);
-  return `${start.toLocaleString()} - ${end.toLocaleString()}`;
+const formatWindow = (startTime, endTime, timeZone) => {
+  const options = { dateStyle: "medium", timeStyle: "short" };
+  return `${formatInTimeZone(startTime, options, timeZone)} - ${formatInTimeZone(endTime, options, timeZone)}`;
 };
 
 export default function ShiftSwapRequestModal({
@@ -39,6 +39,7 @@ export default function ShiftSwapRequestModal({
   staffList = [],
 }) {
   const { user, facilityPreferences } = useAuth();
+  const displayTimeZone = getDisplayTimeZone(facilityPreferences);
 
   const [mySchedules, setMySchedules] = useState([]);
   const [selectedScheduleId, setSelectedScheduleId] = useState(
@@ -171,7 +172,7 @@ export default function ShiftSwapRequestModal({
               ) : mySchedules.length ? (
                 mySchedules.map((item) => (
                   <MenuItem key={item._id} value={item._id}>
-                    {`${item.role} | ${formatWindow(item.startTime, item.endTime)}`}
+                    {`${item.role} | ${formatWindow(item.startTime, item.endTime, displayTimeZone)}`}
                   </MenuItem>
                 ))
               ) : (
@@ -190,7 +191,11 @@ export default function ShiftSwapRequestModal({
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {activeSchedule.role} |{" "}
-              {formatWindow(activeSchedule.startTime, activeSchedule.endTime)}
+              {formatWindow(
+                activeSchedule.startTime,
+                activeSchedule.endTime,
+                displayTimeZone,
+              )}
             </Typography>
           </Box>
         ) : (

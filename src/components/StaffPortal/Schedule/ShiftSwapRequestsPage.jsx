@@ -19,6 +19,7 @@ import { FiCheck, FiRefreshCw, FiSend, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
+import { formatInTimeZone, getDisplayTimeZone } from "../../../utils/timeZone";
 import ShiftSwapRequestModal from "./ShiftSwapRequestModal";
 
 const STATUS_COLOR = {
@@ -41,14 +42,14 @@ const STATUS_LABEL = {
   expired: "EXPIRED",
 };
 
-const formatWindow = (startTime, endTime) => {
-  const start = new Date(startTime);
-  const end = new Date(endTime);
-  return `${start.toLocaleString()} - ${end.toLocaleString()}`;
+const formatWindow = (startTime, endTime, timeZone) => {
+  const options = { dateStyle: "medium", timeStyle: "short" };
+  return `${formatInTimeZone(startTime, options, timeZone)} - ${formatInTimeZone(endTime, options, timeZone)}`;
 };
 
 export default function ShiftSwapRequestsPage() {
-  const { user, can } = useAuth();
+  const { user, can, facilityPreferences } = useAuth();
+  const displayTimeZone = getDisplayTimeZone(facilityPreferences);
   const canManageSchedules = can("schedule.manage");
 
   const [activeTab, setActiveTab] = useState("inbox");
@@ -258,8 +259,9 @@ export default function ShiftSwapRequestsPage() {
                     <Typography sx={{ fontWeight: 700 }}>
                       {requestItem.role} |{" "}
                       {formatWindow(
-                        requestItem.shiftStartTime,
-                        requestItem.shiftEndTime,
+                        requestItem.startTime,
+                        requestItem.endTime,
+                        displayTimeZone,
                       )}
                     </Typography>
                     <Typography
@@ -332,7 +334,13 @@ export default function ShiftSwapRequestsPage() {
                       size="small"
                       variant="contained"
                       startIcon={<FiCheck />}
-                      onClick={() => openRespondDialog(requestItem, "accept")}
+                      onClick={() =>
+                        openRespondDialog(
+                          requestItem,
+                          "accept",
+                          displayTimeZone,
+                        )
+                      }
                       sx={{
                         textTransform: "none",
                         bgcolor: "#15803d",

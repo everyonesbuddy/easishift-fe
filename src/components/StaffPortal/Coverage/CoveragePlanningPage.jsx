@@ -38,7 +38,10 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
 import api from "../../../config/api";
-import { getLocalTimeZoneAbbreviation } from "../../../utils/timeZone";
+import {
+  getDisplayTimeZone,
+  getTimeZoneAbbreviation,
+} from "../../../utils/timeZone";
 import {
   FiCalendar,
   FiList,
@@ -91,23 +94,25 @@ const COVERAGE_TOUR_STEPS = [
   },
 ];
 
-const formatShortTime = (dateValue) => {
+const formatShortTime = (dateValue, timeZone) => {
   if (!dateValue) return "";
   const date = new Date(dateValue);
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
   });
 };
 
-const formatShortDate = (dateValue) => {
+const formatShortDate = (dateValue, timeZone) => {
   if (!dateValue) return "";
   const date = new Date(dateValue);
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleDateString([], {
     month: "short",
     day: "numeric",
+    ...(timeZone ? { timeZone } : {}),
   });
 };
 
@@ -157,6 +162,7 @@ const FILL_STATUS_FILTER_OPTIONS = ["unfilled", "partial", "full"];
 export default function CoveragePlanningPage() {
   const { user, can, facilityPreferences } = useAuth();
   const isAdmin = can("coverage.manage");
+  const displayTimeZone = getDisplayTimeZone(facilityPreferences);
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -457,13 +463,16 @@ export default function CoveragePlanningPage() {
     if (!start) {
       return parseCoverageDateAsLocal(
         coverage?.date || coverage?.startTime,
-      )?.toLocaleDateString();
+      )?.toLocaleDateString([], {
+        ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
+      });
     }
 
     const startLabel = start.toLocaleDateString([], {
       month: "short",
       day: "numeric",
       year: "numeric",
+      ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
     });
 
     if (!spansOvernight(coverage)) {
@@ -477,6 +486,7 @@ export default function CoveragePlanningPage() {
       month: "short",
       day: "numeric",
       year: "numeric",
+      ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
     });
 
     return `${startLabel} - ${endLabel}`;
@@ -492,21 +502,25 @@ export default function CoveragePlanningPage() {
       month: "short",
       day: "numeric",
       year: "numeric",
+      ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
     });
     const endDateLabel = end.toLocaleDateString([], {
       month: "short",
       day: "numeric",
       year: "numeric",
+      ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
     });
     const startLabel = start.toLocaleTimeString([], {
       hour: "numeric",
       minute: "2-digit",
+      ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
     });
     const endLabel = end.toLocaleTimeString([], {
       hour: "numeric",
       minute: "2-digit",
+      ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
     });
-    const zone = getLocalTimeZoneAbbreviation(start);
+    const zone = getTimeZoneAbbreviation(start, displayTimeZone);
 
     return `${startDateLabel} ${startLabel} - ${endDateLabel} ${endLabel} ${zone}`;
   }
@@ -1471,6 +1485,9 @@ export default function CoveragePlanningPage() {
                         {toLocal(c.startTime)?.toLocaleTimeString([], {
                           hour: "numeric",
                           minute: "2-digit",
+                          ...(displayTimeZone
+                            ? { timeZone: displayTimeZone }
+                            : {}),
                         }) || "-"}
                       </Typography>
                     </TableCell>
@@ -1480,6 +1497,9 @@ export default function CoveragePlanningPage() {
                           ? toLocal(c.endTime)?.toLocaleDateString([], {
                               month: "short",
                               day: "numeric",
+                              ...(displayTimeZone
+                                ? { timeZone: displayTimeZone }
+                                : {}),
                             })
                           : formatCoverageDateLabel(c)}
                       </Typography>
@@ -1490,9 +1510,15 @@ export default function CoveragePlanningPage() {
                         {toLocal(c.endTime)?.toLocaleTimeString([], {
                           hour: "numeric",
                           minute: "2-digit",
+                          ...(displayTimeZone
+                            ? { timeZone: displayTimeZone }
+                            : {}),
                         }) || "-"}{" "}
                         {toLocal(c.endTime)
-                          ? getLocalTimeZoneAbbreviation(toLocal(c.endTime))
+                          ? getTimeZoneAbbreviation(
+                              toLocal(c.endTime),
+                              displayTimeZone,
+                            )
                           : ""}
                         {spansOvernight(c) ? " (+1 day)" : ""}
                       </Typography>
@@ -1706,6 +1732,7 @@ export default function CoveragePlanningPage() {
 
           <FullCalendar
             plugins={[dayGridPlugin, interactionPlugin]}
+            timeZone={displayTimeZone || "local"}
             initialView="dayGridMonth"
             editable={isAdmin}
             selectable={isAdmin}
@@ -1751,13 +1778,13 @@ export default function CoveragePlanningPage() {
               const start = toLocal(arg.event.start);
               const end = toLocal(arg.event.end);
 
-              const startLabel = formatShortTime(start);
-              const endLabel = formatShortTime(end);
+              const startLabel = formatShortTime(start, displayTimeZone);
+              const endLabel = formatShortTime(end, displayTimeZone);
               const spansMultipleDays =
                 start && end && start.toDateString() !== end.toDateString();
 
               const dateMarker = spansMultipleDays
-                ? `${formatShortDate(start)} - ${formatShortDate(end)} • Overnight`
+                ? `${formatShortDate(start, displayTimeZone)} - ${formatShortDate(end, displayTimeZone)} • Overnight`
                 : "";
 
               const timeLabel = `${startLabel || "--"} - ${endLabel || "--"}`;

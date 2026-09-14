@@ -33,7 +33,10 @@ import interactionPlugin from "@fullcalendar/interaction";
 import { toast } from "react-toastify";
 
 import api from "../../../config/api";
-import { getLocalTimeZoneAbbreviation } from "../../../utils/timeZone";
+import {
+  getDisplayTimeZone,
+  getTimeZoneAbbreviation,
+} from "../../../utils/timeZone";
 import { useAuth } from "../../../context/AuthContext";
 import { useGuideTour } from "../../../context/GuideTourContext";
 import GuideHelpButton from "../../Shared/GuideHelpButton";
@@ -235,7 +238,7 @@ const getCoverageId = (coverage) =>
 const getAssignmentCoverageId = (assignment) =>
   String(assignment?.coverageId?._id || assignment?.coverageId || "");
 
-const formatDatePart = (value) => {
+const formatDatePart = (value, timeZone) => {
   if (!value) return "Unknown date";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Unknown date";
@@ -243,14 +246,19 @@ const formatDatePart = (value) => {
     month: "short",
     day: "numeric",
     year: "numeric",
+    ...(timeZone ? { timeZone } : {}),
   });
 };
 
-const formatTimePart = (value) => {
+const formatTimePart = (value, timeZone) => {
   if (!value) return "--:--";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "--:--";
-  return parsed.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return parsed.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
+  });
 };
 
 const getLocalDayKey = (value) => {
@@ -262,8 +270,8 @@ const getLocalDayKey = (value) => {
   return `${year}-${month}-${day}`;
 };
 
-const formatDateTimeWindow = (startTime, endTime) =>
-  `${formatDatePart(startTime)} | ${formatTimePart(startTime)} - ${formatTimePart(endTime)} ${startTime ? getLocalTimeZoneAbbreviation(new Date(startTime)) : ""}`;
+const formatDateTimeWindow = (startTime, endTime, timeZone) =>
+  `${formatDatePart(startTime, timeZone)} | ${formatTimePart(startTime, timeZone)} - ${formatTimePart(endTime, timeZone)} ${startTime ? getTimeZoneAbbreviation(new Date(startTime), timeZone) : ""}`;
 
 const toDateTimeLocalInput = (value) => {
   const date = new Date(value);
@@ -433,7 +441,8 @@ export default function AutoGenerateScheduleForm({
   schedules = [],
   onOpenManualSchedule,
 }) {
-  useAuth();
+  const { facilityPreferences } = useAuth();
+  const displayTimeZone = getDisplayTimeZone(facilityPreferences);
   const { startTourIfUnseen } = useGuideTour();
 
   useEffect(() => {
@@ -2492,16 +2501,19 @@ export default function AutoGenerateScheduleForm({
                                                         Time:{" "}
                                                         {formatTimePart(
                                                           coverage.startTime,
+                                                          displayTimeZone,
                                                         )}{" "}
                                                         -{" "}
                                                         {formatTimePart(
                                                           coverage.endTime,
+                                                          displayTimeZone,
                                                         )}{" "}
                                                         {coverage.startTime
-                                                          ? getLocalTimeZoneAbbreviation(
+                                                          ? getTimeZoneAbbreviation(
                                                               new Date(
                                                                 coverage.startTime,
                                                               ),
+                                                              displayTimeZone,
                                                             )
                                                           : ""}
                                                       </Typography>
@@ -3056,6 +3068,7 @@ export default function AutoGenerateScheduleForm({
                                       {formatDateTimeWindow(
                                         assignment.startTime,
                                         assignment.endTime,
+                                        displayTimeZone,
                                       )}
                                       {assignment.unitArea
                                         ? ` · ${getUnitAreaDisplayName(assignment.unitArea)}`

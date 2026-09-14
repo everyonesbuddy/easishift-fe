@@ -241,10 +241,11 @@ When human users define shifts (e.g. "7:00 AM – 3:00 PM"), that clock time mus
    - If the facility timezone has not been confirmed (`facilityTimezoneConfirmed: false`), or if the scheduler manually enters custom start/end clock times without a shift slot, the frontend uses `toUTCISOString` / `toUTC`.
    - The browser calculates the absolute UTC instant using the device's local clock (`Intl.DateTimeFormat().resolvedOptions().timeZone`) and sends per-date requests with explicit UTC timestamps.
 
-### Read-Time & UI Display: Dynamic Timezone Labeling
+### Read-Time & UI Display: Facility Timezone Labeling
 
-- **Client-Side Rendering:** All viewing components (`ScheduleList`, `CoveragePlanningPage`, `AutoGenerateScheduleForm`, `ScheduleForm`, `TimeOffDecision`) parse the stored UTC instant via `new Date(utcString)` and format it locally using standard browser localization (`toLocaleTimeString` / `toLocaleDateString`).
-- **Dynamic Timezone Abbreviations:** Using the `getLocalTimeZoneAbbreviation` utility (`src/utils/timeZone.js`), displayed shift ranges explicitly show the active DST-aware zone abbreviation (e.g. `7:00 AM - 3:00 PM EDT` or `6:00 AM - 2:00 PM CDT`).
+- **Facility-local rendering:** Operational displays (`ScheduleList`, `CoveragePlanningPage`, dashboard schedule/coverage charts, auto-generated schedule review, schedule forms, shift swaps, and time-off views) parse stored UTC instants and render dates, times, day grouping, and calendars in the confirmed facility IANA timezone.
+- **Fallback behavior:** If `facilityTimezoneConfirmed` is false, displays fall back to the viewer's browser timezone. This preserves usable behavior while facility setup is incomplete.
+- **Dynamic timezone abbreviations:** The shared timezone utilities in `src/utils/timeZone.js` produce DST-aware abbreviations for the active display zone (for example, `7:00 AM - 3:00 PM EDT` or `6:00 AM - 2:00 PM CDT`).
 - **Backend Notifications:** Email and SMS alerts format timestamps in the facility's configured timezone using `timezoneUtils.js` (`formatRangeInFacilityZone`), avoiding UTC label confusion in operational messages.
 
 ---

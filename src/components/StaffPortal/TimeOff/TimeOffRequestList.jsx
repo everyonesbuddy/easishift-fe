@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
+import { formatInTimeZone, getDisplayTimeZone } from "../../../utils/timeZone";
 import { useGuideTour } from "../../../context/GuideTourContext";
 import TimeOffRequestModal from "./TimeOffRequestModal";
 import GuideHelpButton from "../../Shared/GuideHelpButton";
@@ -44,7 +45,8 @@ const TIMEOFF_LIST_TOUR_STEPS = [
 ];
 
 export default function TimeOffRequestList() {
-  const { user, can } = useAuth();
+  const { user, can, facilityPreferences } = useAuth();
+  const displayTimeZone = getDisplayTimeZone(facilityPreferences);
   const { startTourIfUnseen } = useGuideTour();
 
   useEffect(() => {
@@ -317,13 +319,17 @@ export default function TimeOffRequestList() {
                           sx={{ flexWrap: "wrap" }}
                         >
                           <Typography variant="subtitle1" sx={{ minWidth: 0 }}>
-                            {new Date(
+                            {formatInTimeZone(
                               r.startTime || r.startDate || r.start,
-                            ).toLocaleDateString()}{" "}
+                              {},
+                              displayTimeZone,
+                            )}{" "}
                             -{" "}
-                            {new Date(
+                            {formatInTimeZone(
                               r.endTime || r.endDate || r.end,
-                            ).toLocaleDateString()}
+                              {},
+                              displayTimeZone,
+                            )}
                           </Typography>
                           <Chip label={r.status || "pending"} />
                           {isPast && <Chip label="Past" variant="outlined" />}
@@ -345,9 +351,11 @@ export default function TimeOffRequestList() {
                           <Box display="flex" alignItems="center" gap={1}>
                             <FiCalendar />{" "}
                             <Typography variant="body2">
-                              {new Date(
+                              {formatInTimeZone(
                                 r.startTime || r.startDate || r.start,
-                              ).toLocaleDateString()}
+                                {},
+                                displayTimeZone,
+                              )}
                             </Typography>
                           </Box>
                         </Box>
@@ -375,13 +383,17 @@ export default function TimeOffRequestList() {
 
                         <Typography variant="caption" color="text.secondary">
                           Submitted{" "}
-                          {new Date(
+                          {formatInTimeZone(
                             r.requestedAt || r.createdAt || r.created,
-                          ).toLocaleString()}
+                            {},
+                            displayTimeZone,
+                          )}
                           {r.reviewedAt
-                            ? ` • Reviewed ${new Date(
+                            ? ` • Reviewed ${formatInTimeZone(
                                 r.reviewedAt,
-                              ).toLocaleString()}`
+                                {},
+                                displayTimeZone,
+                              )}`
                             : ""}
                         </Typography>
                       </Box>

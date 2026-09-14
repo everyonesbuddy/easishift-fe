@@ -19,9 +19,14 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import api from "../../../config/api";
+import { useAuth } from "../../../context/AuthContext";
 import { useGuideTour } from "../../../context/GuideTourContext";
 import GuideHelpButton from "../../Shared/GuideHelpButton";
-import { getLocalTimeZoneAbbreviation } from "../../../utils/timeZone";
+import {
+  formatInTimeZone,
+  getDisplayTimeZone,
+  getTimeZoneAbbreviation,
+} from "../../../utils/timeZone";
 import { FiCheck, FiX, FiCalendar, FiClock } from "react-icons/fi";
 
 function statusColor(status) {
@@ -74,6 +79,8 @@ const TIMEOFF_DECISION_TOUR_STEPS = [
 ];
 
 export default function TimeOffDecision() {
+  const { facilityPreferences } = useAuth();
+  const displayTimeZone = getDisplayTimeZone(facilityPreferences);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -313,8 +320,8 @@ export default function TimeOffDecision() {
                   </Box>
 
                   <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-                    {new Date(r.startTime).toLocaleDateString()} -{" "}
-                    {new Date(r.endTime).toLocaleDateString()}
+                    {formatInTimeZone(r.startTime, {}, displayTimeZone)} -{" "}
+                    {formatInTimeZone(r.endTime, {}, displayTimeZone)}
                   </Typography>
 
                   {r.reason && (
@@ -329,7 +336,7 @@ export default function TimeOffDecision() {
                     sx={{ display: "block", mt: 1 }}
                   >
                     {r.requestedAt
-                      ? new Date(r.requestedAt).toLocaleString()
+                      ? formatInTimeZone(r.requestedAt, {}, displayTimeZone)
                       : ""}
                     {r.reviewedBy ? ` • Reviewed` : ""}
                   </Typography>
@@ -390,9 +397,12 @@ export default function TimeOffDecision() {
                     {selected.staffId?.name || selected.staffName}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {new Date(selected.startTime).toLocaleString()} —{" "}
-                    {new Date(selected.endTime).toLocaleString()}{" "}
-                    {getLocalTimeZoneAbbreviation(new Date(selected.startTime))}
+                    {formatInTimeZone(selected.startTime, {}, displayTimeZone)}{" "}
+                    — {formatInTimeZone(selected.endTime, {}, displayTimeZone)}{" "}
+                    {getTimeZoneAbbreviation(
+                      new Date(selected.startTime),
+                      displayTimeZone,
+                    )}
                   </Typography>
                 </Box>
               </Box>

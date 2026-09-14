@@ -18,7 +18,10 @@ import { useAuth } from "../../../context/AuthContext";
 import { useGuideTour } from "../../../context/GuideTourContext";
 import GuideHelpButton from "../../Shared/GuideHelpButton";
 import api from "../../../config/api";
-import { getLocalTimeZoneAbbreviation } from "../../../utils/timeZone";
+import {
+  getDisplayTimeZone,
+  getTimeZoneAbbreviation,
+} from "../../../utils/timeZone";
 import { toast } from "react-toastify";
 import {
   getFacilityRolesFromUser,
@@ -46,7 +49,7 @@ function toUTC(dateString) {
 }
 
 // Format shift label using local time (FIXES date issue)
-function formatShiftLabel(coverage) {
+function formatShiftLabel(coverage, timeZone) {
   const start = new Date(coverage.startTime);
   const end = new Date(coverage.endTime);
 
@@ -54,19 +57,22 @@ function formatShiftLabel(coverage) {
     year: "numeric",
     month: "short",
     day: "numeric",
+    ...(timeZone ? { timeZone } : {}),
   });
 
   const startLabel = start.toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
   });
 
   const endLabel = end.toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
   });
 
-  const zone = getLocalTimeZoneAbbreviation(start);
+  const zone = getTimeZoneAbbreviation(start, timeZone);
 
   return `${dateLabel} — ${startLabel} - ${endLabel} ${zone}`;
 }
@@ -207,6 +213,7 @@ export default function ScheduleForm({
   const isPickup = mode === "pickup";
 
   const { can, facilityPreferences } = useAuth();
+  const displayTimeZone = getDisplayTimeZone(facilityPreferences);
   const canManageSchedules = can("schedule.manage");
   const { startTourIfUnseen } = useGuideTour();
   const scheduleFormTourId = isPickup
@@ -710,7 +717,7 @@ export default function ScheduleForm({
               ? ` • ${getUnitAreaDisplayName(initialCoverage.unitArea)}`
               : ""}
             {initialCoverage.startTime && initialCoverage.endTime
-              ? ` • ${formatShiftLabel(initialCoverage)}`
+              ? ` • ${formatShiftLabel(initialCoverage, displayTimeZone)}`
               : ""}
             {Array.isArray(initialCoverage.requiredCertificationTags) &&
             initialCoverage.requiredCertificationTags.length > 0
@@ -760,7 +767,8 @@ export default function ScheduleForm({
                       value={c._id}
                       disabled={c.spotsRemaining <= 0}
                     >
-                      {getRoleDisplayName(c.role)} • {formatShiftLabel(c)}
+                      {getRoleDisplayName(c.role)} •{" "}
+                      {formatShiftLabel(c, displayTimeZone)}
                       {c.unitArea
                         ? ` • ${getUnitAreaDisplayName(c.unitArea)}`
                         : ""}

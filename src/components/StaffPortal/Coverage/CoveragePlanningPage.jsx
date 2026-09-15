@@ -41,6 +41,8 @@ import api from "../../../config/api";
 import {
   getDisplayTimeZone,
   getTimeZoneAbbreviation,
+  getTimeZoneDateTimeValue,
+  getTimeZoneDayKey,
 } from "../../../utils/timeZone";
 import {
   FiCalendar,
@@ -447,14 +449,15 @@ export default function CoveragePlanningPage() {
   }
 
   function spansOvernight(coverage) {
-    // Always compute from local time — the backend's spansOvernight is UTC-based
-    // and will be wrong when the UTC dates match but local dates differ (e.g. 11 PM → 7 AM shift)
     const start = toLocal(coverage?.startTime);
     const end = toLocal(coverage?.endTime);
 
     if (!start || !end) return false;
 
-    return start.toDateString() !== end.toDateString();
+    return (
+      getTimeZoneDayKey(start, displayTimeZone) !==
+      getTimeZoneDayKey(end, displayTimeZone)
+    );
   }
 
   function formatCoverageDateLabel(coverage) {
@@ -590,8 +593,8 @@ export default function CoveragePlanningPage() {
         title: `${getRoleDisplayName(c.role)} (${c.requiredCount || 1})${
           c.unitArea ? ` • ${getUnitAreaDisplayName(c.unitArea)}` : ""
         }${c.shiftType ? ` • ${getShiftTypeDisplayName(c.shiftType)}` : ""}${c.shiftTag ? ` • ${getShiftTagDisplayName(c.shiftTag)}` : ""}`,
-        start: c.startTime,
-        end: c.endTime,
+        start: getTimeZoneDateTimeValue(c.startTime, displayTimeZone),
+        end: getTimeZoneDateTimeValue(c.endTime, displayTimeZone),
         backgroundColor: roleColor,
         borderColor: fillMeta.border,
         textColor: "#fff",
@@ -608,6 +611,8 @@ export default function CoveragePlanningPage() {
           remaining: c.remaining,
           fillStatus: fill,
           spansOvernight: spansOvernight(c),
+          startTime: c.startTime,
+          endTime: c.endTime,
         },
       };
     });
@@ -1775,13 +1780,16 @@ export default function CoveragePlanningPage() {
                 status: "unfilled",
               };
               const fillMeta = FILL_STATUS_META[fill.status];
-              const start = toLocal(arg.event.start);
-              const end = toLocal(arg.event.end);
+              const start = toLocal(arg.event.extendedProps?.startTime);
+              const end = toLocal(arg.event.extendedProps?.endTime);
 
               const startLabel = formatShortTime(start, displayTimeZone);
               const endLabel = formatShortTime(end, displayTimeZone);
               const spansMultipleDays =
-                start && end && start.toDateString() !== end.toDateString();
+                start &&
+                end &&
+                getTimeZoneDayKey(start, displayTimeZone) !==
+                  getTimeZoneDayKey(end, displayTimeZone);
 
               const dateMarker = spansMultipleDays
                 ? `${formatShortDate(start, displayTimeZone)} - ${formatShortDate(end, displayTimeZone)} • Overnight`
@@ -1872,11 +1880,7 @@ export default function CoveragePlanningPage() {
                 </Box>
               );
             }}
-            events={calendarEvents.map((e) => ({
-              ...e,
-              start: toLocal(e.start),
-              end: toLocal(e.end),
-            }))}
+            events={calendarEvents}
             eventClick={(info) => {
               const matched = coverages.find((c) => c._id === info.event.id);
               if (!matched) return;

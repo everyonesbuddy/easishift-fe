@@ -42,6 +42,8 @@ import api from "../../../config/api";
 import {
   formatInTimeZone,
   getDisplayTimeZone,
+  getTimeZoneDayKey,
+  getTimeZoneDateTimeValue,
   getTimeZoneAbbreviation,
 } from "../../../utils/timeZone";
 import { useGuideTour } from "../../../context/GuideTourContext";
@@ -4770,7 +4772,7 @@ export default function ScheduleList() {
               weekday: "short",
             }}
             dayCellClassNames={(arg) => {
-              const day = arg.date.getDay();
+              const day = new Date(`${arg.dateStr}T12:00:00Z`).getUTCDay();
               return day === 0 || day === 6 ? ["weekend-day-cell"] : [];
             }}
             dayCellContent={(arg) => (
@@ -4829,12 +4831,13 @@ export default function ScheduleList() {
                 );
               }
 
-              const start = new Date(arg.event.start);
-              const end = new Date(arg.event.end);
+              const start = new Date(props.startTime || arg.event.start);
+              const end = new Date(props.endTime || arg.event.end);
               const spansMultipleDays =
                 !Number.isNaN(start.getTime()) &&
                 !Number.isNaN(end.getTime()) &&
-                start.toDateString() !== end.toDateString();
+                getTimeZoneDayKey(start, displayTimeZone) !==
+                  getTimeZoneDayKey(end, displayTimeZone);
 
               const startLabel = formatCompactDateTime(start).time;
               const endLabel = formatCompactDateTime(end).time;
@@ -4955,8 +4958,8 @@ export default function ScheduleList() {
                 return {
                   id: s._id,
                   title: s.staffId?.name,
-                  start: s.startTime,
-                  end: s.endTime,
+                  start: getTimeZoneDateTimeValue(s.startTime, displayTimeZone),
+                  end: getTimeZoneDateTimeValue(s.endTime, displayTimeZone),
                   backgroundColor: isUrgentStatus ? "#EF4444" : roleColor,
                   borderColor: isUrgentStatus ? "#EF4444" : roleColor,
                   textColor: "#fff",
@@ -4966,6 +4969,8 @@ export default function ScheduleList() {
                     roleName: getRoleDisplayName(s.role),
                     status: s.status,
                     isUrgentStatus,
+                    startTime: s.startTime,
+                    endTime: s.endTime,
                   },
                 };
               }),

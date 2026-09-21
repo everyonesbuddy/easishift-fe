@@ -17,9 +17,13 @@ import {
   FiArrowRight,
   FiTrendingDown,
   FiHome,
+  FiDownload,
 } from "react-icons/fi";
 
 import heroImage from "../../assets/images/wisershifts-hero-visual.png";
+import gustoLogo from "../../assets/images/gusto.jpg";
+import quickbooksLogo from "../../assets/images/quickbooks.jpg";
+import ripplingLogo from "../../assets/images/rippling.png";
 import Footer from "../Shared/Footer";
 
 const NAVBAR_HEIGHT = 80;
@@ -449,6 +453,114 @@ export default function Home() {
                 title="Keep everyone informed"
                 text="Publish changes from one place so employees have a clear, current schedule."
               />
+            </Box>
+          </Section>
+
+          <Section sx={{ pb: { xs: 7, md: 8 } }}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", md: "0.9fr 1.1fr" },
+                gap: { xs: 4, md: 7 },
+                alignItems: "center",
+                borderTop: "1px solid #E5E7EB",
+                borderBottom: "1px solid #E5E7EB",
+                py: { xs: 5, md: 6 },
+              }}
+            >
+              <Box>
+                <Box sx={{ color: "#2563EB", mb: 1.5 }}>
+                  <FiDownload size={26} />
+                </Box>
+                <Typography
+                  component="h2"
+                  sx={{
+                    color: "#111827",
+                    fontWeight: 900,
+                    fontSize: { xs: "1.8rem", md: "2.35rem" },
+                    lineHeight: 1.1,
+                  }}
+                >
+                  Connect the tools around your workforce.
+                </Typography>
+                <Typography
+                  sx={{ color: "#667085", lineHeight: 1.65, mt: 1.5 }}
+                >
+                  Start with provider-ready payroll exports, then bring more of
+                  your workforce workflow into one connected place.
+                </Typography>
+                <Button
+                  onClick={() => navigate("/integrations")}
+                  endIcon={<FiArrowRight />}
+                  sx={{ mt: 2, px: 0, textTransform: "none", fontWeight: 800 }}
+                >
+                  Explore workforce integrations
+                </Button>
+              </Box>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
+                  border: "1px solid #E5E7EB",
+                  borderRadius: "16px",
+                  overflow: "hidden",
+                }}
+              >
+                {[
+                  { name: "Gusto", logo: gustoLogo, bg: "#FFF1EE" },
+                  { name: "QuickBooks", logo: quickbooksLogo, bg: "#EFFAEE" },
+                  { name: "Rippling", logo: ripplingLogo, bg: "#F3F4F6" },
+                ].map((provider, index) => (
+                  <Box
+                    key={provider.name}
+                    sx={{
+                      minHeight: 150,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 1.25,
+                      borderTop: {
+                        xs: index ? "1px solid #E5E7EB" : "none",
+                        sm: "none",
+                      },
+                      borderLeft: {
+                        xs: "none",
+                        sm: index ? "1px solid #E5E7EB" : "none",
+                      },
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 128,
+                        height: 62,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: 2,
+                        bgcolor: provider.bg,
+                        overflow: "hidden",
+                        p: provider.name === "Gusto" ? 0 : 0.75,
+                      }}
+                    >
+                      <Box
+                        component="img"
+                        src={provider.logo}
+                        alt={`${provider.name} logo`}
+                        sx={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                          display: "block",
+                        }}
+                      />
+                    </Box>
+                    <Typography sx={{ fontWeight: 800 }}>
+                      {provider.name}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
             </Box>
           </Section>
 

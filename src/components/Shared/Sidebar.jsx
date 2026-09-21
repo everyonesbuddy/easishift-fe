@@ -28,6 +28,7 @@ import {
   MdTune,
   MdHelpOutline,
   MdAccessTime,
+  MdFileDownload,
 } from "react-icons/md";
 import logo from "../../assets/logos/wiserShifts-logo-dark.svg";
 import { useAuth } from "../../context/AuthContext";
@@ -142,6 +143,16 @@ function Sidebar({ mobileOpen, onMobileClose }) {
             icon: MdAccessTime,
             label: can("staff.view") ? "Attendance" : "Time Tracking",
             to: "/time-tracking",
+          },
+        ]
+      : []),
+    ...(can("staff.view")
+      ? [
+          {
+            id: "payroll-exports",
+            icon: MdFileDownload,
+            label: "Payroll Exports",
+            to: "/payroll-exports",
           },
         ]
       : []),

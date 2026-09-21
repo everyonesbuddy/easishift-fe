@@ -13,6 +13,8 @@ import TermsAndConditions from "./components/Home/TermsAndConditions";
 import PrivacyPolicy from "./components/Home/PrivacyPolicy";
 import EndUserLicenseAgreement from "./components/Home/EndUserLicenseAgreement";
 import ContactPage from "./components/Home/ContactPage";
+import IntegrationsPage from "./components/Home/IntegrationsPage";
+import FeatureLandingPage from "./components/Home/FeatureLandingPage";
 import Navbar from "./components/Shared/Navbar";
 import Sidebar from "./components/Shared/Sidebar";
 import HowToUsePage from "./components/Shared/HowToUsePage";
@@ -31,6 +33,7 @@ import PreferencesPage from "./components/StaffPortal/NoAdminPreferences/Prefere
 import FacilityPreferencesPage from "./components/StaffPortal/FacilityPreferences/FacilityPreferencesPage";
 import CoveragePlanningPage from "./components/StaffPortal/Coverage/CoveragePlanningPage";
 import TimeTrackingPage from "./components/StaffPortal/TimeTracking/TimeTrackingPage";
+import PayrollExportsPage from "./components/StaffPortal/Exports/PayrollExportsPage";
 import { ToastContainer } from "react-toastify";
 import { Box } from "@mui/material";
 import { useAuth } from "./context/AuthContext";
@@ -100,6 +103,8 @@ export default function App() {
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/eula" element={<EndUserLicenseAgreement />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/integrations" element={<IntegrationsPage />} />
+          <Route path="/features/:feature" element={<FeatureLandingPage />} />
           <Route
             path="/login"
             element={user ? <Navigate to="/dashboard" replace /> : <Login />}
@@ -191,6 +196,14 @@ export default function App() {
             element={
               <PrivateRoute>
                 <TimeTrackingPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/payroll-exports"
+            element={
+              <PrivateRoute>
+                <PayrollExportsPage />
               </PrivateRoute>
             }
           />

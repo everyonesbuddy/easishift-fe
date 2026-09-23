@@ -1,9 +1,9 @@
 import { Box, Button, Chip, Container, Stack, Typography } from "@mui/material";
 import {
+  FiAlertCircle,
   FiArrowRight,
+  FiActivity,
   FiClock,
-  FiDollarSign,
-  FiTrendingUp,
   FiUsers,
 } from "react-icons/fi";
 import { Link as RouterLink } from "react-router-dom";
@@ -13,32 +13,32 @@ const NAVBAR_HEIGHT = 80;
 
 const CALCULATORS = [
   {
-    title: "Turnover ROI Calculator",
+    title: "Call-Out Cost Calculator",
     description:
-      "Estimate annual turnover burden and projected Wisershifts savings based on headcount, wage, turnover, and vacancy timeline.",
-    cta: "Open Turnover ROI",
-    to: "/turnover-roi-calculator",
-    icon: <FiTrendingUp size={18} />,
-    tag: "Retention & ROI",
-    question: "What is turnover costing us?",
-    details: ["Hiring cost", "Vacancy time", "Projected savings"],
-    accent: "#2563EB",
-    softAccent: "#EFF6FF",
-    time: "About 3 minutes",
+      "See the annual cost of covering call-outs through overtime, agency staff, and manager coordination time.",
+    cta: "Calculate Call-Out Cost",
+    to: "/calculators/call-out-cost-calculator",
+    icon: <FiAlertCircle size={18} />,
+    tag: "Flagship calculator",
+    question: "What does each coverage scramble cost?",
+    details: ["Overtime", "Agency spend", "Unfilled shifts"],
+    accent: "#0369A1",
+    softAccent: "#E0F2FE",
+    time: "About 4 minutes",
   },
   {
-    title: "Cost Leak Calculator (Estimator)",
+    title: "Overtime Cost Calculator",
     description:
-      "Estimate annual labor cost leakage across overtime, temporary labor premium, scheduling effort, and coverage inefficiency.",
-    cta: "Open Cost Leak Estimator",
-    to: "/cost-leak-calculator",
-    icon: <FiDollarSign size={18} />,
-    tag: "Labor Cost",
-    question: "Where is labor spend leaking?",
-    details: ["Overtime pressure", "Temporary labor", "Scheduling effort"],
-    accent: "#C2410C",
-    softAccent: "#FFF7ED",
-    time: "About 4 minutes",
+      "Separate reactive, last-minute overtime from planned overtime and estimate the annual scheduling-driven cost.",
+    cta: "Calculate Overtime Cost",
+    to: "/calculators/overtime-cost-calculator",
+    icon: <FiActivity size={18} />,
+    tag: "Reactive scheduling",
+    question: "How much overtime is avoidable?",
+    details: ["Reactive hours", "Planned hours", "Annual spend"],
+    accent: "#0F766E",
+    softAccent: "#ECFDF5",
+    time: "About 2 minutes",
   },
 ];
 
@@ -112,7 +112,10 @@ export default function Calculators() {
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+              gridTemplateColumns: {
+                xs: "1fr",
+                md: "repeat(2, minmax(0, 1fr))",
+              },
               gap: { xs: 2, md: 3 },
               alignItems: "stretch",
             }}

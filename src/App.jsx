@@ -7,8 +7,8 @@ import SignupTenant from "./components/Auth/SignupTenant";
 import Home from "./components/Home/Home";
 import PricingPage from "./components/Home/PricingPage";
 import Calculators from "./components/Home/Calculators";
-import TurnoverRoiCalculator from "./components/Home/TurnoverRoiCalculator";
-import CostLeakCalculator from "./components/Home/CostLeakCalculator";
+import CallOutCostCalculator from "./components/Home/CallOutCostCalculator";
+import OvertimeCostCalculator from "./components/Home/OvertimeCostCalculator";
 import TermsAndConditions from "./components/Home/TermsAndConditions";
 import PrivacyPolicy from "./components/Home/PrivacyPolicy";
 import EndUserLicenseAgreement from "./components/Home/EndUserLicenseAgreement";
@@ -90,11 +90,19 @@ export default function App() {
           <Route path="/calculators" element={<Calculators />} />
           <Route
             path="/turnover-roi-calculator"
-            element={<TurnoverRoiCalculator />}
+            element={<Navigate to="/calculators" replace />}
           />
           <Route
             path="/cost-leak-calculator"
-            element={<CostLeakCalculator />}
+            element={<Navigate to="/calculators" replace />}
+          />
+          <Route
+            path="/calculators/call-out-cost-calculator"
+            element={<CallOutCostCalculator />}
+          />
+          <Route
+            path="/calculators/overtime-cost-calculator"
+            element={<OvertimeCostCalculator />}
           />
           <Route
             path="/terms-and-conditions"

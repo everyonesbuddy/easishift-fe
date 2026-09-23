@@ -16,6 +16,7 @@ import { FiMail, FiPhoneCall } from "react-icons/fi";
 import { toast } from "react-toastify";
 import api from "../../config/api";
 import Footer from "../Shared/Footer";
+import { openBeehiivCaptureOnce } from "./calculatorUtils";
 
 const NAVBAR_HEIGHT = 80;
 const DEFAULTS = {
@@ -32,8 +33,6 @@ const SCHEDULING_HOURS_PER_WEEK = 10;
 const WEEKS_PER_YEAR = 52;
 const PRODUCTIVITY_FACTOR = 0.5;
 const WISERSHIFTS_SAVINGS_RATE = 0.28;
-const BEEHIIV_MAGIC_LINK_TEMPLATE =
-  "https://magic.beehiiv.com/v1/d46e492b-b716-407d-80d5-80ad8b9b4512?email=<email>";
 
 const formatMoney = (value) =>
   new Intl.NumberFormat("en-US", {
@@ -48,26 +47,6 @@ const alignToStep = (value, step, min) => {
   if (!step || step <= 0) return value;
   const snapped = Math.round((value - min) / step) * step + min;
   return Number(snapped.toFixed(4));
-};
-
-const buildBeehiivMagicLink = (email) => {
-  const encodedEmail = encodeURIComponent(email);
-  return BEEHIIV_MAGIC_LINK_TEMPLATE.replace("<email>", encodedEmail).replace(
-    "{{email}}",
-    encodedEmail,
-  );
-};
-
-const openBeehiivMagicLink = (email) => {
-  const url = buildBeehiivMagicLink(email);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.target = "_blank";
-  anchor.rel = "noopener noreferrer";
-  anchor.style.display = "none";
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
 };
 
 function InputWithSlider({
@@ -289,7 +268,7 @@ export default function TurnoverRoiCalculator() {
     try {
       setSendingEmail(true);
       // Trigger Beehiiv capture as a real link click from user interaction.
-      openBeehiivMagicLink(trimmedEmail);
+      openBeehiivCaptureOnce(trimmedEmail);
       await api.post("/marketing/turnover-roi/email-summary", payload);
 
       toast.success("Summary sent. Check your inbox.");

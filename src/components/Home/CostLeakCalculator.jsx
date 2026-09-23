@@ -16,34 +16,13 @@ import { FiMail, FiPhoneCall } from "react-icons/fi";
 import { toast } from "react-toastify";
 import api from "../../config/api";
 import Footer from "../Shared/Footer";
+import { openBeehiivCaptureOnce } from "./calculatorUtils";
 
 const NAVBAR_HEIGHT = 80;
 const WEEKS_PER_YEAR = 52;
 const MONTHS_PER_YEAR = 12;
 const TEMP_PREMIUM_RATE = 0.35;
 const SAVINGS_RATE = 0.24;
-const BEEHIIV_MAGIC_LINK_TEMPLATE =
-  "https://magic.beehiiv.com/v1/d46e492b-b716-407d-80d5-80ad8b9b4512?email=<email>";
-
-const buildBeehiivMagicLink = (email) => {
-  const encodedEmail = encodeURIComponent(email);
-  return BEEHIIV_MAGIC_LINK_TEMPLATE.replace("<email>", encodedEmail).replace(
-    "{{email}}",
-    encodedEmail,
-  );
-};
-
-const openBeehiivMagicLink = (email) => {
-  const url = buildBeehiivMagicLink(email);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.target = "_blank";
-  anchor.rel = "noopener noreferrer";
-  anchor.style.display = "none";
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-};
 
 const DEFAULTS = {
   employees: 120,
@@ -234,7 +213,7 @@ export default function CostLeakCalculator() {
 
     try {
       setSendingEmail(true);
-      openBeehiivMagicLink(trimmedEmail);
+      openBeehiivCaptureOnce(trimmedEmail);
       await api.post("/marketing/cost-leak/email-summary", payload);
       toast.success("Summary sent. Check your inbox.");
     } catch (error) {

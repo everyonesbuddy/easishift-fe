@@ -11,11 +11,12 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { FiArrowRight, FiCopy, FiMail } from "react-icons/fi";
+import { FiArrowRight, FiCopy, FiDownload, FiMail } from "react-icons/fi";
 import { Link as RouterLink } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../../config/api";
 import CalculatorInput from "./CalculatorInput";
+import { downloadCalculatorPdf } from "./calculatorPdf";
 import {
   copyCalculatorLink,
   formatMoney,
@@ -97,6 +98,10 @@ export default function CallOutCostCalculator() {
   const [managerHourlyRate, setManagerHourlyRate] = useState(() =>
     readNumberParam("managerRate", DEFAULTS.managerHourlyRate, 10, 150),
   );
+  const [potentialReductionPercent, setPotentialReductionPercent] = useState(
+    () => readNumberParam("savings", 25, 0, 50),
+  );
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
 
@@ -140,6 +145,9 @@ export default function CallOutCostCalculator() {
       annualManagerTimeCost,
       totalAnnualCost:
         annualOvertimeCost + annualAgencyCost + annualManagerTimeCost,
+      potentialSavings:
+        (annualOvertimeCost + annualAgencyCost) *
+        (potentialReductionPercent / 100),
       annualUnfilledShiftCount:
         callOutsPerWeek * (coverage.unfilledPercent / 100) * WEEKS_PER_YEAR,
     };
@@ -151,6 +159,7 @@ export default function CallOutCostCalculator() {
     managerHourlyRate,
     managerMinutes,
     overtimeMultiplier,
+    potentialReductionPercent,
     shiftLength,
   ]);
 
@@ -184,11 +193,56 @@ export default function CallOutCostCalculator() {
         agencyRate,
         managerMinutes,
         managerRate: managerHourlyRate,
+        savings: potentialReductionPercent,
       });
       toast.success("A link to these results was copied.");
     } catch {
       toast.error("Unable to copy the link. Please copy it from your browser.");
     }
+  };
+
+  const handleDownloadPdf = () => {
+    downloadCalculatorPdf({
+      calculatorTitle: "Call-Out Coverage Cost Summary",
+      filePrefix: "call-out-cost",
+      companyName,
+      costLabel: "Estimated call-out cost",
+      totalCost: formatMoney(metrics.totalAnnualCost),
+      potentialSavings: formatMoney(metrics.potentialSavings),
+      reductionPercent: potentialReductionPercent,
+      inputs: [
+        ["Employees", formatNumber(employees, 0)],
+        ["Average hourly wage", `$${formatNumber(hourlyWage, 2)}/hr`],
+        ["Call-outs per week", formatNumber(callOutsPerWeek)],
+        ["Average shift length", `${formatNumber(shiftLength)} hours`],
+        ["Typical fill time", `${formatNumber(fillDelayHours)} hours`],
+        ["Covered by overtime", `${coverage.overtimePercent}%`],
+        ["Covered by agency", `${coverage.agencyPercent}%`],
+        ["Left unfilled", `${coverage.unfilledPercent}%`],
+        ["Overtime multiplier", `${formatNumber(overtimeMultiplier)}x`],
+        ["Agency rate", `${formatMoney(agencyRate)}/hr`],
+        ["Manager time per call-out", `${formatNumber(managerMinutes, 0)} min`],
+        ["Manager hourly rate", `${formatMoney(managerHourlyRate)}/hr`],
+        ["Savings scenario", `${potentialReductionPercent}%`],
+      ],
+      costs: [
+        ["Overtime cost", formatMoney(metrics.annualOvertimeCost)],
+        ["Agency cost", formatMoney(metrics.annualAgencyCost)],
+        [
+          "Manager coordination time",
+          formatMoney(metrics.annualManagerTimeCost),
+        ],
+        ["Total estimated annual cost", formatMoney(metrics.totalAnnualCost)],
+        [
+          "Unfilled shifts, shown separately",
+          `${formatNumber(metrics.annualUnfilledShiftCount)} per year`,
+        ],
+      ],
+      featureSummary:
+        "WiserShifts sends open shifts through push and email notifications, lets staff pick them up through self-service scheduling, and helps teams plan coverage with AI-generated schedules.",
+      calculatorUrl: "https://calendly.com/wisershifts-info/30min",
+    });
+    toast.success("Your WiserShifts report was downloaded.");
   };
 
   const handleEmail = async () => {
@@ -205,6 +259,7 @@ export default function CallOutCostCalculator() {
       await api.post("/marketing/call-out-cost/email-summary", {
         recipientEmail: trimmedEmail,
         inputs: {
+          companyName: companyName.trim(),
           employees,
           hourlyWage,
           callOutsPerWeek,
@@ -217,6 +272,7 @@ export default function CallOutCostCalculator() {
           agencyRate,
           managerMinutes,
           managerHourlyRate,
+          potentialReductionPercent,
         },
       });
       toast.success("Summary sent. Check your inbox.");
@@ -482,6 +538,26 @@ export default function CallOutCostCalculator() {
                     step={1}
                     adornment="$"
                   />
+                  <CalculatorInput
+                    label="Illustrative reduction in overtime and agency costs"
+                    value={potentialReductionPercent}
+                    onChange={setPotentialReductionPercent}
+                    min={0}
+                    max={50}
+                    step={5}
+                    endAdornment="%"
+                    helper="Scenario assumption only, not a guaranteed result. Applied only to call-out overtime and agency costs."
+                    tooltip="Adjust this estimate to model how much call-out overtime and agency spend could be avoided through faster internal coverage."
+                  />
+                  <TextField
+                    label="Company or facility name"
+                    placeholder="Your organization"
+                    size="small"
+                    value={companyName}
+                    onChange={(event) => setCompanyName(event.target.value)}
+                    helperText="Personalizes your PDF and email summary"
+                    fullWidth
+                  />
                 </Stack>
               </CardContent>
             </Card>
@@ -599,6 +675,60 @@ export default function CallOutCostCalculator() {
                     standard overtime/agency premium assumptions. Your actual
                     costs may vary. Adjust any field to match your facility.
                   </Typography>
+                  <Box
+                    sx={{
+                      mt: 2.5,
+                      p: 2.25,
+                      bgcolor: "#ECFDF5",
+                      borderLeft: "4px solid #0F766E",
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#0F766E",
+                        fontWeight: 900,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      What you could save with WiserShifts
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ display: "block", mt: 0.5, color: "#475569" }}
+                    >
+                      Modeled at a {potentialReductionPercent}% reduction in
+                      call-out overtime and agency costs.
+                    </Typography>
+                    <Typography
+                      sx={{
+                        mt: 0.5,
+                        color: "#134E4A",
+                        fontSize: { xs: "1.8rem", md: "2.15rem" },
+                        lineHeight: 1.1,
+                        fontWeight: 950,
+                      }}
+                    >
+                      {formatMoney(metrics.potentialSavings)}/year
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ mt: 1.25, color: "#134E4A", lineHeight: 1.55 }}
+                    >
+                      WiserShifts sends open shifts through push and email
+                      notifications, then lets staff pick them up through
+                      self-service scheduling. AI-generated schedules help teams
+                      plan coverage before gaps become urgent.
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ display: "block", mt: 0.75, color: "#475569" }}
+                    >
+                      Illustrative estimate based only on call-out overtime and
+                      agency costs. Actual results depend on your staffing and
+                      coverage patterns.
+                    </Typography>
+                  </Box>
                 </CardContent>
               </Card>
 
@@ -621,7 +751,7 @@ export default function CallOutCostCalculator() {
                 </Typography>
               </Box>
 
-              <Stack spacing={1.25} sx={{ mt: 2.5 }}>
+              <Stack spacing={1.5} sx={{ mt: 2.5 }}>
                 <Button
                   component="a"
                   href="https://calendly.com/wisershifts-info/30min"
@@ -633,41 +763,72 @@ export default function CallOutCostCalculator() {
                 >
                   Book your free scheduling audit
                 </Button>
-                <Button
-                  onClick={handleCopyLink}
-                  variant="outlined"
-                  startIcon={<FiCopy />}
-                  sx={{ py: 1, fontWeight: 800, textTransform: "none" }}
-                >
-                  Copy link to my results
-                </Button>
                 <Box
                   sx={{
                     display: "grid",
-                    gridTemplateColumns: { xs: "1fr", sm: "1fr auto" },
+                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
                     gap: 1,
                   }}
                 >
-                  <TextField
-                    label="Email these results"
-                    placeholder="you@facility.com"
-                    size="small"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                  />
                   <Button
-                    onClick={handleEmail}
-                    disabled={sendingEmail}
-                    variant="text"
-                    startIcon={<FiMail />}
+                    onClick={handleCopyLink}
+                    variant="outlined"
+                    startIcon={<FiCopy />}
+                    sx={{ py: 0.9, fontWeight: 800, textTransform: "none" }}
+                  >
+                    Copy results link
+                  </Button>
+                  <Button
+                    onClick={handleDownloadPdf}
+                    variant="outlined"
+                    startIcon={<FiDownload />}
+                    sx={{ py: 0.9, fontWeight: 800, textTransform: "none" }}
+                  >
+                    Download PDF
+                  </Button>
+                </Box>
+                <Box
+                  sx={{
+                    p: 1.75,
+                    border: "1px solid #E2E8F0",
+                    bgcolor: "#F8FAFC",
+                    borderRadius: 2,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{ mb: 1.25, color: "#334155", fontWeight: 800 }}
+                  >
+                    Email a copy of this estimate
+                  </Typography>
+                  <Box
                     sx={{
-                      fontWeight: 800,
-                      textTransform: "none",
-                      whiteSpace: "nowrap",
+                      display: "grid",
+                      gridTemplateColumns: {
+                        xs: "1fr",
+                        sm: "minmax(0, 1fr) auto",
+                      },
+                      gap: 1,
                     }}
                   >
-                    {sendingEmail ? "Sending..." : "Email me these results"}
-                  </Button>
+                    <TextField
+                      label="Email address"
+                      placeholder="you@facility.com"
+                      size="small"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      sx={{ bgcolor: "#fff" }}
+                    />
+                    <Button
+                      onClick={handleEmail}
+                      disabled={sendingEmail}
+                      variant="contained"
+                      startIcon={<FiMail />}
+                      sx={{ fontWeight: 800, textTransform: "none" }}
+                    >
+                      {sendingEmail ? "Sending..." : "Email results"}
+                    </Button>
+                  </Box>
                 </Box>
               </Stack>
             </Box>

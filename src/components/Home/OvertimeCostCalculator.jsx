@@ -10,11 +10,12 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { FiArrowRight, FiCopy, FiMail } from "react-icons/fi";
+import { FiArrowRight, FiCopy, FiDownload, FiMail } from "react-icons/fi";
 import { Link as RouterLink } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../../config/api";
 import CalculatorInput from "./CalculatorInput";
+import { downloadCalculatorPdf } from "./calculatorPdf";
 import {
   copyCalculatorLink,
   formatMoney,
@@ -55,6 +56,10 @@ export default function OvertimeCostCalculator() {
   const [overtimeMultiplier, setOvertimeMultiplier] = useState(() =>
     readNumberParam("otRate", DEFAULTS.overtimeMultiplier, 1, 3),
   );
+  const [potentialReductionPercent, setPotentialReductionPercent] = useState(
+    () => readNumberParam("savings", 25, 0, 50),
+  );
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
 
@@ -72,8 +77,15 @@ export default function OvertimeCostCalculator() {
       annualReactiveCost,
       annualPlannedCost,
       totalAnnualCost: annualReactiveCost + annualPlannedCost,
+      potentialSavings: annualReactiveCost * (potentialReductionPercent / 100),
     };
-  }, [hourlyWage, overtimeHours, overtimeMultiplier, reactivePercent]);
+  }, [
+    hourlyWage,
+    overtimeHours,
+    overtimeMultiplier,
+    potentialReductionPercent,
+    reactivePercent,
+  ]);
 
   const handleCopyLink = async () => {
     try {
@@ -83,11 +95,49 @@ export default function OvertimeCostCalculator() {
         hours: overtimeHours,
         reactive: reactivePercent,
         otRate: overtimeMultiplier,
+        savings: potentialReductionPercent,
       });
       toast.success("A link to these results was copied.");
     } catch {
       toast.error("Unable to copy the link. Please copy it from your browser.");
     }
+  };
+
+  const handleDownloadPdf = () => {
+    downloadCalculatorPdf({
+      calculatorTitle: "Reactive Overtime Cost Summary",
+      filePrefix: "overtime-cost",
+      companyName,
+      costLabel: "Total overtime spend",
+      totalCost: formatMoney(metrics.totalAnnualCost),
+      potentialSavings: formatMoney(metrics.potentialSavings),
+      reductionPercent: potentialReductionPercent,
+      inputs: [
+        ["Employees", formatNumber(employees, 0)],
+        ["Average hourly wage", `$${formatNumber(hourlyWage, 2)}/hr`],
+        ["Total overtime hours", `${formatNumber(overtimeHours)} per week`],
+        ["Reactive overtime", `${reactivePercent}%`],
+        ["Overtime multiplier", `${formatNumber(overtimeMultiplier)}x`],
+        ["Savings scenario", `${potentialReductionPercent}%`],
+      ],
+      costs: [
+        [
+          "Reactive overtime hours",
+          `${formatNumber(metrics.weeklyReactiveHours)} per week`,
+        ],
+        ["Reactive overtime cost", formatMoney(metrics.annualReactiveCost)],
+        [
+          "Planned overtime hours",
+          `${formatNumber(metrics.weeklyPlannedHours)} per week`,
+        ],
+        ["Planned overtime cost", formatMoney(metrics.annualPlannedCost)],
+        ["Total overtime spend", formatMoney(metrics.totalAnnualCost)],
+      ],
+      featureSummary:
+        "AI-generated schedules help teams plan coverage earlier. Push and email notifications, together with self-service shift pickup, help staff respond to open shifts before gaps turn into last-minute overtime.",
+      calculatorUrl: "https://calendly.com/wisershifts-info/30min",
+    });
+    toast.success("Your WiserShifts report was downloaded.");
   };
 
   const handleEmail = async () => {
@@ -104,11 +154,13 @@ export default function OvertimeCostCalculator() {
       await api.post("/marketing/overtime-cost/email-summary", {
         recipientEmail: trimmedEmail,
         inputs: {
+          companyName: companyName.trim(),
           employees,
           hourlyWage,
           overtimeHours,
           reactivePercent,
           overtimeMultiplier,
+          potentialReductionPercent,
         },
       });
       toast.success("Summary sent. Check your inbox.");
@@ -278,6 +330,26 @@ export default function OvertimeCostCalculator() {
                     endAdornment="x"
                     tooltip="The overtime rate applied to the average hourly wage"
                   />
+                  <CalculatorInput
+                    label="Illustrative reduction in reactive overtime"
+                    value={potentialReductionPercent}
+                    onChange={setPotentialReductionPercent}
+                    min={0}
+                    max={50}
+                    step={5}
+                    endAdornment="%"
+                    helper="Scenario assumption only, not a guaranteed result. Applied only to reactive overtime costs."
+                    tooltip="Model a possible reduction in last-minute overtime if open shifts are shared earlier and picked up internally."
+                  />
+                  <TextField
+                    label="Company or facility name"
+                    placeholder="Your organization"
+                    size="small"
+                    value={companyName}
+                    onChange={(event) => setCompanyName(event.target.value)}
+                    helperText="Personalizes your PDF and email summary"
+                    fullWidth
+                  />
                 </Stack>
               </CardContent>
             </Card>
@@ -429,6 +501,60 @@ export default function OvertimeCostCalculator() {
                       {100 - reactivePercent}% planned
                     </Typography>
                   </Box>
+                  <Box
+                    sx={{
+                      mt: 2.5,
+                      p: 2.25,
+                      bgcolor: "#ECFDF5",
+                      borderLeft: "4px solid #0F766E",
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#0F766E",
+                        fontWeight: 900,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      What you could save with WiserShifts
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ display: "block", mt: 0.5, color: "#475569" }}
+                    >
+                      Modeled at a {potentialReductionPercent}% reduction in
+                      reactive overtime costs.
+                    </Typography>
+                    <Typography
+                      sx={{
+                        mt: 0.5,
+                        color: "#134E4A",
+                        fontSize: { xs: "1.8rem", md: "2.15rem" },
+                        lineHeight: 1.1,
+                        fontWeight: 950,
+                      }}
+                    >
+                      {formatMoney(metrics.potentialSavings)}/year
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ mt: 1.25, color: "#134E4A", lineHeight: 1.55 }}
+                    >
+                      AI-generated schedules help teams plan coverage earlier.
+                      When gaps still appear, push and email notifications plus
+                      self-service shift pickup help staff respond before the
+                      gap turns into last-minute overtime.
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ display: "block", mt: 0.75, color: "#475569" }}
+                    >
+                      Illustrative estimate based only on reactive overtime.
+                      Actual results depend on your staffing and coverage
+                      patterns.
+                    </Typography>
+                  </Box>
                   <Typography
                     variant="caption"
                     sx={{
@@ -463,7 +589,7 @@ export default function OvertimeCostCalculator() {
                 </Typography>
               </Box>
 
-              <Stack spacing={1.25} sx={{ mt: 2.5 }}>
+              <Stack spacing={1.5} sx={{ mt: 2.5 }}>
                 <Button
                   component="a"
                   href="https://calendly.com/wisershifts-info/30min"
@@ -481,48 +607,84 @@ export default function OvertimeCostCalculator() {
                 >
                   Book your free scheduling audit
                 </Button>
-                <Button
-                  onClick={handleCopyLink}
-                  variant="outlined"
-                  startIcon={<FiCopy />}
-                  sx={{
-                    color: "#0F766E",
-                    borderColor: "#0F766E",
-                    py: 1,
-                    fontWeight: 800,
-                    textTransform: "none",
-                  }}
-                >
-                  Copy link to my results
-                </Button>
                 <Box
                   sx={{
                     display: "grid",
-                    gridTemplateColumns: { xs: "1fr", sm: "1fr auto" },
+                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
                     gap: 1,
                   }}
                 >
-                  <TextField
-                    label="Email these results"
-                    placeholder="you@facility.com"
-                    size="small"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                  />
                   <Button
-                    onClick={handleEmail}
-                    disabled={sendingEmail}
-                    variant="text"
-                    startIcon={<FiMail />}
+                    onClick={handleCopyLink}
+                    variant="outlined"
+                    startIcon={<FiCopy />}
                     sx={{
                       color: "#0F766E",
+                      borderColor: "#0F766E",
+                      py: 0.9,
                       fontWeight: 800,
                       textTransform: "none",
-                      whiteSpace: "nowrap",
                     }}
                   >
-                    {sendingEmail ? "Sending..." : "Email me these results"}
+                    Copy results link
                   </Button>
+                  <Button
+                    onClick={handleDownloadPdf}
+                    variant="outlined"
+                    startIcon={<FiDownload />}
+                    sx={{
+                      color: "#0F766E",
+                      borderColor: "#0F766E",
+                      py: 0.9,
+                      fontWeight: 800,
+                      textTransform: "none",
+                    }}
+                  >
+                    Download PDF
+                  </Button>
+                </Box>
+                <Box
+                  sx={{
+                    p: 1.75,
+                    border: "1px solid #D1FAE5",
+                    bgcolor: "#F0FDFA",
+                    borderRadius: 2,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{ mb: 1.25, color: "#134E4A", fontWeight: 800 }}
+                  >
+                    Email a copy of this estimate
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: {
+                        xs: "1fr",
+                        sm: "minmax(0, 1fr) auto",
+                      },
+                      gap: 1,
+                    }}
+                  >
+                    <TextField
+                      label="Email address"
+                      placeholder="you@facility.com"
+                      size="small"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      sx={{ bgcolor: "#fff" }}
+                    />
+                    <Button
+                      onClick={handleEmail}
+                      disabled={sendingEmail}
+                      variant="contained"
+                      startIcon={<FiMail />}
+                      sx={{ fontWeight: 800, textTransform: "none" }}
+                    >
+                      {sendingEmail ? "Sending..." : "Email results"}
+                    </Button>
+                  </Box>
                 </Box>
               </Stack>
             </Box>

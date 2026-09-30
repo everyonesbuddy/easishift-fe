@@ -39,7 +39,7 @@ const FEATURE_PAGES = {
     softAccent: "#ECFDF5",
     points: [
       "Track clock-ins, clock-outs, breaks, and worked minutes.",
-      "Support open or QR-based clock-in workflows.",
+      "Support open or geofence-based clock-in workflows.",
       "Compare attendance outcomes with scheduled shifts.",
     ],
     panelTitle: "Attendance without guesswork",

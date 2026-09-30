@@ -231,14 +231,14 @@ function Sidebar({ mobileOpen, onMobileClose }) {
             const isActive = activePath === item.to;
 
             return (
-              <ListItem key={item.id} disablePadding sx={{ mb: 0.5 }}>
+              <ListItem key={item.id} disablePadding sx={{ mb: 0.25 }}>
                 <ListItemButton
                   onClick={() => navigate(item.to)}
                   sx={{
                     borderRadius: 2,
-                    px: 1.5,
-                    py: 0.9,
-                    gap: 1,
+                    px: 1.25,
+                    py: 0.65,
+                    gap: 0.75,
                     color: isActive ? "white" : "#d1d5db", // gray-300
                     bgcolor: isActive ? "#2563eb" : "transparent", // blue-600
                     transition: "background-color 0.2s ease",
@@ -247,12 +247,12 @@ function Sidebar({ mobileOpen, onMobileClose }) {
                     },
                   }}
                 >
-                  <ListItemIcon sx={{ minWidth: 28, color: "inherit" }}>
-                    <Icon size={17} />
+                  <ListItemIcon sx={{ minWidth: 24, color: "inherit" }}>
+                    <Icon size={16} />
                   </ListItemIcon>
                   <ListItemText
                     primary={item.label}
-                    primaryTypographyProps={{ fontSize: "0.82rem" }}
+                    primaryTypographyProps={{ fontSize: "0.74rem" }}
                   />
                 </ListItemButton>
               </ListItem>
@@ -269,9 +269,9 @@ function Sidebar({ mobileOpen, onMobileClose }) {
               onClick={() => navigate("/how-to-use")}
               sx={{
                 borderRadius: 2,
-                px: 1.5,
-                py: 0.9,
-                gap: 1,
+                px: 1.25,
+                py: 0.65,
+                gap: 0.75,
                 color: activePath === "/how-to-use" ? "white" : "#d1d5db",
                 bgcolor:
                   activePath === "/how-to-use" ? "#2563eb" : "transparent",
@@ -281,12 +281,12 @@ function Sidebar({ mobileOpen, onMobileClose }) {
                 },
               }}
             >
-              <ListItemIcon sx={{ minWidth: 28, color: "inherit" }}>
-                <MdHelpOutline size={17} />
+              <ListItemIcon sx={{ minWidth: 24, color: "inherit" }}>
+                <MdHelpOutline size={16} />
               </ListItemIcon>
               <ListItemText
                 primary="How to Use"
-                primaryTypographyProps={{ fontSize: "0.82rem" }}
+                primaryTypographyProps={{ fontSize: "0.74rem" }}
               />
             </ListItemButton>
           </ListItem>

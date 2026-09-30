@@ -4,6 +4,7 @@ import {
   FiArrowRight,
   FiActivity,
   FiClock,
+  FiMapPin,
   FiUsers,
 } from "react-icons/fi";
 import { Link as RouterLink } from "react-router-dom";
@@ -38,6 +39,20 @@ const CALCULATORS = [
     details: ["Reactive hours", "Planned hours", "Annual spend"],
     accent: "#0F766E",
     softAccent: "#ECFDF5",
+    time: "About 2 minutes",
+  },
+  {
+    title: "Time Clock Accuracy Calculator",
+    description:
+      "Estimate the annual cost of unverified punch time and manual timesheet correction.",
+    cta: "Calculate Clock Accuracy",
+    to: "/calculators/time-clock-accuracy-calculator",
+    icon: <FiMapPin size={18} />,
+    tag: "Verified punches",
+    question: "What does unverified time cost?",
+    details: ["Punch accuracy", "Payroll corrections", "Geofence visibility"],
+    accent: "#0F766E",
+    softAccent: "#CCFBF1",
     time: "About 2 minutes",
   },
 ];
@@ -114,7 +129,7 @@ export default function Calculators() {
               display: "grid",
               gridTemplateColumns: {
                 xs: "1fr",
-                md: "repeat(2, minmax(0, 1fr))",
+                md: "repeat(3, minmax(0, 1fr))",
               },
               gap: { xs: 2, md: 3 },
               alignItems: "stretch",

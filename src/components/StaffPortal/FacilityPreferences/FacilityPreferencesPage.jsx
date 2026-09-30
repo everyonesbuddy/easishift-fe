@@ -32,6 +32,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { useGuideTour } from "../../../context/GuideTourContext";
 import { Navigate, useNavigate } from "react-router-dom";
 import GuideHelpButton from "../../Shared/GuideHelpButton";
+import FacilityGeofenceMap from "./FacilityGeofenceMap";
 
 const SCHEDULING_PATTERNS = [
   { value: "balance", label: "Balance (fairness-based)" },
@@ -63,6 +64,13 @@ const TIME_TRACKING_DEFAULTS = {
   clockOutGraceMinutes: 30,
   roundingMinutes: 0,
   autoCloseOpenBreakOnClockOut: true,
+  geofence: {
+    address: "",
+    latitude: null,
+    longitude: null,
+    radiusMeters: 150,
+    maxAccuracyMeters: 50,
+  },
 };
 
 const ACCORDION_BASE_SX = {
@@ -162,13 +170,12 @@ const normalizeArrayValues = (values) =>
 const normalizeTimeTrackingPrefs = (input) => {
   const safe = input && typeof input === "object" ? input : {};
 
-  const normalizedMode = ["open", "qr"].includes(safe.mode)
+  const normalizedMode = ["open", "geofence"].includes(safe.mode)
     ? safe.mode
-    : safe.mode === "geofence"
-      ? "qr"
-      : safe.mode === "manual"
-        ? "open"
-        : TIME_TRACKING_DEFAULTS.mode;
+    : "open";
+
+  const safeGeofence =
+    safe.geofence && typeof safe.geofence === "object" ? safe.geofence : {};
 
   const normalizedRounding = [0, 5, 6, 10, 15].includes(
     Number(safe.roundingMinutes),
@@ -194,6 +201,33 @@ const normalizeTimeTrackingPrefs = (input) => {
     ),
     roundingMinutes: normalizedRounding,
     autoCloseOpenBreakOnClockOut: true,
+    geofence: {
+      address: String(safeGeofence.address || ""),
+      latitude:
+        safeGeofence.latitude !== null &&
+        safeGeofence.latitude !== "" &&
+        Number.isFinite(Number(safeGeofence.latitude))
+          ? Number(safeGeofence.latitude)
+          : null,
+      longitude:
+        safeGeofence.longitude !== null &&
+        safeGeofence.longitude !== "" &&
+        Number.isFinite(Number(safeGeofence.longitude))
+          ? Number(safeGeofence.longitude)
+          : null,
+      radiusMeters: Math.max(
+        1,
+        Number.isFinite(Number(safeGeofence.radiusMeters))
+          ? Number(safeGeofence.radiusMeters)
+          : TIME_TRACKING_DEFAULTS.geofence.radiusMeters,
+      ),
+      maxAccuracyMeters: Math.max(
+        1,
+        Number.isFinite(Number(safeGeofence.maxAccuracyMeters))
+          ? Number(safeGeofence.maxAccuracyMeters)
+          : TIME_TRACKING_DEFAULTS.geofence.maxAccuracyMeters,
+      ),
+    },
   };
 };
 
@@ -383,6 +417,19 @@ export default function FacilityPreferencesPage() {
     }));
   };
 
+  const handleGeofenceChange = (field, value) => {
+    setPrefs((prev) => ({
+      ...prev,
+      timeTracking: {
+        ...normalizeTimeTrackingPrefs(prev?.timeTracking),
+        geofence: {
+          ...normalizeTimeTrackingPrefs(prev?.timeTracking).geofence,
+          [field]: value,
+        },
+      },
+    }));
+  };
+
   const handleArrayAdd = (field) => {
     const value = toSnakeCase(arrayInputs[field]);
     if (!value) return;
@@ -553,6 +600,36 @@ export default function FacilityPreferencesPage() {
   };
 
   const handleSave = async () => {
+    if (prefs.timeTracking?.mode === "geofence") {
+      const geofence = prefs.timeTracking.geofence || {};
+      const hasValidCoordinates =
+        Number.isFinite(geofence.latitude) &&
+        geofence.latitude >= -90 &&
+        geofence.latitude <= 90 &&
+        Number.isFinite(geofence.longitude) &&
+        geofence.longitude >= -180 &&
+        geofence.longitude <= 180;
+      const hasValidLimits =
+        Number.isFinite(geofence.radiusMeters) &&
+        geofence.radiusMeters >= 1 &&
+        geofence.radiusMeters <= 5000 &&
+        Number.isFinite(geofence.maxAccuracyMeters) &&
+        geofence.maxAccuracyMeters >= 1 &&
+        geofence.maxAccuracyMeters <= 500;
+
+      if (
+        !geofence.address?.trim() ||
+        !hasValidCoordinates ||
+        !hasValidLimits
+      ) {
+        const message =
+          "Confirm a facility address and valid geofence location, radius, and accuracy limits before saving.";
+        setError(message);
+        toast.warning(message);
+        return;
+      }
+    }
+
     setSaving(true);
     setError("");
     try {
@@ -1350,7 +1427,7 @@ export default function FacilityPreferencesPage() {
                 Time Tracking
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Configure open or QR-based clock in/out behavior for your
+                Configure open or geofence-based clock in/out behavior for your
                 facility
               </Typography>
             </Box>
@@ -1408,7 +1485,7 @@ export default function FacilityPreferencesPage() {
                       sx={{ borderRadius: 2 }}
                     >
                       <MenuItem value="open">Open</MenuItem>
-                      <MenuItem value="qr">QR</MenuItem>
+                      <MenuItem value="geofence">Geofence</MenuItem>
                     </Select>
                   </FormControl>
                   <Typography
@@ -1416,9 +1493,9 @@ export default function FacilityPreferencesPage() {
                     color="text.secondary"
                     sx={{ mt: 0.75, display: "block" }}
                   >
-                    {prefs.timeTracking?.mode === "qr"
-                      ? "QR: Staff scan a valid facility QR code to clock in and out."
-                      : "Open: Staff can clock in and out directly without scanning a QR code."}
+                    {prefs.timeTracking?.mode === "geofence"
+                      ? "Geofence: staff location is checked against the facility boundary when clocking in and out."
+                      : "Open: Staff can clock in and out directly without location checks."}
                   </Typography>
                 </Box>
 
@@ -1454,6 +1531,49 @@ export default function FacilityPreferencesPage() {
                   </Typography>
                 </Box>
               </Stack>
+
+              {prefs.timeTracking?.mode === "geofence" ? (
+                <Stack spacing={1.5}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                    Facility Geofence
+                  </Typography>
+                  <FacilityGeofenceMap
+                    geofence={prefs.timeTracking?.geofence}
+                    onChange={handleGeofenceChange}
+                    disabled={!canManageFacilityPreferences}
+                  />
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Geofence radius (meters)"
+                      value={prefs.timeTracking?.geofence?.radiusMeters ?? 150}
+                      onChange={(e) =>
+                        handleGeofenceChange(
+                          "radiusMeters",
+                          Math.max(1, Number(e.target.value) || 1),
+                        )
+                      }
+                      inputProps={{ min: 1, max: 5000 }}
+                    />
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Maximum location accuracy (meters)"
+                      value={
+                        prefs.timeTracking?.geofence?.maxAccuracyMeters ?? 50
+                      }
+                      onChange={(e) =>
+                        handleGeofenceChange(
+                          "maxAccuracyMeters",
+                          Math.max(1, Number(e.target.value) || 1),
+                        )
+                      }
+                      inputProps={{ min: 1, max: 500 }}
+                    />
+                  </Stack>
+                </Stack>
+              ) : null}
 
               <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
                 <TextField

@@ -9,6 +9,7 @@ import PricingPage from "./components/Home/PricingPage";
 import Calculators from "./components/Home/Calculators";
 import CallOutCostCalculator from "./components/Home/CallOutCostCalculator";
 import OvertimeCostCalculator from "./components/Home/OvertimeCostCalculator";
+import TimeClockAccuracyCalculator from "./components/Home/TimeClockAccuracyCalculator";
 import TermsAndConditions from "./components/Home/TermsAndConditions";
 import PrivacyPolicy from "./components/Home/PrivacyPolicy";
 import EndUserLicenseAgreement from "./components/Home/EndUserLicenseAgreement";
@@ -103,6 +104,10 @@ export default function App() {
           <Route
             path="/calculators/overtime-cost-calculator"
             element={<OvertimeCostCalculator />}
+          />
+          <Route
+            path="/calculators/time-clock-accuracy-calculator"
+            element={<TimeClockAccuracyCalculator />}
           />
           <Route
             path="/terms-and-conditions"

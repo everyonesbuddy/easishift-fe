@@ -20,7 +20,8 @@ import { FiClock, FiCoffee, FiRefreshCw } from "react-icons/fi";
 import { toast } from "react-toastify";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
-import QrScannerDialog from "../../Shared/QrScannerDialog";
+import { getDisplayTimeZone, formatInTimeZone } from "../../../utils/timeZone";
+import { getPunchLocation } from "../../../utils/geolocation";
 
 const STATUS_COLOR = {
   in_progress: "warning",
@@ -43,15 +44,13 @@ const formatStatusLabel = (status) =>
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
 const SOURCE = "web";
-const QR_STATION_POLL_INTERVAL_MS = 5000;
-
 const toIsoNow = () => new Date().toISOString();
 
-const formatDateTime = (value) => {
+const formatDateTime = (value, timeZone) => {
   if (!value) return "-";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleString();
+  return formatInTimeZone(d, {}, timeZone);
 };
 
 const formatElapsedFromNow = (startValue) => {
@@ -70,23 +69,23 @@ const formatElapsedFromNow = (startValue) => {
   return `${hours}h ${minutes}m`;
 };
 
-const getBreakSummary = (entry) => {
+const getBreakSummary = (entry, timeZone) => {
   const breaks = Array.isArray(entry?.breaks) ? entry.breaks : [];
   if (!breaks.length) return "No breaks yet";
 
   const openBreak = breaks.find((item) => item && !item.endAt);
   if (openBreak) {
-    return `On break since ${formatDateTime(openBreak.startAt)}`;
+    return `On break since ${formatDateTime(openBreak.startAt, timeZone)}`;
   }
 
   return `${breaks.length} break${breaks.length > 1 ? "s" : ""} logged`;
 };
 
-const formatSessionWindow = (schedule) => {
+const formatSessionWindow = (schedule, timeZone) => {
   const startTime = schedule?.startTime;
   const endTime = schedule?.endTime;
   if (!startTime || !endTime) return "Time not available";
-  return `${formatDateTime(startTime)} to ${formatDateTime(endTime)}`;
+  return `${formatDateTime(startTime, timeZone)} to ${formatDateTime(endTime, timeZone)}`;
 };
 
 const normalizeEntriesFromResponse = (data) => {
@@ -125,9 +124,9 @@ const normalizeTrackingMode = (mode) => {
   const normalized = String(mode || "open")
     .trim()
     .toLowerCase();
-  if (normalized === "geofence") return "qr";
+  if (normalized === "geofence") return "geofence";
   if (normalized === "manual") return "open";
-  return normalized === "qr" ? "qr" : "open";
+  return "open";
 };
 
 export default function TimeTrackingPage() {
@@ -142,14 +141,12 @@ export default function TimeTrackingPage() {
   const [activeEntry, setActiveEntry] = useState(null);
   const [staffSchedules, setStaffSchedules] = useState([]);
   const [adminEntries, setAdminEntries] = useState([]);
-  const [qrScanAction, setQrScanAction] = useState(null);
-  const [qrStationToken, setQrStationToken] = useState("");
-  const [qrTokenVersion, setQrTokenVersion] = useState(null);
 
   const trackingConfig = facilityPreferences?.timeTracking || {};
+  const displayTimeZone = getDisplayTimeZone(facilityPreferences);
   const trackingEnabled = Boolean(trackingConfig.enabled);
   const trackingMode = normalizeTrackingMode(trackingConfig.mode);
-  const requiresQrToken = trackingMode === "qr";
+  const requiresGeofenceLocation = trackingMode === "geofence";
 
   const openBreak = useMemo(() => {
     if (!activeEntry?.breaks?.length) return null;
@@ -187,45 +184,6 @@ export default function TimeTrackingPage() {
     setAdminEntries(normalizedEntries);
   }, [isAdmin]);
 
-  const applyNextQrToken = useCallback((payload) => {
-    const nextToken = payload?.nextQrToken || payload?.token || "";
-    const nextVersion =
-      payload?.nextQrTokenVersion ?? payload?.tokenVersion ?? null;
-
-    if (nextToken) {
-      setQrStationToken(nextToken);
-    }
-    if (nextVersion !== null && nextVersion !== undefined) {
-      setQrTokenVersion(nextVersion);
-    }
-  }, []);
-
-  const refreshQrStationToken = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      const tokenRes = await api.post("/time-tracking/qr-token");
-      applyNextQrToken(tokenRes.data);
-    } catch (err) {
-      toast.error(extractMessage(err, "Failed to rotate QR token"));
-    } finally {
-      setRefreshing(false);
-    }
-  }, [applyNextQrToken]);
-
-  const syncCurrentQrStationToken = useCallback(
-    async ({ silent = false } = {}) => {
-      try {
-        const tokenRes = await api.get("/time-tracking/qr-token/current");
-        applyNextQrToken(tokenRes.data);
-      } catch (err) {
-        if (!silent) {
-          toast.error(extractMessage(err, "Failed to fetch current QR token"));
-        }
-      }
-    },
-    [applyNextQrToken],
-  );
-
   const refreshAll = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -233,15 +191,6 @@ export default function TimeTrackingPage() {
       await loadStaffEntries();
       await loadStaffSchedules();
       await loadAdminEntries();
-
-      const latestMode = normalizeTrackingMode(latestPrefs?.timeTracking?.mode);
-      if (isAdmin && latestMode === "qr") {
-        await syncCurrentQrStationToken({ silent: true });
-      }
-      if (isAdmin && latestMode !== "qr") {
-        setQrStationToken("");
-        setQrTokenVersion(null);
-      }
     } catch (err) {
       toast.error(extractMessage(err, "Failed to refresh time tracking data"));
     } finally {
@@ -253,7 +202,6 @@ export default function TimeTrackingPage() {
     loadAdminEntries,
     loadStaffEntries,
     loadStaffSchedules,
-    syncCurrentQrStationToken,
   ]);
 
   useEffect(() => {
@@ -269,12 +217,6 @@ export default function TimeTrackingPage() {
         await loadStaffEntries();
         await loadStaffSchedules();
         await loadAdminEntries();
-        if (isAdmin && latestMode === "qr") {
-          await syncCurrentQrStationToken({ silent: true });
-        } else if (mounted) {
-          setQrStationToken("");
-          setQrTokenVersion(null);
-        }
       } catch (err) {
         if (mounted) {
           toast.error(extractMessage(err, "Failed to load time tracking"));
@@ -290,13 +232,11 @@ export default function TimeTrackingPage() {
       mounted = false;
     };
   }, [
-    applyNextQrToken,
     fetchFacilityPreferences,
     isAdmin,
     loadAdminEntries,
     loadStaffEntries,
     loadStaffSchedules,
-    syncCurrentQrStationToken,
   ]);
 
   const clockInWindowState = useMemo(() => {
@@ -372,25 +312,16 @@ export default function TimeTrackingPage() {
     };
   }, [isAdmin, staffSchedules, trackingConfig]);
 
-  useEffect(() => {
-    if (!isAdmin || !requiresQrToken || !trackingEnabled) return undefined;
-
-    const intervalId = setInterval(() => {
-      syncCurrentQrStationToken({ silent: true });
-    }, QR_STATION_POLL_INTERVAL_MS);
-
-    return () => clearInterval(intervalId);
-  }, [isAdmin, requiresQrToken, trackingEnabled, syncCurrentQrStationToken]);
-
-  const submitClockIn = async (qrToken = "") => {
+  const submitClockIn = async () => {
     setSubmitting(true);
     try {
-      const res = await api.post("/time-tracking/clock-in", {
-        at: toIsoNow(),
+      const location = requiresGeofenceLocation
+        ? await getPunchLocation()
+        : null;
+      await api.post("/time-tracking/clock-in", {
         source: SOURCE,
-        ...(requiresQrToken ? { qrToken: String(qrToken || "").trim() } : {}),
+        ...(requiresGeofenceLocation ? { location } : {}),
       });
-      applyNextQrToken(res.data);
       toast.success("Clocked in");
       await refreshAll();
     } catch (err) {
@@ -401,10 +332,6 @@ export default function TimeTrackingPage() {
   };
 
   const handleClockIn = async () => {
-    if (requiresQrToken) {
-      setQrScanAction("clock-in");
-      return;
-    }
     await submitClockIn();
   };
 
@@ -441,15 +368,16 @@ export default function TimeTrackingPage() {
     }
   };
 
-  const submitClockOut = async (qrToken = "") => {
+  const submitClockOut = async () => {
     setSubmitting(true);
     try {
-      const res = await api.post("/time-tracking/clock-out", {
-        at: toIsoNow(),
+      const location = requiresGeofenceLocation
+        ? await getPunchLocation()
+        : null;
+      await api.post("/time-tracking/clock-out", {
         source: SOURCE,
-        ...(requiresQrToken ? { qrToken: String(qrToken || "").trim() } : {}),
+        ...(requiresGeofenceLocation ? { location } : {}),
       });
-      applyNextQrToken(res.data);
       toast.success("Clocked out");
       await refreshAll();
     } catch (err) {
@@ -460,31 +388,7 @@ export default function TimeTrackingPage() {
   };
 
   const handleClockOut = async () => {
-    if (requiresQrToken) {
-      setQrScanAction("clock-out");
-      return;
-    }
     await submitClockOut();
-  };
-
-  const handleQrScanned = async (token) => {
-    const action = qrScanAction;
-    const trimmedToken = String(token || "").trim();
-    setQrScanAction(null);
-
-    if (!trimmedToken) {
-      toast.warning("Invalid QR code. Please try again.");
-      return;
-    }
-
-    if (action === "clock-in") {
-      await submitClockIn(trimmedToken);
-      return;
-    }
-
-    if (action === "clock-out") {
-      await submitClockOut(trimmedToken);
-    }
   };
 
   const canClockIn =
@@ -547,8 +451,8 @@ export default function TimeTrackingPage() {
           >
             <Chip
               size="small"
-              color={trackingMode === "qr" ? "info" : "default"}
-              label={trackingMode === "qr" ? "QR Mode" : "Open Mode"}
+              color={trackingMode === "geofence" ? "success" : "default"}
+              label={`${formatStatusLabel(trackingMode)} Mode`}
             />
             <Chip
               size="small"
@@ -568,21 +472,12 @@ export default function TimeTrackingPage() {
         </Button>
       </Box>
 
-      {requiresQrToken ? (
-        <Paper
-          sx={{
-            p: { xs: 2, md: 2.5 },
-            borderRadius: 3,
-            border: "1px solid",
-            borderColor: "divider",
-            mb: 2,
-          }}
-        >
-          <Alert severity="info">
-            QR mode is active. Staff must scan a valid facility QR code to clock
-            in and clock out.
-          </Alert>
-        </Paper>
+      {requiresGeofenceLocation ? (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Geofence mode is active. Clock In requires a location inside the
+          facility boundary. Clock Out will continue even if location is
+          unavailable or outside the boundary.
+        </Alert>
       ) : (
         <Alert severity="info" sx={{ mb: 2 }}>
           Open mode is active. Location capture is not required for clock
@@ -618,26 +513,29 @@ export default function TimeTrackingPage() {
           {activeEntry ? (
             <Stack sx={{ gap: 0.75, mb: 2 }}>
               <Typography variant="body2" color="text.secondary">
-                Started: {formatDateTime(activeEntry.clockInAt)}
+                Started:{" "}
+                {formatDateTime(activeEntry.clockInAt, displayTimeZone)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Elapsed: {formatElapsedFromNow(activeEntry.clockInAt)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Breaks: {getBreakSummary(activeEntry)}
+                Breaks: {getBreakSummary(activeEntry, displayTimeZone)}
               </Typography>
               {activeEntry?.scheduleId?.startTime &&
               activeEntry?.scheduleId?.endTime ? (
                 <Typography variant="body2" color="text.secondary">
                   Shift Window:{" "}
-                  {formatDateTime(activeEntry.scheduleId.startTime)} to{" "}
-                  {formatDateTime(activeEntry.scheduleId.endTime)}
+                  {formatDateTime(
+                    activeEntry.scheduleId.startTime,
+                    displayTimeZone,
+                  )}{" "}
+                  to{" "}
+                  {formatDateTime(
+                    activeEntry.scheduleId.endTime,
+                    displayTimeZone,
+                  )}
                 </Typography>
-              ) : null}
-              {requiresQrToken ? (
-                <Alert severity="info" sx={{ mt: 0.5 }}>
-                  QR mode: tap Clock Out to open your camera and scan.
-                </Alert>
               ) : null}
             </Stack>
           ) : (
@@ -646,7 +544,10 @@ export default function TimeTrackingPage() {
               {clockInWindowState.nextSchedule ? (
                 <Typography variant="body2" color="text.secondary">
                   Next session:{" "}
-                  {formatSessionWindow(clockInWindowState.nextSchedule)}
+                  {formatSessionWindow(
+                    clockInWindowState.nextSchedule,
+                    displayTimeZone,
+                  )}
                 </Typography>
               ) : (
                 <Typography variant="body2" color="text.secondary">
@@ -660,6 +561,7 @@ export default function TimeTrackingPage() {
                     : clockInWindowState.nextAvailableAt
                       ? `Clock In will be available at ${formatDateTime(
                           clockInWindowState.nextAvailableAt,
+                          displayTimeZone,
                         )} based on your shift window.`
                       : "Clock In is unavailable right now because you are outside your allowed shift window."}
                 </Typography>
@@ -670,13 +572,8 @@ export default function TimeTrackingPage() {
               )}
               {entries[0]?.clockOutAt ? (
                 <Typography variant="caption" color="text.secondary">
-                  Last clock-out: {formatDateTime(entries[0].clockOutAt)}
-                </Typography>
-              ) : null}
-              {requiresQrToken ? (
-                <Typography variant="caption" color="text.secondary">
-                  Tip: tap Scan to Clock In and point your camera at your
-                  facility QR code.
+                  Last clock-out:{" "}
+                  {formatDateTime(entries[0].clockOutAt, displayTimeZone)}
                 </Typography>
               ) : null}
             </Stack>
@@ -688,7 +585,7 @@ export default function TimeTrackingPage() {
               disabled={!canClockIn || submitting}
               onClick={handleClockIn}
             >
-              {requiresQrToken ? "Scan to Clock In" : "Clock In"}
+              Clock In
             </Button>
             <Button
               variant="outlined"
@@ -711,7 +608,7 @@ export default function TimeTrackingPage() {
               disabled={!canClockOut || submitting}
               onClick={handleClockOut}
             >
-              {requiresQrToken ? "Scan to Clock Out" : "Clock Out"}
+              Clock Out
             </Button>
           </Stack>
         </Paper>
@@ -752,8 +649,8 @@ export default function TimeTrackingPage() {
                     >
                       <Box>
                         <Typography variant="body2">
-                          {formatDateTime(entry.clockInAt)} to{" "}
-                          {formatDateTime(entry.clockOutAt)}
+                          {formatDateTime(entry.clockInAt, displayTimeZone)} to{" "}
+                          {formatDateTime(entry.clockOutAt, displayTimeZone)}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           Breaks: {breakCount}
@@ -773,86 +670,8 @@ export default function TimeTrackingPage() {
         </Paper>
       )}
 
-      <QrScannerDialog
-        open={Boolean(qrScanAction)}
-        onClose={() => setQrScanAction(null)}
-        onScan={handleQrScanned}
-        title={
-          qrScanAction === "clock-out"
-            ? "Scan to Clock Out"
-            : "Scan to Clock In"
-        }
-        description="Allow camera access, then point at your facility attendance QR code."
-      />
-
       {isAdmin && (
         <>
-          {requiresQrToken ? (
-            <Paper
-              sx={{
-                p: { xs: 2, md: 2.5 },
-                borderRadius: 3,
-                border: "1px solid",
-                borderColor: "divider",
-                mb: 2,
-              }}
-            >
-              <Typography sx={{ fontWeight: 700, mb: 1 }}>
-                QR Station
-              </Typography>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ mb: 1.5 }}
-              >
-                Display this token as a QR code at your attendance station.
-              </Typography>
-              <Stack spacing={1}>
-                {qrStationToken ? (
-                  <Box
-                    sx={{
-                      width: { xs: 200, md: 240 },
-                      height: { xs: 200, md: 240 },
-                      border: "1px solid",
-                      borderColor: "divider",
-                      borderRadius: 2,
-                      bgcolor: "background.paper",
-                      p: 1,
-                      alignSelf: "flex-start",
-                    }}
-                  >
-                    <Box
-                      component="img"
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=480x480&data=${encodeURIComponent(qrStationToken)}`}
-                      alt="Facility attendance QR"
-                      sx={{ width: "100%", height: "100%", display: "block" }}
-                    />
-                  </Box>
-                ) : null}
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Current QR Token"
-                  value={qrStationToken}
-                  InputProps={{ readOnly: true }}
-                />
-                {Number.isFinite(Number(qrTokenVersion)) ? (
-                  <Typography variant="body2" color="text.secondary">
-                    Token version: {Number(qrTokenVersion)}
-                  </Typography>
-                ) : null}
-                <Button
-                  variant="outlined"
-                  onClick={refreshQrStationToken}
-                  disabled={refreshing || submitting}
-                  sx={{ alignSelf: "flex-start" }}
-                >
-                  Rotate QR Token
-                </Button>
-              </Stack>
-            </Paper>
-          ) : null}
-
           <Paper
             sx={{
               p: { xs: 2, md: 2.5 },
@@ -903,10 +722,10 @@ export default function TimeTrackingPage() {
                             />
                           </TableCell>
                           <TableCell>
-                            {formatDateTime(entry.clockInAt)}
+                            {formatDateTime(entry.clockInAt, displayTimeZone)}
                           </TableCell>
                           <TableCell>
-                            {formatDateTime(entry.clockOutAt)}
+                            {formatDateTime(entry.clockOutAt, displayTimeZone)}
                           </TableCell>
                         </TableRow>
                       );

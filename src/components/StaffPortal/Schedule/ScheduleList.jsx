@@ -75,11 +75,11 @@ import AutoGenerateScheduleForm from "./AutoGenerateScheduleForm";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import ShiftSwapRequestModal from "./ShiftSwapRequestModal";
 import { useAuth } from "../../../context/AuthContext";
+import { getPunchLocation } from "../../../utils/geolocation";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Stack from "@mui/material/Stack";
 import { useLocation, useNavigate } from "react-router-dom";
-import QrScannerDialog from "../../Shared/QrScannerDialog";
 import GuideHelpButton from "../../Shared/GuideHelpButton";
 import {
   getRoleColor,
@@ -250,7 +250,6 @@ export default function ScheduleList() {
   const [timeEntrySubmitting, setTimeEntrySubmitting] = useState(false);
   const [timeEntryLoading, setTimeEntryLoading] = useState(false);
   const [activeTimeEntry, setActiveTimeEntry] = useState(null);
-  const [qrScanAction, setQrScanAction] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [monthDate, setMonthDate] = useState(new Date());
@@ -883,12 +882,10 @@ export default function ScheduleList() {
   const configuredTimeTrackingMode =
     facilityPreferences?.timeTracking?.mode || "open";
   const timeTrackingMode =
-    configuredTimeTrackingMode === "geofence"
-      ? "qr"
-      : configuredTimeTrackingMode === "manual"
-        ? "open"
-        : configuredTimeTrackingMode;
-  const requiresQrToken = timeTrackingMode === "qr";
+    configuredTimeTrackingMode === "manual"
+      ? "open"
+      : configuredTimeTrackingMode;
+  const requiresGeofenceLocation = timeTrackingMode === "geofence";
 
   const normalizeTimeEntries = (data) => {
     if (Array.isArray(data)) return data;
@@ -926,19 +923,20 @@ export default function ScheduleList() {
     setTimeEntryOpen(false);
     setTimeEntrySchedule(null);
     setActiveTimeEntry(null);
-    setQrScanAction(null);
   };
 
-  const submitClockInFromSchedule = async (qrToken = "") => {
+  const submitClockInFromSchedule = async () => {
     if (!timeEntrySchedule?._id) return;
 
     try {
       setTimeEntrySubmitting(true);
+      const location = requiresGeofenceLocation
+        ? await getPunchLocation()
+        : null;
       await api.post("/time-tracking/clock-in", {
-        at: new Date().toISOString(),
         source: "web",
         scheduleId: timeEntrySchedule._id,
-        ...(requiresQrToken ? { qrToken: String(qrToken || "").trim() } : {}),
+        ...(requiresGeofenceLocation ? { location } : {}),
       });
       await fetchActiveTimeEntry();
       await fetchSchedules();
@@ -953,20 +951,18 @@ export default function ScheduleList() {
   };
 
   const handleClockInFromSchedule = async () => {
-    if (requiresQrToken) {
-      setQrScanAction("clock-in");
-      return;
-    }
     await submitClockInFromSchedule();
   };
 
-  const submitClockOutFromSchedule = async (qrToken = "") => {
+  const submitClockOutFromSchedule = async () => {
     try {
       setTimeEntrySubmitting(true);
+      const location = requiresGeofenceLocation
+        ? await getPunchLocation()
+        : null;
       await api.post("/time-tracking/clock-out", {
-        at: new Date().toISOString(),
         source: "web",
-        ...(requiresQrToken ? { qrToken: String(qrToken || "").trim() } : {}),
+        ...(requiresGeofenceLocation ? { location } : {}),
       });
       await fetchActiveTimeEntry();
       await fetchSchedules();
@@ -982,31 +978,7 @@ export default function ScheduleList() {
   };
 
   const handleClockOutFromSchedule = async () => {
-    if (requiresQrToken) {
-      setQrScanAction("clock-out");
-      return;
-    }
     await submitClockOutFromSchedule();
-  };
-
-  const handleQrScannedForSchedule = async (token) => {
-    const action = qrScanAction;
-    const trimmedToken = String(token || "").trim();
-    setQrScanAction(null);
-
-    if (!trimmedToken) {
-      toast.warning("Invalid QR code. Please try again.");
-      return;
-    }
-
-    if (action === "clock-in") {
-      await submitClockInFromSchedule(trimmedToken);
-      return;
-    }
-
-    if (action === "clock-out") {
-      await submitClockOutFromSchedule(trimmedToken);
-    }
   };
 
   const getOpenBreak = (entry) => {
@@ -1071,6 +1043,85 @@ export default function ScheduleList() {
     if (!timeTrackingEnabled) return false;
     if (!canUsePersonalSchedule) return false;
     return isCurrentUserSchedule(schedule);
+  };
+
+  const getTimeEntryAvailability = (schedule) => {
+    if (!canOpenTimeEntryForSchedule(schedule)) {
+      return { canOpen: false, disabled: false, tooltip: "Time entry" };
+    }
+
+    const status = String(schedule?.status || "").toLowerCase();
+    if (status !== "scheduled") {
+      return { canOpen: true, disabled: false, tooltip: "Time entry" };
+    }
+
+    const startMs = new Date(schedule?.startTime).getTime();
+    const endMs = new Date(schedule?.endTime).getTime();
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+      return { canOpen: true, disabled: false, tooltip: "Time entry" };
+    }
+
+    const clockInGraceMinutes = Math.max(
+      0,
+      Number(facilityPreferences?.timeTracking?.clockInGraceMinutes) || 0,
+    );
+    const clockOutGraceMinutes = Math.max(
+      0,
+      Number(facilityPreferences?.timeTracking?.clockOutGraceMinutes) || 0,
+    );
+    const windowStartMs = startMs - clockInGraceMinutes * 60 * 1000;
+    const windowEndMs = endMs + clockOutGraceMinutes * 60 * 1000;
+    const nowMs = Date.now();
+
+    if (nowMs < windowStartMs) {
+      return {
+        canOpen: true,
+        disabled: true,
+        tooltip: `Clock In available from ${formatCompactDateTime(windowStartMs).time}`,
+      };
+    }
+
+    if (nowMs > windowEndMs) {
+      return {
+        canOpen: true,
+        disabled: true,
+        tooltip: "The clock-in window has closed",
+      };
+    }
+
+    return { canOpen: true, disabled: false, tooltip: "Open time entry" };
+  };
+
+  const nextTimeEntryScheduleId = useMemo(() => {
+    const nowMs = Date.now();
+    const upcoming = schedules
+      .filter((schedule) => {
+        if (!canOpenTimeEntryForSchedule(schedule)) return false;
+        const status = String(schedule?.status || "").toLowerCase();
+        const startMs = new Date(schedule?.startTime).getTime();
+        const endMs = new Date(schedule?.endTime).getTime();
+        return (
+          status === "scheduled" &&
+          Number.isFinite(startMs) &&
+          Number.isFinite(endMs) &&
+          endMs >= nowMs
+        );
+      })
+      .sort(
+        (left, right) =>
+          new Date(left.startTime).getTime() -
+          new Date(right.startTime).getTime(),
+      );
+
+    return upcoming[0]?._id || null;
+  }, [schedules, user, facilityPreferences]);
+
+  const shouldShowTimeEntryForSchedule = (schedule) => {
+    if (!getTimeEntryAvailability(schedule).canOpen) return false;
+    const status = String(schedule?.status || "").toLowerCase();
+    return (
+      status === "in_progress" || schedule?._id === nextTimeEntryScheduleId
+    );
   };
 
   const uniqueShiftTimes = useMemo(() => {
@@ -2599,146 +2650,159 @@ export default function ScheduleList() {
   };
 
   // Shared desktop List-view row, used for both the flat "Date" order and grouped modes
-  const renderScheduleTableRow = (s) => (
-    <TableRow key={s._id} sx={{ "&:hover": { background: "#f3f4f6" } }}>
-      {canManageSchedules && (
-        <TableCell padding="checkbox">
-          <Checkbox
-            size="small"
-            checked={selectedScheduleIds.includes(s._id)}
-            onChange={() => toggleScheduleSelection(s._id)}
-          />
-        </TableCell>
-      )}
-      <TableCell sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}>
-        <Box display="flex" alignItems="center" gap={1}>
-          <Box
-            sx={{
-              width: 10,
-              height: 10,
-              borderRadius: "50%",
-              backgroundColor: getRoleColor(s.role),
-            }}
-          />
-          <Box sx={{ fontSize: "0.7rem", fontWeight: 600, lineHeight: 1.2 }}>
-            {s.staffId?.name || "Unknown"}
+  const renderScheduleTableRow = (s) => {
+    const timeEntryAvailability = getTimeEntryAvailability(s);
+
+    return (
+      <TableRow key={s._id} sx={{ "&:hover": { background: "#f3f4f6" } }}>
+        {canManageSchedules && (
+          <TableCell padding="checkbox">
+            <Checkbox
+              size="small"
+              checked={selectedScheduleIds.includes(s._id)}
+              onChange={() => toggleScheduleSelection(s._id)}
+            />
+          </TableCell>
+        )}
+        <TableCell sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}>
+          <Box display="flex" alignItems="center" gap={1}>
+            <Box
+              sx={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                backgroundColor: getRoleColor(s.role),
+              }}
+            />
+            <Box sx={{ fontSize: "0.7rem", fontWeight: 600, lineHeight: 1.2 }}>
+              {s.staffId?.name || "Unknown"}
+            </Box>
           </Box>
-        </Box>
-      </TableCell>
-      <TableCell sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}>
-        <Box component="span" sx={getRoleChipStyles(s.role)}>
-          {getRoleDisplayName(s.role)}
-        </Box>
-      </TableCell>
-      <TableCell sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}>
-        <Typography
-          sx={{ fontSize: "0.72rem", fontWeight: 600, lineHeight: 1.2 }}
-        >
-          {formatCompactDateTime(s.startTime).date}
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{ fontSize: "0.66rem", color: "text.secondary", lineHeight: 1.1 }}
-        >
-          {formatCompactDateTime(s.startTime).time}
-        </Typography>
-      </TableCell>
-      <TableCell sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}>
-        <Typography
-          sx={{ fontSize: "0.72rem", fontWeight: 600, lineHeight: 1.2 }}
-        >
-          {formatCompactDateTime(s.endTime).date}
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{ fontSize: "0.66rem", color: "text.secondary", lineHeight: 1.1 }}
-        >
-          {formatCompactDateTime(s.endTime).time}{" "}
-          {formatCompactDateTime(s.endTime).zone}
-        </Typography>
-      </TableCell>
-      <TableCell sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}>
-        {getUnitAreaDisplayName(s.unitArea)}
-      </TableCell>
-      <TableCell sx={{ py: 0.75 }}>
-        <Box
-          component="span"
-          sx={{
-            display: "inline-block",
-            px: 1,
-            py: 0.3,
-            borderRadius: 1,
-            border: `1px solid ${getScheduleStatusColor(s.status)}`,
-            color: getScheduleStatusColor(s.status),
-            fontWeight: 700,
-            fontSize: "0.64rem",
-            background: "#fff",
-            letterSpacing: 0.2,
-          }}
-        >
-          {getScheduleStatusLabel(s.status)}
-        </Box>
-      </TableCell>
-      <TableCell sx={{ whiteSpace: "nowrap", py: 0.75 }}>
-        <Tooltip title="View details">
-          <IconButton
-            size="small"
-            onClick={() => openDetailsModal(s)}
-            sx={{ mr: 0.5, color: "#475569" }}
+        </TableCell>
+        <TableCell sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}>
+          <Box component="span" sx={getRoleChipStyles(s.role)}>
+            {getRoleDisplayName(s.role)}
+          </Box>
+        </TableCell>
+        <TableCell sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}>
+          <Typography
+            sx={{ fontSize: "0.72rem", fontWeight: 600, lineHeight: 1.2 }}
           >
-            <FiEye />
-          </IconButton>
-        </Tooltip>
-        {canOpenTimeEntryForSchedule(s) && (
-          <Tooltip title="Time entry">
+            {formatCompactDateTime(s.startTime).date}
+          </Typography>
+          <Typography
+            variant="caption"
+            sx={{
+              fontSize: "0.66rem",
+              color: "text.secondary",
+              lineHeight: 1.1,
+            }}
+          >
+            {formatCompactDateTime(s.startTime).time}
+          </Typography>
+        </TableCell>
+        <TableCell sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}>
+          <Typography
+            sx={{ fontSize: "0.72rem", fontWeight: 600, lineHeight: 1.2 }}
+          >
+            {formatCompactDateTime(s.endTime).date}
+          </Typography>
+          <Typography
+            variant="caption"
+            sx={{
+              fontSize: "0.66rem",
+              color: "text.secondary",
+              lineHeight: 1.1,
+            }}
+          >
+            {formatCompactDateTime(s.endTime).time}{" "}
+            {formatCompactDateTime(s.endTime).zone}
+          </Typography>
+        </TableCell>
+        <TableCell sx={{ color: "black", fontSize: "0.72rem", py: 0.75 }}>
+          {getUnitAreaDisplayName(s.unitArea)}
+        </TableCell>
+        <TableCell sx={{ py: 0.75 }}>
+          <Box
+            component="span"
+            sx={{
+              display: "inline-block",
+              px: 1,
+              py: 0.3,
+              borderRadius: 1,
+              border: `1px solid ${getScheduleStatusColor(s.status)}`,
+              color: getScheduleStatusColor(s.status),
+              fontWeight: 700,
+              fontSize: "0.64rem",
+              background: "#fff",
+              letterSpacing: 0.2,
+            }}
+          >
+            {getScheduleStatusLabel(s.status)}
+          </Box>
+        </TableCell>
+        <TableCell sx={{ whiteSpace: "nowrap", py: 0.75 }}>
+          <Tooltip title="View details">
             <IconButton
               size="small"
-              onClick={() => openTimeEntryModal(s)}
-              sx={{ mr: 0.5, color: "#0f766e" }}
+              onClick={() => openDetailsModal(s)}
+              sx={{ mr: 0.5, color: "#475569" }}
             >
-              <FiClock />
+              <FiEye />
             </IconButton>
           </Tooltip>
-        )}
-        {canManageSchedule(s) && (
-          <Tooltip title="Edit schedule">
-            <IconButton
-              size="small"
-              color="info"
-              onClick={() => openEdit(s)}
-              sx={{ mr: 0.5 }}
-            >
-              <FiEdit />
-            </IconButton>
-          </Tooltip>
-        )}
-        {canUsePersonalSchedule &&
-          isCurrentUserSchedule(s) &&
-          s.status === "scheduled" && (
-            <Tooltip title="Swap shift">
+          {shouldShowTimeEntryForSchedule(s) && (
+            <Tooltip title={timeEntryAvailability.tooltip}>
               <IconButton
                 size="small"
-                onClick={() => openSwapRequestModal(s)}
-                sx={{ mr: 0.5, color: "#7c3aed" }}
+                onClick={() => openTimeEntryModal(s)}
+                disabled={timeEntryAvailability.disabled}
+                sx={{ mr: 0.5, color: "#0f766e" }}
               >
-                <FiRepeat />
+                <FiClock />
               </IconButton>
             </Tooltip>
           )}
-        {canManageSchedules && (
-          <Tooltip title="Delete schedule">
-            <IconButton
-              size="small"
-              color="error"
-              onClick={() => askDelete(s._id)}
-            >
-              <FiDelete />
-            </IconButton>
-          </Tooltip>
-        )}
-      </TableCell>
-    </TableRow>
-  );
+          {canManageSchedule(s) && (
+            <Tooltip title="Edit schedule">
+              <IconButton
+                size="small"
+                color="info"
+                onClick={() => openEdit(s)}
+                sx={{ mr: 0.5 }}
+              >
+                <FiEdit />
+              </IconButton>
+            </Tooltip>
+          )}
+          {canUsePersonalSchedule &&
+            isCurrentUserSchedule(s) &&
+            s.status === "scheduled" && (
+              <Tooltip title="Swap shift">
+                <IconButton
+                  size="small"
+                  onClick={() => openSwapRequestModal(s)}
+                  sx={{ mr: 0.5, color: "#7c3aed" }}
+                >
+                  <FiRepeat />
+                </IconButton>
+              </Tooltip>
+            )}
+          {canManageSchedules && (
+            <Tooltip title="Delete schedule">
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => askDelete(s._id)}
+              >
+                <FiDelete />
+              </IconButton>
+            </Tooltip>
+          )}
+        </TableCell>
+      </TableRow>
+    );
+  };
 
   // "Needs Coverage" row for the List view, styled like Roster's coverage-gap cells
   const renderCoverageTableRow = (coverage) => (
@@ -3804,12 +3868,14 @@ export default function ScheduleList() {
                     >
                       View
                     </Button>
-                    {canOpenTimeEntryForSchedule(s) && (
+                    {shouldShowTimeEntryForSchedule(s) && (
                       <Button
                         size="small"
                         variant="contained"
                         startIcon={<FiClock />}
                         onClick={() => openTimeEntryModal(s)}
+                        disabled={getTimeEntryAvailability(s).disabled}
+                        title={getTimeEntryAvailability(s).tooltip}
                         sx={{ textTransform: "none" }}
                       >
                         Time Entry
@@ -5208,13 +5274,18 @@ export default function ScheduleList() {
                 </Typography>
               </Box>
 
-              {requiresQrToken ? (
-                <Stack spacing={1}>
-                  <Alert severity="info">
-                    QR mode is active. Tap Clock In or Clock Out to open your
-                    camera and scan the facility QR code.
-                  </Alert>
-                </Stack>
+              {requiresGeofenceLocation ? (
+                <Alert severity="info">
+                  Geofence mode is active. Clock In requires a location inside
+                  the facility boundary. Clock Out is not blocked by location.
+                </Alert>
+              ) : null}
+
+              {getTimeEntryAvailability(timeEntrySchedule).disabled ? (
+                <Alert severity="warning">
+                  {getTimeEntryAvailability(timeEntrySchedule).tooltip}. You can
+                  still review this shift here.
+                </Alert>
               ) : null}
 
               {timeEntryLoading ? (
@@ -5293,25 +5364,14 @@ export default function ScheduleList() {
               timeEntrySubmitting ||
               Boolean(activeTimeEntry) ||
               !timeEntrySchedule ||
-              timeEntrySchedule.status !== "scheduled"
+              timeEntrySchedule.status !== "scheduled" ||
+              getTimeEntryAvailability(timeEntrySchedule).disabled
             }
           >
             Clock In
           </Button>
         </DialogActions>
       </Dialog>
-
-      <QrScannerDialog
-        open={Boolean(qrScanAction)}
-        onClose={() => setQrScanAction(null)}
-        onScan={handleQrScannedForSchedule}
-        title={
-          qrScanAction === "clock-out"
-            ? "Scan to Clock Out"
-            : "Scan to Clock In"
-        }
-        description="Allow camera access, then point at your facility attendance QR code."
-      />
 
       <Dialog
         open={openAutoModal}

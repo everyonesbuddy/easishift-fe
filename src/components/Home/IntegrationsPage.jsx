@@ -139,7 +139,7 @@ export default function IntegrationsPage() {
                       fontWeight: 800,
                     }}
                   >
-                    Book a scheduling audit
+                    Book a Demo
                   </Button>
                 </Stack>
               </Box>

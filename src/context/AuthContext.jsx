@@ -6,10 +6,24 @@ import {
   useMemo,
   useState,
 } from "react";
-import api from "../config/api";
+import api, { API_BASE } from "../config/api";
+import { getTenantSubdomain } from "../utils/tenantWorkspace";
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
+const publicBrandingRequests = new Map();
+
+const fetchPublicBranding = (subdomain) => {
+  if (!publicBrandingRequests.has(subdomain)) {
+    publicBrandingRequests.set(
+      subdomain,
+      api
+        .get("/public/tenant-branding", { params: { subdomain } })
+        .then((res) => res.data?.branding || null),
+    );
+  }
+  return publicBrandingRequests.get(subdomain);
+};
 
 const FALLBACK_SYSTEM_ROLE_PERMISSIONS = {
   staff: [
@@ -149,7 +163,50 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(""); // always string
   const [tenant, setTenant] = useState(null);
+  const [publicBranding, setPublicBranding] = useState(null);
+  const [publicBrandingLoading, setPublicBrandingLoading] = useState(true);
   const [loading, setLoading] = useState(true);
+  const subdomain = getTenantSubdomain();
+
+  const updatePublicBranding = useCallback((branding) => {
+    if (!branding) return;
+    setPublicBranding({
+      ...branding,
+      logoUrl: branding.logoUrl?.startsWith("/")
+        ? `${API_BASE}${branding.logoUrl}`
+        : branding.logoUrl,
+    });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!subdomain) {
+      setPublicBranding(null);
+      setPublicBrandingLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setPublicBrandingLoading(true);
+
+    fetchPublicBranding(subdomain)
+      .then((branding) => {
+        if (cancelled || !branding) return;
+        updatePublicBranding(branding);
+      })
+      .catch(() => {
+        if (!cancelled) setPublicBranding(null);
+      })
+      .finally(() => {
+        if (!cancelled) setPublicBrandingLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [subdomain, updatePublicBranding]);
 
   const logout = useCallback(() => {
     setUser(null);
@@ -350,6 +407,9 @@ export const AuthProvider = ({ children }) => {
       roles,
       permissions,
       tenant,
+      publicBranding,
+      publicBrandingLoading,
+      updatePublicBranding,
       refreshTenant,
       facilityPreferences,
       fetchFacilityPreferences,
@@ -370,6 +430,9 @@ export const AuthProvider = ({ children }) => {
       roles,
       permissions,
       tenant,
+      publicBranding,
+      publicBrandingLoading,
+      updatePublicBranding,
       refreshTenant,
       facilityPreferences,
       fetchFacilityPreferences,

@@ -4,7 +4,6 @@ import {
   Box,
   Typography,
   IconButton,
-  Badge,
   Button,
   Menu,
   MenuItem,
@@ -16,7 +15,7 @@ import { useTheme } from "@mui/material/styles";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useState } from "react";
-import { MdNotifications, MdLogout } from "react-icons/md";
+import { MdLogout, MdMenu } from "react-icons/md";
 import {
   FiCalendar,
   FiChevronDown,
@@ -26,11 +25,11 @@ import {
   FiPhoneCall,
 } from "react-icons/fi";
 import logo from "../../assets/logos/wiserShifts-logo-light.svg";
-import { MdMenu } from "react-icons/md";
 import { getRoleDisplayName } from "../../constants/industryRoles";
+import { isRootWorkspaceHost } from "../../utils/tenantWorkspace";
 
 export default function Navbar({ onMobileOpen }) {
-  const { user, logout, roles } = useAuth();
+  const { user, logout, roles, publicBranding } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
   const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
@@ -62,6 +61,58 @@ export default function Navbar({ onMobileOpen }) {
     setMobileMenuAnchor(null);
   };
 
+  if (!user && isRootWorkspaceHost() && window.location.pathname === "/login") {
+    return (
+      <AppBar
+        position="sticky"
+        sx={{
+          bgcolor: "background.paper",
+          borderBottom: 1,
+          borderColor: "divider",
+          boxShadow: "none",
+          zIndex: 30,
+        }}
+      >
+        <Toolbar
+          sx={{
+            width: "100%",
+            maxWidth: 1200,
+            mx: "auto",
+            px: { xs: 2, sm: 4 },
+            minHeight: 72,
+          }}
+        >
+          <Box
+            component={Link}
+            to="/"
+            aria-label="WiserShifts home"
+            sx={{ display: "flex", alignItems: "center" }}
+          >
+            <Box
+              component="img"
+              src={logo}
+              alt="WiserShifts"
+              sx={{
+                width: { xs: 170, sm: 200 },
+                maxHeight: 44,
+                objectFit: "contain",
+              }}
+            />
+          </Box>
+          <Box sx={{ flex: 1 }} />
+          <Button
+            component={Link}
+            to="/signup-tenant"
+            variant="contained"
+            sx={{ textTransform: "none", fontWeight: 700 }}
+          >
+            Create workspace
+          </Button>
+        </Toolbar>
+      </AppBar>
+    );
+  }
+
   return (
     <AppBar
       position="sticky"
@@ -84,114 +135,107 @@ export default function Navbar({ onMobileOpen }) {
                 sx={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 1,
                   textDecoration: "none",
-                  color: "text.primary",
                 }}
               >
                 <Box
                   component="img"
-                  src={logo}
-                  alt="Wisershifts logo"
-                  aria-label="Wisershifts"
+                  src={publicBranding?.logoUrl || logo}
+                  alt={publicBranding?.displayName || "Wisershifts logo"}
                   sx={{
                     width: { xs: 190, sm: 220 },
-                    height: 40,
+                    maxHeight: 48,
+                    height: "auto",
                     display: "block",
                     objectFit: "contain",
-                    transform: { xs: "translateX(-8px)", sm: "none" },
                   }}
                 />
               </Box>
-              <Box
-                sx={{
-                  display: { xs: "none", md: "flex" },
-                  alignItems: "center",
-                  ml: 2,
-                  gap: 0.25,
-                }}
-              >
-                <Button
-                  onClick={(event) => setFeaturesAnchor(event.currentTarget)}
-                  endIcon={<FiChevronDown size={16} />}
+              {!publicBranding && (
+                <Box
                   sx={{
-                    color: "#111827",
-                    textTransform: "none",
-                    fontWeight: 700,
+                    display: { xs: "none", md: "flex" },
+                    alignItems: "center",
+                    ml: 2,
+                    gap: 0.25,
                   }}
                 >
-                  Features
-                </Button>
-                <Menu
-                  anchorEl={featuresAnchor}
-                  open={Boolean(featuresAnchor)}
-                  onClose={() => setFeaturesAnchor(null)}
-                  MenuListProps={{ "aria-label": "Feature pages" }}
-                  slotProps={{
-                    paper: { sx: { mt: 1, minWidth: 220, borderRadius: 2 } },
-                  }}
-                >
-                  {featureLinks.map((item) => (
-                    <MenuItem
-                      key={item.to}
-                      component={Link}
-                      to={item.to}
-                      onClick={closePublicMenus}
-                    >
-                      <ListItemIcon sx={{ minWidth: 32, color: "#2563EB" }}>
-                        <item.icon size={17} />
-                      </ListItemIcon>
-                      {item.label}
-                    </MenuItem>
-                  ))}
-                </Menu>
-                <Button
-                  component={Link}
-                  to="/calculators"
-                  sx={{
-                    color: "#111827",
-                    textTransform: "none",
-                    fontWeight: 700,
-                  }}
-                >
-                  Calculators
-                </Button>
-                <Button
-                  component={Link}
-                  to="/pricing"
-                  sx={{
-                    color: "#111827",
-                    textTransform: "none",
-                    fontWeight: 700,
-                  }}
-                >
-                  Pricing
-                </Button>
-              </Box>
+                  <Button
+                    onClick={(event) => setFeaturesAnchor(event.currentTarget)}
+                    endIcon={<FiChevronDown size={16} />}
+                    sx={{
+                      color: "#111827",
+                      textTransform: "none",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Features
+                  </Button>
+                  <Menu
+                    anchorEl={featuresAnchor}
+                    open={Boolean(featuresAnchor)}
+                    onClose={() => setFeaturesAnchor(null)}
+                    MenuListProps={{ "aria-label": "Feature pages" }}
+                    slotProps={{
+                      paper: { sx: { mt: 1, minWidth: 220, borderRadius: 2 } },
+                    }}
+                  >
+                    {featureLinks.map((item) => (
+                      <MenuItem
+                        key={item.to}
+                        component={Link}
+                        to={item.to}
+                        onClick={closePublicMenus}
+                      >
+                        <ListItemIcon sx={{ minWidth: 32, color: "#2563EB" }}>
+                          <item.icon size={17} />
+                        </ListItemIcon>
+                        {item.label}
+                      </MenuItem>
+                    ))}
+                  </Menu>
+                  <Button
+                    component={Link}
+                    to="/calculators"
+                    sx={{
+                      color: "#111827",
+                      textTransform: "none",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Calculators
+                  </Button>
+                  <Button
+                    component={Link}
+                    to="/pricing"
+                    sx={{
+                      color: "#111827",
+                      textTransform: "none",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Pricing
+                  </Button>
+                </Box>
+              )}
             </>
           ) : (
             <>
               {isSmall ? (
-                // Mobile: only show burger to open the sidebar
-                <IconButton onClick={onMobileOpen} sx={{ mr: 1 }}>
+                <IconButton
+                  onClick={onMobileOpen}
+                  sx={{ mr: 1 }}
+                  aria-label="Open dashboard navigation"
+                >
                   <MdMenu />
                 </IconButton>
               ) : (
-                // Desktop: show title + optional collapse toggle
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box>
-                    <Typography
-                      variant={isSmall ? "h6" : "h5"}
-                      sx={{ color: "text.primary" }}
-                    >
-                      {roles.length
-                        ? roles.map(getRoleDisplayName).join(" / ")
-                        : "Staff"}{" "}
-                      Dashboard
-                    </Typography>
-                  </Box>
-                  {/* no collapse controls on desktop */}
-                </Box>
+                <Typography variant="h5" sx={{ color: "text.primary" }}>
+                  {roles.length
+                    ? roles.map(getRoleDisplayName).join(" / ")
+                    : "Staff"}{" "}
+                  Dashboard
+                </Typography>
               )}
             </>
           )}
@@ -200,91 +244,80 @@ export default function Navbar({ onMobileOpen }) {
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
           {!user ? (
             <>
-              <IconButton
-                aria-label="Open navigation menu"
-                onClick={(event) => setMobileMenuAnchor(event.currentTarget)}
-                sx={{
-                  display: { xs: "inline-flex", md: "none" },
-                  color: "#111827",
-                }}
-              >
-                <MdMenu />
-              </IconButton>
-              <Menu
-                anchorEl={mobileMenuAnchor}
-                open={Boolean(mobileMenuAnchor)}
-                onClose={() => setMobileMenuAnchor(null)}
-                MenuListProps={{ "aria-label": "Website navigation" }}
-                slotProps={{
-                  paper: { sx: { mt: 1, minWidth: 235, borderRadius: 2 } },
-                }}
-              >
-                <MenuItem
-                  component={Link}
-                  to="/calculators"
-                  onClick={closePublicMenus}
-                >
-                  Calculators
-                </MenuItem>
-                <MenuItem
-                  component={Link}
-                  to="/pricing"
-                  onClick={closePublicMenus}
-                >
-                  Pricing
-                </MenuItem>
-                <Divider />
-                <Typography
-                  sx={{
-                    px: 2,
-                    py: 0.75,
-                    color: "text.secondary",
-                    fontSize: "0.75rem",
-                    fontWeight: 800,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Features
-                </Typography>
-                {featureLinks.map((item) => (
-                  <MenuItem
-                    key={item.to}
-                    component={Link}
-                    to={item.to}
-                    onClick={closePublicMenus}
+              {!publicBranding && (
+                <>
+                  <IconButton
+                    aria-label="Open navigation menu"
+                    onClick={(event) =>
+                      setMobileMenuAnchor(event.currentTarget)
+                    }
+                    sx={{
+                      display: { xs: "inline-flex", md: "none" },
+                      color: "#111827",
+                    }}
                   >
-                    <ListItemIcon sx={{ minWidth: 32, color: "#2563EB" }}>
-                      <item.icon size={17} />
-                    </ListItemIcon>
-                    {item.label}
-                  </MenuItem>
-                ))}
-              </Menu>
-              <Button
-                component="a"
-                href="https://calendly.com/wisershifts-info/30min"
-                target="_blank"
-                rel="noopener noreferrer"
-                startIcon={<FiPhoneCall size={16} />}
-                sx={{
-                  display: { xs: "none", sm: "inline-flex" },
-                  color: "#fff",
-                  bgcolor: "#2563EB",
-                  borderRadius: 999,
-                  px: 2,
-                  py: 0.9,
-                  textTransform: "none",
-                  fontWeight: 700,
-                  boxShadow: "0 10px 24px rgba(37, 99, 235, 0.22)",
-                  "&:hover": {
-                    bgcolor: "#0F172A",
-                    color: "#fff",
-                    boxShadow: "0 12px 28px rgba(15, 23, 42, 0.24)",
-                  },
-                }}
-              >
-                Book a Scheduling Audit
-              </Button>
+                    <MdMenu />
+                  </IconButton>
+                  <Menu
+                    anchorEl={mobileMenuAnchor}
+                    open={Boolean(mobileMenuAnchor)}
+                    onClose={() => setMobileMenuAnchor(null)}
+                    MenuListProps={{ "aria-label": "Website navigation" }}
+                    slotProps={{
+                      paper: { sx: { mt: 1, minWidth: 235, borderRadius: 2 } },
+                    }}
+                  >
+                    <MenuItem
+                      component={Link}
+                      to="/calculators"
+                      onClick={closePublicMenus}
+                    >
+                      Calculators
+                    </MenuItem>
+                    <MenuItem
+                      component={Link}
+                      to="/pricing"
+                      onClick={closePublicMenus}
+                    >
+                      Pricing
+                    </MenuItem>
+                    <Divider />
+                    {featureLinks.map((item) => (
+                      <MenuItem
+                        key={item.to}
+                        component={Link}
+                        to={item.to}
+                        onClick={closePublicMenus}
+                      >
+                        <ListItemIcon sx={{ minWidth: 32, color: "#2563EB" }}>
+                          <item.icon size={17} />
+                        </ListItemIcon>
+                        {item.label}
+                      </MenuItem>
+                    ))}
+                  </Menu>
+                  <Button
+                    component="a"
+                    href="https://calendly.com/wisershifts-info/30min"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    startIcon={<FiPhoneCall size={16} />}
+                    sx={{
+                      display: { xs: "none", sm: "inline-flex" },
+                      color: "#fff",
+                      bgcolor: "#2563EB",
+                      borderRadius: 999,
+                      px: 2,
+                      py: 0.9,
+                      textTransform: "none",
+                      fontWeight: 700,
+                      "&:hover": { bgcolor: "#0F172A", color: "#fff" },
+                    }}
+                  >
+                    Book a Demo
+                  </Button>
+                </>
+              )}
               <Button
                 component={Link}
                 to="/login"
@@ -294,15 +327,13 @@ export default function Navbar({ onMobileOpen }) {
               </Button>
             </>
           ) : (
-            <>
-              <Button
-                startIcon={<MdLogout size={18} />}
-                sx={{ color: "text.secondary" }}
-                onClick={handleLogout}
-              >
-                Logout
-              </Button>
-            </>
+            <Button
+              startIcon={<MdLogout size={18} />}
+              sx={{ color: "text.secondary" }}
+              onClick={handleLogout}
+            >
+              Logout
+            </Button>
           )}
         </Box>
       </Toolbar>

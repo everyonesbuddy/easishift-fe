@@ -177,7 +177,7 @@ export default function Home() {
                       bgcolor: "#60A5FA",
                     }}
                   />
-                  Healthcare workforce scheduling
+                  Healthcare workforce management
                 </Typography>
                 <Typography
                   component="h1"
@@ -194,10 +194,7 @@ export default function Home() {
                     },
                   }}
                 >
-                  Healthcare Scheduling{" "}
-                  <Box component="span" sx={{ color: "#93C5FD" }}>
-                    Without the Chaos.
-                  </Box>
+                  Workforce management, built around your organization.
                 </Typography>
                 <Typography
                   sx={{
@@ -208,8 +205,9 @@ export default function Home() {
                     mt: 3,
                   }}
                 >
-                  Build schedules faster. Handle call-outs and shift changes.
-                  Keep your staff informed, all from one place.
+                  Scheduling, time tracking, call-outs, and workforce
+                  communication in one platform designed to fit the way your
+                  organization operates.
                 </Typography>
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
@@ -237,7 +235,7 @@ export default function Home() {
                       "&:hover": { bgcolor: "#3B82F6" },
                     }}
                   >
-                    Book a Scheduling Audit
+                    Book a Demo
                   </Button>
                   <Button
                     variant="outlined"
@@ -273,7 +271,7 @@ export default function Home() {
                       mb: 1.5,
                     }}
                   >
-                    Built for healthcare teams
+                    Built for healthcare organizations
                   </Typography>
                   <Box
                     sx={{
@@ -382,7 +380,7 @@ export default function Home() {
                       mt: 0.75,
                     }}
                   >
-                    Estimate the labor impact of scheduling inefficiency.
+                    See what inefficiency is costing you.
                   </Typography>
                   <Typography
                     sx={{
@@ -393,7 +391,7 @@ export default function Home() {
                     }}
                   >
                     Use practical calculators to understand labor cost leakage
-                    and evaluate the impact of better scheduling.
+                    and the impact of better workforce management.
                   </Typography>
                 </Box>
                 <Button
@@ -421,8 +419,8 @@ export default function Home() {
           <Section>
             <SectionTitle
               eyebrow="Why WiserShifts"
-              title="Scheduling built for the reality of healthcare."
-              subtitle="Built around the constant changes, call-outs, and coverage challenges healthcare teams deal with every day."
+              title="A workforce platform that fits the way you work."
+              subtitle="Healthcare operations change every day. WiserShifts gives your team the tools and flexibility to keep up."
             />
             <Box
               sx={{
@@ -436,7 +434,7 @@ export default function Home() {
               <Feature
                 icon={<FiShuffle size={21} />}
                 title="Handle call-outs calmly"
-                text="Make last-minute changes without rebuilding the entire schedule or relying on scattered messages."
+                text="Make last-minute changes without rebuilding the schedule or relying on scattered messages."
               />
               <Feature
                 icon={<FiTrendingDown size={21} />}
@@ -445,13 +443,13 @@ export default function Home() {
               />
               <Feature
                 icon={<FiUsers size={21} />}
-                title="Keep rotating staff organized"
+                title="Keep your team organized"
                 text="Manage part-time, float, and rotating employees with a clearer scheduling process."
               />
               <Feature
                 icon={<FiCheckCircle size={21} />}
                 title="Keep everyone informed"
-                text="Publish changes from one place so employees have a clear, current schedule."
+                text="Publish changes from one place so employees always have a clear, current schedule."
               />
             </Box>
           </Section>
@@ -486,8 +484,9 @@ export default function Home() {
                 <Typography
                   sx={{ color: "#667085", lineHeight: 1.65, mt: 1.5 }}
                 >
-                  Start with provider-ready payroll exports, then bring more of
-                  your workforce workflow into one connected place.
+                  Bring scheduling, time, payroll, and workforce information
+                  together without changing the systems your organization
+                  already relies on.
                 </Typography>
                 <Button
                   onClick={() => navigate("/integrations")}
@@ -608,7 +607,7 @@ export default function Home() {
                       fontSize: { xs: "1.8rem", md: "2.35rem" },
                     }}
                   >
-                    Healthcare Scheduling Without the Chaos.
+                    Built around your organization.
                   </Typography>
                   <Typography
                     sx={{
@@ -619,7 +618,8 @@ export default function Home() {
                     }}
                   >
                     See how WiserShifts can simplify scheduling, call-outs,
-                    shift changes, and team communication.
+                    shift changes, and workforce communication while fitting the
+                    way your organization operates.
                   </Typography>
                 </Box>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
@@ -642,7 +642,7 @@ export default function Home() {
                       "&:hover": { bgcolor: "#3B82F6" },
                     }}
                   >
-                    Book a Scheduling Audit
+                    Book a Demo
                   </Button>
                   <Button
                     variant="outlined"

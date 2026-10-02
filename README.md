@@ -1,6 +1,6 @@
 # WiserShifts — Frontend
 
-WiserShifts is a **multi-tenant workforce scheduling and management SaaS** built for care facilities. Admins get tools to plan coverage, build schedules, manage staff, and review time-off requests. Staff members get a self-service portal for their own schedule, shift swaps, time-off, messaging, and preferences.
+WiserShifts is a **white-label, multi-tenant workforce management SaaS** built for healthcare and care organizations. Each organization can have a dedicated workspace on its own subdomain, with a configurable display name, logo, and brand colors. Teams use that branded portal for scheduling, time tracking, coverage, call-outs, messaging, and staff self-service, while administrators manage their organization's operations and subscription.
 
 ---
 
@@ -10,12 +10,13 @@ WiserShifts is a **multi-tenant workforce scheduling and management SaaS** built
 2. [Project Structure](#project-structure)
 3. [Getting Started](#getting-started)
 4. [Environment & API Configuration](#environment--api-configuration)
-5. [Authentication & Session Lifecycle](#authentication--session-lifecycle)
-6. [Role System](#role-system)
-7. [Date & Timezone Architecture](#date--timezone-architecture)
-8. [App Entry Point & Routing](#app-entry-point--routing)
-9. [Paywall / Billing Guard](#paywall--billing-guard)
-10. [Feature Areas](#feature-areas)
+5. [White-Label Workspace](#white-label-workspace)
+6. [Authentication & Session Lifecycle](#authentication--session-lifecycle)
+7. [Role System](#role-system)
+8. [Date & Timezone Architecture](#date--timezone-architecture)
+9. [App Entry Point & Routing](#app-entry-point--routing)
+10. [Paywall / Billing Guard](#paywall--billing-guard)
+11. [Feature Areas](#feature-areas)
 
 - [Facility Preferences & Timezone](#facility-preferences--timezone)
 - [Dashboard](#dashboard)
@@ -28,12 +29,12 @@ WiserShifts is a **multi-tenant workforce scheduling and management SaaS** built
 - [Staff Preferences](#staff-preferences)
 - [Billing / Subscription](#billing--subscription)
 
-11. [Interactive Guide Tours](#interactive-guide-tours)
-12. [Shared Components](#shared-components)
-13. [Key Developer Patterns](#key-developer-patterns)
-14. [Performance Optimizations](#performance-optimizations)
-15. [Recent Major Changes](#recent-major-changes)
-16. [Deployment](#deployment)
+12. [Interactive Guide Tours](#interactive-guide-tours)
+13. [Shared Components](#shared-components)
+14. [Key Developer Patterns](#key-developer-patterns)
+15. [Performance Optimizations](#performance-optimizations)
+16. [Recent Major Changes](#recent-major-changes)
+17. [Deployment](#deployment)
 
 ---
 
@@ -65,6 +66,9 @@ src/
 │
 ├── config/
 │   └── api.js                   # Axios instance with runtime base-URL detection
+│
+├── utils/
+│   └── tenantWorkspace.js       # Root/tenant host detection and workspace URLs
 │
 ├── context/
 │   └── AuthContext.jsx          # Global auth state (user, role, tenant, login/logout)
@@ -176,6 +180,22 @@ If you need to override the backend at build time, extend `api.js` to read `impo
 
 ---
 
+## White-Label Workspace
+
+The public site is the product entry point; each customer works in a tenant-specific portal such as `https://example-clinic.wisershifts.com`.
+
+- **Workspace discovery:** `/login` on the root domain presents a workspace finder. It checks the requested subdomain through `GET /api/v1/public/tenant-branding?subdomain=...`, remembers the last workspace in `localStorage`, and redirects to that tenant's login page. The root finder skips branding lookups when there is no subdomain.
+- **Tenant-branded experience:** On a tenant subdomain, the app loads public branding once and applies the tenant display name, logo, and primary/secondary colors to the login and portal UI.
+- **Brand management:** Users with the `tenant.settings` permission manage the display name, logo, colors, and subdomain at `/tenant-branding`. Logo uploads support PNG, JPEG, and WebP up to 512 KB.
+- **New customer signup:** `/signup-tenant` remains the public organization signup route.
+- **Local development:** The root finder uses `.localhost` (for example, `example-clinic.localhost:5173`) and preserves the Vite port when redirecting to a local tenant workspace.
+
+Configure the frontend root domain with `VITE_TENANT_ROOT_DOMAIN` (domain only, no scheme), and set the backend `TENANT_ROOT_DOMAIN` to the same value. Production also requires wildcard DNS and HTTPS certificates for `*.<root-domain>`. Backend-generated portal and public logo URLs use `TENANT_APP_URL_SCHEME`, `TENANT_APP_URL_PORT`, and `API_PUBLIC_URL` as applicable.
+
+Workspace routing in the frontend is for discovery and presentation, not access control. The backend must resolve the tenant from the request host and enforce tenant membership and permissions for authentication and protected APIs.
+
+---
+
 ## Authentication & Session Lifecycle
 
 **File:** `src/context/AuthContext.jsx`
@@ -273,6 +293,7 @@ The full `<BrowserRouter>` renders with a persistent `<Sidebar>` + `<Navbar>` sh
 | `/login`                   | `Login`                 | Public                      |
 | `/reset-password`          | `ResetPassword`         | Public                      |
 | `/signup-tenant`           | `SignupTenant`          | Public                      |
+| `/tenant-branding`         | `TenantBrandingPage`    | Private — `tenant.settings` |
 | `/billing`                 | `ManageSubscription`    | Public (internally guarded) |
 | `/billing/success`         | `BillingSuccess`        | Public                      |
 | `/billing/cancel`          | `BillingCancel`         | Public                      |
@@ -549,6 +570,9 @@ Forms (create staff, create shift, request time off, compose message, etc.) are 
    - Native HTML5 drag-and-drop roster reordering with month-keyed (`YYYY-MM`) and user-scoped `localStorage` persistence.
    - Complete rebrand of storage keys to `wisershifts_*` with backward-compatible legacy key fallbacks.
 
+7. **White-Label Workspace Foundation:**
+   - Added root-domain workspace discovery, remembered-workspace continuation, tenant-subdomain login branding, and owner-managed tenant display names, logos, colors, and subdomains.
+
 ---
 
 ## Deployment
@@ -561,4 +585,4 @@ The app is deployed to **Netlify**.
 | Publish directory | `dist`                                                                     |
 | SPA redirect      | `netlify.toml` + `public/_redirects` both contain `/* → /index.html (200)` |
 
-No build-time environment variables are required — the API base URL is determined at runtime from `window.location.hostname`. To target a different backend at build time, add `VITE_API_BASE` to your Netlify environment variables and update `src/config/api.js` to read `import.meta.env.VITE_API_BASE`.
+The API base URL is determined at runtime from `window.location.hostname`. Configure `VITE_TENANT_ROOT_DOMAIN` in Netlify and set the matching `TENANT_ROOT_DOMAIN` on the backend for tenant subdomains; wildcard DNS and TLS must also point to the deployed frontend. To target a different backend at build time, add `VITE_API_BASE` to your Netlify environment variables and update `src/config/api.js` to read `import.meta.env.VITE_API_BASE`.

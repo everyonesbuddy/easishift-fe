@@ -76,7 +76,7 @@ import ConfirmDialog from "../../Shared/ConfirmDialog";
 import ShiftSwapRequestModal from "./ShiftSwapRequestModal";
 import { useAuth } from "../../../context/AuthContext";
 import { getPunchLocation } from "../../../utils/geolocation";
-import { useTheme } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Stack from "@mui/material/Stack";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -2971,8 +2971,9 @@ export default function ScheduleList() {
                 fontSize: "0.78rem",
               },
               "& .MuiToggleButton-root.Mui-selected": {
-                backgroundColor: "#2563eb",
-                color: "#fff",
+                backgroundColor: "primary.main",
+                color: "primary.contrastText",
+                "&:hover": { backgroundColor: "primary.dark" },
               },
             }}
             size="small"
@@ -4438,8 +4439,9 @@ export default function ScheduleList() {
                                     p: 0.25,
                                     borderRadius: 1,
                                     "&:hover": {
-                                      color: "#2563eb",
-                                      backgroundColor: "#eff6ff",
+                                      color: "primary.main",
+                                      backgroundColor: (theme) =>
+                                        alpha(theme.palette.primary.main, 0.08),
                                     },
                                     "&:active": {
                                       cursor: "grabbing",
@@ -4715,37 +4717,37 @@ export default function ScheduleList() {
               },
               ".fc .fc-button": {
                 background: "#FFFFFF",
-                border: "1px solid #BFDBFE",
-                color: "#1E3A8A",
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.32)}`,
+                color: theme.palette.primary.dark,
                 boxShadow: "none",
                 textTransform: "capitalize",
                 borderRadius: "8px",
                 fontWeight: 600,
               },
               ".fc .fc-button:hover": {
-                background: "#EFF6FF",
-                borderColor: "#93C5FD",
+                background: alpha(theme.palette.primary.main, 0.08),
+                borderColor: theme.palette.primary.light,
               },
               ".fc .fc-button-primary:not(:disabled).fc-button-active, .fc .fc-button-primary:not(:disabled):active":
                 {
-                  background: "#1D4ED8",
-                  borderColor: "#1D4ED8",
-                  color: "#FFFFFF",
+                  background: theme.palette.primary.main,
+                  borderColor: theme.palette.primary.main,
+                  color: theme.palette.primary.contrastText,
                 },
               ".fc .fc-scrollgrid": {
-                border: "1px solid #BFDBFE",
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.32)}`,
                 borderRadius: "14px",
                 overflow: "hidden",
                 background: "#fff",
               },
               ".fc .fc-col-header-cell-cushion": {
-                color: "#1E3A8A",
+                color: theme.palette.primary.dark,
                 fontWeight: 700,
                 fontSize: "0.74rem",
                 padding: "0.6rem 0.35rem",
               },
               ".fc .fc-col-header-cell": {
-                backgroundColor: "#EFF6FF",
+                backgroundColor: alpha(theme.palette.primary.main, 0.08),
               },
               ".fc .fc-daygrid-day-number": {
                 color: "#0F172A",
@@ -4756,7 +4758,7 @@ export default function ScheduleList() {
                 backgroundColor: "#FFFFFF",
               },
               ".fc .fc-daygrid-day.fc-day-today": {
-                backgroundColor: "#EFF6FF",
+                backgroundColor: alpha(theme.palette.primary.main, 0.08),
               },
               ".fc .fc-daygrid-day.weekend-day-cell:not(.fc-day-today)": {
                 backgroundColor: WEEKEND_BG,
@@ -4782,24 +4784,24 @@ export default function ScheduleList() {
                 padding: "0",
               },
               ".fc .fc-daygrid-more-link": {
-                color: "#1D4ED8",
+                color: theme.palette.primary.dark,
                 fontWeight: 700,
                 fontSize: "0.7rem",
                 borderRadius: "8px",
                 padding: "1px 6px",
-                backgroundColor: "#EFF6FF",
+                backgroundColor: alpha(theme.palette.primary.main, 0.08),
               },
               ".fc .fc-popover": {
                 backgroundColor: "#FFFFFF",
-                border: "1px solid #BFDBFE",
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.32)}`,
                 borderRadius: "12px",
                 boxShadow: "0 16px 36px rgba(15, 23, 42, 0.2)",
                 overflow: "hidden",
                 zIndex: 30,
               },
               ".fc .fc-popover-header": {
-                backgroundColor: "#EFF6FF",
-                borderBottom: "1px solid #DBEAFE",
+                backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                borderBottom: `1px solid ${alpha(theme.palette.primary.main, 0.18)}`,
                 padding: "6px 10px",
               },
               ".fc .fc-popover-title": {

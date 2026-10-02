@@ -6,6 +6,7 @@ import {
   Button,
   CircularProgress,
 } from "@mui/material";
+import { darken, useTheme } from "@mui/material/styles";
 
 import { useAuth } from "../../../context/AuthContext";
 import api from "../../../config/api";
@@ -44,6 +45,7 @@ const DASHBOARD_TOUR_STEPS = [
 export default function StaffDashboard() {
   const { user, roles, can, facilityPreferences, updateCurrentUser } =
     useAuth();
+  const theme = useTheme();
   const canViewOperations = can("schedule.view");
   const canViewStaffSummary = can("staff.view");
   const hasSchedulableRole =
@@ -313,8 +315,7 @@ export default function StaffDashboard() {
           p: { xs: 2.5, md: 3.5 },
           borderRadius: 4,
           color: "white",
-          background:
-            "radial-gradient(circle at 0% 0%, rgba(255,255,255,0.22), transparent 36%), linear-gradient(120deg, #0F4C81 0%, #0E7490 58%, #06B6D4 100%)",
+          background: `radial-gradient(circle at 0% 0%, rgba(255,255,255,0.18), transparent 36%), linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)), linear-gradient(120deg, ${darken(theme.palette.primary.main, 0.12)} 0%, ${darken(theme.palette.secondary.main, 0.12)} 100%)`,
           boxShadow: "0 12px 28px rgba(15, 23, 42, 0.2)",
         }}
       >

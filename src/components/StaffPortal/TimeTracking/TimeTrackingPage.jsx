@@ -22,6 +22,7 @@ import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 import { getDisplayTimeZone, formatInTimeZone } from "../../../utils/timeZone";
 import { getPunchLocation } from "../../../utils/geolocation";
+import { getFacilityRolesFromUser } from "../../../constants/industryRoles";
 
 const STATUS_COLOR = {
   in_progress: "warning",
@@ -130,8 +131,12 @@ const normalizeTrackingMode = (mode) => {
 };
 
 export default function TimeTrackingPage() {
-  const { can, facilityPreferences, fetchFacilityPreferences } = useAuth();
+  const { user, can, facilityPreferences, fetchFacilityPreferences } =
+    useAuth();
   const isAdmin = can("staff.view");
+  const hasFacilityRole =
+    getFacilityRolesFromUser(user, facilityPreferences).length > 0;
+  const showPersonalTracking = !isAdmin || hasFacilityRole;
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -485,7 +490,7 @@ export default function TimeTrackingPage() {
         </Alert>
       )}
 
-      {!isAdmin && (
+      {showPersonalTracking && (
         <Paper
           sx={{
             p: { xs: 2, md: 2.5 },
@@ -614,7 +619,7 @@ export default function TimeTrackingPage() {
         </Paper>
       )}
 
-      {!isAdmin && (
+      {showPersonalTracking && (
         <Paper
           sx={{
             p: { xs: 2, md: 2.5 },

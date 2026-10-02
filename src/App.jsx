@@ -32,16 +32,43 @@ import TimeOffRequestList from "./components/StaffPortal/TimeOff/TimeOffRequestL
 import TimeOffDecision from "./components/StaffPortal/TimeOff/TimeOffDecision";
 import PreferencesPage from "./components/StaffPortal/NoAdminPreferences/PreferencesPage";
 import FacilityPreferencesPage from "./components/StaffPortal/FacilityPreferences/FacilityPreferencesPage";
+import TenantBrandingPage from "./components/StaffPortal/FacilityPreferences/TenantBrandingPage";
 import CoveragePlanningPage from "./components/StaffPortal/Coverage/CoveragePlanningPage";
 import TimeTrackingPage from "./components/StaffPortal/TimeTracking/TimeTrackingPage";
 import PayrollExportsPage from "./components/StaffPortal/Exports/PayrollExportsPage";
 import { ToastContainer } from "react-toastify";
-import { Box } from "@mui/material";
+import { Box, CssBaseline } from "@mui/material";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { useAuth } from "./context/AuthContext";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 export default function App() {
-  const { user, tenant, can } = useAuth();
+  const { user, tenant, can, publicBranding } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const primaryColor = publicBranding?.primaryColor || "#2563eb";
+  const secondaryColor = publicBranding?.secondaryColor || "#1e40af";
+  const theme = useMemo(
+    () =>
+      createTheme({
+        palette: {
+          primary: { main: primaryColor },
+          secondary: { main: secondaryColor },
+        },
+        components: {
+          MuiButton: {
+            styleOverrides: {
+              containedPrimary: {
+                backgroundColor: `${primaryColor} !important`,
+                "&:hover": {
+                  backgroundColor: `${secondaryColor} !important`,
+                },
+              },
+            },
+          },
+        },
+      }),
+    [primaryColor, secondaryColor],
+  );
   const hasPaywallExemptStatus =
     tenant && ["active", "trialing"].includes(tenant.subscriptionStatus);
 
@@ -53,193 +80,213 @@ export default function App() {
   // Billing-only mode for admins with inactive/limited tenant
   if (user && showPaywall) {
     return (
-      <BrowserRouter>
-        <Box sx={{ marginLeft: 0 }}>
-          <Navbar />
-          <Routes>
-            <Route path="/billing" element={<Paywall tenant={tenant} />} />
-            <Route path="*" element={<Navigate to="/billing" replace />} />
-          </Routes>
-        </Box>
-      </BrowserRouter>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <BrowserRouter>
+          <Box sx={{ marginLeft: 0 }}>
+            <Navbar />
+            <Routes>
+              <Route path="/billing" element={<Paywall tenant={tenant} />} />
+              <Route path="*" element={<Navigate to="/billing" replace />} />
+            </Routes>
+          </Box>
+        </BrowserRouter>
+      </ThemeProvider>
     );
   }
 
-  const [mobileOpen, setMobileOpen] = useState(false);
-
   return (
-    <BrowserRouter>
-      {user && (
-        <Sidebar
-          mobileOpen={mobileOpen}
-          onMobileClose={() => setMobileOpen(false)}
-        />
-      )}
-      <Box
-        sx={{
-          marginLeft: user ? { xs: 0, sm: "260px" } : 0,
-          position: "relative",
-        }}
-      >
-        <Navbar onMobileOpen={() => setMobileOpen(true)} />
-        <Routes>
-          <Route
-            path="/"
-            element={user ? <Navigate to="/dashboard" replace /> : <Home />}
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <BrowserRouter>
+        {user && (
+          <Sidebar
+            mobileOpen={mobileOpen}
+            onMobileClose={() => setMobileOpen(false)}
           />
-          <Route path="/pricing" element={<PricingPage />} />
-          <Route path="/calculators" element={<Calculators />} />
-          <Route
-            path="/turnover-roi-calculator"
-            element={<Navigate to="/calculators" replace />}
-          />
-          <Route
-            path="/cost-leak-calculator"
-            element={<Navigate to="/calculators" replace />}
-          />
-          <Route
-            path="/calculators/call-out-cost-calculator"
-            element={<CallOutCostCalculator />}
-          />
-          <Route
-            path="/calculators/overtime-cost-calculator"
-            element={<OvertimeCostCalculator />}
-          />
-          <Route
-            path="/calculators/time-clock-accuracy-calculator"
-            element={<TimeClockAccuracyCalculator />}
-          />
-          <Route
-            path="/terms-and-conditions"
-            element={<TermsAndConditions />}
-          />
-          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-          <Route path="/eula" element={<EndUserLicenseAgreement />} />
-          <Route path="/contact" element={<ContactPage />} />
-          <Route path="/integrations" element={<IntegrationsPage />} />
-          <Route path="/features/:feature" element={<FeatureLandingPage />} />
-          <Route
-            path="/login"
-            element={user ? <Navigate to="/dashboard" replace /> : <Login />}
-          />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route
-            path="/signup-tenant"
-            element={
-              user ? <Navigate to="/dashboard" replace /> : <SignupTenant />
-            }
-          />
-          <Route path="/billing" element={<ManageSubscription />} />
-          <Route path="/billing/success" element={<BillingSuccess />} />
-          <Route path="/billing/cancel" element={<BillingCancel />} />
-          <Route
-            path="/dashboard"
-            element={
-              <PrivateRoute>
-                <StaffDashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/coverage-planning"
-            element={
-              <PrivateRoute>
-                <CoveragePlanningPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/schedule"
-            element={
-              <PrivateRoute>
-                <ScheduleList />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/swap-requests"
-            element={
-              <PrivateRoute>
-                <ShiftSwapRequestsPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/staffs"
-            element={
-              <PrivateRoute>
-                <StaffList />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/timeoff-decisions"
-            element={
-              <PrivateRoute>
-                <TimeOffDecision />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/messages"
-            element={
-              <PrivateRoute>
-                <MessageList />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/preferences"
-            element={
-              <PrivateRoute>
-                <PreferencesPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/timeoff-requests"
-            element={
-              <PrivateRoute>
-                <TimeOffRequestList />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/time-tracking"
-            element={
-              <PrivateRoute>
-                <TimeTrackingPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/payroll-exports"
-            element={
-              <PrivateRoute>
-                <PayrollExportsPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/facility-preferences"
-            element={
-              <PrivateRoute>
-                <FacilityPreferencesPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/how-to-use"
-            element={
-              <PrivateRoute>
-                <HowToUsePage />
-              </PrivateRoute>
-            }
-          />
-        </Routes>
-        <ToastContainer />
-        <GuideTourOverlay />
-      </Box>
-    </BrowserRouter>
+        )}
+        <Box
+          sx={{
+            marginLeft: user ? { xs: 0, sm: "260px" } : 0,
+            position: "relative",
+          }}
+        >
+          <Navbar onMobileOpen={() => setMobileOpen(true)} />
+          <Routes>
+            <Route
+              path="/"
+              element={
+                user ? (
+                  <Navigate to="/dashboard" replace />
+                ) : publicBranding ? (
+                  <Navigate to="/login" replace />
+                ) : (
+                  <Home />
+                )
+              }
+            />
+            <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/calculators" element={<Calculators />} />
+            <Route
+              path="/turnover-roi-calculator"
+              element={<Navigate to="/calculators" replace />}
+            />
+            <Route
+              path="/cost-leak-calculator"
+              element={<Navigate to="/calculators" replace />}
+            />
+            <Route
+              path="/calculators/call-out-cost-calculator"
+              element={<CallOutCostCalculator />}
+            />
+            <Route
+              path="/calculators/overtime-cost-calculator"
+              element={<OvertimeCostCalculator />}
+            />
+            <Route
+              path="/calculators/time-clock-accuracy-calculator"
+              element={<TimeClockAccuracyCalculator />}
+            />
+            <Route
+              path="/terms-and-conditions"
+              element={<TermsAndConditions />}
+            />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/eula" element={<EndUserLicenseAgreement />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/integrations" element={<IntegrationsPage />} />
+            <Route path="/features/:feature" element={<FeatureLandingPage />} />
+            <Route
+              path="/login"
+              element={user ? <Navigate to="/dashboard" replace /> : <Login />}
+            />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route
+              path="/signup-tenant"
+              element={
+                user ? <Navigate to="/dashboard" replace /> : <SignupTenant />
+              }
+            />
+            <Route path="/billing" element={<ManageSubscription />} />
+            <Route path="/billing/success" element={<BillingSuccess />} />
+            <Route path="/billing/cancel" element={<BillingCancel />} />
+            <Route
+              path="/dashboard"
+              element={
+                <PrivateRoute>
+                  <StaffDashboard />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/coverage-planning"
+              element={
+                <PrivateRoute>
+                  <CoveragePlanningPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/schedule"
+              element={
+                <PrivateRoute>
+                  <ScheduleList />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/swap-requests"
+              element={
+                <PrivateRoute>
+                  <ShiftSwapRequestsPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/staffs"
+              element={
+                <PrivateRoute>
+                  <StaffList />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/timeoff-decisions"
+              element={
+                <PrivateRoute>
+                  <TimeOffDecision />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/messages"
+              element={
+                <PrivateRoute>
+                  <MessageList />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/preferences"
+              element={
+                <PrivateRoute>
+                  <PreferencesPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/timeoff-requests"
+              element={
+                <PrivateRoute>
+                  <TimeOffRequestList />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/time-tracking"
+              element={
+                <PrivateRoute>
+                  <TimeTrackingPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/payroll-exports"
+              element={
+                <PrivateRoute>
+                  <PayrollExportsPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/facility-preferences"
+              element={
+                <PrivateRoute>
+                  <FacilityPreferencesPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/tenant-branding"
+              element={
+                <PrivateRoute>
+                  <TenantBrandingPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/how-to-use"
+              element={
+                <PrivateRoute>
+                  <HowToUsePage />
+                </PrivateRoute>
+              }
+            />
+          </Routes>
+          <ToastContainer />
+          <GuideTourOverlay />
+        </Box>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }

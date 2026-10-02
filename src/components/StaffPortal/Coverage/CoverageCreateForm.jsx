@@ -17,6 +17,7 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
 import CloseIcon from "@mui/icons-material/Close";
 import {
   MdAccessTime,
@@ -263,6 +264,7 @@ const getCoverageFormTourSteps = ({ canUseNlParser }) => {
 
 export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
   const { facilityPreferences, can } = useAuth();
+  const theme = useTheme();
   const { startTourIfUnseen } = useGuideTour();
   const navigate = useNavigate();
   const canUseNlParser =
@@ -1320,7 +1322,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
               px: { xs: 1.5, sm: 2 },
               pt: 1.5,
               pb: 1.25,
-              background: "linear-gradient(135deg, #EFF6FF 0%, #F8FAFC 100%)",
+              background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, #F8FAFC 100%)`,
             }}
           >
             <Box
@@ -1331,18 +1333,18 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                   width: 30,
                   height: 30,
                   borderRadius: 1.5,
-                  backgroundColor: "#DBEAFE",
+                  backgroundColor: alpha(theme.palette.primary.main, 0.12),
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "#1D4ED8",
+                  color: theme.palette.primary.dark,
                 }}
               >
                 <MdCalendarMonth size={17} />
               </Box>
               <Typography
                 variant="body2"
-                sx={{ fontWeight: 700, color: "#1E3A8A" }}
+                sx={{ fontWeight: 700, color: theme.palette.primary.dark }}
               >
                 Date Pattern
               </Typography>
@@ -1354,8 +1356,8 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                     height: 20,
                     fontSize: "0.65rem",
                     fontWeight: 700,
-                    backgroundColor: "#DBEAFE",
-                    color: "#1D4ED8",
+                    backgroundColor: alpha(theme.palette.primary.main, 0.12),
+                    color: theme.palette.primary.dark,
                   }}
                 />
               )}
@@ -1409,7 +1411,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
             subtitle={`${repeatMode.charAt(0).toUpperCase() + repeatMode.slice(1)} · ${generatedDates.length} generated`}
             open={repeatOpen}
             onToggle={() => setRepeatOpen((v) => !v)}
-            accentColor="#2563EB"
+            accentColor={theme.palette.primary.main}
           />
           <Collapse in={repeatOpen}>
             <Box sx={{ px: { xs: 1.5, sm: 2 }, py: 1.5 }}>
@@ -1426,15 +1428,16 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
                   "& .MuiToggleButton-root": {
                     textTransform: "none",
                     borderRadius: "20px !important",
-                    border: "1px solid #BFDBFE",
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.35)}`,
                     px: 1.5,
                     py: 0.4,
                     fontSize: "0.78rem",
-                    color: "#374151",
+                    color: "text.secondary",
                     "&.Mui-selected": {
-                      backgroundColor: "#2563EB",
-                      color: "#fff",
-                      borderColor: "#2563EB",
+                      backgroundColor: "primary.main",
+                      color: "primary.contrastText",
+                      borderColor: "primary.main",
+                      "&:hover": { backgroundColor: "primary.dark" },
                     },
                   },
                 }}
@@ -2038,8 +2041,8 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
               fontWeight: 700,
               py: 1.1,
               borderRadius: 2,
-              background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
-              boxShadow: "0 4px 12px rgba(37,99,235,0.3)",
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+              boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
             }}
           >
             {loading && submitMode === "generate"

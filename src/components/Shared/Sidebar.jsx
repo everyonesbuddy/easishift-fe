@@ -29,22 +29,26 @@ import {
   MdHelpOutline,
   MdAccessTime,
   MdFileDownload,
+  MdPalette,
 } from "react-icons/md";
 import logo from "../../assets/logos/wiserShifts-logo-dark.svg";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { useTheme } from "@mui/material/styles";
+import { darken, useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import ChangePasswordModal from "../Auth/ChangePasswordModal";
 import { getFacilityRolesFromUser } from "../../constants/industryRoles";
 
 function Sidebar({ mobileOpen, onMobileClose }) {
-  const { user, facilityPreferences, can } = useAuth();
+  const { user, facilityPreferences, can, publicBranding } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
   const isMdUp = useMediaQuery(theme.breakpoints.up("sm"));
+  const sidebarBg = publicBranding?.secondaryColor || "#111827";
+  const sidebarText = theme.palette.getContrastText(sidebarBg);
+  const primaryColor = publicBranding?.primaryColor || "#2563eb";
   const [anchorEl, setAnchorEl] = useState(null);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const menuOpen = Boolean(anchorEl);
@@ -101,6 +105,16 @@ function Sidebar({ mobileOpen, onMobileClose }) {
             icon: MdTune,
             label: "Facility Preferences",
             to: "/facility-preferences",
+          },
+        ]
+      : []),
+    ...(can("tenant.settings")
+      ? [
+          {
+            id: "tenant-branding",
+            icon: MdPalette,
+            label: "Tenant Branding",
+            to: "/tenant-branding",
           },
         ]
       : []),
@@ -183,9 +197,9 @@ function Sidebar({ mobileOpen, onMobileClose }) {
         "& .MuiDrawer-paper": {
           width: 260,
           boxSizing: "border-box",
-          bgcolor: "#111827", // gray-900
-          color: "white",
-          borderRight: "1px solid #1f2937", // gray-800
+          bgcolor: sidebarBg,
+          color: sidebarText,
+          borderRight: `1px solid ${theme.palette.action.disabledBackground}`,
         },
       }}
     >
@@ -193,7 +207,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
       <Box
         sx={{
           p: 2,
-          borderBottom: "1px solid #1f2937",
+          borderBottom: `1px solid ${theme.palette.action.disabledBackground}`,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -203,10 +217,11 @@ function Sidebar({ mobileOpen, onMobileClose }) {
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <Box
             component="img"
-            src={logo}
-            alt="Wisershifts logo"
+            src={publicBranding?.logoUrl || logo}
+            alt={publicBranding?.displayName || "Wisershifts logo"}
             sx={{
               width: 180,
+              maxHeight: 48,
               height: "auto",
               display: "block",
               objectFit: "contain",
@@ -239,11 +254,13 @@ function Sidebar({ mobileOpen, onMobileClose }) {
                     px: 1.25,
                     py: 0.65,
                     gap: 0.75,
-                    color: isActive ? "white" : "#d1d5db", // gray-300
-                    bgcolor: isActive ? "#2563eb" : "transparent", // blue-600
+                    color: sidebarText,
+                    bgcolor: isActive ? primaryColor : "transparent",
                     transition: "background-color 0.2s ease",
                     "&:hover": {
-                      bgcolor: isActive ? "#1d4ed8" : "#1f2937", // blue-700 / gray-800
+                      bgcolor: isActive
+                        ? darken(primaryColor, 0.12)
+                        : theme.palette.action.hover,
                     },
                   }}
                 >
@@ -272,12 +289,15 @@ function Sidebar({ mobileOpen, onMobileClose }) {
                 px: 1.25,
                 py: 0.65,
                 gap: 0.75,
-                color: activePath === "/how-to-use" ? "white" : "#d1d5db",
+                color: sidebarText,
                 bgcolor:
-                  activePath === "/how-to-use" ? "#2563eb" : "transparent",
+                  activePath === "/how-to-use" ? primaryColor : "transparent",
                 transition: "background-color 0.2s ease",
                 "&:hover": {
-                  bgcolor: activePath === "/how-to-use" ? "#1d4ed8" : "#1f2937",
+                  bgcolor:
+                    activePath === "/how-to-use"
+                      ? darken(primaryColor, 0.12)
+                      : theme.palette.action.hover,
                 },
               }}
             >
@@ -294,7 +314,12 @@ function Sidebar({ mobileOpen, onMobileClose }) {
       </Box>
 
       {/* User Footer */}
-      <Box sx={{ p: 2, borderTop: "1px solid #1f2937" }}>
+      <Box
+        sx={{
+          p: 2,
+          borderTop: `1px solid ${theme.palette.action.disabledBackground}`,
+        }}
+      >
         <Box
           sx={{
             display: "flex",
@@ -305,14 +330,21 @@ function Sidebar({ mobileOpen, onMobileClose }) {
             position: "relative",
           }}
         >
-          <Avatar sx={{ bgcolor: "#2563eb", width: 40, height: 40 }}>
+          <Avatar
+            sx={{
+              bgcolor: primaryColor,
+              color: theme.palette.getContrastText(primaryColor),
+              width: 40,
+              height: 40,
+            }}
+          >
             <MdAccountCircle size={24} />
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography
               variant="body2"
               sx={{
-                color: "white",
+                color: sidebarText,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -323,7 +355,8 @@ function Sidebar({ mobileOpen, onMobileClose }) {
             <Typography
               variant="caption"
               sx={{
-                color: "#9ca3af", // gray-400
+                color: sidebarText,
+                opacity: 0.72,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -336,7 +369,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
           <IconButton
             size="small"
             onClick={(e) => setAnchorEl(e.currentTarget)}
-            sx={{ color: "#9ca3af", "&:hover": { color: "white" } }}
+            sx={{ color: sidebarText, "&:hover": { opacity: 0.8 } }}
           >
             <MdMoreVert size={18} />
           </IconButton>
@@ -348,8 +381,8 @@ function Sidebar({ mobileOpen, onMobileClose }) {
           onClose={() => setAnchorEl(null)}
           PaperProps={{
             sx: {
-              bgcolor: "#1f2937",
-              color: "white",
+              bgcolor: sidebarBg,
+              color: sidebarText,
             },
           }}
         >
@@ -359,7 +392,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
               setAnchorEl(null);
             }}
             sx={{
-              "&:hover": { bgcolor: "#111827" },
+              "&:hover": { bgcolor: theme.palette.action.hover },
             }}
           >
             Change Password

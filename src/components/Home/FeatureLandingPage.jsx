@@ -189,7 +189,7 @@ export default function FeatureLandingPage() {
                       fontWeight: 800,
                     }}
                   >
-                    Book a scheduling audit
+                    Book a Demo
                   </Button>
                 </Stack>
               </Box>

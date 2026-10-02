@@ -42,17 +42,17 @@ const DEFAULTS = {
   employees: 50,
   hourlyWage: 22,
   hoursPerWeek: 40,
-  unverifiedMinutesPerShift: 12,
+  discrepancyMinutesPerShift: 12,
   shiftsPerWeek: 5,
-  sharedDevicePercent: 50,
   adminHoursPerPayPeriod: 4,
   adminHourlyRate: 25,
+  payDisputesPerMonth: 3,
 };
 
 export default function TimeClockAccuracyCalculator() {
   usePageMetadata(
-    "Time Clock Accuracy Calculator | WiserShifts",
-    "Estimate the annual cost of unverified time entries and manual timesheet corrections for your facility.",
+    "Payroll Accuracy Calculator | WiserShifts",
+    "Estimate the cost of payroll discrepancies, manual corrections, and pay disputes for your facility.",
   );
 
   const [companyName, setCompanyName] = useState("");
@@ -65,14 +65,11 @@ export default function TimeClockAccuracyCalculator() {
   const [hoursPerWeek, setHoursPerWeek] = useState(() =>
     readNumberParam("hours", DEFAULTS.hoursPerWeek, 1, 100),
   );
-  const [unverifiedMinutesPerShift, setUnverifiedMinutesPerShift] = useState(
-    () => readNumberParam("minutes", DEFAULTS.unverifiedMinutesPerShift, 0, 60),
+  const [discrepancyMinutesPerShift, setDiscrepancyMinutesPerShift] = useState(
+    () => readNumberParam("minutes", DEFAULTS.discrepancyMinutesPerShift, 0, 60),
   );
   const [shiftsPerWeek, setShiftsPerWeek] = useState(() =>
     readNumberParam("shifts", DEFAULTS.shiftsPerWeek, 1, 14),
-  );
-  const [sharedDevicePercent, setSharedDevicePercent] = useState(() =>
-    readNumberParam("shared", DEFAULTS.sharedDevicePercent, 0, 100),
   );
   const [adminHoursPerPayPeriod, setAdminHoursPerPayPeriod] = useState(() =>
     readNumberParam("adminHours", DEFAULTS.adminHoursPerPayPeriod, 0, 80),
@@ -80,38 +77,37 @@ export default function TimeClockAccuracyCalculator() {
   const [adminHourlyRate, setAdminHourlyRate] = useState(() =>
     readNumberParam("adminRate", DEFAULTS.adminHourlyRate, 1, 200),
   );
+  const [payDisputesPerMonth, setPayDisputesPerMonth] = useState(() =>
+    readNumberParam("disputes", DEFAULTS.payDisputesPerMonth, 0, 1000),
+  );
   const [email, setEmail] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
 
   const metrics = useMemo(() => {
-    const exposureMultiplier = sharedDevicePercent / 50;
-    const weeklyUnverifiedMinutes =
-      unverifiedMinutesPerShift *
-      shiftsPerWeek *
-      employees *
-      exposureMultiplier;
-    const weeklyUnverifiedCost = (weeklyUnverifiedMinutes / 60) * hourlyWage;
-    const annualUnverifiedCost = weeklyUnverifiedCost * WEEKS_PER_YEAR;
+    const weeklyDiscrepancyMinutes =
+      discrepancyMinutesPerShift * shiftsPerWeek * employees;
+    const weeklyDiscrepancyCost =
+      (weeklyDiscrepancyMinutes / 60) * hourlyWage;
+    const annualDiscrepancyCost = weeklyDiscrepancyCost * WEEKS_PER_YEAR;
     const annualAdminCorrectionCost =
       adminHoursPerPayPeriod * adminHourlyRate * PAY_PERIODS_PER_YEAR;
-    const annualUnverifiedHours =
-      (weeklyUnverifiedMinutes * WEEKS_PER_YEAR) / 60;
+    const annualDisputes = payDisputesPerMonth * 12;
 
     return {
-      weeklyUnverifiedMinutes,
-      annualUnverifiedHours,
-      annualUnverifiedCost,
+      weeklyDiscrepancyMinutes,
+      annualDiscrepancyCost,
       annualAdminCorrectionCost,
-      totalAnnualCost: annualUnverifiedCost + annualAdminCorrectionCost,
+      annualDisputes,
+      totalAnnualCost: annualDiscrepancyCost + annualAdminCorrectionCost,
     };
   }, [
     adminHourlyRate,
     adminHoursPerPayPeriod,
+    discrepancyMinutesPerShift,
     employees,
     hourlyWage,
-    sharedDevicePercent,
+    payDisputesPerMonth,
     shiftsPerWeek,
-    unverifiedMinutesPerShift,
   ]);
 
   const handleCopyLink = async () => {
@@ -121,11 +117,11 @@ export default function TimeClockAccuracyCalculator() {
         employees,
         wage: hourlyWage,
         hours: hoursPerWeek,
-        minutes: unverifiedMinutesPerShift,
+        minutes: discrepancyMinutesPerShift,
         shifts: shiftsPerWeek,
-        shared: sharedDevicePercent,
         adminHours: adminHoursPerPayPeriod,
         adminRate: adminHourlyRate,
+        disputes: payDisputesPerMonth,
       });
       toast.success("A link to these results was copied.");
     } catch {
@@ -135,10 +131,10 @@ export default function TimeClockAccuracyCalculator() {
 
   const handleDownloadPdf = () => {
     downloadCalculatorPdf({
-      calculatorTitle: "Time Clock Accuracy Summary",
-      filePrefix: "time-clock-accuracy",
+      calculatorTitle: "Payroll Accuracy Summary",
+      filePrefix: "payroll-accuracy",
       companyName,
-      costLabel: "Total annual unverified-time cost",
+      costLabel: "Estimated annual payroll discrepancy cost",
       totalCost: formatMoney(metrics.totalAnnualCost),
       potentialSavings: formatMoney(metrics.totalAnnualCost),
       reductionPercent: 100,
@@ -147,37 +143,31 @@ export default function TimeClockAccuracyCalculator() {
         ["Average hourly wage", `$${formatNumber(hourlyWage, 2)}/hr`],
         ["Average hours per week", `${formatNumber(hoursPerWeek, 1)} hours`],
         [
-          "Unverified time per shift",
-          `${formatNumber(unverifiedMinutesPerShift, 1)} minutes`,
+          "Clock-in/out discrepancy per shift",
+          `${formatNumber(discrepancyMinutesPerShift, 1)} minutes`,
         ],
         ["Shifts per week per employee", formatNumber(shiftsPerWeek, 1)],
         [
-          "Shared or kiosk device use",
-          `${formatNumber(sharedDevicePercent, 0)}%`,
-        ],
-        [
-          "Payroll correction hours per pay period",
+          "Payroll resolution hours per pay period",
           `${formatNumber(adminHoursPerPayPeriod, 1)} hours`,
         ],
         [
           "Payroll admin hourly rate",
           `$${formatNumber(adminHourlyRate, 2)}/hr`,
         ],
+        ["Pay disputes or corrections per month", formatNumber(payDisputesPerMonth, 0)],
       ],
       costs: [
-        ["Unverified punch time", formatMoney(metrics.annualUnverifiedCost)],
+        ["Time discrepancies", formatMoney(metrics.annualDiscrepancyCost)],
         [
-          "Manual timesheet correction time",
+          "Manual correction time",
           formatMoney(metrics.annualAdminCorrectionCost),
         ],
-        [
-          "Estimated unverified time",
-          `${formatNumber(metrics.annualUnverifiedHours)} hours/year`,
-        ],
+        ["Pay disputes per year", formatNumber(metrics.annualDisputes, 0)],
         ["Total annual cost", formatMoney(metrics.totalAnnualCost)],
       ],
       featureSummary:
-        "Geofenced clock-in confirms that a punch happens on-site and flags entries outside the facility boundary for review, helping payroll reflect verified time instead of manual trust.",
+        "Geofenced clock-in confirms when and where a shift started and ended, helping staff be paid accurately for time worked and giving payroll a clear record when a discrepancy needs review.",
       calculatorUrl: "https://calendly.com/wisershifts-info/30min",
     });
     toast.success("Your WiserShifts report was downloaded.");
@@ -193,23 +183,23 @@ export default function TimeClockAccuracyCalculator() {
     try {
       setSendingEmail(true);
       openBeehiivCaptureOnce(trimmedEmail);
-      await api.post("/marketing/time-clock-accuracy/email-summary", {
+      await api.post("/marketing/payroll-accuracy/email-summary", {
         recipientEmail: trimmedEmail,
         inputs: {
           companyName,
           employees,
           hourlyWage,
           hoursPerWeek,
-          unverifiedMinutesPerShift,
+          discrepancyMinutesPerShift,
           shiftsPerWeek,
-          sharedDevicePercent,
           adminHoursPerPayPeriod,
           adminHourlyRate,
+          payDisputesPerMonth,
         },
         outputs: {
-          annualUnverifiedCost: metrics.annualUnverifiedCost,
+          annualDiscrepancyCost: metrics.annualDiscrepancyCost,
           annualAdminCorrectionCost: metrics.annualAdminCorrectionCost,
-          annualUnverifiedHours: metrics.annualUnverifiedHours,
+          annualDisputes: metrics.annualDisputes,
           totalAnnualCost: metrics.totalAnnualCost,
         },
       });
@@ -253,7 +243,7 @@ export default function TimeClockAccuracyCalculator() {
                 letterSpacing: "0.12em",
               }}
             >
-              Time clock accuracy calculator
+              Payroll accuracy calculator
             </Typography>
             <Typography
               component="h1"
@@ -265,12 +255,11 @@ export default function TimeClockAccuracyCalculator() {
                 lineHeight: 1.02,
               }}
             >
-              What do unverified time entries cost your facility?
+              Is everyone getting paid accurately for the time they work?
             </Typography>
             <Typography sx={{ maxWidth: 790, mt: 2, color: "#CCFBF1" }}>
-              Estimate the annual cost of unverified punch time and manual
-              timesheet correction without assuming anyone is acting in bad
-              faith.
+              Estimate the cost of time discrepancies, manual corrections, and
+              pay disputes with clear, verified clock data for everyone.
             </Typography>
           </Container>
         </Box>
@@ -336,13 +325,13 @@ export default function TimeClockAccuracyCalculator() {
                     endAdornment="hrs"
                   />
                   <CalculatorInput
-                    label="Unverified time per shift"
-                    value={unverifiedMinutesPerShift}
-                    onChange={setUnverifiedMinutesPerShift}
+                    label="Clock-in/out discrepancy per shift (minutes)"
+                    value={discrepancyMinutesPerShift}
+                    onChange={setDiscrepancyMinutesPerShift}
                     min={0}
                     max={60}
                     endAdornment="min"
-                    tooltip="Early clock-ins, late clock-outs, or punches from outside the facility that go unreviewed."
+                    tooltip="Gaps between scheduled and actual punch time that go unreviewed, not a claim about any individual."
                     helper="The 12-minute default is an editable estimate, not a claim about your team."
                   />
                   <CalculatorInput
@@ -352,18 +341,9 @@ export default function TimeClockAccuracyCalculator() {
                     min={1}
                     max={14}
                   />
-                  <CalculatorInput
-                    label="Staff using shared or kiosk devices"
-                    value={sharedDevicePercent}
-                    onChange={setSharedDevicePercent}
-                    min={0}
-                    max={100}
-                    endAdornment="%"
-                    tooltip="Used to scale the unverified-time estimate as shared-device exposure changes."
-                  />
                   <Divider />
                   <CalculatorInput
-                    label="Payroll correction hours per pay period"
+                    label="Payroll hours resolving discrepancies per pay period"
                     value={adminHoursPerPayPeriod}
                     onChange={setAdminHoursPerPayPeriod}
                     min={0}
@@ -377,6 +357,13 @@ export default function TimeClockAccuracyCalculator() {
                     min={1}
                     max={200}
                     adornment="$"
+                  />
+                  <CalculatorInput
+                    label="Pay disputes or corrections per month"
+                    value={payDisputesPerMonth}
+                    onChange={setPayDisputesPerMonth}
+                    min={0}
+                    max={1000}
                   />
                 </Stack>
               </CardContent>
@@ -400,7 +387,7 @@ export default function TimeClockAccuracyCalculator() {
                       fontSize: "0.75rem",
                     }}
                   >
-                    Estimated annual cost of unverified time entries
+                    Estimated annual cost of unresolved payroll discrepancies
                   </Typography>
                   <Typography
                     sx={{
@@ -414,8 +401,7 @@ export default function TimeClockAccuracyCalculator() {
                     {formatMoney(metrics.totalAnnualCost)}
                   </Typography>
                   <Typography sx={{ color: "text.secondary", mt: 1.25 }}>
-                    Across {formatNumber(metrics.annualUnverifiedHours)} hours
-                    of estimated unverified time per year.
+                    Includes time discrepancies and manual payroll resolution.
                   </Typography>
                   <Stack spacing={1.25} sx={{ mt: 3 }}>
                     <Box
@@ -426,10 +412,10 @@ export default function TimeClockAccuracyCalculator() {
                       }}
                     >
                       <Typography color="text.secondary">
-                        Unverified or unreviewed punch time
+                        Time discrepancies (pay not matching actual hours worked)
                       </Typography>
                       <Typography sx={{ fontWeight: 900 }}>
-                        {formatMoney(metrics.annualUnverifiedCost)}
+                        {formatMoney(metrics.annualDiscrepancyCost)}
                       </Typography>
                     </Box>
                     <Box
@@ -440,13 +426,26 @@ export default function TimeClockAccuracyCalculator() {
                       }}
                     >
                       <Typography color="text.secondary">
-                        Manual timesheet correction time
+                        Manual correction time
                       </Typography>
                       <Typography sx={{ fontWeight: 900 }}>
                         {formatMoney(metrics.annualAdminCorrectionCost)}
                       </Typography>
                     </Box>
                   </Stack>
+                  <Typography
+                    sx={{
+                      mt: 2.5,
+                      p: 1.75,
+                      borderLeft: "3px solid #0F766E",
+                      bgcolor: "#F0FDFA",
+                      color: "#134E4A",
+                    }}
+                  >
+                    An estimated {formatNumber(metrics.annualDisputes, 0)} pay
+                    disputes a year could be avoided or resolved faster with
+                    verified clock data.
+                  </Typography>
                   <Stack
                     direction={{ xs: "column", sm: "row" }}
                     spacing={1}
@@ -524,19 +523,19 @@ export default function TimeClockAccuracyCalculator() {
                 </CardContent>
               </Card>
               <Alert severity="info" icon={<FiClock />}>
-                WiserShifts does not assume staff are dishonest. Geofenced
-                clock-in confirms a punch happens on-site and flags entries
-                outside that boundary for review, so payroll reflects verified
-                time instead of manual trust.
+                WiserShifts doesn&apos;t assume anyone&apos;s punching in wrong.
+                Geofenced clock-in confirms exactly when and where a shift
+                started and ended, so staff are paid accurately for the time
+                they worked and payroll isn&apos;t left guessing when something
+                looks off.
               </Alert>
               <Typography
                 variant="caption"
                 color="text.secondary"
                 sx={{ px: 1 }}
               >
-                These are estimates based on commonly cited time-tracking
-                research and the inputs you provide. Actual impact depends on
-                your current clock-in method and facility layout.
+                These are estimates based on the inputs above. Actual impact
+                depends on your current clock-in method and payroll process.
               </Typography>
               <Button
                 component="a"

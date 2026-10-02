@@ -16,6 +16,7 @@ export const isRootWorkspaceHost = (hostname = window.location.hostname) => {
   return (
     normalizedHost === "localhost" ||
     normalizedHost === "127.0.0.1" ||
+    normalizedHost === "easishift.netlify.app" ||
     normalizedHost === TENANT_ROOT_DOMAIN ||
     normalizedHost === `www.${TENANT_ROOT_DOMAIN}`
   );

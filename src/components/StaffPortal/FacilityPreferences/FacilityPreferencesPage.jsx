@@ -27,6 +27,7 @@ import {
 import { FiSave, FiInfo, FiRotateCcw, FiChevronDown } from "react-icons/fi";
 import { FiX, FiPlus } from "react-icons/fi";
 import api from "../../../config/api";
+import { trackEvent } from "../../../utils/analytics";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 import { useGuideTour } from "../../../context/GuideTourContext";
@@ -636,6 +637,7 @@ export default function FacilityPreferencesPage() {
       const payload = normalizeTaxonomyPrefs(prefs);
 
       const res = await api.post("/facility-preferences", payload);
+      trackEvent("facility_settings_saved");
       setPrefs(normalizeTaxonomyPrefs(res.data));
       toast.success("Facility preferences saved", {
         position: "top-right",

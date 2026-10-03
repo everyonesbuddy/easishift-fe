@@ -17,6 +17,7 @@ import {
 import ArrowOutwardRoundedIcon from "@mui/icons-material/ArrowOutwardRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import api from "../../../config/api";
+import { trackEvent } from "../../../utils/analytics";
 import useBillingPlans from "../../../hooks/useBillingPlans";
 import {
   SHARED_FEATURE_LIST,
@@ -56,8 +57,10 @@ export default function Paywall({ tenant }) {
       });
 
       const { url } = res.data;
-      if (url) window.location.href = url;
-      else setError("Missing checkout URL from server");
+      if (url) {
+        trackEvent("begin_checkout");
+        window.location.href = url;
+      } else setError("Missing checkout URL from server");
     } catch (err) {
       const responseData = err?.response?.data;
       if (responseData?.errorCode === "SUBSCRIPTION_ALREADY_ACTIVE") {
@@ -75,6 +78,7 @@ export default function Paywall({ tenant }) {
     setLoadingPlan(planKey);
     try {
       await api.post("/stripe/change-plan", { planKey });
+      trackEvent("subscription_change_requested");
       await refetch();
     } catch (err) {
       const responseData = err?.response?.data;
@@ -90,6 +94,7 @@ export default function Paywall({ tenant }) {
   };
 
   const handleGetQuote = () => {
+    trackEvent("book_demo_click", { cta_path: "/portal", cta_location: "paywall_quote" });
     window.open(
       "https://calendly.com/wisershifts-info/30min",
       "_blank",

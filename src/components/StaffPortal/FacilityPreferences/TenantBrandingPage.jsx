@@ -13,6 +13,7 @@ import {
 import { FiSave, FiTrash2, FiUpload } from "react-icons/fi";
 import { Navigate } from "react-router-dom";
 import api, { API_BASE } from "../../../config/api";
+import { trackEvent } from "../../../utils/analytics";
 import { useAuth } from "../../../context/AuthContext";
 
 const emptyValues = {
@@ -186,6 +187,7 @@ export default function TenantBrandingPage() {
       if (subdomain) payload.subdomain = subdomain;
 
       const res = await api.patch("/tenants/me/branding", payload);
+      trackEvent("workspace_branding_saved");
       applyBranding(res.data?.branding);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to save tenant branding");

@@ -22,6 +22,7 @@ import {
 import { Link as RouterLink } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../../config/api";
+import { trackEvent } from "../../utils/analytics";
 import CalculatorInput from "./CalculatorInput";
 import { downloadCalculatorPdf } from "./calculatorPdf";
 import {
@@ -203,6 +204,7 @@ export default function TimeClockAccuracyCalculator() {
           totalAnnualCost: metrics.totalAnnualCost,
         },
       });
+      trackEvent("calculator_summary_requested", { calculator_type: "time_clock_accuracy" });
       toast.success("Summary sent. Check your inbox.");
     } catch (error) {
       toast.error(

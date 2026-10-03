@@ -18,6 +18,7 @@ import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import { useTheme } from "@mui/material/styles";
 import { useAuth } from "../../../context/AuthContext";
 import api from "../../../config/api";
+import { trackEvent } from "../../../utils/analytics";
 import { toast } from "react-toastify";
 import useBillingPlans from "../../../hooks/useBillingPlans";
 import {
@@ -67,8 +68,10 @@ export default function ManageSubscription() {
       });
 
       const { url } = res.data;
-      if (url) window.location.href = url;
-      else setError("Missing checkout URL from server");
+      if (url) {
+        trackEvent("begin_checkout");
+        window.location.href = url;
+      } else setError("Missing checkout URL from server");
     } catch (err) {
       const responseData = err?.response?.data;
       if (responseData?.errorCode === "SUBSCRIPTION_ALREADY_ACTIVE") {
@@ -86,6 +89,7 @@ export default function ManageSubscription() {
     setLoadingPlan(planKey);
     try {
       await api.post("/stripe/change-plan", { planKey });
+      trackEvent("subscription_change_requested");
       await Promise.all([refetch(), refreshTenant()]);
       toast.success("Plan updated successfully.", {
         position: "top-right",
@@ -119,6 +123,7 @@ export default function ManageSubscription() {
         tenantId: tenant._id,
         atPeriodEnd: !!opts.atPeriodEnd,
       });
+      trackEvent("subscription_cancellation_requested");
       await Promise.all([refreshTenant(), refetch()]);
       toast.success(
         "Subscription cancellation requested. Changes may take a moment to appear.",
@@ -137,6 +142,7 @@ export default function ManageSubscription() {
   };
 
   const handleGetQuote = () => {
+    trackEvent("book_demo_click", { cta_path: "/portal", cta_location: "billing_quote" });
     window.open(
       "https://calendly.com/wisershifts-info/30min",
       "_blank",

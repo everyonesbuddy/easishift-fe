@@ -92,6 +92,9 @@ src/
     │   └── ConfirmDialog.jsx    # Reusable confirmation dialog for destructive actions
     │
     └── StaffPortal/
+      ├── FacilityPreferences/
+      │   └── TenantBrandingPage.jsx  # Tenant display name, logo, colors, and subdomain
+      │
         ├── Billing/
         │   ├── ManageSubscription.jsx
         │   ├── BillingSuccess.jsx
@@ -185,6 +188,7 @@ If you need to override the backend at build time, extend `api.js` to read `impo
 The public site is the product entry point; each customer works in a tenant-specific portal such as `https://example-clinic.wisershifts.com`.
 
 - **Workspace discovery:** `/login` on the root domain presents a workspace finder. It checks the requested subdomain through `GET /api/v1/public/tenant-branding?subdomain=...`, remembers the last workspace in `localStorage`, and redirects to that tenant's login page. The root finder skips branding lookups when there is no subdomain.
+- **Root entry points:** The finder is available at `https://wisershifts.com/login` and the Netlify deployment at `https://easishift.netlify.app/login`.
 - **Tenant-branded experience:** On a tenant subdomain, the app loads public branding once and applies the tenant display name, logo, and primary/secondary colors to the login and portal UI.
 - **Brand management:** Users with the `tenant.settings` permission manage the display name, logo, colors, and subdomain at `/tenant-branding`. Logo uploads support PNG, JPEG, and WebP up to 512 KB.
 - **New customer signup:** `/signup-tenant` remains the public organization signup route.

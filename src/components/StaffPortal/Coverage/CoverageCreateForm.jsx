@@ -35,6 +35,7 @@ import {
 } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import api from "../../../config/api";
+import { trackEvent } from "../../../utils/analytics";
 import { getLocalTimeZoneAbbreviation } from "../../../utils/timeZone";
 import { useGuideTour } from "../../../context/GuideTourContext";
 import GuideHelpButton from "../../Shared/GuideHelpButton";
@@ -924,6 +925,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
               }),
             );
 
+      trackEvent("coverage_requirements_saved");
       createResponses.forEach((response) => {
         const createdForDate = Array.isArray(response.data)
           ? response.data
@@ -940,6 +942,7 @@ export default function CoverageCreateForm({ tenantId, onSuccess, onClose }) {
           await api.post("/schedules/auto-generate", {
             coverageIds: createdCoverages.map((item) => item._id),
           });
+          trackEvent("schedule_draft_generated");
           draftWasGenerated = true;
         } catch (draftErr) {
           console.error(draftErr);

@@ -20,6 +20,7 @@ import Navbar from "./components/Shared/Navbar";
 import Sidebar from "./components/Shared/Sidebar";
 import HowToUsePage from "./components/Shared/HowToUsePage";
 import GuideTourOverlay from "./components/Shared/GuideTourOverlay";
+import AnalyticsTracker from "./components/Shared/AnalyticsTracker";
 import Paywall from "./components/StaffPortal/Dashboard/Paywall";
 import ManageSubscription from "./components/StaffPortal/Billing/ManageSubscription";
 import BillingSuccess from "./components/StaffPortal/Billing/BillingSuccess";
@@ -83,6 +84,7 @@ export default function App() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <BrowserRouter>
+          <AnalyticsTracker />
           <Box sx={{ marginLeft: 0 }}>
             <Navbar />
             <Routes>
@@ -99,6 +101,7 @@ export default function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <BrowserRouter>
+        <AnalyticsTracker />
         {user && (
           <Sidebar
             mobileOpen={mobileOpen}

@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import api from "../../config/api";
+import { trackEvent } from "../../utils/analytics";
 
 const TERMS_VERSION = "1.0";
 
@@ -160,7 +161,7 @@ export default function SignupTenant() {
     }
 
     try {
-      const res = await api.post("/auth/signup/tenant", {
+      await api.post("/auth/signup/tenant", {
         name: hospitalName,
         email: adminEmail,
         password: adminPassword,
@@ -175,6 +176,7 @@ export default function SignupTenant() {
         termsVersion: TERMS_VERSION,
         termsAcceptedAt: new Date().toISOString(),
       });
+      trackEvent("sign_up", { method: "password", account_type: "organization" });
       navigate("/login");
     } catch (err) {
       console.error("Signup error:", err);

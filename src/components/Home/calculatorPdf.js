@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import { trackEvent } from "../../utils/analytics";
 
 const COLORS = {
   navy: [15, 23, 42],
@@ -224,4 +225,14 @@ export const downloadCalculatorPdf = ({
   doc.save(
     `${safeFilePart(companyName)}-${safeFilePart(filePrefix)}-summary.pdf`,
   );
+  const calculatorTypes = {
+    "call-out-cost": "call_out_cost",
+    "overtime-cost": "overtime_cost",
+    "payroll-accuracy": "time_clock_accuracy",
+  };
+  trackEvent("file_download", {
+    asset_type: "calculator_report",
+    file_extension: "pdf",
+    calculator_type: calculatorTypes[filePrefix] || "other",
+  });
 };

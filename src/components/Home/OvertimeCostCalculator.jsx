@@ -14,6 +14,7 @@ import { FiArrowRight, FiCopy, FiDownload, FiMail } from "react-icons/fi";
 import { Link as RouterLink } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../../config/api";
+import { trackEvent } from "../../utils/analytics";
 import CalculatorInput from "./CalculatorInput";
 import { downloadCalculatorPdf } from "./calculatorPdf";
 import {
@@ -163,6 +164,7 @@ export default function OvertimeCostCalculator() {
           potentialReductionPercent,
         },
       });
+      trackEvent("calculator_summary_requested", { calculator_type: "overtime_cost" });
       toast.success("Summary sent. Check your inbox.");
     } catch (error) {
       toast.error(

@@ -20,6 +20,7 @@ import { FiDownload } from "react-icons/fi";
 import { Navigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../../../config/api";
+import { trackEvent } from "../../../utils/analytics";
 import { useAuth } from "../../../context/AuthContext";
 
 const PROVIDERS = [
@@ -121,6 +122,7 @@ export default function PayrollExportsPage() {
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(url);
+      trackEvent("file_download", { asset_type: "payroll_export", file_extension: "csv" });
       toast.success(`${filename} downloaded.`);
     } catch (error) {
       toast.error(await getBlobErrorMessage(error));

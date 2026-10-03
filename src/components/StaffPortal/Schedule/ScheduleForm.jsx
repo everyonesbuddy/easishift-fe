@@ -18,6 +18,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { useGuideTour } from "../../../context/GuideTourContext";
 import GuideHelpButton from "../../Shared/GuideHelpButton";
 import api from "../../../config/api";
+import { trackEvent } from "../../../utils/analytics";
 import {
   getDisplayTimeZone,
   getTimeZoneAbbreviation,
@@ -559,6 +560,7 @@ export default function ScheduleForm({
         // Staff without schedule.manage may only change their own shift status.
         if (canManageSchedules) {
           await api.put(`/schedules/${schedule._id}`, payload);
+          trackEvent("schedule_updated");
         } else {
           await api.patch(`/schedules/${schedule._id}/status`, {
             status: formData.status,
@@ -570,6 +572,7 @@ export default function ScheduleForm({
         });
       } else {
         await api.post("/schedules", payload);
+        trackEvent("schedule_created");
         toast.success("Schedule created", {
           position: "top-right",
           autoClose: 2500,

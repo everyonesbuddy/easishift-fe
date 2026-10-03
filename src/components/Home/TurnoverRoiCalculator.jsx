@@ -15,6 +15,7 @@ import {
 import { FiMail, FiPhoneCall } from "react-icons/fi";
 import { toast } from "react-toastify";
 import api from "../../config/api";
+import { trackEvent } from "../../utils/analytics";
 import Footer from "../Shared/Footer";
 import { openBeehiivCaptureOnce } from "./calculatorUtils";
 
@@ -270,7 +271,7 @@ export default function TurnoverRoiCalculator() {
       // Trigger Beehiiv capture as a real link click from user interaction.
       openBeehiivCaptureOnce(trimmedEmail);
       await api.post("/marketing/turnover-roi/email-summary", payload);
-
+      trackEvent("calculator_summary_requested", { calculator_type: "turnover_roi" });
       toast.success("Summary sent. Check your inbox.");
     } catch (error) {
       const message =

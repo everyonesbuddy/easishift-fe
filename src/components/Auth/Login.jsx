@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import api, { API_BASE } from "../../config/api";
 import ForgotPasswordModal from "./ForgotPasswordModal";
+import { trackEvent } from "../../utils/analytics";
 import {
   getWorkspaceDomainLabel,
   getTenantLoginUrl,
@@ -98,6 +99,7 @@ export default function Login() {
         console.warn("Unable to remember the last workspace", storageError);
       }
       setLastWorkspace(rememberedWorkspace);
+      trackEvent("workspace_selected");
       window.location.assign(getTenantLoginUrl(subdomain));
     } catch (err) {
       setError(
@@ -135,6 +137,7 @@ export default function Login() {
       }
 
       login(res.data.user);
+      trackEvent("login", { method: "password" });
       navigate("/dashboard");
     } catch (err) {
       console.error("Login error:", err);

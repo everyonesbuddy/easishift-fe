@@ -33,6 +33,7 @@ import interactionPlugin from "@fullcalendar/interaction";
 import { toast } from "react-toastify";
 
 import api from "../../../config/api";
+import { trackEvent } from "../../../utils/analytics";
 import {
   getDisplayTimeZone,
   getTimeZoneAbbreviation,
@@ -1445,6 +1446,7 @@ export default function AutoGenerateScheduleForm({
           }),
         ),
       );
+      trackEvent("schedule_published", { publish_mode: "selected" });
       toast.success("Selected draft assignments published.", toastOptions);
       await Promise.all([
         activeDraftId ? loadDraftDetail(activeDraftId) : Promise.resolve(),
@@ -1492,6 +1494,7 @@ export default function AutoGenerateScheduleForm({
           }),
         ),
       );
+      trackEvent("schedule_published", { publish_mode: "all" });
       toast.success(
         "All publishable draft assignments published.",
         toastOptions,
@@ -1577,6 +1580,7 @@ export default function AutoGenerateScheduleForm({
       const res = await api.post("/schedules/auto-generate", {
         coverageIds: [coverageId],
       });
+      trackEvent("schedule_draft_generated");
 
       toast.success(
         "Draft created for this coverage. Review assignments and publish when ready.",

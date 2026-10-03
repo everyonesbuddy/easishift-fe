@@ -271,7 +271,9 @@ export default function TurnoverRoiCalculator() {
       // Trigger Beehiiv capture as a real link click from user interaction.
       openBeehiivCaptureOnce(trimmedEmail);
       await api.post("/marketing/turnover-roi/email-summary", payload);
-      trackEvent("calculator_summary_requested", { calculator_type: "turnover_roi" });
+      trackEvent("calculator_summary_requested", {
+        calculator_type: "turnover_roi",
+      });
       toast.success("Summary sent. Check your inbox.");
     } catch (error) {
       const message =

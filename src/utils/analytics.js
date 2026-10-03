@@ -1,10 +1,23 @@
 const ROOT_DOMAINS = ["wisershifts.com", "easishift.com"];
 const CAMPAIGN_PARAMETERS = [
-  "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "utm_id",
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_content",
+  "utm_term",
+  "utm_id",
 ];
 const PUBLIC_PATHS = new Set([
-  "/", "/pricing", "/calculators", "/contact", "/integrations", "/login",
-  "/signup-tenant", "/terms-and-conditions", "/privacy-policy", "/eula",
+  "/",
+  "/pricing",
+  "/calculators",
+  "/contact",
+  "/integrations",
+  "/login",
+  "/signup-tenant",
+  "/terms-and-conditions",
+  "/privacy-policy",
+  "/eula",
   "/calculators/call-out-cost-calculator",
   "/calculators/overtime-cost-calculator",
   "/calculators/time-clock-accuracy-calculator",
@@ -44,9 +57,10 @@ export function isAnalyticsHost(hostname) {
 export function getAnalyticsUrl(value) {
   const url = new URL(value);
   const path = url.pathname.replace(/\/$/, "") || "/";
-  const safePath = PUBLIC_PATHS.has(path) || /^\/features\/[a-z0-9-]+$/.test(path)
-    ? path
-    : "/portal";
+  const safePath =
+    PUBLIC_PATHS.has(path) || /^\/features\/[a-z0-9-]+$/.test(path)
+      ? path
+      : "/portal";
   const safeUrl = new URL(safePath, url.origin);
   if (safePath !== "/portal") {
     CAMPAIGN_PARAMETERS.forEach((parameter) => {
@@ -61,21 +75,27 @@ export function getAnalyticsPageContext(value) {
   const url = new URL(value);
   const path = url.pathname.replace(/\/$/, "") || "/";
   const pageLocation = getAnalyticsUrl(value);
-  const workspaceHost = ROOT_DOMAINS.some(
-    (domain) => url.hostname.endsWith(`.${domain}`) && url.hostname !== `www.${domain}`,
-  ) || url.hostname.endsWith(".localhost");
+  const workspaceHost =
+    ROOT_DOMAINS.some(
+      (domain) =>
+        url.hostname.endsWith(`.${domain}`) && url.hostname !== `www.${domain}`,
+    ) || url.hostname.endsWith(".localhost");
   return {
     page_location: pageLocation,
     site_area: workspaceHost ? "workspace" : "main_site",
-    page_area: PAGE_AREAS[path] || (
-      path.startsWith("/features/") ? "features"
-        : path.startsWith("/calculators/") ? "calculators"
-          : PUBLIC_PATHS.has(path) ? path.slice(1).replaceAll("-", "_")
-            : "portal"
-    ),
-    page_title: new URL(pageLocation).pathname === "/portal"
-      ? "WiserShifts workspace"
-      : "WiserShifts",
+    page_area:
+      PAGE_AREAS[path] ||
+      (path.startsWith("/features/")
+        ? "features"
+        : path.startsWith("/calculators/")
+          ? "calculators"
+          : PUBLIC_PATHS.has(path)
+            ? path.slice(1).replaceAll("-", "_")
+            : "portal"),
+    page_title:
+      new URL(pageLocation).pathname === "/portal"
+        ? "WiserShifts workspace"
+        : "WiserShifts",
   };
 }
 
@@ -102,9 +122,8 @@ export function trackPageView() {
   const pageLocation = parameters.page_location;
   const pageKey = `${pageLocation}|${parameters.page_area}`;
   if (lastPageKey === pageKey) return;
-  const pageReferrer = lastPage || (
-    document.referrer ? getAnalyticsUrl(document.referrer) : ""
-  );
+  const pageReferrer =
+    lastPage || (document.referrer ? getAnalyticsUrl(document.referrer) : "");
   lastPage = pageLocation;
   lastPageKey = pageKey;
   window.gtag("set", {
@@ -151,7 +170,11 @@ export function initializeAnalytics({ enabled, id, debug = false }) {
   script.src = `https://www.googletagmanager.com/gtag/js?id=${id}`;
   document.head.appendChild(script);
   document.addEventListener("click", trackLinkClick, true);
-  document.addEventListener("auxclick", (event) => {
-    if (event.button === 1) trackLinkClick(event);
-  }, true);
+  document.addEventListener(
+    "auxclick",
+    (event) => {
+      if (event.button === 1) trackLinkClick(event);
+    },
+    true,
+  );
 }

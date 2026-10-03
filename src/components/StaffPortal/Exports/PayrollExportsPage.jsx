@@ -122,7 +122,10 @@ export default function PayrollExportsPage() {
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(url);
-      trackEvent("file_download", { asset_type: "payroll_export", file_extension: "csv" });
+      trackEvent("file_download", {
+        asset_type: "payroll_export",
+        file_extension: "csv",
+      });
       toast.success(`${filename} downloaded.`);
     } catch (error) {
       toast.error(await getBlobErrorMessage(error));

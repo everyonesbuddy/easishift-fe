@@ -142,7 +142,10 @@ export default function ManageSubscription() {
   };
 
   const handleGetQuote = () => {
-    trackEvent("book_demo_click", { cta_path: "/portal", cta_location: "billing_quote" });
+    trackEvent("book_demo_click", {
+      cta_path: "/portal",
+      cta_location: "billing_quote",
+    });
     window.open(
       "https://calendly.com/wisershifts-info/30min",
       "_blank",

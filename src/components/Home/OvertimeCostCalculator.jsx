@@ -164,7 +164,9 @@ export default function OvertimeCostCalculator() {
           potentialReductionPercent,
         },
       });
-      trackEvent("calculator_summary_requested", { calculator_type: "overtime_cost" });
+      trackEvent("calculator_summary_requested", {
+        calculator_type: "overtime_cost",
+      });
       toast.success("Summary sent. Check your inbox.");
     } catch (error) {
       toast.error(

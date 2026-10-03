@@ -216,7 +216,9 @@ export default function CostLeakCalculator() {
       setSendingEmail(true);
       openBeehiivCaptureOnce(trimmedEmail);
       await api.post("/marketing/cost-leak/email-summary", payload);
-      trackEvent("calculator_summary_requested", { calculator_type: "cost_leak" });
+      trackEvent("calculator_summary_requested", {
+        calculator_type: "cost_leak",
+      });
       toast.success("Summary sent. Check your inbox.");
     } catch (error) {
       const message =

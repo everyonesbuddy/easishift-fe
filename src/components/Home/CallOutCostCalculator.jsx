@@ -276,7 +276,9 @@ export default function CallOutCostCalculator() {
           potentialReductionPercent,
         },
       });
-      trackEvent("calculator_summary_requested", { calculator_type: "call_out_cost" });
+      trackEvent("calculator_summary_requested", {
+        calculator_type: "call_out_cost",
+      });
       toast.success("Summary sent. Check your inbox.");
     } catch (error) {
       toast.error(

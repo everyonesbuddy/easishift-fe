@@ -8,27 +8,27 @@ You can override the ID using the Netlify build variable `VITE_GA_MEASUREMENT_ID
 Do not reinstall the old inline script alongside this implementation, or add a
 second pageview implementation through Google Tag Manager.
 
-| Event | Trigger | Recommended key event? |
-| --- | --- | --- |
-| `page_view` | Initial route and changes between public pages or known workspace areas | No |
-| `book_demo_click` | Calendly link click, or enterprise quote button | No: intent only |
-| `signup_click` | Link to organization signup | No |
-| `sign_up` | Organization signup API succeeds | Yes |
-| `login_click` | Link to login/workspace finder | No |
-| `login` | Staff login API succeeds and auth state is updated | No: customer usage |
-| `workspace_selected` | Workspace finder successfully resolves a workspace, before redirect | No |
-| `calculator_summary_requested` | Calculator email-summary API accepts the request | Optional secondary lead signal, not a demo |
-| `file_download` | Calculator PDF or payroll CSV download is initiated | No |
-| `begin_checkout` | Backend returns a checkout URL, before navigating to Stripe | No: not payment |
-| `subscription_change_requested` | Backend accepts a plan-change request | No: not payment |
-| `subscription_cancellation_requested` | Backend accepts a cancellation request | No |
-| `facility_settings_saved` | Facility-preferences save API succeeds | No: product adoption |
-| `workspace_branding_saved` | Workspace-branding save API succeeds | No: product adoption |
-| `coverage_requirements_saved` | All coverage-creation requests in a submission succeed | No: product adoption |
-| `schedule_created` | Manual schedule creation API succeeds | No: product adoption |
-| `schedule_updated` | Manager's schedule-edit API succeeds | No: product adoption |
-| `schedule_draft_generated` | Draft-generation API succeeds from coverage creation or draft board | No: product adoption |
-| `schedule_published` | All requests in selected/all publishing batch succeed | No: product adoption |
+| Event                                 | Trigger                                                                 | Recommended key event?                     |
+| ------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------ |
+| `page_view`                           | Initial route and changes between public pages or known workspace areas | No                                         |
+| `book_demo_click`                     | Calendly link click, or enterprise quote button                         | No: intent only                            |
+| `signup_click`                        | Link to organization signup                                             | No                                         |
+| `sign_up`                             | Organization signup API succeeds                                        | Yes                                        |
+| `login_click`                         | Link to login/workspace finder                                          | No                                         |
+| `login`                               | Staff login API succeeds and auth state is updated                      | No: customer usage                         |
+| `workspace_selected`                  | Workspace finder successfully resolves a workspace, before redirect     | No                                         |
+| `calculator_summary_requested`        | Calculator email-summary API accepts the request                        | Optional secondary lead signal, not a demo |
+| `file_download`                       | Calculator PDF or payroll CSV download is initiated                     | No                                         |
+| `begin_checkout`                      | Backend returns a checkout URL, before navigating to Stripe             | No: not payment                            |
+| `subscription_change_requested`       | Backend accepts a plan-change request                                   | No: not payment                            |
+| `subscription_cancellation_requested` | Backend accepts a cancellation request                                  | No                                         |
+| `facility_settings_saved`             | Facility-preferences save API succeeds                                  | No: product adoption                       |
+| `workspace_branding_saved`            | Workspace-branding save API succeeds                                    | No: product adoption                       |
+| `coverage_requirements_saved`         | All coverage-creation requests in a submission succeed                  | No: product adoption                       |
+| `schedule_created`                    | Manual schedule creation API succeeds                                   | No: product adoption                       |
+| `schedule_updated`                    | Manager's schedule-edit API succeeds                                    | No: product adoption                       |
+| `schedule_draft_generated`            | Draft-generation API succeeds from coverage creation or draft board     | No: product adoption                       |
+| `schedule_published`                  | All requests in selected/all publishing batch succeed                   | No: product adoption                       |
 
 `calculator_summary_requested` covers call-out cost, overtime cost, time-clock
 accuracy, cost leak, and turnover ROI. PDF tracking covers the three calculators
@@ -125,9 +125,9 @@ belongs in a funnel exploration unless you explicitly implement a completion eve
   `utm_content`, `utm_term`, and `utm_id`. Other queries and fragments, including
   reset tokens and `_kx`, are removed from the URLs this helper sends.
 - Private routes and password-reset routes are grouped into `/portal` with a
-   generic page title. Known product areas are distinguished by the allowlisted
-   `page_area` parameter, not raw URLs or record identifiers. Hostnames remain
-   available to separate root/tenant traffic.
+  generic page title. Known product areas are distinguished by the allowlisted
+  `page_area` parameter, not raw URLs or record identifiers. Hostnames remain
+  available to separate root/tenant traffic.
 - Google Signals and ad personalization are disabled in this tag configuration.
 - Sanitizing our payloads is not a complete privacy guarantee for Google's SDK or
   other tags. Review actual network requests. Never place personal or health data

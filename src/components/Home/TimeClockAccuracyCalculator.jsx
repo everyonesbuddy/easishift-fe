@@ -67,7 +67,8 @@ export default function TimeClockAccuracyCalculator() {
     readNumberParam("hours", DEFAULTS.hoursPerWeek, 1, 100),
   );
   const [discrepancyMinutesPerShift, setDiscrepancyMinutesPerShift] = useState(
-    () => readNumberParam("minutes", DEFAULTS.discrepancyMinutesPerShift, 0, 60),
+    () =>
+      readNumberParam("minutes", DEFAULTS.discrepancyMinutesPerShift, 0, 60),
   );
   const [shiftsPerWeek, setShiftsPerWeek] = useState(() =>
     readNumberParam("shifts", DEFAULTS.shiftsPerWeek, 1, 14),
@@ -87,8 +88,7 @@ export default function TimeClockAccuracyCalculator() {
   const metrics = useMemo(() => {
     const weeklyDiscrepancyMinutes =
       discrepancyMinutesPerShift * shiftsPerWeek * employees;
-    const weeklyDiscrepancyCost =
-      (weeklyDiscrepancyMinutes / 60) * hourlyWage;
+    const weeklyDiscrepancyCost = (weeklyDiscrepancyMinutes / 60) * hourlyWage;
     const annualDiscrepancyCost = weeklyDiscrepancyCost * WEEKS_PER_YEAR;
     const annualAdminCorrectionCost =
       adminHoursPerPayPeriod * adminHourlyRate * PAY_PERIODS_PER_YEAR;
@@ -156,7 +156,10 @@ export default function TimeClockAccuracyCalculator() {
           "Payroll admin hourly rate",
           `$${formatNumber(adminHourlyRate, 2)}/hr`,
         ],
-        ["Pay disputes or corrections per month", formatNumber(payDisputesPerMonth, 0)],
+        [
+          "Pay disputes or corrections per month",
+          formatNumber(payDisputesPerMonth, 0),
+        ],
       ],
       costs: [
         ["Time discrepancies", formatMoney(metrics.annualDiscrepancyCost)],
@@ -204,7 +207,9 @@ export default function TimeClockAccuracyCalculator() {
           totalAnnualCost: metrics.totalAnnualCost,
         },
       });
-      trackEvent("calculator_summary_requested", { calculator_type: "time_clock_accuracy" });
+      trackEvent("calculator_summary_requested", {
+        calculator_type: "time_clock_accuracy",
+      });
       toast.success("Summary sent. Check your inbox.");
     } catch (error) {
       toast.error(
@@ -414,7 +419,8 @@ export default function TimeClockAccuracyCalculator() {
                       }}
                     >
                       <Typography color="text.secondary">
-                        Time discrepancies (pay not matching actual hours worked)
+                        Time discrepancies (pay not matching actual hours
+                        worked)
                       </Typography>
                       <Typography sx={{ fontWeight: 900 }}>
                         {formatMoney(metrics.annualDiscrepancyCost)}

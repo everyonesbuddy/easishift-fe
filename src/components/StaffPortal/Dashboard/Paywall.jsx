@@ -94,7 +94,10 @@ export default function Paywall({ tenant }) {
   };
 
   const handleGetQuote = () => {
-    trackEvent("book_demo_click", { cta_path: "/portal", cta_location: "paywall_quote" });
+    trackEvent("book_demo_click", {
+      cta_path: "/portal",
+      cta_location: "paywall_quote",
+    });
     window.open(
       "https://calendly.com/wisershifts-info/30min",
       "_blank",

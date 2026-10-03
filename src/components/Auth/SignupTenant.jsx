@@ -176,7 +176,10 @@ export default function SignupTenant() {
         termsVersion: TERMS_VERSION,
         termsAcceptedAt: new Date().toISOString(),
       });
-      trackEvent("sign_up", { method: "password", account_type: "organization" });
+      trackEvent("sign_up", {
+        method: "password",
+        account_type: "organization",
+      });
       navigate("/login");
     } catch (err) {
       console.error("Signup error:", err);

@@ -15,16 +15,18 @@ import { useNavigate } from "react-router-dom";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 import StaffingTemplateEditor from "../Setup/StaffingTemplateEditor";
+import { IOS } from "../../../theme/ios";
 
 /**
  * "What a normal week needs": how many of each role on each shift, by day.
  * Every new week's open slots come from this.
  */
 export default function StaffingTemplatePage() {
-  const { facilityPreferences, can } = useAuth();
+  const { facilityPreferences, fetchFacilityPreferences, can } = useAuth();
   const navigate = useNavigate();
   const canEdit = can("coverage.manage");
   const [rules, setRules] = useState(null);
+  const [options, setOptions] = useState(null);
   const [applyTo, setApplyTo] = useState("unpublished");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -32,7 +34,10 @@ export default function StaffingTemplatePage() {
   useEffect(() => {
     api
       .get("/staffing-template")
-      .then((res) => setRules(res.data?.rules || []))
+      .then((res) => {
+        setRules(res.data?.rules || []);
+        setOptions(res.data?.options || null);
+      })
       .catch((err) => {
         console.error("Failed to load staffing template", err);
         setRules([]);
@@ -51,6 +56,8 @@ export default function StaffingTemplatePage() {
         { position: "top-right", autoClose: 3000 },
       );
       setDirty(false);
+      const added = res.data?.addedToPreferences || {};
+      if (added.unitAreas?.length || added.certificationTags?.length) fetchFacilityPreferences?.();
     } catch (err) {
       // Plan answers (402) are shown by the upgrade dialog.
       if (err?.response?.status === 402) return;
@@ -63,22 +70,22 @@ export default function StaffingTemplatePage() {
   };
 
   return (
-    <Container sx={{ mt: 4 }}>
+    <Container sx={{ mt: 4, mb: 6 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" gap={2} flexWrap="wrap">
         <Box>
-          <Typography variant="h5">Weekly Needs</Typography>
-          <Typography color="text.secondary">
+          <Typography sx={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em", color: IOS.ink }}>Weekly Needs</Typography>
+          <Typography sx={{ color: IOS.secondary, maxWidth: 720 }}>
             How many people each shift needs on a normal week. Each new week's
             open slots are filled in from this; change a single day on the
             schedule when a week is different.
           </Typography>
         </Box>
-        <Button variant="outlined" onClick={() => navigate("/schedule")} sx={{ textTransform: "none" }}>
+        <Button onClick={() => navigate("/schedule")} sx={{ bgcolor: IOS.fill, color: IOS.ink, borderRadius: "10px", px: 2, "&:hover": { bgcolor: "rgba(118,118,128,0.2)" } }}>
           Back to schedule
         </Button>
       </Box>
 
-      <Paper sx={{ mt: 3, p: { xs: 2, md: 3 } }}>
+      <Box sx={{ mt: 3 }}>
         {rules === null ? (
           <Typography color="text.secondary">Loading…</Typography>
         ) : (
@@ -89,13 +96,14 @@ export default function StaffingTemplatePage() {
               setDirty(true);
             }}
             facilityPreferences={facilityPreferences}
+            options={options}
             disabled={!canEdit}
           />
         )}
-      </Paper>
+      </Box>
 
       {canEdit && rules !== null && (
-        <Paper sx={{ mt: 2, p: { xs: 2, md: 3 } }}>
+        <Paper elevation={0} sx={{ mt: 2, p: { xs: 2, md: 3 }, borderRadius: IOS.radius.card, boxShadow: IOS.shadow, border: `1px solid ${IOS.hairline}` }}>
           <Typography sx={{ fontWeight: 700, mb: 1 }}>Apply changes to</Typography>
           <RadioGroup value={applyTo} onChange={(e) => setApplyTo(e.target.value)}>
             <FormControlLabel
@@ -119,7 +127,8 @@ export default function StaffingTemplatePage() {
               variant="contained"
               disabled={saving || !dirty}
               onClick={save}
-              sx={{ textTransform: "none", borderRadius: 2, px: 3 }}
+              disableElevation
+              sx={{ borderRadius: "10px", px: 3, bgcolor: IOS.blue, "&.Mui-disabled": { bgcolor: IOS.fill, color: IOS.tertiary } }}
             >
               {saving ? "Saving…" : "Save weekly needs"}
             </Button>

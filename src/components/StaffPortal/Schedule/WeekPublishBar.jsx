@@ -19,6 +19,9 @@ import { useNavigate } from "react-router-dom";
 import api from "../../../config/api";
 import { notSentReason } from "../../../utils/deliveryReasons";
 import { useAuth } from "../../../context/AuthContext";
+import { IOS, tint } from "../../../theme/ios";
+
+const navSx = { bgcolor: IOS.fill, color: IOS.ink, width: 30, height: 30, "&:hover": { bgcolor: "rgba(118,118,128,0.2)" } };
 
 // "2026-10-12" -> Date at local midnight (no timezone shift)
 const keyToDate = (key) => {
@@ -158,9 +161,10 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
       sx={{
         mt: 2,
         p: { xs: 1.5, md: 2 },
-        border: "1px solid #e5e7eb",
-        borderRadius: 2,
-        backgroundColor: isPublished ? "#F0FDF4" : "#FFFBEB",
+        border: `1px solid ${IOS.hairline}`,
+        borderRadius: IOS.radius.card,
+        backgroundColor: IOS.surface,
+        boxShadow: IOS.shadow,
       }}
     >
       <Box
@@ -176,10 +180,11 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
             aria-label="Previous week"
             onClick={() => goToWeek(addDays(weekStart, -7))}
             disabled={!weekStart || loading}
+            sx={navSx}
           >
             <FiChevronLeft />
           </IconButton>
-          <Typography sx={{ fontWeight: 700, minWidth: 130, textAlign: "center" }}>
+          <Typography sx={{ fontWeight: 700, fontSize: 17, letterSpacing: "-0.01em", color: IOS.ink, minWidth: 130, textAlign: "center", px: 0.5 }}>
             {weekStart ? `Week of ${formatWeek(weekStart)}` : "Loading week…"}
           </Typography>
           <IconButton
@@ -187,6 +192,7 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
             aria-label="Next week"
             onClick={() => goToWeek(addDays(weekStart, 7))}
             disabled={!weekStart || loading}
+            sx={navSx}
           >
             <FiChevronRight />
           </IconButton>
@@ -194,16 +200,20 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
             <Chip
               size="small"
               label={isPublished ? "Published" : "Draft"}
-              color={isPublished ? "success" : "warning"}
-              sx={{ fontWeight: 700 }}
+              sx={{
+                fontWeight: 600,
+                borderRadius: IOS.radius.round,
+                bgcolor: tint(isPublished ? IOS.green : IOS.orange, 0.14),
+                color: isPublished ? IOS.greenText : IOS.orangeText,
+              }}
             />
           )}
           {data && (
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{ color: IOS.secondary }}>
               {plural(counts.shifts || 0, "shift")} ·{" "}
               <Box
                 component="span"
-                sx={{ color: counts.openSlots ? "#B45309" : "inherit", fontWeight: counts.openSlots ? 700 : 400 }}
+                sx={{ color: counts.openSlots ? IOS.orangeText : "inherit", fontWeight: counts.openSlots ? 600 : 400 }}
               >
                 {plural(counts.openSlots || 0, "open slot")}
               </Box>
@@ -218,7 +228,7 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
             variant="text"
             startIcon={<FiSliders />}
             onClick={() => navigate("/staffing-template")}
-            sx={{ textTransform: "none" }}
+            sx={{ borderRadius: "10px", color: IOS.blue, px: 1.5 }}
           >
             Weekly needs
           </Button>
@@ -236,11 +246,13 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
                 startIcon={<FiSend />}
                 disabled={!week || !canPublish || publishing}
                 onClick={() => setConfirmOpen(true)}
+                disableElevation
                 sx={{
-                  textTransform: "none",
-                  borderRadius: 2,
-                  bgcolor: "#15803D",
-                  "&:hover": { bgcolor: "#166534" },
+                  borderRadius: IOS.radius.round,
+                  px: 2.25,
+                  bgcolor: IOS.blue,
+                  "&:hover": { bgcolor: "#0066DB" },
+                  "&.Mui-disabled": { bgcolor: tint(IOS.green, 0.14), color: IOS.greenText },
                 }}
               >
                 {publishing
@@ -257,7 +269,7 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
       </Box>
 
       {week && (
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+        <Typography variant="caption" sx={{ display: "block", mt: 1, color: IOS.secondary }}>
           {isPublished
             ? `Published ${formatWhen(week.publishedAt)}. ${week.lastPublish ? `Last send: ${week.lastPublish.sms || 0} by text, ${week.lastPublish.email || 0} by email${notReachedLast.length ? `, ${notReachedLast.length} not reached` : ""}.` : ""}`
             : "Staff don't see this week yet. Fill the open slots, then publish: everyone gets one text or email with their shifts and their link."}

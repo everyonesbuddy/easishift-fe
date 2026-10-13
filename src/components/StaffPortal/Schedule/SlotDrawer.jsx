@@ -17,6 +17,38 @@ import { useAuth } from "../../../context/AuthContext";
 import { getRoleDisplayName } from "../../../constants/industryRoles";
 import { ineligibleReason } from "../../../utils/deliveryReasons";
 import { GRID, slotLabel, titleCase } from "./weekGridUtils";
+import { IOS, roleColor, tint } from "../../../theme/ios";
+
+const initials = (name) =>
+  String(name || "?")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || "")
+    .join("");
+
+function Avatar({ name, color }) {
+  return (
+    <Box
+      sx={{
+        width: 34,
+        height: 34,
+        borderRadius: "50%",
+        bgcolor: tint(color, 0.16),
+        color,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 13,
+        fontWeight: 700,
+        flexShrink: 0,
+      }}
+    >
+      {initials(name)}
+    </Box>
+  );
+}
+
 
 const errorText = (err, fallback) => err?.response?.data?.message || fallback;
 
@@ -50,6 +82,7 @@ export default function SlotDrawer({ open, row, weekStart, people, canEdit, onCl
   if (!row) return <Drawer anchor="right" open={false} onClose={onClose} />;
 
   const label = slotLabel(facilityPreferences, row.shiftType, row.shiftTag);
+  const color = roleColor(row.role, facilityPreferences?.roleFamilies);
   const date = new Date(row.startTime);
   const isPast = new Date(row.endTime).getTime() < Date.now();
   const eligible = (candidates || []).filter((c) => c.eligible);
@@ -110,15 +143,29 @@ export default function SlotDrawer({ open, row, weekStart, people, canEdit, onCl
       anchor="right"
       open={open}
       onClose={onClose}
-      PaperProps={{ sx: { width: { xs: "100%", sm: 420 }, p: 0 } }}
+      PaperProps={{
+        sx: {
+          width: { xs: "100%", sm: 420 },
+          p: 0,
+          bgcolor: IOS.canvas,
+          borderTopLeftRadius: { sm: 20 },
+          borderBottomLeftRadius: { sm: 20 },
+        },
+      }}
     >
-      <Box sx={{ p: 2.5, borderBottom: `1px solid ${GRID.line}`, display: "flex", justifyContent: "space-between", gap: 1 }}>
+      <Box sx={{ p: 2.5, pb: 2, bgcolor: IOS.surface, borderBottom: `1px solid ${IOS.separator}`, display: "flex", justifyContent: "space-between", gap: 1 }}>
         <Box>
           <Typography sx={{ color: GRID.muted, fontSize: 13 }}>
             {date.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
           </Typography>
-          <Typography sx={{ fontWeight: 800, fontSize: 20, color: GRID.ink, lineHeight: 1.25 }}>
-            {getRoleDisplayName(row.role)}, {label.name} {label.time}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Box sx={{ width: 4, height: 22, borderRadius: 4, bgcolor: color }} />
+            <Typography sx={{ fontWeight: 700, fontSize: 20, color: GRID.ink, lineHeight: 1.25, letterSpacing: "-0.01em" }}>
+              {getRoleDisplayName(row.role)}
+            </Typography>
+          </Box>
+          <Typography sx={{ color: GRID.muted, fontSize: 14, mt: 0.25 }}>
+            {label.name} · {label.time}
           </Typography>
           {(row.unitArea || row.requiredCertificationTags?.length > 0) && (
             <Typography sx={{ color: GRID.muted, fontSize: 13, mt: 0.25 }}>
@@ -133,14 +180,14 @@ export default function SlotDrawer({ open, row, weekStart, people, canEdit, onCl
             </Typography>
           )}
         </Box>
-        <IconButton onClick={onClose} aria-label="Close" sx={{ alignSelf: "flex-start" }}>
+        <IconButton onClick={onClose} aria-label="Close" size="small" sx={{ alignSelf: "flex-start", bgcolor: IOS.fill, color: IOS.secondary, "&:hover": { bgcolor: "rgba(118,118,128,0.2)" } }}>
           <FiX />
         </IconButton>
       </Box>
 
       <Box sx={{ p: 2.5, overflowY: "auto", flex: 1 }}>
         {/* Needed that day */}
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2.5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2.5, p: 1.75, bgcolor: IOS.surface, borderRadius: IOS.radius.cell }}>
           <Box>
             <Typography sx={{ fontWeight: 700, color: GRID.ink }}>People needed</Typography>
             <Typography sx={{ fontSize: 12, color: GRID.muted }}>
@@ -153,7 +200,7 @@ export default function SlotDrawer({ open, row, weekStart, people, canEdit, onCl
               aria-label="One fewer"
               disabled={!canEdit || isPast || busyId === "count" || row.requiredCount === 0}
               onClick={() => setCount(row.requiredCount - 1)}
-              sx={{ border: `1px solid ${GRID.line}` }}
+              sx={{ bgcolor: IOS.fill }}
             >
               <FiMinus />
             </IconButton>
@@ -165,7 +212,7 @@ export default function SlotDrawer({ open, row, weekStart, people, canEdit, onCl
               aria-label="One more"
               disabled={!canEdit || isPast || busyId === "count"}
               onClick={() => setCount(row.requiredCount + 1)}
-              sx={{ border: `1px solid ${GRID.line}` }}
+              sx={{ bgcolor: IOS.fill }}
             >
               <FiPlus />
             </IconButton>
@@ -173,16 +220,17 @@ export default function SlotDrawer({ open, row, weekStart, people, canEdit, onCl
         </Box>
 
         {/* On this shift */}
-        <Typography sx={{ fontWeight: 700, color: GRID.ink, mb: 1 }}>
+        <Typography sx={{ fontWeight: 600, color: IOS.secondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em", mb: 0.75, px: 1.5 }}>
           On this shift ({row.assignedCount} of {row.requiredCount})
         </Typography>
         {people.length === 0 ? (
           <Typography sx={{ color: GRID.muted, mb: 2 }}>Nobody yet.</Typography>
         ) : (
-          <Stack divider={<Divider flexItem />} sx={{ mb: 2.5, border: `1px solid ${GRID.line}`, borderRadius: 2 }}>
+          <Stack divider={<Divider flexItem sx={{ borderColor: IOS.hairline, ml: 7 }} />} sx={{ mb: 2.5, bgcolor: IOS.surface, borderRadius: IOS.radius.cell, overflow: "hidden" }}>
             {people.map((s) => (
               <Box key={s._id} sx={{ px: 1.5, py: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
-                <Box>
+                <Avatar name={s.staffId?.name} color={color} />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography sx={{ fontWeight: 600, color: GRID.ink }}>{s.staffId?.name || "Someone"}</Typography>
                   <Typography sx={{ fontSize: 12, color: s.state === "draft" ? GRID.short : GRID.muted }}>
                     {s.state === "draft" ? "Not sent yet" : titleCase(s.status)}
@@ -214,7 +262,7 @@ export default function SlotDrawer({ open, row, weekStart, people, canEdit, onCl
         {/* Who can take it */}
         {canEdit && !isPast && (
           <>
-            <Typography sx={{ fontWeight: 700, color: GRID.ink, mb: 1 }}>
+            <Typography sx={{ fontWeight: 600, color: IOS.secondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em", mb: 0.75, px: 1.5 }}>
               {remaining > 0 ? `Can take it (${eligible.length})` : "Others who could work it"}
             </Typography>
             {candidates === null ? (
@@ -231,9 +279,10 @@ export default function SlotDrawer({ open, row, weekStart, people, canEdit, onCl
                 {eligible.map((c) => (
                   <Box
                     key={c.staffId}
-                    sx={{ px: 1.5, py: 1, borderRadius: 2, bgcolor: GRID.canvas, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}
+                    sx={{ px: 1.5, py: 1, borderRadius: IOS.radius.cell, bgcolor: IOS.surface, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}
                   >
-                    <Box>
+                    <Avatar name={c.name} color={IOS.secondary} />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography sx={{ fontWeight: 600, color: GRID.ink }}>{c.name}</Typography>
                       <Typography sx={{ fontSize: 12, color: c.overtimeIfAssigned ? GRID.short : GRID.muted }}>
                         {c.weekHours}h this week{c.overtimeIfAssigned ? ", would be overtime" : ""}
@@ -244,7 +293,8 @@ export default function SlotDrawer({ open, row, weekStart, people, canEdit, onCl
                       variant={remaining > 0 ? "contained" : "outlined"}
                       disabled={Boolean(busyId)}
                       onClick={() => assign(c)}
-                      sx={{ textTransform: "none", fontWeight: 700, flexShrink: 0 }}
+                      disableElevation
+                      sx={{ fontWeight: 600, flexShrink: 0, borderRadius: IOS.radius.round, px: 2 }}
                     >
                       {busyId === c.staffId ? "Adding…" : "Assign"}
                     </Button>

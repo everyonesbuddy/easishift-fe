@@ -1,15 +1,17 @@
 // Shared look and labels for the week grid and its dialogs.
 
+import { IOS, tint } from "../../../theme/ios";
+
 export const GRID = {
-  ink: "#1F2937",
-  muted: "#6B7280",
-  line: "#E5E7EB",
-  canvas: "#F8FAFC",
-  filled: "#0F766E",
-  filledBg: "#F0FDFA",
-  short: "#B45309",
-  shortBg: "#FFFBEB",
-  over: "#6D28D9",
+  ink: IOS.ink,
+  muted: IOS.secondary,
+  line: IOS.separator,
+  canvas: IOS.canvas,
+  filled: IOS.greenText,
+  filledBg: tint(IOS.green, 0.12),
+  short: IOS.orangeText,
+  shortBg: tint(IOS.orange, 0.1),
+  over: "#8944AB",
 };
 
 import { toLabel } from "../../../utils/labels";

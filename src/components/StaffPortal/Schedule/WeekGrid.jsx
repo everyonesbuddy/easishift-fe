@@ -1,17 +1,18 @@
 import { useMemo, useState } from "react";
-import { Box, Button, Tooltip, Typography } from "@mui/material";
+import { Box, Button, IconButton, Tooltip, Typography } from "@mui/material";
 import { FiPlus } from "react-icons/fi";
 import { useAuth } from "../../../context/AuthContext";
 import { getRoleDisplayName } from "../../../constants/industryRoles";
 import SlotDrawer from "./SlotDrawer";
 import AddNeedDialog from "./AddNeedDialog";
 import { GRID, slotLabel, titleCase } from "./weekGridUtils";
+import { IOS, roleColor, tint } from "../../../theme/ios";
 
 /**
  * The week, as needs vs people. Rows are shift + role (+ area), columns are
- * days. Each cell shows one pip per person needed, filled for each person
- * assigned. Click a cell to fill it, change that day's count or handle a
- * call-out.
+ * days. Each cell shows a colored pill per person on the shift and a dashed
+ * "Open" pill per empty spot. Click a cell to fill it, change that day's
+ * count or handle a call-out.
  */
 
 const keyToDate = (key) => {
@@ -25,56 +26,83 @@ const todayKey = () => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
-function Pips({ needed, filled }) {
-  const max = 8;
-  const shown = Math.min(Math.max(needed, filled), max);
-  const extra = Math.max(needed, filled) - shown;
+const shortName = (name) => {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "Someone";
+  return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0];
+};
+
+const pillBase = {
+  display: "flex",
+  alignItems: "center",
+  gap: 0.75,
+  minWidth: 0,
+  height: 24,
+  px: 0.75,
+  borderRadius: IOS.radius.pill,
+  fontSize: 12,
+  fontWeight: 600,
+  lineHeight: 1,
+};
+
+/** One person on the shift, as a calendar-style colored pill. */
+function PersonPill({ schedule, color }) {
+  const draft = schedule.state === "draft";
   return (
-    <Box sx={{ display: "flex", flexWrap: "wrap", gap: "3px", alignItems: "center" }} aria-hidden>
-      {Array.from({ length: shown }, (_, i) => {
-        const isFilled = i < filled;
-        const isOver = i >= needed;
-        return (
-          <Box
-            key={i}
-            sx={{
-              width: 9,
-              height: 9,
-              borderRadius: "50%",
-              bgcolor: isOver ? GRID.over : isFilled ? GRID.filled : "transparent",
-              border: `1.5px solid ${isOver ? GRID.over : isFilled ? GRID.filled : GRID.short}`,
-            }}
-          />
-        );
-      })}
-      {extra > 0 && (
-        <Typography component="span" sx={{ fontSize: 10, color: GRID.muted, ml: 0.25 }}>
-          +{extra}
-        </Typography>
-      )}
+    <Box
+      sx={{
+        ...pillBase,
+        bgcolor: tint(color, draft ? 0.08 : 0.15),
+        color: IOS.ink,
+        border: draft ? `1px dashed ${tint(color, 0.6)}` : "1px solid transparent",
+      }}
+      title={draft ? `${schedule.staffId?.name || ""} (not sent yet)` : schedule.staffId?.name}
+    >
+      <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: color, flexShrink: 0 }} />
+      <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {shortName(schedule.staffId?.name)}
+      </Box>
     </Box>
   );
 }
 
-function Cell({ row, people, callOuts, onOpen, onAdd, canEdit, isPast }) {
+function OpenPill({ count = 1 }) {
+  return (
+    <Box
+      sx={{
+        ...pillBase,
+        color: IOS.orangeText,
+        bgcolor: tint(IOS.orange, 0.06),
+        border: `1px dashed ${tint(IOS.orange, 0.7)}`,
+        justifyContent: "center",
+      }}
+    >
+      {count > 1 ? `${count} open` : "Open"}
+    </Box>
+  );
+}
+
+function Cell({ row, people, callOuts, color, onOpen, onAdd, canEdit, isPast }) {
   if (!row) {
     return (
       <Box
         sx={{
-          minHeight: 64,
-          borderRadius: 1.5,
+          minHeight: 56,
+          height: "100%",
+          borderRadius: IOS.radius.cell,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           "& button": { opacity: 0 },
+          "&:hover": { bgcolor: "rgba(0,0,0,0.02)" },
           "&:hover button, & button:focus-visible": { opacity: 1 },
         }}
       >
         {canEdit && !isPast && (
           <Tooltip title="Add a need on this day">
-            <Button size="small" onClick={onAdd} sx={{ minWidth: 0, color: GRID.muted }} aria-label="Add a need on this day">
-              <FiPlus />
-            </Button>
+            <IconButton size="small" onClick={onAdd} sx={{ color: IOS.blue, bgcolor: tint(IOS.blue, 0.08) }} aria-label="Add a need on this day">
+              <FiPlus size={14} />
+            </IconButton>
           </Tooltip>
         )}
       </Box>
@@ -82,14 +110,11 @@ function Cell({ row, people, callOuts, onOpen, onAdd, canEdit, isPast }) {
   }
   const needed = row.requiredCount;
   const filled = row.assignedCount;
-  const state = needed === 0 && filled === 0 ? "none" : filled >= needed ? (filled > needed ? "over" : "full") : "short";
-  const tone =
-    state === "short"
-      ? { bg: GRID.shortBg, fg: GRID.short }
-      : state === "none"
-        ? { bg: "transparent", fg: GRID.muted }
-        : { bg: GRID.filledBg, fg: state === "over" ? GRID.over : GRID.filled };
-  const firstNames = people.map((p) => String(p.staffId?.name || "").split(" ")[0]).filter(Boolean);
+  const open = Math.max(0, needed - filled);
+  const extra = Math.max(0, filled - needed);
+  const MAX_PEOPLE = 4;
+  const shown = people.slice(0, MAX_PEOPLE);
+  const hidden = people.length - shown.length;
 
   return (
     <Box
@@ -101,34 +126,43 @@ function Cell({ row, people, callOuts, onOpen, onAdd, canEdit, isPast }) {
         all: "unset",
         boxSizing: "border-box",
         width: "100%",
-        minHeight: 64,
-        p: 1,
-        borderRadius: 1.5,
+        height: "100%",
+        minHeight: 56,
+        p: 0.75,
+        borderRadius: IOS.radius.cell,
         cursor: "pointer",
-        bgcolor: tone.bg,
-        border: `1px solid ${state === "short" ? "#FDE68A" : "transparent"}`,
-        opacity: isPast ? 0.6 : 1,
+        opacity: isPast ? 0.55 : 1,
         display: "flex",
         flexDirection: "column",
         gap: 0.5,
-        transition: "box-shadow 120ms ease",
-        "&:hover": { boxShadow: `0 0 0 2px ${tone.fg}33` },
-        "&:focus-visible": { boxShadow: `0 0 0 2px ${tone.fg}` },
+        transition: "background-color 120ms ease, box-shadow 120ms ease",
+        "&:hover": { bgcolor: "rgba(0,0,0,0.03)" },
+        "&:focus-visible": { boxShadow: `0 0 0 2px ${IOS.blue}` },
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.5 }}>
-        <Pips needed={needed} filled={filled} />
-        <Typography sx={{ fontSize: 12, fontWeight: 700, color: tone.fg, fontVariantNumeric: "tabular-nums" }}>
-          {filled}/{needed}
-        </Typography>
-      </Box>
-      <Typography sx={{ fontSize: 12, color: GRID.ink, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-        {firstNames.length ? firstNames.join(", ") : state === "short" ? "Open" : ""}
-      </Typography>
-      {callOuts > 0 && (
-        <Typography sx={{ fontSize: 11, color: "#B91C1C", fontWeight: 600 }}>
-          {callOuts} called out
-        </Typography>
+      {shown.map((s) => (
+        <PersonPill key={s._id} schedule={s} color={color} />
+      ))}
+      {hidden > 0 && (
+        <Typography sx={{ fontSize: 11, color: IOS.secondary, fontWeight: 600, pl: 0.5 }}>+{hidden} more</Typography>
+      )}
+      {open > 0 && (open <= 2 ? Array.from({ length: open }, (_, i) => <OpenPill key={`o${i}`} />) : <OpenPill count={open} />)}
+      {(extra > 0 || callOuts > 0) && (
+        <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+          {extra > 0 && (
+            <Typography sx={{ fontSize: 11, fontWeight: 600, color: GRID.over, bgcolor: tint(IOS.purple, 0.1), px: 0.75, py: 0.25, borderRadius: "6px" }}>
+              +{extra} extra
+            </Typography>
+          )}
+          {callOuts > 0 && (
+            <Typography sx={{ fontSize: 11, fontWeight: 600, color: IOS.redText, bgcolor: tint(IOS.red, 0.1), px: 0.75, py: 0.25, borderRadius: "6px" }}>
+              {callOuts} called out
+            </Typography>
+          )}
+        </Box>
+      )}
+      {needed === 0 && filled === 0 && (
+        <Typography sx={{ fontSize: 11, color: IOS.tertiary, pl: 0.5 }}>None needed</Typography>
       )}
     </Box>
   );
@@ -223,121 +257,199 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
     else groups.push({ key: groupKey, label: line.label, lines: [line] });
   }
 
-  const columns = `minmax(170px, 1.1fr) repeat(${days.length || 7}, minmax(104px, 1fr))`;
+  const columns = `minmax(180px, 1.15fr) repeat(${days.length || 7}, minmax(112px, 1fr))`;
+  const roleList = facilityPreferences?.roleFamilies || [];
+  const totalOpen = dayTotals.reduce((sum, t) => sum + (t.needed - t.filled), 0);
 
   return (
     <Box sx={{ mt: 2 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5, gap: 2, flexWrap: "wrap" }}>
         <Box sx={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
-          <Legend color={GRID.filled} filled label="Filled" />
-          <Legend color={GRID.short} label="Open" />
-          <Legend color={GRID.over} filled label="Extra" />
+          <Legend kind="person" label="On shift" />
+          <Legend kind="draft" label="Not sent yet" />
+          <Legend kind="open" label="Open" />
         </Box>
         {canEdit && (
           <Button
             size="small"
-            variant="outlined"
             startIcon={<FiPlus />}
             onClick={() => setAddFor({})}
-            sx={{ textTransform: "none", borderRadius: 2 }}
+            sx={{ borderRadius: "10px", px: 1.5, color: IOS.blue, bgcolor: tint(IOS.blue, 0.1), "&:hover": { bgcolor: tint(IOS.blue, 0.16) } }}
           >
             Add a one-off need
           </Button>
         )}
       </Box>
 
-      <Box sx={{ overflowX: "auto", border: `1px solid ${GRID.line}`, borderRadius: 2, bgcolor: "#fff" }}>
-        <Box sx={{ minWidth: 900 }}>
+      <Box
+        sx={{
+          overflowX: "auto",
+          borderRadius: IOS.radius.card,
+          bgcolor: IOS.surface,
+          boxShadow: IOS.shadow,
+          border: `1px solid ${IOS.hairline}`,
+        }}
+      >
+        <Box sx={{ minWidth: 960 }}>
           {/* Day header */}
           <Box
             sx={{
               display: "grid",
               gridTemplateColumns: columns,
-              borderBottom: `1px solid ${GRID.line}`,
-              bgcolor: GRID.canvas,
+              borderBottom: `1px solid ${IOS.separator}`,
+              bgcolor: "rgba(255,255,255,0.92)",
+              backdropFilter: "saturate(180%) blur(20px)",
               position: "sticky",
               top: 0,
               zIndex: 1,
             }}
           >
-            <Box sx={{ p: 1.5 }} />
+            <Box sx={{ px: 2, py: 1.5, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+              <Typography sx={{ fontSize: 12, color: IOS.secondary, fontWeight: 600 }}>This week</Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 600, color: totalOpen > 0 ? IOS.orangeText : IOS.greenText }}>
+                {totalOpen > 0 ? `${totalOpen} open spot${totalOpen === 1 ? "" : "s"}` : "Everything filled"}
+              </Typography>
+            </Box>
             {days.map((day, i) => {
               const date = keyToDate(day);
               const isToday = day === today;
               const t = dayTotals[i];
               const open = t.needed - t.filled;
               return (
-                <Box key={day} sx={{ p: 1.25, borderLeft: `1px solid ${GRID.line}` }}>
-                  <Typography sx={{ fontSize: 12, color: isToday ? "primary.main" : GRID.muted, fontWeight: 600 }}>
+                <Box key={day} sx={{ px: 1.25, py: 1.25, textAlign: "left" }}>
+                  <Typography
+                    sx={{
+                      fontSize: 11,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      color: isToday ? IOS.red : IOS.secondary,
+                      fontWeight: 600,
+                    }}
+                  >
                     {date.toLocaleDateString(undefined, { weekday: "short" })}
-                    {isToday ? ", today" : ""}
                   </Typography>
-                  <Typography sx={{ fontSize: 18, fontWeight: 800, color: isToday ? "primary.main" : GRID.ink, lineHeight: 1.2 }}>
+                  <Box
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      minWidth: 32,
+                      height: 32,
+                      mt: 0.25,
+                      ml: isToday ? -0.5 : 0,
+                      px: isToday ? 0.5 : 0,
+                      borderRadius: IOS.radius.round,
+                      bgcolor: isToday ? IOS.red : "transparent",
+                      color: isToday ? "#fff" : IOS.ink,
+                      fontSize: 22,
+                      fontWeight: isToday ? 700 : 400,
+                      letterSpacing: "-0.02em",
+                    }}
+                  >
                     {date.getDate()}
-                  </Typography>
-                  <Typography sx={{ fontSize: 11, color: open > 0 ? GRID.short : GRID.filled, fontWeight: 600 }}>
-                    {t.needed === 0 ? "No needs" : open > 0 ? `${open} open` : "All filled"}
-                  </Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.25 }}>
+                    <Box
+                      sx={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        bgcolor: t.needed === 0 ? IOS.tertiary : open > 0 ? IOS.orange : IOS.green,
+                      }}
+                    />
+                    <Typography sx={{ fontSize: 11, color: t.needed === 0 ? IOS.tertiary : open > 0 ? IOS.orangeText : IOS.greenText, fontWeight: 600 }}>
+                      {t.needed === 0 ? "No needs" : open > 0 ? `${open} open` : "Filled"}
+                    </Typography>
+                  </Box>
                 </Box>
               );
             })}
           </Box>
 
           {lines.length === 0 && (
-            <Box sx={{ p: 4, textAlign: "center" }}>
-              <Typography sx={{ color: GRID.ink, fontWeight: 600 }}>No needs this week yet.</Typography>
-              <Typography sx={{ color: GRID.muted }}>
+            <Box sx={{ p: 5, textAlign: "center" }}>
+              <Typography sx={{ color: IOS.ink, fontWeight: 600 }}>No needs this week yet.</Typography>
+              <Typography sx={{ color: IOS.secondary }}>
                 Set up Weekly Needs and every new week fills in on its own, or add a one-off need.
               </Typography>
             </Box>
           )}
 
-          {groups.map((group) => (
+          {groups.map((group, gi) => (
             <Box key={group.key}>
-              <Box sx={{ px: 1.5, pt: 1.5, pb: 0.5, display: "flex", gap: 1, alignItems: "baseline", borderTop: `1px solid ${GRID.line}` }}>
-                <Typography sx={{ fontWeight: 800, color: GRID.ink, fontSize: 14 }}>{group.label.name}</Typography>
-                <Typography sx={{ color: GRID.muted, fontSize: 13 }}>{group.label.time}</Typography>
+              <Box
+                sx={{
+                  px: 2,
+                  py: 0.75,
+                  display: "flex",
+                  gap: 1,
+                  alignItems: "baseline",
+                  bgcolor: IOS.canvas,
+                  borderTop: gi === 0 ? "none" : `1px solid ${IOS.separator}`,
+                  borderBottom: `1px solid ${IOS.hairline}`,
+                }}
+              >
+                <Typography sx={{ fontWeight: 700, color: IOS.ink, fontSize: 13 }}>{group.label.name}</Typography>
+                <Typography sx={{ color: IOS.secondary, fontSize: 12, fontVariantNumeric: "tabular-nums" }}>{group.label.time}</Typography>
               </Box>
-              {group.lines.map((line) => (
-                <Box key={line.key} sx={{ display: "grid", gridTemplateColumns: columns, alignItems: "stretch" }}>
-                  <Box sx={{ px: 1.5, py: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                    <Typography sx={{ fontWeight: 600, color: GRID.ink, fontSize: 14 }}>
-                      {getRoleDisplayName(line.role)}
-                    </Typography>
-                    {(line.unitArea || line.certs.size > 0) && (
-                      <Typography sx={{ color: GRID.muted, fontSize: 12 }}>
-                        {[line.unitArea && titleCase(line.unitArea), line.certs.size ? `needs ${[...line.certs].map(titleCase).join(", ")}` : null]
-                          .filter(Boolean)
-                          .join(", ")}
-                      </Typography>
-                    )}
-                  </Box>
-                  {days.map((day) => {
-                    const row = byKey.get(`${line.key}|${day}`);
-                    return (
-                      <Box key={day} sx={{ p: 0.5, borderLeft: `1px solid ${GRID.line}` }}>
-                        <Cell
-                          row={row}
-                          people={row ? peopleByCoverage.get(String(row._id)) || [] : []}
-                          callOuts={row ? callOutsByCoverage.get(String(row._id)) || 0 : 0}
-                          canEdit={canEdit}
-                          isPast={day < today}
-                          onOpen={() => setOpenRowId(row._id)}
-                          onAdd={() =>
-                            setAddFor({
-                              date: day,
-                              shiftType: line.shiftType,
-                              shiftTag: line.shiftTag,
-                              role: line.role,
-                              unitArea: line.unitArea,
-                            })
-                          }
-                        />
+              {group.lines.map((line, li) => {
+                const color = roleColor(line.role, roleList);
+                return (
+                  <Box
+                    key={line.key}
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: columns,
+                      alignItems: "stretch",
+                      borderTop: li === 0 ? "none" : `1px solid ${IOS.hairline}`,
+                    }}
+                  >
+                    <Box sx={{ px: 2, py: 1.25, display: "flex", gap: 1.25, alignItems: "flex-start" }}>
+                      <Box sx={{ width: 4, alignSelf: "stretch", minHeight: 20, borderRadius: 4, bgcolor: color, flexShrink: 0 }} />
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ fontWeight: 600, color: IOS.ink, fontSize: 14, lineHeight: 1.3 }}>
+                          {getRoleDisplayName(line.role)}
+                        </Typography>
+                        {(line.unitArea || line.certs.size > 0) && (
+                          <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mt: 0.5 }}>
+                            {line.unitArea && <Tag color={IOS.blue}>{titleCase(line.unitArea)}</Tag>}
+                            {[...line.certs].map((c) => (
+                              <Tag key={c} color={IOS.purple}>
+                                {titleCase(c)}
+                              </Tag>
+                            ))}
+                          </Box>
+                        )}
                       </Box>
-                    );
-                  })}
-                </Box>
-              ))}
+                    </Box>
+                    {days.map((day) => {
+                      const row = byKey.get(`${line.key}|${day}`);
+                      return (
+                        <Box key={day} sx={{ p: 0.5, borderLeft: `1px solid ${IOS.hairline}` }}>
+                          <Cell
+                            row={row}
+                            color={color}
+                            people={row ? peopleByCoverage.get(String(row._id)) || [] : []}
+                            callOuts={row ? callOutsByCoverage.get(String(row._id)) || 0 : 0}
+                            canEdit={canEdit}
+                            isPast={day < today}
+                            onOpen={() => setOpenRowId(row._id)}
+                            onAdd={() =>
+                              setAddFor({
+                                date: day,
+                                shiftType: line.shiftType,
+                                shiftTag: line.shiftTag,
+                                role: line.role,
+                                unitArea: line.unitArea,
+                              })
+                            }
+                          />
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                );
+              })}
             </Box>
           ))}
         </Box>
@@ -369,11 +481,37 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
   );
 }
 
-function Legend({ color, filled, label }) {
+function Tag({ color, children }) {
+  return (
+    <Box
+      component="span"
+      sx={{
+        fontSize: 11,
+        fontWeight: 600,
+        lineHeight: "18px",
+        px: 0.75,
+        borderRadius: "6px",
+        bgcolor: tint(color, 0.1),
+        color: color === IOS.purple ? "#8944AB" : "#0062CC",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
+function Legend({ kind, label }) {
+  const swatch =
+    kind === "open"
+      ? { border: `1px dashed ${tint(IOS.orange, 0.7)}`, bgcolor: tint(IOS.orange, 0.06) }
+      : kind === "draft"
+        ? { border: `1px dashed ${tint(IOS.blue, 0.6)}`, bgcolor: tint(IOS.blue, 0.08) }
+        : { border: "1px solid transparent", bgcolor: tint(IOS.blue, 0.15) };
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-      <Box sx={{ width: 9, height: 9, borderRadius: "50%", border: `1.5px solid ${color}`, bgcolor: filled ? color : "transparent" }} />
-      <Typography sx={{ fontSize: 12, color: GRID.muted }}>{label}</Typography>
+      <Box sx={{ width: 18, height: 12, borderRadius: "4px", ...swatch }} />
+      <Typography sx={{ fontSize: 12, color: IOS.secondary }}>{label}</Typography>
     </Box>
   );
 }

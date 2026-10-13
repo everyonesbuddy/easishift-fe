@@ -32,6 +32,7 @@ import StaffList from "./components/StaffPortal/Staffs/StaffList";
 import MembersPage from "./components/StaffPortal/Members/MembersPage";
 import FitToPlanPage from "./components/StaffPortal/Billing/FitToPlanPage";
 import PlanBanner from "./components/Shared/PlanBanner";
+import { IOS } from "./theme/ios";
 import StaffLinkPage from "./components/StaffLink/StaffLinkPage";
 import StaffingTemplatePage from "./components/StaffPortal/Coverage/StaffingTemplatePage";
 import MessageList from "./components/StaffPortal/Messages/MessageList";
@@ -58,9 +59,12 @@ export default function App() {
           primary: { main: primaryColor },
           secondary: { main: secondaryColor },
         },
+        typography: { fontFamily: IOS.font },
+        shape: { borderRadius: 10 },
         components: {
           MuiButton: {
             styleOverrides: {
+              root: { textTransform: "none", fontWeight: 600, borderRadius: 10 },
               containedPrimary: {
                 backgroundColor: `${primaryColor} !important`,
                 "&:hover": {

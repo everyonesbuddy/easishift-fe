@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import {
+  Autocomplete,
   Box,
   Button,
   Chip,
   IconButton,
   Menu,
   MenuItem,
-  Select,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
@@ -15,20 +16,14 @@ import {
 import { FiPlus, FiTrash2 } from "react-icons/fi";
 import { getRoleDisplayName } from "../../../constants/industryRoles";
 import { toLabel } from "../../../utils/labels";
+import { tagKey } from "../../../utils/tags";
+import { IOS, roleColor, segmentedSx, tint } from "../../../theme/ios";
 
 // countsByWeekday is Sunday-first: [Sun, Mon, Tue, Wed, Thu, Fri, Sat]
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // show Monday first
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const WEEKEND = [0, 6];
-
-const C = {
-  ink: "#1F2937",
-  muted: "#6B7280",
-  line: "#E5E7EB",
-  canvas: "#F8FAFC",
-  accent: "#2563EB",
-};
 
 const titleCase = toLabel;
 
@@ -44,7 +39,9 @@ const isWeekdayWeekendShape = (counts) =>
   WEEKDAYS.every((d) => counts[d] === counts[1]) &&
   WEEKEND.every((d) => counts[d] === counts[0]);
 
-const lower = (v) => String(v || "").trim().toLowerCase();
+const lower = tagKey;
+
+const mergeKeys = (...lists) => [...new Set(lists.flat().map(lower).filter(Boolean))].sort();
 
 /** Every shift slot defined in facility preferences. */
 const listShiftSlots = (prefs) =>
@@ -54,10 +51,27 @@ const listShiftSlots = (prefs) =>
       shiftType: def.key,
       shiftTag: slot.tag,
       name: def.label || titleCase(def.key),
+      slotLabel: slot.label || "",
       time: `${compactTime(slot.startLocalTime)}–${compactTime(slot.endLocalTime)}`,
       start: slot.startLocalTime || "",
     })),
   );
+
+// Borderless, rounded field used for area and certification pickers.
+const fieldSx = {
+  "& .MuiOutlinedInput-root": {
+    borderRadius: "10px",
+    bgcolor: IOS.canvas,
+    minHeight: 36,
+    py: "2px !important",
+    pl: "8px !important",
+    fontSize: 13,
+    "& fieldset": { border: "none" },
+    "&:hover": { bgcolor: "#EDEDF0" },
+    "&.Mui-focused": { bgcolor: "#fff", boxShadow: `0 0 0 3px ${tint(IOS.blue, 0.25)}` },
+  },
+  "& .MuiAutocomplete-input": { fontSize: 13, py: "4px !important" },
+};
 
 function CountInput({ value, onChange, disabled, label }) {
   return (
@@ -74,7 +88,7 @@ function CountInput({ value, onChange, disabled, label }) {
       onFocus={(e) => e.target.select()}
       sx={{
         width: "100%",
-        maxWidth: 56,
+        maxWidth: 52,
         height: 36,
         boxSizing: "border-box",
         textAlign: "center",
@@ -82,12 +96,14 @@ function CountInput({ value, onChange, disabled, label }) {
         fontWeight: 700,
         fontSize: 15,
         fontVariantNumeric: "tabular-nums",
-        color: Number(value) === 0 ? C.muted : C.ink,
-        bgcolor: Number(value) === 0 ? "transparent" : "#fff",
-        border: `1px solid ${C.line}`,
-        borderRadius: 1.5,
+        color: Number(value) === 0 ? IOS.tertiary : IOS.ink,
+        bgcolor: Number(value) === 0 ? "transparent" : IOS.canvas,
+        border: `1px solid ${Number(value) === 0 ? IOS.separator : "transparent"}`,
+        borderRadius: "10px",
         outline: "none",
-        "&:focus": { borderColor: C.accent, boxShadow: `0 0 0 3px ${C.accent}22` },
+        transition: "background-color 120ms ease, box-shadow 120ms ease",
+        "&:hover": { bgcolor: "#EDEDF0" },
+        "&:focus": { bgcolor: "#fff", borderColor: IOS.blue, boxShadow: `0 0 0 3px ${tint(IOS.blue, 0.2)}` },
         "&::-webkit-inner-spin-button": { display: "none" },
         MozAppearance: "textfield",
       }}
@@ -99,12 +115,37 @@ function CountInput({ value, onChange, disabled, label }) {
  * Weekly Needs: for each shift, which roles (optionally in a unit area and
  * with required certifications) and how many on each day.
  * Controlled: `rules` in, `onChange(rules)` out.
+ * `options` ({ unitAreas, certificationTags }) adds areas and certifications
+ * already used by staff or coverage; new ones can be typed in and are saved
+ * to facility preferences with the template.
  */
-export default function StaffingTemplateEditor({ rules, onChange, facilityPreferences, disabled = false }) {
+export default function StaffingTemplateEditor({
+  rules,
+  onChange,
+  facilityPreferences,
+  options,
+  disabled = false,
+}) {
   const slots = useMemo(() => listShiftSlots(facilityPreferences), [facilityPreferences]);
   const roles = facilityPreferences?.roleFamilies || [];
-  const areas = facilityPreferences?.unitAreas || [];
-  const certs = facilityPreferences?.certificationTags || [];
+  const areas = useMemo(
+    () =>
+      mergeKeys(
+        facilityPreferences?.unitAreas || [],
+        options?.unitAreas || [],
+        rules.map((r) => r.unitArea),
+      ),
+    [facilityPreferences, options, rules],
+  );
+  const certs = useMemo(
+    () =>
+      mergeKeys(
+        facilityPreferences?.certificationTags || [],
+        options?.certificationTags || [],
+        rules.flatMap((r) => r.requiredCertificationTags || []),
+      ),
+    [facilityPreferences, options, rules],
+  );
   const [mode, setMode] = useState(() =>
     rules.every((rule) => isWeekdayWeekendShape(rule.countsByWeekday)) ? "weekday_weekend" : "each_day",
   );
@@ -162,25 +203,22 @@ export default function StaffingTemplateEditor({ rules, onChange, facilityPrefer
 
   const ruleSlotKey = (rule) => `${rule.shiftType}:${rule.shiftTag}`;
   const totals = columns.map((col) => rules.reduce((sum, rule) => sum + (rule.countsByWeekday[col.days[0]] || 0), 0));
-  const grid = `minmax(190px, 1.6fr) repeat(${columns.length}, minmax(48px, 64px)) 36px`;
+  const countCols = `repeat(${columns.length}, ${mode === "each_day" ? "52px" : "72px"})`;
+  const grid = `minmax(130px, 1fr) minmax(150px, 1fr) minmax(170px, 1.2fr) ${countCols} 36px`;
+  const minWidth = mode === "each_day" ? 920 : 640;
 
   const sortedSlots = [...slots].sort((a, b) => a.start.localeCompare(b.start));
+  const headCell = { fontSize: 12, color: IOS.secondary, fontWeight: 600, letterSpacing: "0.02em" };
 
   return (
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, flexWrap: "wrap", mb: 2 }}>
-        <ToggleButtonGroup
-          exclusive
-          size="small"
-          value={mode}
-          onChange={(_, value) => value && setMode(value)}
-          sx={{ "& .MuiToggleButton-root": { textTransform: "none", px: 1.75 } }}
-        >
+        <ToggleButtonGroup exclusive size="small" value={mode} onChange={(_, value) => value && setMode(value)} sx={segmentedSx}>
           <ToggleButton value="weekday_weekend">Weekdays and weekends</ToggleButton>
           <ToggleButton value="each_day">Each day different</ToggleButton>
         </ToggleButtonGroup>
         {rules.length > 0 && (
-          <Typography sx={{ color: C.muted, fontSize: 14 }}>
+          <Typography sx={{ color: IOS.secondary, fontSize: 14 }}>
             {mode === "weekday_weekend"
               ? `${totals[0]} people on a weekday, ${totals[1]} on a weekend day`
               : `${Math.min(...totals)}–${Math.max(...totals)} people a day`}
@@ -188,13 +226,25 @@ export default function StaffingTemplateEditor({ rules, onChange, facilityPrefer
         )}
       </Box>
 
-      <Box sx={{ overflowX: "auto", border: `1px solid ${C.line}`, borderRadius: 2, bgcolor: "#fff" }}>
-        <Box sx={{ minWidth: mode === "each_day" ? 720 : 480 }}>
+      <Box sx={{ overflowX: "auto", borderRadius: IOS.radius.card, bgcolor: IOS.surface, boxShadow: IOS.shadow, border: `1px solid ${IOS.hairline}` }}>
+        <Box sx={{ minWidth }}>
           {/* Column header */}
-          <Box sx={{ display: "grid", gridTemplateColumns: grid, alignItems: "center", px: 1.5, py: 1, bgcolor: C.canvas, borderBottom: `1px solid ${C.line}` }}>
-            <Typography sx={{ fontSize: 13, color: C.muted, fontWeight: 600 }}>Who</Typography>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: grid,
+              columnGap: 1.5,
+              alignItems: "center",
+              px: 2,
+              py: 1.25,
+              borderBottom: `1px solid ${IOS.separator}`,
+            }}
+          >
+            <Typography sx={headCell}>Role</Typography>
+            <Typography sx={headCell}>Unit area</Typography>
+            <Typography sx={headCell}>Certifications</Typography>
             {columns.map((col) => (
-              <Typography key={col.label} sx={{ fontSize: 13, color: C.muted, fontWeight: 600, textAlign: "center" }}>
+              <Typography key={col.label} sx={{ ...headCell, textAlign: "center" }}>
                 {col.label}
               </Typography>
             ))}
@@ -204,109 +254,134 @@ export default function StaffingTemplateEditor({ rules, onChange, facilityPrefer
           {sortedSlots.map((slot) => {
             const inSlot = rules.map((rule, index) => ({ rule, index })).filter(({ rule }) => ruleSlotKey(rule) === slot.key);
             return (
-              <Box key={slot.key} sx={{ borderBottom: `1px solid ${C.line}` }}>
-                <Box sx={{ px: 1.5, pt: 1.5, pb: 0.5, display: "flex", alignItems: "baseline", gap: 1 }}>
-                  <Typography sx={{ fontWeight: 800, color: C.ink }}>{slot.name}</Typography>
-                  <Typography sx={{ color: C.muted, fontSize: 14 }}>{slot.time}</Typography>
+              <Box key={slot.key} sx={{ "& + &": { borderTop: `1px solid ${IOS.separator}` } }}>
+                <Box sx={{ px: 2, pt: 1.75, pb: 0.75, display: "flex", alignItems: "baseline", gap: 1 }}>
+                  <Typography sx={{ fontWeight: 700, color: IOS.ink, fontSize: 15 }}>{slot.name}</Typography>
+                  {slot.slotLabel && !slot.slotLabel.toLowerCase().startsWith(slot.name.toLowerCase()) && (
+                    <Typography sx={{ color: IOS.secondary, fontSize: 13 }}>{slot.slotLabel}</Typography>
+                  )}
+                  <Typography sx={{ color: IOS.secondary, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>{slot.time}</Typography>
                 </Box>
 
-                {inSlot.map(({ rule, index }) => (
-                  <Box key={`${rule.role}:${rule.unitArea || ""}:${index}`} sx={{ display: "grid", gridTemplateColumns: grid, alignItems: "center", px: 1.5, py: 0.75, gap: 0 }}>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, pr: 1, minWidth: 0 }}>
-                      <Typography sx={{ fontWeight: 600, color: C.ink }}>{getRoleDisplayName(rule.role)}</Typography>
-                      {(areas.length > 0 || certs.length > 0) && (
-                        <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap", alignItems: "center" }}>
-                          {areas.length > 0 && (
-                            <Select
-                              size="small"
-                              variant="standard"
-                              disableUnderline
-                              displayEmpty
-                              disabled={disabled}
-                              value={lower(rule.unitArea)}
-                              onChange={(e) => {
-                                const next = e.target.value || null;
-                                if (isDuplicate({ ...rule, unitArea: next }, index)) return;
-                                update(index, { unitArea: next });
-                              }}
-                              renderValue={(v) => (v ? titleCase(v) : "Any area")}
-                              sx={{ fontSize: 13, color: rule.unitArea ? C.ink : C.muted, "& .MuiSelect-select": { py: 0, pr: "20px !important" } }}
-                            >
-                              <MenuItem value="">Any area</MenuItem>
-                              {areas.map((a) => (
-                                <MenuItem key={a} value={lower(a)} disabled={isDuplicate({ ...rule, unitArea: lower(a) }, index)}>
-                                  {titleCase(a)}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          )}
-                          {certs.length > 0 && (
-                            <Select
-                              size="small"
-                              variant="standard"
-                              disableUnderline
-                              multiple
-                              displayEmpty
-                              disabled={disabled}
-                              value={(rule.requiredCertificationTags || []).map(lower)}
-                              onChange={(e) => update(index, { requiredCertificationTags: e.target.value })}
-                              renderValue={(v) =>
-                                v.length ? (
-                                  <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
-                                    {v.map((c) => (
-                                      <Chip key={c} size="small" label={titleCase(c)} sx={{ height: 20, fontSize: 12 }} />
-                                    ))}
-                                  </Box>
-                                ) : (
-                                  "Any certification"
-                                )
-                              }
-                              sx={{ fontSize: 13, color: C.muted, "& .MuiSelect-select": { py: 0, pr: "20px !important" } }}
-                            >
-                              {certs.map((c) => (
-                                <MenuItem key={c} value={lower(c)}>
-                                  {titleCase(c)}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          )}
-                        </Box>
-                      )}
-                    </Box>
-                    {columns.map((col) => (
-                      <Box key={col.label} sx={{ display: "flex", justifyContent: "center" }}>
-                        <CountInput
-                          value={rule.countsByWeekday[col.days[0]]}
-                          onChange={(v) => setCount(index, col.days, v)}
-                          disabled={disabled}
-                          label={`${getRoleDisplayName(rule.role)} ${slot.name} ${col.label}`}
-                        />
+                {inSlot.map(({ rule, index }) => {
+                  const color = roleColor(rule.role, roles);
+                  const roleName = getRoleDisplayName(rule.role);
+                  return (
+                    <Box
+                      key={`${rule.role}:${rule.unitArea || ""}:${index}`}
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: grid,
+                        columnGap: 1.5,
+                        alignItems: "center",
+                        px: 2,
+                        py: 0.75,
+                        "&:hover": { bgcolor: "rgba(0,0,0,0.015)" },
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+                        <Box sx={{ width: 4, alignSelf: "stretch", minHeight: 24, borderRadius: 4, bgcolor: color, flexShrink: 0 }} />
+                        <Typography noWrap sx={{ fontWeight: 600, color: IOS.ink, fontSize: 14 }}>
+                          {roleName}
+                        </Typography>
                       </Box>
-                    ))}
-                    <Tooltip title="Remove">
-                      <span>
-                        <IconButton
-                          size="small"
-                          aria-label={`Remove ${getRoleDisplayName(rule.role)} on ${slot.name}`}
-                          onClick={() => onChange(rules.filter((_, i) => i !== index))}
-                          disabled={disabled}
-                          sx={{ color: C.muted }}
-                        >
-                          <FiTrash2 size={15} />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </Box>
-                ))}
+
+                      <Autocomplete
+                        size="small"
+                        freeSolo
+                        autoSelect
+                        disabled={disabled}
+                        options={areas}
+                        value={lower(rule.unitArea) || null}
+                        getOptionLabel={(o) => titleCase(o)}
+                        getOptionDisabled={(o) => isDuplicate({ ...rule, unitArea: o }, index)}
+                        onChange={(_, value) => {
+                          const next = lower(value) || null;
+                          if (next && isDuplicate({ ...rule, unitArea: next }, index)) return;
+                          update(index, { unitArea: next });
+                        }}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            placeholder="Any area"
+                            inputProps={{ ...params.inputProps, "aria-label": `Unit area for ${roleName} on ${slot.name}` }}
+                          />
+                        )}
+                        sx={fieldSx}
+                      />
+
+                      <Autocomplete
+                        size="small"
+                        multiple
+                        freeSolo
+                        autoSelect
+                        disableCloseOnSelect
+                        disabled={disabled}
+                        options={certs}
+                        value={(rule.requiredCertificationTags || []).map(lower)}
+                        getOptionLabel={(o) => titleCase(o)}
+                        onChange={(_, value) =>
+                          update(index, { requiredCertificationTags: [...new Set(value.map(lower).filter(Boolean))] })
+                        }
+                        renderTags={(value, getTagProps) =>
+                          value.map((c, i) => {
+                            const { key, ...tagProps } = getTagProps({ index: i });
+                            return (
+                              <Chip
+                                key={key}
+                                {...tagProps}
+                                size="small"
+                                label={titleCase(c)}
+                                sx={{ height: 22, fontSize: 12, fontWeight: 600, borderRadius: "6px", bgcolor: tint(IOS.purple, 0.12), color: "#8944AB" }}
+                              />
+                            );
+                          })
+                        }
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            placeholder={(rule.requiredCertificationTags || []).length ? "" : "Any certification"}
+                            inputProps={{ ...params.inputProps, "aria-label": `Certifications for ${roleName} on ${slot.name}` }}
+                          />
+                        )}
+                        sx={fieldSx}
+                      />
+
+                      {columns.map((col) => (
+                        <Box key={col.label} sx={{ display: "flex", justifyContent: "center" }}>
+                          <CountInput
+                            value={rule.countsByWeekday[col.days[0]]}
+                            onChange={(v) => setCount(index, col.days, v)}
+                            disabled={disabled}
+                            label={`${roleName} ${slot.name} ${col.label}`}
+                          />
+                        </Box>
+                      ))}
+                      <Tooltip title="Remove">
+                        <span>
+                          <IconButton
+                            size="small"
+                            aria-label={`Remove ${roleName} on ${slot.name}`}
+                            onClick={() => onChange(rules.filter((_, i) => i !== index))}
+                            disabled={disabled}
+                            sx={{ color: IOS.tertiary, "&:hover": { color: IOS.red, bgcolor: tint(IOS.red, 0.08) } }}
+                          >
+                            <FiTrash2 size={15} />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </Box>
+                  );
+                })}
 
                 {!disabled && (
-                  <Box sx={{ px: 1, pb: 1 }}>
+                  <Box sx={{ px: 1.25, pb: 1.25, pt: 0.25 }}>
                     <Button
                       size="small"
                       startIcon={<FiPlus />}
                       onClick={(e) => setAddMenu({ anchor: e.currentTarget, slot })}
                       disabled={!roles.length}
-                      sx={{ textTransform: "none", color: C.accent }}
+                      sx={{ color: IOS.blue, borderRadius: "8px", fontWeight: 600 }}
                     >
                       {inSlot.length ? "Add a role" : `Who works ${slot.name.toLowerCase()}?`}
                     </Button>
@@ -317,10 +392,24 @@ export default function StaffingTemplateEditor({ rules, onChange, facilityPrefer
           })}
 
           {rules.length > 0 && (
-            <Box sx={{ display: "grid", gridTemplateColumns: grid, alignItems: "center", px: 1.5, py: 1.25, bgcolor: C.canvas }}>
-              <Typography sx={{ fontWeight: 700, color: C.ink, fontSize: 14 }}>People per day</Typography>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: grid,
+                columnGap: 1.5,
+                alignItems: "center",
+                px: 2,
+                py: 1.5,
+                bgcolor: IOS.canvas,
+                borderTop: `1px solid ${IOS.separator}`,
+              }}
+            >
+              <Typography sx={{ fontWeight: 700, color: IOS.ink, fontSize: 14, gridColumn: "span 3" }}>People per day</Typography>
               {totals.map((total, i) => (
-                <Typography key={columns[i].label} sx={{ fontWeight: 800, textAlign: "center", color: C.ink, fontVariantNumeric: "tabular-nums" }}>
+                <Typography
+                  key={columns[i].label}
+                  sx={{ fontWeight: 700, textAlign: "center", color: IOS.ink, fontVariantNumeric: "tabular-nums" }}
+                >
                   {total}
                 </Typography>
               ))}
@@ -331,18 +420,23 @@ export default function StaffingTemplateEditor({ rules, onChange, facilityPrefer
       </Box>
 
       {(!slots.length || !roles.length) && (
-        <Typography variant="body2" sx={{ color: C.muted, mt: 1.5 }}>
+        <Typography variant="body2" sx={{ color: IOS.secondary, mt: 1.5 }}>
           Add shift times and roles in Facility Preferences first.
         </Typography>
       )}
-      {slots.length > 0 && roles.length > 0 && areas.length === 0 && (
-        <Typography variant="body2" sx={{ color: C.muted, mt: 1.5 }}>
-          Need some people only in memory care, or only with Med Pass? Add unit areas and certifications in
-          Facility Preferences and they'll show up here.
+      {slots.length > 0 && roles.length > 0 && (
+        <Typography variant="body2" sx={{ color: IOS.secondary, mt: 1.5 }}>
+          Pick a unit area or certification to only match staff tagged with it. Type a new one to add it; it's
+          saved to Facility Preferences so you can tag staff with it too.
         </Typography>
       )}
 
-      <Menu anchorEl={addMenu?.anchor} open={Boolean(addMenu)} onClose={() => setAddMenu(null)}>
+      <Menu
+        anchorEl={addMenu?.anchor}
+        open={Boolean(addMenu)}
+        onClose={() => setAddMenu(null)}
+        slotProps={{ paper: { sx: { borderRadius: "12px", boxShadow: IOS.shadowRaised, minWidth: 200 } } }}
+      >
         {roles.map((role) => (
           <MenuItem
             key={role}
@@ -350,7 +444,9 @@ export default function StaffingTemplateEditor({ rules, onChange, facilityPrefer
               addRole(addMenu.slot, role);
               setAddMenu(null);
             }}
+            sx={{ gap: 1.25, fontSize: 14 }}
           >
+            <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: roleColor(role, roles) }} />
             {getRoleDisplayName(role)}
           </MenuItem>
         ))}

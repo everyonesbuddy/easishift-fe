@@ -43,11 +43,19 @@ const DASHBOARD_TOUR_STEPS = [
 ];
 
 export default function StaffDashboard() {
-  const { user, roles, can, facilityPreferences, updateCurrentUser } =
+  const {
+    user,
+    roles,
+    can,
+    hasFeature,
+    facilityPreferences,
+    updateCurrentUser,
+  } =
     useAuth();
   const theme = useTheme();
   const canViewOperations = can("schedule.view");
-  const canViewStaffSummary = can("staff.view");
+  // The summary numbers are a Facility-plan feature.
+  const canViewStaffSummary = can("staff.view") && hasFeature("dashboard");
   const hasSchedulableRole =
     getFacilityRolesFromUser(user, facilityPreferences).length > 0;
   const canUsePersonalSchedule = hasSchedulableRole;
@@ -93,7 +101,7 @@ export default function StaffDashboard() {
       });
 
       // Tenant
-      const tenantRes = await api.get(`/tenants/${user.tenantId}`);
+      const tenantRes = await api.get("/tenants/me");
       setTenant(tenantRes.data);
     } catch (err) {
       console.error("Failed to load dashboard", err);
@@ -140,7 +148,7 @@ export default function StaffDashboard() {
     try {
       setUploadingProfile(true);
       const base64Image = await fileToBase64(file);
-      const response = await api.put(`/auth/${user._id}`, {
+      const response = await api.patch("/auth/me", {
         profilePicture: base64Image,
       });
 

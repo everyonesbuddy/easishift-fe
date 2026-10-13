@@ -38,10 +38,10 @@ import { useState } from "react";
 import { darken, useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import ChangePasswordModal from "../Auth/ChangePasswordModal";
-import { getFacilityRolesFromUser } from "../../constants/industryRoles";
 
 function Sidebar({ mobileOpen, onMobileClose }) {
-  const { user, facilityPreferences, can, publicBranding } = useAuth();
+  const { user, facilityPreferences, can, publicBranding, hasFeature } =
+    useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -54,8 +54,6 @@ function Sidebar({ mobileOpen, onMobileClose }) {
   const menuOpen = Boolean(anchorEl);
 
   const trackingEnabled = Boolean(facilityPreferences?.timeTracking?.enabled);
-  const hasSchedulableRole =
-    getFacilityRolesFromUser(user, facilityPreferences).length > 0;
   const canViewFacilityPreferences =
     can("facility_preferences.view") || can("facility_preferences.manage");
 
@@ -108,7 +106,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
           },
         ]
       : []),
-    ...(can("tenant.settings")
+    ...(can("tenant.settings") && hasFeature("branding")
       ? [
           {
             id: "tenant-branding",
@@ -128,29 +126,17 @@ function Sidebar({ mobileOpen, onMobileClose }) {
           },
         ]
       : []),
-    {
-      id: "timeoff-requests",
-      icon: MdSchedule,
-      label: "My Time Off Requests",
-      to: "/timeoff-requests",
-    },
-    ...(hasSchedulableRole && can("preferences.manage_own")
+    ...(can("schedule.view")
       ? [
           {
-            id: "preferences",
-            icon: MdSettings,
-            label: "Preferences",
-            to: "/preferences",
+            id: "swap-requests",
+            icon: MdSwapHoriz,
+            label: "Shift Swaps",
+            to: "/swap-requests",
           },
         ]
       : []),
-    {
-      id: "swap-requests",
-      icon: MdSwapHoriz,
-      label: "Shift Swaps",
-      to: "/swap-requests",
-    },
-    ...(trackingEnabled
+    ...(trackingEnabled && hasFeature("timeClock")
       ? [
           {
             id: can("staff.view") ? "attendance" : "time-tracking",
@@ -160,7 +146,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
           },
         ]
       : []),
-    ...(can("staff.view")
+    ...(can("staff.view") && hasFeature("timesheets")
       ? [
           {
             id: "payroll-exports",
@@ -170,13 +156,15 @@ function Sidebar({ mobileOpen, onMobileClose }) {
           },
         ]
       : []),
-    { id: "messages", icon: MdMessage, label: "Messages", to: "/messages" },
+    ...(hasFeature("messaging")
+      ? [{ id: "messages", icon: MdMessage, label: "Messages", to: "/messages" }]
+      : []),
     ...(can("billing.manage")
       ? [
           {
             id: "subscription",
             icon: MdSettings,
-            label: "Manage Subscription",
+            label: "Plan & Billing",
             to: "/billing",
           },
         ]

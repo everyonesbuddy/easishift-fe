@@ -20,7 +20,6 @@ const emptyValues = {
   displayName: "",
   primaryColor: "",
   secondaryColor: "",
-  subdomain: "",
 };
 
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
@@ -89,27 +88,21 @@ export default function TenantBrandingPage() {
   const canManageBranding = can("tenant.settings");
   const [values, setValues] = useState(emptyValues);
   const [branding, setBranding] = useState(null);
-  const [originalSubdomain, setOriginalSubdomain] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
   const [error, setError] = useState("");
-  const [availability, setAvailability] = useState("");
 
   const applyBranding = useCallback(
     (nextBranding) => {
       if (!nextBranding) return;
       updatePublicBranding(nextBranding);
-      const subdomain = nextBranding.subdomain || "";
       setBranding(nextBranding);
-      setOriginalSubdomain(subdomain);
       setValues({
         displayName: nextBranding.displayName || "",
         primaryColor: nextBranding.primaryColor || "",
         secondaryColor: nextBranding.secondaryColor || "",
-        subdomain,
       });
-      setAvailability("");
     },
     [updatePublicBranding],
   );
@@ -131,60 +124,15 @@ export default function TenantBrandingPage() {
       .finally(() => setLoading(false));
   }, [applyBranding, canManageBranding]);
 
-  const checkSubdomain = async () => {
-    const subdomain = values.subdomain.trim().toLowerCase();
-    if (!subdomain) {
-      setAvailability("Enter a subdomain to check.");
-      return false;
-    }
-    if (subdomain === originalSubdomain) {
-      setAvailability("This is your current subdomain.");
-      return true;
-    }
-
-    try {
-      const res = await api.get("/public/subdomain-availability", {
-        params: { subdomain },
-      });
-      const isAvailable = res.data?.available === true;
-      setAvailability(
-        isAvailable
-          ? `${subdomain} is available.`
-          : res.data?.reason || "That subdomain is unavailable.",
-      );
-      return isAvailable;
-    } catch (err) {
-      setAvailability(
-        err.response?.data?.message ||
-          "Could not check subdomain availability.",
-      );
-      return false;
-    }
-  };
-
   const handleSave = async () => {
     setSaving(true);
     setError("");
     try {
-      const subdomain = values.subdomain.trim().toLowerCase();
-      if (originalSubdomain && !subdomain) {
-        setError("An assigned subdomain cannot be removed.");
-        return;
-      }
-      if (subdomain && subdomain !== originalSubdomain) {
-        const available = await checkSubdomain();
-        if (!available) {
-          setError("Choose an available subdomain before saving.");
-          return;
-        }
-      }
-
       const payload = {
         displayName: values.displayName.trim() || null,
         primaryColor: values.primaryColor.trim() || null,
         secondaryColor: values.secondaryColor.trim() || null,
       };
-      if (subdomain) payload.subdomain = subdomain;
 
       const res = await api.patch("/tenants/me/branding", payload);
       trackEvent("workspace_branding_saved");
@@ -367,58 +315,6 @@ export default function TenantBrandingPage() {
                 }
               />
             </Stack>
-            <TextField
-              label="Portal subdomain"
-              value={values.subdomain}
-              onChange={(event) => {
-                setValues((prev) => ({
-                  ...prev,
-                  subdomain: event.target.value,
-                }));
-                setAvailability("");
-              }}
-              inputProps={{ maxLength: 40 }}
-              helperText={
-                branding?.appUrl
-                  ? `Portal URL: ${branding.appUrl}`
-                  : "Your portal URL is configured by the deployment domain settings."
-              }
-              sx={inputSx}
-            />
-            {branding?.appUrl && (
-              <Link
-                href={branding.appUrl}
-                target="_blank"
-                rel="noreferrer"
-                sx={{ width: "fit-content" }}
-              >
-                Open tenant portal
-              </Link>
-            )}
-            <Box>
-              <Button
-                variant="outlined"
-                onClick={checkSubdomain}
-                disabled={!values.subdomain.trim()}
-              >
-                Check availability
-              </Button>
-              {availability && (
-                <Typography
-                  role="status"
-                  variant="body2"
-                  color={
-                    availability.endsWith(" is available.") ||
-                    availability === "This is your current subdomain."
-                      ? "success.main"
-                      : "text.secondary"
-                  }
-                  sx={{ mt: 1 }}
-                >
-                  {availability}
-                </Typography>
-              )}
-            </Box>
           </Stack>
         </Box>
 

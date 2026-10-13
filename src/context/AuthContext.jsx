@@ -7,64 +7,37 @@ import {
   useState,
 } from "react";
 import api, { API_BASE } from "../config/api";
-import { getTenantSubdomain } from "../utils/tenantWorkspace";
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
-const publicBrandingRequests = new Map();
-
-const fetchPublicBranding = (subdomain) => {
-  if (!publicBrandingRequests.has(subdomain)) {
-    publicBrandingRequests.set(
-      subdomain,
-      api
-        .get("/public/tenant-branding", { params: { subdomain } })
-        .then((res) => res.data?.branding || null),
-    );
-  }
-  return publicBrandingRequests.get(subdomain);
-};
+// Mirrors config/authorization.js on the backend. The backend also sends
+// user.permissions, which always wins; this is only a fallback.
+const SCHEDULER_PERMISSIONS = [
+  "schedule.view",
+  "schedule.manage",
+  "coverage.view",
+  "coverage.manage",
+  "staff.view",
+  "staff.manage",
+  "staff.reset_password",
+  "timeoff.review",
+  "messages.manage",
+  "facility_preferences.view",
+  "facility_preferences.manage",
+];
 
 const FALLBACK_SYSTEM_ROLE_PERMISSIONS = {
-  staff: [
-    "schedule.view_own",
-    "schedule.pick_up",
-    "timeoff.request",
-    "shift_swap.use",
-    "messages.use",
-    "preferences.manage_own",
-  ],
-  scheduler: [
+  scheduler: SCHEDULER_PERMISSIONS,
+  // "admin" is the old name for scheduler.
+  admin: SCHEDULER_PERMISSIONS,
+  viewer: [
     "schedule.view",
-    "schedule.manage",
     "coverage.view",
-    "coverage.manage",
     "staff.view",
     "facility_preferences.view",
   ],
-  admin: [
-    "schedule.view",
-    "schedule.manage",
-    "coverage.view",
-    "coverage.manage",
-    "staff.view",
-    "staff.manage",
-    "staff.reset_password",
-    "timeoff.review",
-    "messages.manage",
-    "facility_preferences.manage",
-  ],
   owner: [
-    "schedule.view",
-    "schedule.manage",
-    "coverage.view",
-    "coverage.manage",
-    "staff.view",
-    "staff.manage",
-    "staff.reset_password",
-    "timeoff.review",
-    "messages.manage",
-    "facility_preferences.manage",
+    ...SCHEDULER_PERMISSIONS,
     "billing.view",
     "billing.manage",
     "tenant.settings",
@@ -106,11 +79,9 @@ const normalizePermissions = (user) => {
   );
 
   const roles = normalizeRoles(user);
-  const permissionRoles = roles.some(
+  const permissionRoles = roles.filter(
     (role) => FALLBACK_SYSTEM_ROLE_PERMISSIONS[role],
-  )
-    ? roles.filter((role) => FALLBACK_SYSTEM_ROLE_PERMISSIONS[role])
-    : ["staff"];
+  );
 
   return Array.from(
     new Set([
@@ -155,7 +126,7 @@ const normalizeUser = (user) => {
     ...user,
     roles,
     permissions,
-    role: user.role || roles[0] || "staff",
+    role: user.role || roles[0] || "owner",
   };
 };
 
@@ -163,55 +134,48 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(""); // always string
   const [tenant, setTenant] = useState(null);
-  const [publicBranding, setPublicBranding] = useState(null);
-  const [publicBrandingLoading, setPublicBrandingLoading] = useState(true);
+  // Plan, limits and usage from GET /auth/me.
+  const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  const subdomain = getTenantSubdomain();
 
-  const updatePublicBranding = useCallback((branding) => {
-    if (!branding) return;
-    setPublicBranding({
-      ...branding,
-      logoUrl: branding.logoUrl?.startsWith("/")
-        ? `${API_BASE}${branding.logoUrl}`
-        : branding.logoUrl,
-    });
-  }, []);
+  // Branding just saved on the branding page (shown before the next reload).
+  const [brandingOverride, setBrandingOverride] = useState(null);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!subdomain) {
-      setPublicBranding(null);
-      setPublicBrandingLoading(false);
-      return () => {
-        cancelled = true;
-      };
+  // White-label colors/logo (Organization plan only).
+  const derivedBranding = useMemo(() => {
+    const branding = tenant?.branding;
+    if (!branding || !session?.plan?.features?.includes("branding")) {
+      return null;
     }
-
-    setPublicBrandingLoading(true);
-
-    fetchPublicBranding(subdomain)
-      .then((branding) => {
-        if (cancelled || !branding) return;
-        updatePublicBranding(branding);
-      })
-      .catch(() => {
-        if (!cancelled) setPublicBranding(null);
-      })
-      .finally(() => {
-        if (!cancelled) setPublicBrandingLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
+    return {
+      displayName: branding.displayName || tenant?.name,
+      primaryColor: branding.primaryColor || null,
+      secondaryColor: branding.secondaryColor || null,
+      logoUrl: branding.logoUpdatedAt
+        ? `${API_BASE}/api/v1/public/tenants/${tenant._id}/logo?v=${new Date(branding.logoUpdatedAt).getTime()}`
+        : null,
     };
-  }, [subdomain, updatePublicBranding]);
+  }, [tenant, session]);
+  const publicBranding =
+    derivedBranding && brandingOverride
+      ? {
+          ...derivedBranding,
+          ...brandingOverride,
+          logoUrl: brandingOverride.logoUrl?.startsWith("/")
+            ? `${API_BASE}${brandingOverride.logoUrl}`
+            : brandingOverride.logoUrl || derivedBranding.logoUrl,
+        }
+      : derivedBranding;
+  const publicBrandingLoading = false;
+  const updatePublicBranding = useCallback((branding) => {
+    if (branding) setBrandingOverride(branding);
+  }, []);
 
   const logout = useCallback(() => {
     setUser(null);
     setRole("");
     setTenant(null);
+    setSession(null);
     setFacilityPreferences(null);
     localStorage.removeItem("user");
     localStorage.removeItem("role");
@@ -220,6 +184,56 @@ export const AuthProvider = ({ children }) => {
       delete api.defaults.headers.common["Authorization"];
     } catch (err) {}
   }, []);
+
+  const [facilityPreferences, setFacilityPreferences] = useState(null);
+
+  const fetchFacilityPreferences = useCallback(async () => {
+    try {
+      const res = await api.get("/facility-preferences");
+      setFacilityPreferences(res.data || {});
+      return res.data;
+    } catch (err) {
+      console.error("Failed to fetch facility preferences", err);
+      setFacilityPreferences({});
+      return {};
+    }
+  }, []);
+
+  /**
+   * GET /auth/me (who you are, plan, limits, usage) + GET /tenants/me.
+   * Call after login, after billing changes, and after adding staff.
+   */
+  const loadSession = useCallback(async () => {
+    try {
+      const [meRes, tenantRes] = await Promise.all([
+        api.get("/auth/me"),
+        api.get("/tenants/me"),
+      ]);
+      const me = meRes.data || {};
+      setSession({
+        plan: me.plan || null,
+        paidPlan: me.paidPlan || "free",
+        subscriptionStatus: me.subscriptionStatus || null,
+        trialAvailable: Boolean(me.trialAvailable),
+        trialEndsAt: me.trialEndsAt || null,
+        usage: me.usage || null,
+      });
+      setTenant(tenantRes.data?.tenant || null);
+      if (me.user) {
+        const nextUser = normalizeUser(me.user);
+        setUser(nextUser);
+        localStorage.setItem("user", JSON.stringify(nextUser));
+      }
+      fetchFacilityPreferences();
+      return me;
+    } catch (err) {
+      console.error("Failed to load session", err);
+      // The session is no longer valid (e.g. a staff login from before staff
+      // moved to personal links): sign out instead of showing a broken app.
+      if (err?.response?.status === 401) logout();
+      return null;
+    }
+  }, [fetchFacilityPreferences, logout]);
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
@@ -244,33 +258,32 @@ export const AuthProvider = ({ children }) => {
         const parsedUser = normalizeUser(JSON.parse(savedUser));
         setUser(parsedUser);
         setRole(parsedUser.role || parsedUser.roles?.[0] || "staff"); // ✅ always a string
-        // try to fetch tenant if available
-        if (parsedUser.tenantId) {
-          (async () => {
-            try {
-              const res = await api.get(`/tenants/${parsedUser.tenantId}`);
-              // Normalize: API may return { tenant: {...} } or raw tenant
-              setTenant(res.data?.tenant || res.data || null);
-              await fetchFacilityPreferences();
-            } catch (err) {
-              // swallow — tenant can be fetched later
-              console.error("Failed to fetch tenant in AuthProvider", err);
-            }
-          })();
-        }
+        // Load workspace, plan and usage
+        loadSession();
       } catch (err) {
         console.error("Failed to parse saved user", err);
         logout();
       }
     }
     setLoading(false);
-  }, [logout]);
+  }, [logout, loadSession]);
 
   // Set up axios interceptor: only log out if the token is genuinely expired or missing
   useEffect(() => {
     const interceptor = api.interceptors.response.use(
       (response) => response,
       (error) => {
+        // Plan limits: let the app show the upgrade / free-trial dialog.
+        // Only for actions the user took (not background GETs that load a
+        // page), so a Free workspace isn't nagged on every screen.
+        const method = String(error.config?.method || "get").toLowerCase();
+        if (error.response?.status === 402 && method !== "get") {
+          window.dispatchEvent(
+            new CustomEvent("wisershifts:plan-required", {
+              detail: error.response.data || {},
+            }),
+          );
+        }
         if (error.response?.status === 401) {
           const currentToken = localStorage.getItem("token");
           // Only log out if the token is missing or has actually passed its expiration timestamp
@@ -289,19 +302,6 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {}, [role, user]);
 
-  const [facilityPreferences, setFacilityPreferences] = useState(null);
-
-  const fetchFacilityPreferences = useCallback(async () => {
-    try {
-      const res = await api.get("/facility-preferences");
-      setFacilityPreferences(res.data || {});
-      return res.data;
-    } catch (err) {
-      console.error("Failed to fetch facility preferences", err);
-      setFacilityPreferences({});
-      return {};
-    }
-  }, []);
   const login = useCallback(
     (data) => {
       let userData = null;
@@ -331,21 +331,8 @@ export const AuthProvider = ({ children }) => {
 
       setUser(normalizedUserData);
       setRole(nextRole);
-      // fetch tenant for global state if present
-      if (normalizedUserData && normalizedUserData.tenantId) {
-        (async () => {
-          try {
-            const res = await api.get(
-              `/tenants/${normalizedUserData.tenantId}`,
-            );
-            setTenant(res.data?.tenant || res.data || null);
-            // Also fetch facility preferences on login
-            await fetchFacilityPreferences();
-          } catch (err) {
-            console.error("Failed to fetch tenant after login", err);
-            setTenant(null);
-          }
-        })();
+      if (normalizedUserData) {
+        loadSession();
       } else {
         setTenant(null);
       }
@@ -353,22 +340,15 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("user", JSON.stringify(normalizedUserData));
       localStorage.setItem("role", nextRole);
     },
-    [fetchFacilityPreferences],
+    [loadSession],
   );
 
   // Allow manual refresh of tenant data
   const refreshTenant = useCallback(async () => {
-    if (!user || !user.tenantId) return null;
-    try {
-      const res = await api.get(`/tenants/${user.tenantId}`);
-      const t = res.data?.tenant || res.data || null;
-      setTenant(t);
-      return t;
-    } catch (err) {
-      console.error("Failed to refresh tenant", err);
-      return null;
-    }
-  }, [user]);
+    if (!user) return null;
+    await loadSession();
+    return tenant;
+  }, [user, loadSession, tenant]);
 
   const updateCurrentUser = useCallback((partialUser) => {
     if (!partialUser) return;
@@ -396,8 +376,12 @@ export const AuthProvider = ({ children }) => {
     (permission) => permissions.includes(permission),
     [permissions],
   );
+  const hasFeature = useCallback(
+    (feature) => Boolean(session?.plan?.features?.includes(feature)),
+    [session],
+  );
   const isOwner = hasRole("owner");
-  const isAdmin = hasRole("admin") || isOwner;
+  const isAdmin = hasRole("admin") || hasRole("scheduler") || isOwner;
   const isStaff = Boolean(user) && !isPatient;
 
   const contextValue = useMemo(
@@ -407,6 +391,11 @@ export const AuthProvider = ({ children }) => {
       roles,
       permissions,
       tenant,
+      session,
+      plan: session?.plan || null,
+      usage: session?.usage || null,
+      hasFeature,
+      refreshSession: loadSession,
       publicBranding,
       publicBrandingLoading,
       updatePublicBranding,
@@ -430,6 +419,9 @@ export const AuthProvider = ({ children }) => {
       roles,
       permissions,
       tenant,
+      session,
+      hasFeature,
+      loadSession,
       publicBranding,
       publicBrandingLoading,
       updatePublicBranding,

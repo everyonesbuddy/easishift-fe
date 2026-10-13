@@ -1,206 +1,114 @@
 import { useState } from "react";
 import {
-  Container,
-  Box,
-  TextField,
-  Button,
-  Typography,
   Alert,
-  Paper,
-  MenuItem,
+  Box,
+  Button,
   Checkbox,
+  Container,
   FormControlLabel,
   FormHelperText,
   Link,
+  Paper,
+  TextField,
+  Typography,
 } from "@mui/material";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import api from "../../config/api";
+import { useAuth } from "../../context/AuthContext";
 import { trackEvent } from "../../utils/analytics";
 
 const TERMS_VERSION = "1.0";
 
-const validateEmail = (email) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+const isEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+const browserTimezone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch {
+    return "";
+  }
 };
 
+const fieldSx = {
+  "& .MuiOutlinedInput-root": {
+    "& fieldset": { borderColor: "black" },
+    "&:hover fieldset": { borderColor: "#000000" },
+    "&.Mui-focused fieldset": { borderColor: "#000000" },
+    color: "black",
+  },
+  "& .MuiInputLabel-root": {
+    color: "black",
+    "&.Mui-focused": { color: "#000000" },
+  },
+};
+
+/**
+ * Free signup: your name, your facility, email, password. Everything else
+ * (facility type, shifts, staff) happens in /setup right after.
+ */
 export default function SignupTenant() {
-  const [hospitalName, setHospitalName] = useState("");
-  const [adminName, setAdminName] = useState("");
-  const [adminEmail, setAdminEmail] = useState("");
-  const [adminPassword, setAdminPassword] = useState("");
-  const [tenantPhoneCountryCode, setTenantPhoneCountryCode] = useState("");
-  const [tenantPhone, setTenantPhone] = useState("");
-  const [userPhoneCountryCode, setUserPhoneCountryCode] = useState("");
-  const [userPhone, setUserPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [industry, setIndustry] = useState("");
-  const [error, setError] = useState("");
-  const [hospitalNameError, setHospitalNameError] = useState("");
-  const [adminNameError, setAdminNameError] = useState("");
-  const [addressError, setAddressError] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [emailError, setEmailError] = useState("");
-  const [industryError, setIndustryError] = useState("");
-  const [tenantPhoneError, setTenantPhoneError] = useState("");
-  const [adminPhoneError, setAdminPhoneError] = useState("");
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [termsError, setTermsError] = useState("");
+  const { login } = useAuth();
   const navigate = useNavigate();
+  const [form, setForm] = useState({
+    name: "",
+    facilityName: "",
+    email: "",
+    password: "",
+  });
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [touched, setTouched] = useState(false);
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const phoneCountryCodes = [
-    { code: "+1", label: "US/CA (+1)" },
-    { code: "+44", label: "UK (+44)" },
-    { code: "+234", label: "Nigeria (+234)" },
-    { code: "+353", label: "Ireland (+353)" },
-    { code: "+61", label: "Australia (+61)" },
-    { code: "+64", label: "New Zealand (+64)" },
-    { code: "+27", label: "South Africa (+27)" },
-    { code: "+91", label: "India (+91)" },
-    { code: "+49", label: "Germany (+49)" },
-    { code: "+33", label: "France (+33)" },
-  ];
+  const errors = {
+    name: !form.name.trim() ? "Enter your name" : "",
+    facilityName: !form.facilityName.trim() ? "Enter your facility's name" : "",
+    email: !isEmail(form.email.trim()) ? "Enter a valid email" : "",
+    password: form.password.length < 8 ? "Use at least 8 characters" : "",
+    terms: !termsAccepted ? "Please accept the terms to continue" : "",
+  };
+  const isValid = Object.values(errors).every((value) => !value);
 
-  const industries = [
-    "Healthcare",
-    "Senior Living",
-    "Retail",
-    "Hospitality",
-    "Manufacturing",
-    "Education",
-    "Transportation",
-    "Finance",
-    "Police",
-    "Warehouse and Logistics",
-    "Security Service",
-    "Other",
-  ];
+  const update = (key) => (event) =>
+    setForm((prev) => ({ ...prev, [key]: event.target.value }));
 
-  const hasTenantPhoneCountryCode = Boolean(tenantPhoneCountryCode.trim());
-  const hasTenantPhone = Boolean(tenantPhone.trim());
-  const hasAdminPhoneCountryCode = Boolean(userPhoneCountryCode.trim());
-  const hasAdminPhone = Boolean(userPhone.trim());
-
-  const isFormValid =
-    Boolean(hospitalName.trim()) &&
-    Boolean(address.trim()) &&
-    Boolean(adminName.trim()) &&
-    Boolean(adminPassword.trim()) &&
-    adminPassword.length >= 8 &&
-    validateEmail(adminEmail) &&
-    Boolean(industry) &&
-    hasTenantPhoneCountryCode === hasTenantPhone &&
-    hasAdminPhoneCountryCode === hasAdminPhone &&
-    termsAccepted;
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setTouched(true);
     setError("");
-    setHospitalNameError("");
-    setAdminNameError("");
-    setAddressError("");
-    setPasswordError("");
-    setEmailError("");
-    setIndustryError("");
-    setTenantPhoneError("");
-    setAdminPhoneError("");
-    setTermsError("");
+    if (!isValid) return;
 
-    if (!hospitalName.trim()) {
-      setHospitalNameError("Facility name is required");
-      return;
-    }
-
-    if (!address.trim()) {
-      setAddressError("Facility address is required");
-      return;
-    }
-
-    if (!adminName.trim()) {
-      setAdminNameError("Admin name is required");
-      return;
-    }
-
-    if (!adminPassword.trim()) {
-      setPasswordError("Password is required");
-      return;
-    }
-
-    if (adminPassword.length < 8) {
-      setPasswordError("Password must be at least 8 characters");
-      return;
-    }
-
-    if (hasTenantPhoneCountryCode !== hasTenantPhone) {
-      setTenantPhoneError(
-        "Facility phone and country code must be provided together",
-      );
-      return;
-    }
-
-    if (hasAdminPhoneCountryCode !== hasAdminPhone) {
-      setAdminPhoneError(
-        "Admin phone and country code must be provided together",
-      );
-      return;
-    }
-
-    if (!validateEmail(adminEmail)) {
-      setEmailError("Please enter a valid email address");
-      return;
-    }
-
-    if (!industry) {
-      setIndustryError("Please select an industry");
-      return;
-    }
-
-    if (!termsAccepted) {
-      setTermsError("You must accept the Terms and Conditions to continue");
-      return;
-    }
-
+    setSubmitting(true);
     try {
-      await api.post("/auth/signup/tenant", {
-        name: hospitalName,
-        email: adminEmail,
-        password: adminPassword,
-        tenantPhoneCountryCode,
-        tenantPhone,
-        userPhoneCountryCode,
-        userPhone,
-        address,
-        industry,
-        adminName,
+      const res = await api.post("/auth/signup", {
+        name: form.name.trim(),
+        facilityName: form.facilityName.trim(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        timezone: browserTimezone(),
         termsAccepted: true,
         termsVersion: TERMS_VERSION,
-        termsAcceptedAt: new Date().toISOString(),
       });
-      trackEvent("sign_up", {
-        method: "password",
-        account_type: "organization",
-      });
-      navigate("/login");
+      const token = res.data?.token;
+      if (token) {
+        localStorage.setItem("token", token);
+        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      }
+      login(res.data.user);
+      trackEvent("sign_up", { method: "password" });
+      navigate("/setup");
     } catch (err) {
       console.error("Signup error:", err);
       setError(
-        err.response?.data?.message || "Failed to create tenant. Try again.",
+        err.response?.data?.message ||
+          "Couldn't create your account. Try again.",
       );
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const whiteTextField = {
-    "& .MuiOutlinedInput-root": {
-      "& fieldset": { borderColor: "black" },
-      "&:hover fieldset": { borderColor: "#000000" },
-      "&.Mui-focused fieldset": { borderColor: "#000000" },
-      color: "black",
-    },
-    "& .MuiInputLabel-root": {
-      color: "black",
-      "&.Mui-focused": { color: "#000000" },
-    },
-  };
+  const show = (key) => touched && errors[key];
 
   return (
     <Container maxWidth="sm">
@@ -208,195 +116,69 @@ export default function SignupTenant() {
         elevation={6}
         sx={{
           mt: 8,
+          mb: 6,
           p: 4,
           backgroundColor: "rgba(0,0,0,0.05)",
           borderRadius: 3,
         }}
       >
-        <Box display="flex" flexDirection="column" gap={3}>
-          <Typography
-            variant="h4"
-            align="center"
-            sx={{ color: "black", mb: 2 }}
-          >
-            Sign Up Facility
-          </Typography>
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          noValidate
+          sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
+        >
+          <Box sx={{ textAlign: "center" }}>
+            <Typography variant="h4" sx={{ color: "black", fontWeight: 700 }}>
+              Start free
+            </Typography>
+            <Typography color="text.secondary" sx={{ mt: 1 }}>
+              Free for 1 scheduler and up to 15 staff. No card needed.
+            </Typography>
+          </Box>
 
           {error && <Alert severity="error">{error}</Alert>}
 
           <TextField
-            label="Facility Name"
-            fullWidth
-            value={hospitalName}
-            onChange={(e) => {
-              setHospitalName(e.target.value);
-              setHospitalNameError("");
-            }}
-            error={!!hospitalNameError}
-            helperText={hospitalNameError}
-            variant="outlined"
-            sx={whiteTextField}
+            label="Your name"
+            value={form.name}
+            onChange={update("name")}
+            autoComplete="name"
+            error={Boolean(show("name"))}
+            helperText={show("name") || " "}
+            sx={fieldSx}
             required
           />
-
-          <Box display="flex" gap={2}>
-            <TextField
-              select
-              label="Country Code"
-              value={tenantPhoneCountryCode}
-              onChange={(e) => {
-                setTenantPhoneCountryCode(e.target.value);
-                setTenantPhoneError("");
-              }}
-              error={!!tenantPhoneError}
-              helperText={tenantPhoneError}
-              variant="outlined"
-              sx={{ ...whiteTextField, minWidth: 160 }}
-            >
-              <MenuItem value="">Select</MenuItem>
-              {phoneCountryCodes.map((item) => (
-                <MenuItem key={item.code} value={item.code}>
-                  {item.label}
-                </MenuItem>
-              ))}
-            </TextField>
-
-            <TextField
-              label="Facility Phone"
-              fullWidth
-              value={tenantPhone}
-              onChange={(e) => {
-                setTenantPhone(e.target.value);
-                setTenantPhoneError("");
-              }}
-              error={!!tenantPhoneError}
-              variant="outlined"
-              sx={whiteTextField}
-            />
-          </Box>
-
           <TextField
-            label="Facility Address"
-            fullWidth
-            value={address}
-            onChange={(e) => {
-              setAddress(e.target.value);
-              setAddressError("");
-            }}
-            error={!!addressError}
-            helperText={addressError}
-            variant="outlined"
-            sx={whiteTextField}
+            label="Facility name"
+            value={form.facilityName}
+            onChange={update("facilityName")}
+            autoComplete="organization"
+            error={Boolean(show("facilityName"))}
+            helperText={show("facilityName") || " "}
+            sx={fieldSx}
             required
           />
-
           <TextField
-            select
-            label="Industry"
-            fullWidth
-            value={industry}
-            onChange={(e) => {
-              setIndustry(e.target.value);
-              setIndustryError("");
-            }}
-            error={!!industryError}
-            helperText={industryError}
-            variant="outlined"
-            sx={whiteTextField}
-            required
-          >
-            <MenuItem value="">Select Industry</MenuItem>
-            {industries.map((item) => (
-              <MenuItem key={item} value={item}>
-                {item}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <Typography variant="h6" sx={{ color: "black" }}>
-            Admin Info
-          </Typography>
-
-          <TextField
-            label="Admin Name"
-            fullWidth
-            value={adminName}
-            onChange={(e) => {
-              setAdminName(e.target.value);
-              setAdminNameError("");
-            }}
-            error={!!adminNameError}
-            helperText={adminNameError}
-            variant="outlined"
-            sx={whiteTextField}
-            required
-          />
-
-          <Box display="flex" gap={2}>
-            <TextField
-              select
-              label="Country Code"
-              value={userPhoneCountryCode}
-              onChange={(e) => {
-                setUserPhoneCountryCode(e.target.value);
-                setAdminPhoneError("");
-              }}
-              error={!!adminPhoneError}
-              helperText={adminPhoneError}
-              variant="outlined"
-              sx={{ ...whiteTextField, minWidth: 160 }}
-            >
-              <MenuItem value="">Select</MenuItem>
-              {phoneCountryCodes.map((item) => (
-                <MenuItem key={item.code} value={item.code}>
-                  {item.label}
-                </MenuItem>
-              ))}
-            </TextField>
-
-            <TextField
-              label="Admin Phone"
-              fullWidth
-              value={userPhone}
-              onChange={(e) => {
-                setUserPhone(e.target.value);
-                setAdminPhoneError("");
-              }}
-              error={!!adminPhoneError}
-              variant="outlined"
-              sx={whiteTextField}
-            />
-          </Box>
-
-          <TextField
-            label="Admin Email"
+            label="Work email"
             type="email"
-            fullWidth
-            value={adminEmail}
-            onChange={(e) => {
-              setAdminEmail(e.target.value);
-              setEmailError("");
-            }}
-            error={!!emailError}
-            helperText={emailError}
-            variant="outlined"
-            sx={whiteTextField}
+            value={form.email}
+            onChange={update("email")}
+            autoComplete="email"
+            error={Boolean(show("email"))}
+            helperText={show("email") || " "}
+            sx={fieldSx}
             required
           />
-
           <TextField
             label="Password"
             type="password"
-            fullWidth
-            value={adminPassword}
-            onChange={(e) => {
-              setAdminPassword(e.target.value);
-              setPasswordError("");
-            }}
-            error={!!passwordError}
-            helperText={passwordError}
-            variant="outlined"
-            sx={whiteTextField}
+            value={form.password}
+            onChange={update("password")}
+            autoComplete="new-password"
+            error={Boolean(show("password"))}
+            helperText={show("password") || "At least 8 characters"}
+            sx={fieldSx}
             required
           />
 
@@ -405,10 +187,7 @@ export default function SignupTenant() {
               control={
                 <Checkbox
                   checked={termsAccepted}
-                  onChange={(e) => {
-                    setTermsAccepted(e.target.checked);
-                    setTermsError("");
-                  }}
+                  onChange={(event) => setTermsAccepted(event.target.checked)}
                   sx={{ color: "black", "&.Mui-checked": { color: "black" } }}
                 />
               }
@@ -444,29 +223,28 @@ export default function SignupTenant() {
                 </Typography>
               }
             />
-            {termsError && (
+            {show("terms") && (
               <FormHelperText error sx={{ ml: 1.75 }}>
-                {termsError}
+                {errors.terms}
               </FormHelperText>
             )}
           </Box>
 
           <Button
+            type="submit"
             variant="contained"
-            onClick={handleSubmit}
-            disabled={!isFormValid}
-            sx={{
-              mt: 2,
-              py: 1.5,
-              bgcolor: "#42a5f5",
-              "&:hover": { bgcolor: "#1e88e5" },
-              color: "white",
-              fontWeight: 600,
-              borderRadius: 999,
-            }}
+            disabled={submitting}
+            sx={{ py: 1.4, fontWeight: 600, borderRadius: 999 }}
           >
-            Create Facility
+            {submitting ? "Creating your workspace…" : "Create free account"}
           </Button>
+
+          <Typography variant="body2" align="center" sx={{ color: "black" }}>
+            Already have an account?{" "}
+            <Link component={RouterLink} to="/login">
+              Log in
+            </Link>
+          </Typography>
         </Box>
       </Paper>
     </Container>

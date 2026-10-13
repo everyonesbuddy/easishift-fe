@@ -1,67 +1,55 @@
-// Shared plan metadata/helpers for Paywall.jsx and ManageSubscription.jsx.
-// Pricing/availability itself always comes from GET /stripe/plans; this file
-// only supplies presentation details the backend doesn't send (labels,
-// highlight flag, support tier, shared feature list).
+// Presentation details for the plans. Limits, prices and what the workspace
+// is on always come from GET /stripe/plans (backend config/plans.js).
 
-export const SHARED_FEATURE_LIST = [
-  "Automated scheduling",
-  "Shift swaps",
-  "Time-off management",
-  "Internal messaging",
-  "Coverage planning",
-  "Staff directory",
-];
-
-const PLAN_FAMILY_METADATA = {
-  starter: { highlight: false, supportTier: "standard" },
-  growth: { highlight: true, supportTier: "standard" },
-  premium: { highlight: false, supportTier: "priority" },
+export const PLAN_FEATURES = {
+  free: [
+    "1 scheduler, up to 15 staff",
+    "Staffing template and weekly schedule",
+    "Publish by email, one message per person",
+    "Staff personal links (no app, no login)",
+    "Time-off requests",
+  ],
+  pro: [
+    "3 schedulers, up to 75 staff",
+    "Text the schedule to everyone",
+    "Shift swaps and open-shift pickup",
+    "Fill call-outs by text: first YES gets it",
+    "Shift reminders and CSV import",
+  ],
+  facility: [
+    "10 schedulers, up to 200 staff",
+    "Auto-fill the week",
+    "Time clock with location check",
+    "Timesheets and payroll export",
+    "Messaging and dashboard",
+  ],
+  organization: [
+    "Multiple facilities",
+    "White-label branding",
+    "Custom limits and onboarding",
+  ],
 };
 
-// "starterMonthly" / "growthYearly" -> "starter" / "growth"
-export const getPlanFamily = (planKey) =>
-  String(planKey || "")
-    .replace(/(Monthly|Yearly)$/i, "")
-    .toLowerCase();
-
-export const getPlanMetadata = (planKey) =>
-  PLAN_FAMILY_METADATA[getPlanFamily(planKey)] || {
-    highlight: false,
-    supportTier: "standard",
-  };
-
-export const ENTERPRISE_PLAN = {
-  planKey: "enterprise",
-  name: "Enterprise",
-  seats: "150+",
-  supportTier: "priority",
-  highlight: false,
-  isEnterprise: true,
+export const PLAN_TAGLINES = {
+  free: "For one scheduler getting off spreadsheets",
+  pro: "Everything staff need from their phone",
+  facility: "Run the whole facility's time and pay",
+  organization: "For groups with several facilities",
 };
 
-export const getSupportLabel = (plan) =>
-  plan.supportTier === "priority" ? "Priority support" : "Standard support";
-
-export const getCapacityLabel = (plan) =>
-  plan.isEnterprise
-    ? `${plan.seats} active employees`
-    : `Up to ${plan.seats} active employees`;
-
-export const formatPriceLabel = (priceCents, interval) => {
-  const amount = Math.round((Number(priceCents) || 0) / 100);
-  return `$${amount.toLocaleString()}/${interval === "month" ? "mo" : "yr"}`;
+export const formatPrice = (cents, interval) => {
+  if (cents === null || cents === undefined) return "Custom";
+  const dollars = Math.round(Number(cents) / 100);
+  return `$${dollars.toLocaleString()}/${interval === "year" ? "yr" : "mo"}`;
 };
 
-export const formatBillingCadenceNote = (priceCents, interval) => {
-  if (interval === "month") return "Billed monthly";
-  const monthlyEquivalent = Math.round((Number(priceCents) || 0) / 100 / 12);
-  return `Equivalent to $${monthlyEquivalent}/mo billed annually`;
-};
+export const formatLimit = (value, noun) =>
+  value === null || value === undefined ? `Unlimited ${noun}` : `${value} ${noun}`;
 
-// Merges a raw plan entry from GET /stripe/plans with local display metadata.
-export const decoratePlan = (plan) => ({
-  ...plan,
-  ...getPlanMetadata(plan.planKey),
-  priceLabel: formatPriceLabel(plan.priceCents, plan.interval),
-  cadenceNote: formatBillingCadenceNote(plan.priceCents, plan.interval),
-});
+export const daysLeft = (isoDate) => {
+  if (!isoDate) return 0;
+  return Math.max(
+    0,
+    Math.ceil((new Date(isoDate).getTime() - Date.now()) / 86400000),
+  );
+};

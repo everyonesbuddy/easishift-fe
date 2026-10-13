@@ -21,7 +21,8 @@ import Sidebar from "./components/Shared/Sidebar";
 import HowToUsePage from "./components/Shared/HowToUsePage";
 import GuideTourOverlay from "./components/Shared/GuideTourOverlay";
 import AnalyticsTracker from "./components/Shared/AnalyticsTracker";
-import Paywall from "./components/StaffPortal/Dashboard/Paywall";
+import UpgradeDialog from "./components/Shared/UpgradeDialog";
+import SetupPage from "./components/StaffPortal/Setup/SetupPage";
 import ManageSubscription from "./components/StaffPortal/Billing/ManageSubscription";
 import BillingSuccess from "./components/StaffPortal/Billing/BillingSuccess";
 import BillingCancel from "./components/StaffPortal/Billing/BillingCancel";
@@ -44,7 +45,7 @@ import { useAuth } from "./context/AuthContext";
 import { useMemo, useState } from "react";
 
 export default function App() {
-  const { user, tenant, can, publicBranding } = useAuth();
+  const { user, publicBranding } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const primaryColor = publicBranding?.primaryColor || "#2563eb";
   const secondaryColor = publicBranding?.secondaryColor || "#1e40af";
@@ -70,33 +71,6 @@ export default function App() {
       }),
     [primaryColor, secondaryColor],
   );
-  const hasPaywallExemptStatus =
-    tenant && ["active", "trialing"].includes(tenant.subscriptionStatus);
-
-  const showPaywall =
-    can("billing.manage") &&
-    tenant &&
-    (!hasPaywallExemptStatus || (tenant.seatLimit && tenant.seatLimit <= 1));
-
-  // Billing-only mode for admins with inactive/limited tenant
-  if (user && showPaywall) {
-    return (
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <BrowserRouter>
-          <AnalyticsTracker />
-          <Box sx={{ marginLeft: 0 }}>
-            <Navbar />
-            <Routes>
-              <Route path="/billing" element={<Paywall tenant={tenant} />} />
-              <Route path="*" element={<Navigate to="/billing" replace />} />
-            </Routes>
-          </Box>
-        </BrowserRouter>
-      </ThemeProvider>
-    );
-  }
-
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -119,13 +93,7 @@ export default function App() {
             <Route
               path="/"
               element={
-                user ? (
-                  <Navigate to="/dashboard" replace />
-                ) : publicBranding ? (
-                  <Navigate to="/login" replace />
-                ) : (
-                  <Home />
-                )
+                user ? <Navigate to="/dashboard" replace /> : <Home />
               }
             />
             <Route path="/pricing" element={<PricingPage />} />
@@ -168,6 +136,15 @@ export default function App() {
               path="/signup-tenant"
               element={
                 user ? <Navigate to="/dashboard" replace /> : <SignupTenant />
+              }
+            />
+            <Route path="/signup" element={<Navigate to="/signup-tenant" replace />} />
+            <Route
+              path="/setup"
+              element={
+                <PrivateRoute>
+                  <SetupPage />
+                </PrivateRoute>
               }
             />
             <Route path="/billing" element={<ManageSubscription />} />
@@ -288,6 +265,7 @@ export default function App() {
           </Routes>
           <ToastContainer />
           <GuideTourOverlay />
+          {user && <UpgradeDialog />}
         </Box>
       </BrowserRouter>
     </ThemeProvider>

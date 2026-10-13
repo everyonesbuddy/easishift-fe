@@ -26,7 +26,6 @@ import {
 } from "react-icons/fi";
 import logo from "../../assets/logos/wiserShifts-logo-light.svg";
 import { getRoleDisplayName } from "../../constants/industryRoles";
-import { isRootWorkspaceHost } from "../../utils/tenantWorkspace";
 
 export default function Navbar({ onMobileOpen }) {
   const { user, logout, roles, publicBranding } = useAuth();
@@ -61,7 +60,7 @@ export default function Navbar({ onMobileOpen }) {
     setMobileMenuAnchor(null);
   };
 
-  if (!user && isRootWorkspaceHost() && window.location.pathname === "/login") {
+  if (!user && window.location.pathname === "/login") {
     return (
       <AppBar
         position="sticky"

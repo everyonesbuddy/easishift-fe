@@ -184,9 +184,11 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
     const lineMap = new Map();
     const map = new Map();
     for (const row of coverage) {
-      const lineKey = [row.shiftType, row.shiftTag, row.role, row.unitArea || ""].join("|");
+      // Older coverage may lack shiftType/shiftTag; group those by their time.
+      const timeKey = row.shiftType ? "" : `${new Date(row.startTime).getHours()}:${new Date(row.startTime).getMinutes()}`;
+      const lineKey = [row.shiftType || "", row.shiftTag || timeKey, row.role || "", row.unitArea || ""].join("|");
       if (!lineMap.has(lineKey)) {
-        const label = slotLabel(facilityPreferences, row.shiftType, row.shiftTag);
+        const label = slotLabel(facilityPreferences, row.shiftType, row.shiftTag, row);
         lineMap.set(lineKey, {
           key: lineKey,
           shiftType: row.shiftType,
@@ -214,9 +216,9 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
     }
     const sorted = [...lineMap.values()].sort(
       (a, b) =>
-        a.label.start.localeCompare(b.label.start) ||
-        a.shiftType.localeCompare(b.shiftType) ||
-        a.role.localeCompare(b.role) ||
+        String(a.label.start || "").localeCompare(String(b.label.start || "")) ||
+        String(a.shiftType || "").localeCompare(String(b.shiftType || "")) ||
+        String(a.role || "").localeCompare(String(b.role || "")) ||
         String(a.unitArea || "").localeCompare(String(b.unitArea || "")),
     );
     return { lines: sorted, byKey: map, peopleByCoverage: people, callOutsByCoverage: outs };
@@ -251,7 +253,7 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
   // Group lines under their shift for a quiet section header.
   const groups = [];
   for (const line of lines) {
-    const groupKey = `${line.shiftType}|${line.shiftTag}`;
+    const groupKey = `${line.shiftType || ""}|${line.shiftType ? line.shiftTag : line.label.time}`;
     const last = groups[groups.length - 1];
     if (last && last.key === groupKey) last.lines.push(line);
     else groups.push({ key: groupKey, label: line.label, lines: [line] });

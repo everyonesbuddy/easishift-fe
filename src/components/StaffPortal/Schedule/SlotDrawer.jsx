@@ -81,7 +81,7 @@ export default function SlotDrawer({ open, row, weekStart, people, canEdit, onCl
 
   if (!row) return <Drawer anchor="right" open={false} onClose={onClose} />;
 
-  const label = slotLabel(facilityPreferences, row.shiftType, row.shiftTag);
+  const label = slotLabel(facilityPreferences, row.shiftType, row.shiftTag, row);
   const color = roleColor(row.role, facilityPreferences?.roleFamilies);
   const date = new Date(row.startTime);
   const isPast = new Date(row.endTime).getTime() < Date.now();

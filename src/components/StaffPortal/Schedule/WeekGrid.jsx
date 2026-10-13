@@ -1,6 +1,19 @@
 import { useMemo, useState } from "react";
-import { Box, Button, IconButton, Tooltip, Typography } from "@mui/material";
-import { FiPlus } from "react-icons/fi";
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import { FiPlus, FiZap } from "react-icons/fi";
+import { toast } from "react-toastify";
+import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 import { getRoleDisplayName } from "../../../constants/industryRoles";
 import SlotDrawer from "./SlotDrawer";
@@ -173,6 +186,8 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
   const canEdit = can("schedule.manage");
   const [openRowId, setOpenRowId] = useState(null);
   const [addFor, setAddFor] = useState(null); // { date, shiftType, shiftTag, role, unitArea } | {}
+  const [autoFillOpen, setAutoFillOpen] = useState(false);
+  const [autoFilling, setAutoFilling] = useState(false);
 
   const data = week?.data;
   const weekStart = week?.weekStart;
@@ -262,6 +277,33 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
   const columns = `minmax(180px, 1.15fr) repeat(${days.length || 7}, minmax(112px, 1fr))`;
   const roleList = facilityPreferences?.roleFamilies || [];
   const totalOpen = dayTotals.reduce((sum, t) => sum + (t.needed - t.filled), 0);
+  const fillableOpen = dayTotals.reduce((sum, t, i) => sum + (days[i] >= today ? t.needed - t.filled : 0), 0);
+  const isPublished = data?.week?.status === "published";
+
+  const runAutoFill = async () => {
+    setAutoFilling(true);
+    try {
+      const res = await api.post(`/weeks/${weekStart}/auto-fill`, {});
+      const { filled = 0, stillOpen = 0, notified = 0 } = res.data || {};
+      setAutoFillOpen(false);
+      if (!filled) {
+        toast.info(stillOpen ? "Nobody available for the open slots. Try the slot panel to see why." : "Nothing open to fill.");
+      } else {
+        const parts = [`Filled ${filled} slot${filled === 1 ? "" : "s"}`];
+        if (isPublished) parts.push(`${notified} ${notified === 1 ? "person" : "people"} told`);
+        else parts.push("not sent yet");
+        if (stillOpen) parts.push(`${stillOpen} still open`);
+        toast.success(`${parts.join(", ")}.`);
+      }
+      onChanged?.();
+    } catch (err) {
+      setAutoFillOpen(false);
+      // 402 (plan) opens the upgrade dialog on its own.
+      if (err?.response?.status !== 402) toast.error(err?.response?.data?.message || "Couldn't auto-fill");
+    } finally {
+      setAutoFilling(false);
+    }
+  };
 
   return (
     <Box sx={{ mt: 2 }}>
@@ -272,6 +314,16 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
           <Legend kind="open" label="Open" />
         </Box>
         {canEdit && (
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+          <Button
+            size="small"
+            startIcon={<FiZap />}
+            disabled={fillableOpen === 0}
+            onClick={() => setAutoFillOpen(true)}
+            sx={{ borderRadius: "10px", px: 1.5, color: "#fff", bgcolor: IOS.blue, "&:hover": { bgcolor: "#0066DB" }, "&.Mui-disabled": { bgcolor: IOS.fill, color: IOS.tertiary } }}
+          >
+            Auto-fill open slots
+          </Button>
           <Button
             size="small"
             startIcon={<FiPlus />}
@@ -280,6 +332,7 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
           >
             Add a one-off need
           </Button>
+          </Box>
         )}
       </Box>
 
@@ -467,6 +520,34 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
         onChanged={onChanged}
         onCallOut={onCallOut}
       />
+
+      <Dialog open={autoFillOpen} onClose={() => !autoFilling && setAutoFillOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
+        <DialogTitle sx={{ fontWeight: 700 }}>Auto-fill {fillableOpen} open slot{fillableOpen === 1 ? "" : "s"}?</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: IOS.secondary, lineHeight: 1.6 }}>
+            We'll put the best available people on each open slot: right role, area and certifications, not on time off,
+            no double-booking, and work shared out fairly.
+          </Typography>
+          <Typography sx={{ color: IOS.ink, lineHeight: 1.6, mt: 1.5, fontWeight: 600 }}>
+            {isPublished
+              ? "This week is already published, so each person added gets a text or email right away."
+              : "They'll show as Not sent yet. Nobody is told until you publish the week, and you can change anyone first."}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setAutoFillOpen(false)} disabled={autoFilling} sx={{ borderRadius: "10px" }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={runAutoFill}
+            disabled={autoFilling}
+            startIcon={autoFilling ? <CircularProgress size={14} color="inherit" /> : <FiZap />}
+            sx={{ borderRadius: "10px", px: 2, color: "#fff", bgcolor: IOS.blue, "&:hover": { bgcolor: "#0066DB" } }}
+          >
+            {autoFilling ? "Filling…" : "Auto-fill"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <AddNeedDialog
         open={Boolean(addFor)}

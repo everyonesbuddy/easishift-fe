@@ -38,7 +38,6 @@ import MessageList from "./components/StaffPortal/Messages/MessageList";
 import TimeOffDecision from "./components/StaffPortal/TimeOff/TimeOffDecision";
 import FacilityPreferencesPage from "./components/StaffPortal/FacilityPreferences/FacilityPreferencesPage";
 import TenantBrandingPage from "./components/StaffPortal/FacilityPreferences/TenantBrandingPage";
-import CoveragePlanningPage from "./components/StaffPortal/Coverage/CoveragePlanningPage";
 import TimeTrackingPage from "./components/StaffPortal/TimeTracking/TimeTrackingPage";
 import PayrollExportsPage from "./components/StaffPortal/Exports/PayrollExportsPage";
 import { ToastContainer } from "react-toastify";
@@ -177,13 +176,10 @@ export default function App() {
                 </PrivateRoute>
               }
             />
+            {/* Needs now live on the schedule's week grid. */}
             <Route
               path="/coverage-planning"
-              element={
-                <PrivateRoute>
-                  <CoveragePlanningPage />
-                </PrivateRoute>
-              }
+              element={<Navigate to="/schedule" replace />}
             />
             <Route
               path="/schedule"

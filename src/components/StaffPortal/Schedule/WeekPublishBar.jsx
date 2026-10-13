@@ -59,7 +59,7 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
  * and the Publish button. Opening a week fills its open slots from the
  * staffing template.
  */
-export default function WeekPublishBar({ refreshKey, onChanged }) {
+export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
   const navigate = useNavigate();
   const { refreshSession } = useAuth();
   const [weekStart, setWeekStart] = useState(null);
@@ -69,6 +69,11 @@ export default function WeekPublishBar({ refreshKey, onChanged }) {
   const [publishing, setPublishing] = useState(false);
   const [result, setResult] = useState(null);
   const lastLoadedWeek = useRef(null);
+  const onDataRef = useRef(onData);
+  const loadWeekRef = useRef(null);
+  useEffect(() => {
+    onDataRef.current = onData;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -87,12 +92,22 @@ export default function WeekPublishBar({ refreshKey, onChanged }) {
     try {
       const res = await api.get(`/weeks/${key}`);
       setData(res.data);
+      // Share the week with the grid so it isn't fetched twice.
+      onDataRef.current?.({
+        weekStart: key,
+        data: res.data,
+        reload: () => loadWeekRef.current?.(key),
+      });
     } catch (err) {
       console.error("Failed to load week", err);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    loadWeekRef.current = loadWeek;
+  }, [loadWeek]);
 
   useEffect(() => {
     if (!weekStart) return;

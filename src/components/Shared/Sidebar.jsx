@@ -20,7 +20,6 @@ import {
   MdSchedule,
   MdMessage,
   MdSettings,
-  MdAssignment,
   MdSwapHoriz,
   MdAccountCircle,
   MdMoreVert,
@@ -66,12 +65,6 @@ function Sidebar({ mobileOpen, onMobileClose }) {
             icon: MdTune,
             label: "Weekly Needs",
             to: "/staffing-template",
-          },
-          {
-            id: "coverage",
-            icon: MdAssignment,
-            label: "Coverage Planning",
-            to: "/coverage-planning",
           },
         ]
       : []),

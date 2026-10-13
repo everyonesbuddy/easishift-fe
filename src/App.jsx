@@ -30,6 +30,8 @@ import ScheduleList from "./components/StaffPortal/Schedule/ScheduleList";
 import ShiftSwapRequestsPage from "./components/StaffPortal/Schedule/ShiftSwapRequestsPage";
 import StaffList from "./components/StaffPortal/Staffs/StaffList";
 import MembersPage from "./components/StaffPortal/Members/MembersPage";
+import FitToPlanPage from "./components/StaffPortal/Billing/FitToPlanPage";
+import PlanBanner from "./components/Shared/PlanBanner";
 import StaffLinkPage from "./components/StaffLink/StaffLinkPage";
 import StaffingTemplatePage from "./components/StaffPortal/Coverage/StaffingTemplatePage";
 import MessageList from "./components/StaffPortal/Messages/MessageList";
@@ -96,6 +98,7 @@ export default function App() {
           {!isStaffLink && (
             <Navbar onMobileOpen={() => setMobileOpen(true)} />
           )}
+          {showAppChrome && <PlanBanner />}
           <Routes>
             <Route
               path="/"
@@ -157,6 +160,14 @@ export default function App() {
             />
             <Route path="/billing" element={<ManageSubscription />} />
             <Route path="/billing/success" element={<BillingSuccess />} />
+            <Route
+              path="/billing/keep"
+              element={
+                <PrivateRoute>
+                  <FitToPlanPage />
+                </PrivateRoute>
+              }
+            />
             <Route path="/billing/cancel" element={<BillingCancel />} />
             <Route
               path="/dashboard"

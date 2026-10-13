@@ -12,25 +12,31 @@ import { toast } from "react-toastify";
 import api from "../../config/api";
 import { useAuth } from "../../context/AuthContext";
 import { trackEvent } from "../../utils/analytics";
-
-const PLAN_LABELS = { pro: "Pro", facility: "Facility", organization: "Organization" };
+import { planLabel } from "../../config/billingPlans";
 
 const FEATURE_COPY = {
   sms: "Texting the schedule",
   swaps: "Shift swaps",
   pickup: "Open-shift pickup",
   calloutText: "Filling call-outs by text",
-  import: "CSV import",
+  import: "Spreadsheet import",
   reminders: "Shift reminders",
-  autoFill: "Auto-fill",
+  autoFill: "Automated scheduling",
   timeClock: "The time clock",
   timesheets: "Timesheets and payroll export",
   messaging: "Messaging",
   dashboard: "The dashboard",
-  branding: "White-label branding",
+  branding: "Your branding",
+  prioritySupport: "Priority support",
 };
 
 const describe = (detail) => {
+  if (detail.errorCode === "SCHEDULER_READ_ONLY") {
+    return {
+      title: "You can look, but not change things right now",
+      body: "This workspace has more schedulers than its plan allows, so only the owner can make changes. Ask the owner to upgrade or choose who stays a scheduler.",
+    };
+  }
   if (detail.errorCode === "PLAN_LIMIT_REACHED") {
     const noun = detail.kind === "schedulers" ? "schedulers" : "staff";
     return {
@@ -41,22 +47,23 @@ const describe = (detail) => {
   if (detail.errorCode === "OVER_PLAN_LIMIT") {
     return {
       title: "Publishing is paused",
-      body: detail.message,
+      body: "You have more staff or schedulers than your plan allows. Upgrade, or choose who to keep on your plan. Nothing has been deleted, and published weeks keep working.",
+      fit: true,
     };
   }
   const feature = FEATURE_COPY[detail.feature] || "This";
-  const plan = PLAN_LABELS[detail.requiredPlan] || "a paid";
+  const plan = planLabel(detail.requiredPlan);
   return {
     title: `${feature} is on the ${plan} plan`,
     body: detail.trialAvailable
-      ? `Try ${plan === "Pro" ? "it" : "Pro"} free for 14 days, no card needed. Your data stays if you don't upgrade.`
+      ? "Try Starter free for 14 days, no card needed. If you don't upgrade, you go back to Free and nothing is deleted."
       : `Upgrade to ${plan} to use it.`,
   };
 };
 
 /**
  * Shows when the API answers 402 (feature not on this plan, or a limit).
- * Offers the one-time free Pro trial when the backend says it's available.
+ * Offers the one-time free Starter trial when the backend says it's available.
  */
 export default function UpgradeDialog() {
   const { can, refreshSession } = useAuth();
@@ -72,7 +79,7 @@ export default function UpgradeDialog() {
   }, []);
 
   if (!detail) return null;
-  const { title, body } = describe(detail);
+  const { title, body, fit } = describe(detail);
   const canBuy = can("billing.manage");
   const close = () => setDetail(null);
 
@@ -82,7 +89,7 @@ export default function UpgradeDialog() {
       await api.post("/billing/start-trial");
       trackEvent("trial_started");
       await refreshSession?.();
-      toast.success("Your 14-day Pro trial has started. Try that again.");
+      toast.success("Your 14-day Starter trial has started. Try that again.");
       close();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Couldn't start the trial");
@@ -106,7 +113,18 @@ export default function UpgradeDialog() {
         <Button onClick={close}>Not now</Button>
         {canBuy && detail.trialAvailable && (
           <Button variant="outlined" onClick={startTrial} disabled={starting}>
-            {starting ? "Starting…" : "Try Pro free for 14 days"}
+            {starting ? "Starting…" : "Try Starter free for 14 days"}
+          </Button>
+        )}
+        {canBuy && fit && (
+          <Button
+            variant="outlined"
+            onClick={() => {
+              close();
+              navigate("/billing/keep");
+            }}
+          >
+            Choose who to keep
           </Button>
         )}
         {canBuy && (

@@ -407,6 +407,40 @@ export default function PricingPage() {
             ))}
           </Box>
 
+          <Box
+            sx={{
+              mt: 2.5,
+              p: { xs: 2.5, md: 3 },
+              borderRadius: 3,
+              border: "1px solid rgba(15, 23, 42, 0.1)",
+              bgcolor: "#F8FAFC",
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+              alignItems: { md: "center" },
+              justifyContent: "space-between",
+              gap: 2,
+            }}
+          >
+            <Box>
+              <Typography sx={{ fontWeight: 900, fontSize: "1.15rem" }}>
+                Not ready for a facility plan? Start free.
+              </Typography>
+              <Typography sx={{ color: "text.secondary", maxWidth: 720 }}>
+                Free for one scheduler and up to 15 staff: weekly needs, the week
+                schedule, publish by email, staff links and time off. No card.
+                Try Starter free for 14 days whenever you want.
+              </Typography>
+            </Box>
+            <Button
+              component={RouterLink}
+              to="/signup-tenant"
+              variant="contained"
+              sx={{ borderRadius: 999, fontWeight: 800, textTransform: "none", px: 3, py: 1.2, flexShrink: 0 }}
+            >
+              Start free
+            </Button>
+          </Box>
+
           <Typography
             sx={{
               mt: 4,

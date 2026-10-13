@@ -36,7 +36,7 @@ const shiftLabel = (schedule) => {
 
 /**
  * Scheduler marks someone out, then fills the gap: text everyone eligible
- * (first YES wins, Pro) or assign a specific person.
+ * (first YES wins, paid plans) or assign a specific person.
  */
 export default function CallOutDialog({ open, schedule, onClose, onChanged }) {
   const { hasFeature } = useAuth();
@@ -172,7 +172,7 @@ export default function CallOutDialog({ open, schedule, onClose, onChanged }) {
                     Text {eligible.length} eligible{" "}
                     {eligible.length === 1 ? "person" : "people"}. First YES gets it
                     {!canText && (
-                      <Chip size="small" label="Pro" sx={{ ml: 1, bgcolor: "#fff" }} />
+                      <Chip size="small" label="Starter" sx={{ ml: 1, bgcolor: "#fff" }} />
                     )}
                   </Button>
                   <Typography variant="caption" color="text.secondary">

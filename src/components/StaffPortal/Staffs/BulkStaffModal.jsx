@@ -272,7 +272,7 @@ export default function BulkStaffModal({ open, onClose, onSuccess }) {
             label={
               <Box display="flex" alignItems="center" gap={1}>
                 Import a spreadsheet
-                {!canImportFile && <Chip size="small" label="Pro" />}
+                {!canImportFile && <Chip size="small" label="Starter" />}
               </Box>
             }
           />
@@ -308,7 +308,7 @@ export default function BulkStaffModal({ open, onClose, onSuccess }) {
               role (a phone or an email is enough). Common column names like
               "Mobile" or "Position" work too. Maximum {MAX_ROWS} rows.
               {!canImportFile &&
-                " Spreadsheet import is on Pro; pasting a list is free."}
+                " Spreadsheet import is on Starter and up; pasting a list is free."}
             </Alert>
 
             <Box

@@ -2,7 +2,8 @@
 export const NOT_SENT_REASONS = {
   no_contact: "no phone or email on file",
   opted_out: "replied STOP to texts",
-  sms_needs_pro: "phone only; texting is on Pro",
+  sms_needs_upgrade: "phone only; texting is on paid plans",
+  sms_needs_pro: "phone only; texting is on paid plans",
   awaiting_opt_in: "hasn't replied START to our opt-in text yet",
   notifications_off: "turned notifications off",
   send_failed: "the message failed to send",

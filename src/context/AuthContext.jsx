@@ -215,8 +215,13 @@ export const AuthProvider = ({ children }) => {
         paidPlan: me.paidPlan || "free",
         subscriptionStatus: me.subscriptionStatus || null,
         trialAvailable: Boolean(me.trialAvailable),
+        trialPlan: me.trialPlan || "starter",
         trialEndsAt: me.trialEndsAt || null,
         usage: me.usage || null,
+        // Over the scheduler limit: non-owner schedulers can only look.
+        readOnlyReason: me.readOnlyReason || null,
+        // One week can still be published right after a trial ends.
+        grace: me.grace || null,
       });
       setTenant(tenantRes.data?.tenant || null);
       if (me.user) {

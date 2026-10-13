@@ -66,6 +66,7 @@ import {
   FiX,
   FiFilter,
   FiUserX,
+  FiGrid,
 } from "react-icons/fi";
 import { MdDragIndicator } from "react-icons/md";
 import { jsPDF } from "jspdf";
@@ -76,6 +77,7 @@ import AutoGenerateScheduleForm from "./AutoGenerateScheduleForm";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import ShiftSwapRequestModal from "./ShiftSwapRequestModal";
 import WeekPublishBar from "./WeekPublishBar";
+import WeekGrid from "./WeekGrid";
 import CallOutDialog from "./CallOutDialog";
 import { useAuth } from "../../../context/AuthContext";
 import { getPunchLocation } from "../../../utils/geolocation";
@@ -228,7 +230,9 @@ export default function ScheduleList() {
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [scheduleFormMode, setScheduleFormMode] = useState("manual");
   const [manualCoverageFromAuto, setManualCoverageFromAuto] = useState(null);
-  const [view, setView] = useState("table");
+  // Schedulers land on the week grid (needs vs people); others on the list.
+  const [view, setView] = useState(canManageSchedules ? "week" : "table");
+  const [weekBoard, setWeekBoard] = useState(null);
   const [listGroupBy, setListGroupBy] = useState("date");
 
   // Scoped storage keys for individual user preferences
@@ -706,6 +710,35 @@ export default function ScheduleList() {
   };
 
   // Facility-wide open coverage; only managers see this, never personal-schedule-only staff
+  // Calendar and roster show whole months: open every week they show so
+  // each week's needs exist (created from Weekly Needs the first time).
+  const openedRangeRef = useRef("");
+  useEffect(() => {
+    const toKey = (d) => {
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+    let from;
+    let to;
+    if (view === "calendar" && calendarRange.start && calendarRange.end) {
+      from = toKey(new Date(calendarRange.start));
+      to = toKey(new Date(new Date(calendarRange.end).getTime() - 86400000));
+    } else if (view === "month") {
+      from = toKey(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1));
+      to = toKey(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0));
+    } else {
+      return;
+    }
+    const rangeKey = `${from}|${to}`;
+    if (openedRangeRef.current === rangeKey) return;
+    openedRangeRef.current = rangeKey;
+    api
+      .get("/weeks", { params: { from, to } })
+      .then(() => fetchCoverageGaps())
+      .catch((err) => console.error("Failed to open weeks", err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, calendarRange.start, calendarRange.end, monthDate]);
+
   const fetchCoverageGaps = async () => {
     if (!canManageSchedules) {
       setCoverageGaps([]);
@@ -1752,7 +1785,8 @@ export default function ScheduleList() {
       entry.members.forEach((member) => {
         items.push({
           type: "staff",
-          key: member.staffId,
+          // Someone can work in more than one group (area / shift block).
+          key: `${entry.groupKey}-${member.staffId}`,
           member,
           groupKey: entry.groupKey,
         });
@@ -3015,21 +3049,29 @@ export default function ScheduleList() {
             }}
             size="small"
           >
+            {canManageSchedules && (
+              <ToggleButton
+                value="week"
+                sx={{ width: { xs: "25%", md: "auto" } }}
+              >
+                <FiGrid style={{ marginRight: 6 }} /> Week
+              </ToggleButton>
+            )}
             <ToggleButton
               value="table"
-              sx={{ width: { xs: "33%", md: "auto" } }}
+              sx={{ width: { xs: "25%", md: "auto" } }}
             >
               <FiList style={{ marginRight: 6 }} /> List
             </ToggleButton>
             <ToggleButton
               value="calendar"
-              sx={{ width: { xs: "33%", md: "auto" } }}
+              sx={{ width: { xs: "25%", md: "auto" } }}
             >
               <FiCalendar style={{ marginRight: 6 }} /> Calendar
             </ToggleButton>
             <ToggleButton
               value="month"
-              sx={{ width: { xs: "34%", md: "auto" } }}
+              sx={{ width: { xs: "25%", md: "auto" } }}
             >
               <FiPrinter style={{ marginRight: 6 }} /> Roster
             </ToggleButton>
@@ -3193,6 +3235,7 @@ export default function ScheduleList() {
       {canManageSchedules && (
         <WeekPublishBar
           refreshKey={schedules}
+          onData={setWeekBoard}
           onChanged={() => {
             fetchSchedules();
             fetchCoverageGaps();
@@ -3200,7 +3243,19 @@ export default function ScheduleList() {
         />
       )}
 
+      {view === "week" && canManageSchedules && (
+        <WeekGrid
+          week={weekBoard}
+          onChanged={() => {
+            fetchSchedules();
+            fetchCoverageGaps();
+          }}
+          onCallOut={(schedule) => setCallOutSchedule(schedule)}
+        />
+      )}
+
       {/* FILTER BAR */}
+      {view !== "week" && (
       <Paper
         elevation={0}
         data-guide-id="guide-schedule-filters"
@@ -3811,6 +3866,7 @@ export default function ScheduleList() {
           </Box>
         )}
       </Paper>
+      )}
 
       {view === "table" && !isCompact && (
         <Box
@@ -3847,7 +3903,7 @@ export default function ScheduleList() {
       )}
 
       {/* TABLE VIEW */}
-      {view === "table" ? (
+      {view === "week" ? null : view === "table" ? (
         isCompact ? (
           <Box sx={{ mt: 2, display: "grid", gap: 2 }}>
             {paginatedSchedules.map((s) => (

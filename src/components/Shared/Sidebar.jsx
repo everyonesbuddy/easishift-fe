@@ -62,6 +62,12 @@ function Sidebar({ mobileOpen, onMobileClose }) {
     ...(can("coverage.manage")
       ? [
           {
+            id: "weekly-needs",
+            icon: MdTune,
+            label: "Weekly Needs",
+            to: "/staffing-template",
+          },
+          {
             id: "coverage",
             icon: MdAssignment,
             label: "Coverage Planning",

@@ -30,10 +30,9 @@ import ScheduleList from "./components/StaffPortal/Schedule/ScheduleList";
 import ShiftSwapRequestsPage from "./components/StaffPortal/Schedule/ShiftSwapRequestsPage";
 import StaffList from "./components/StaffPortal/Staffs/StaffList";
 import MembersPage from "./components/StaffPortal/Members/MembersPage";
+import StaffingTemplatePage from "./components/StaffPortal/Coverage/StaffingTemplatePage";
 import MessageList from "./components/StaffPortal/Messages/MessageList";
-import TimeOffRequestList from "./components/StaffPortal/TimeOff/TimeOffRequestList";
 import TimeOffDecision from "./components/StaffPortal/TimeOff/TimeOffDecision";
-import PreferencesPage from "./components/StaffPortal/NoAdminPreferences/PreferencesPage";
 import FacilityPreferencesPage from "./components/StaffPortal/FacilityPreferences/FacilityPreferencesPage";
 import TenantBrandingPage from "./components/StaffPortal/FacilityPreferences/TenantBrandingPage";
 import CoveragePlanningPage from "./components/StaffPortal/Coverage/CoveragePlanningPage";
@@ -192,6 +191,14 @@ export default function App() {
               }
             />
             <Route
+              path="/staffing-template"
+              element={
+                <PrivateRoute>
+                  <StaffingTemplatePage />
+                </PrivateRoute>
+              }
+            />
+            <Route
               path="/members"
               element={
                 <PrivateRoute>
@@ -218,17 +225,13 @@ export default function App() {
             <Route
               path="/preferences"
               element={
-                <PrivateRoute>
-                  <PreferencesPage />
-                </PrivateRoute>
+                <Navigate to="/dashboard" replace />
               }
             />
             <Route
               path="/timeoff-requests"
               element={
-                <PrivateRoute>
-                  <TimeOffRequestList />
-                </PrivateRoute>
+                <Navigate to="/timeoff-decisions" replace />
               }
             />
             <Route

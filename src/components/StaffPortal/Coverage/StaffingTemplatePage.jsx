@@ -52,6 +52,8 @@ export default function StaffingTemplatePage() {
       );
       setDirty(false);
     } catch (err) {
+      // Plan answers (402) are shown by the upgrade dialog.
+      if (err?.response?.status === 402) return;
       toast.error(err?.response?.data?.message || "Couldn't save", {
         position: "top-right",
       });

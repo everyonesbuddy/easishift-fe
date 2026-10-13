@@ -30,6 +30,15 @@ const FEATURE_COPY = {
   prioritySupport: "Priority support",
 };
 
+// When a plan answer (402) opens this dialog, the screen that made the
+// request often also shows a generic error toast. Skip toasts right after a
+// 402 so people see one clear message, not two.
+const originalToastError = toast.error;
+toast.error = (...args) =>
+  Date.now() - (window.__wisershiftsPlanNoticeAt || 0) < 1500
+    ? null
+    : originalToastError(...args);
+
 const describe = (detail) => {
   if (detail.errorCode === "SCHEDULER_READ_ONLY") {
     return {
@@ -103,7 +112,7 @@ export default function UpgradeDialog() {
       <DialogTitle sx={{ fontWeight: 800 }}>{title}</DialogTitle>
       <DialogContent>
         <Typography color="text.secondary">{body}</Typography>
-        {!canBuy && (
+        {!canBuy && detail.errorCode !== "SCHEDULER_READ_ONLY" && (
           <Typography color="text.secondary" sx={{ mt: 1.5 }}>
             Ask your workspace owner to upgrade.
           </Typography>

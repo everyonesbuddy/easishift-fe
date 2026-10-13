@@ -48,7 +48,9 @@ const describe = (detail) => {
   const plan = PLAN_LABELS[detail.requiredPlan] || "a paid";
   return {
     title: `${feature} is on the ${plan} plan`,
-    body: `Upgrade to ${plan} to use it.`,
+    body: detail.trialAvailable
+      ? `Try ${plan === "Pro" ? "it" : "Pro"} free for 14 days, no card needed. Your data stays if you don't upgrade.`
+      : `Upgrade to ${plan} to use it.`,
   };
 };
 
@@ -90,7 +92,7 @@ export default function UpgradeDialog() {
   };
 
   return (
-    <Dialog open onClose={close} maxWidth="xs" fullWidth>
+    <Dialog open onClose={close} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ fontWeight: 800 }}>{title}</DialogTitle>
       <DialogContent>
         <Typography color="text.secondary">{body}</Typography>

@@ -44,7 +44,9 @@ export const formatPrice = (cents, interval) => {
 };
 
 export const formatLimit = (value, noun) =>
-  value === null || value === undefined ? `Unlimited ${noun}` : `${value} ${noun}`;
+  value === null || value === undefined
+    ? `Unlimited ${noun}`
+    : `${value} ${value === 1 ? noun.replace(/s$/, "") : noun}`;
 
 export const daysLeft = (isoDate) => {
   if (!isoDate) return 0;

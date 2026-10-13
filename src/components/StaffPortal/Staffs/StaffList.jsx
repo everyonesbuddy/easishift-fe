@@ -470,6 +470,7 @@ export default function StaffList() {
                   textTransform: "none",
                   borderRadius: 2,
                   px: 3,
+                  whiteSpace: "nowrap",
                   width: { xs: "100%", md: "auto" },
                 }}
               >

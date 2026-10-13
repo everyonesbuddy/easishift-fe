@@ -111,8 +111,11 @@ export default function ManageSubscription() {
     try {
       await fn();
     } catch (err) {
-      // 402 / 409 limit answers are explained inline.
-      setError(errorMessage(err));
+      // 402 / 409 limit answers are explained inline, and as a toast so
+      // they're seen even when the page is scrolled down to the plans.
+      const message = errorMessage(err);
+      setError(message);
+      if (err?.response?.status !== 402) toast.error(message, { autoClose: 7000 });
     } finally {
       setBusy(null);
     }
@@ -136,6 +139,13 @@ export default function ManageSubscription() {
         return;
       }
       const res = await api.post("/stripe/create-checkout-session", { plan, interval });
+      if (res.data?.changed) {
+        // Already had a subscription: it was switched in place.
+        trackEvent("subscription_change_requested");
+        toast.success("Plan changed.");
+        await refreshAll();
+        return;
+      }
       if (!res.data?.url) throw new Error("Checkout didn't open. Try again.");
       trackEvent("begin_checkout");
       window.location.href = res.data.url;
@@ -393,11 +403,33 @@ export default function ManageSubscription() {
 
               <Box sx={{ flex: 1 }} />
 
+              {canManage && plan.purchasable && !(isCurrent && isPaying) && plan.fitsUsage === false && (
+                <Alert severity="warning" sx={{ py: 0.25, "& .MuiAlert-message": { fontSize: 13 } }}>
+                  You have more than {plan.label} allows:{" "}
+                  {[
+                    plan.over?.schedulers ? `${plan.over.schedulers} too many scheduler${plan.over.schedulers === 1 ? "" : "s"}` : null,
+                    plan.over?.staff ? `${plan.over.staff} too many staff` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" and ")}
+                  .{" "}
+                  {plan.over?.schedulers ? (
+                    <Box component="span" role="link" tabIndex={0} onClick={() => navigate("/members")} sx={{ fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>
+                      Make some viewers
+                    </Box>
+                  ) : (
+                    <Box component="span" role="link" tabIndex={0} onClick={() => navigate("/staffs")} sx={{ fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>
+                      Archive some staff
+                    </Box>
+                  )}{" "}
+                  or pick a bigger plan.
+                </Alert>
+              )}
               {canManage && plan.purchasable && !(isCurrent && isPaying) && (
                 <Button
                   variant={popular ? "contained" : "outlined"}
                   onClick={() => choosePlan(plan.key)}
-                  disabled={Boolean(busy)}
+                  disabled={Boolean(busy) || plan.fitsUsage === false}
                   sx={{ textTransform: "none", fontWeight: 700, py: 1 }}
                 >
                   {ctaLabel(plan)}

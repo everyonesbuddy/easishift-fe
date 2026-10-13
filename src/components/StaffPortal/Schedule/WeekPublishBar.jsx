@@ -18,6 +18,7 @@ import { FiChevronLeft, FiChevronRight, FiSend, FiSliders } from "react-icons/fi
 import { useNavigate } from "react-router-dom";
 import api from "../../../config/api";
 import { notSentReason } from "../../../utils/deliveryReasons";
+import { useAuth } from "../../../context/AuthContext";
 
 // "2026-10-12" -> Date at local midnight (no timezone shift)
 const keyToDate = (key) => {
@@ -60,6 +61,7 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
  */
 export default function WeekPublishBar({ refreshKey, onChanged }) {
   const navigate = useNavigate();
+  const { refreshSession } = useAuth();
   const [weekStart, setWeekStart] = useState(null);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -113,6 +115,7 @@ export default function WeekPublishBar({ refreshKey, onChanged }) {
     try {
       const res = await api.post(`/weeks/${weekStart}/publish`);
       setResult(res.data);
+      if (res.data?.usedGraceWeek) refreshSession?.();
       await loadWeek(weekStart);
       onChanged?.();
     } catch (err) {
@@ -288,6 +291,12 @@ export default function WeekPublishBar({ refreshKey, onChanged }) {
                     })()
                   : "Nobody needed a message."}
               </Typography>
+              {result?.usedGraceWeek && (
+                <Alert severity="info">
+                  This was your one grace week after the trial. To publish more weeks, upgrade or
+                  choose who to keep on Free.
+                </Alert>
+              )}
               {result?.notReached?.length > 0 && (
                 <Alert severity="warning">
                   <Typography sx={{ fontWeight: 700, mb: 0.5 }}>

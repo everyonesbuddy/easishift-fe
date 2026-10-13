@@ -22,11 +22,10 @@ import { IOS } from "../../../theme/ios";
  * Every new week's open slots come from this.
  */
 export default function StaffingTemplatePage() {
-  const { facilityPreferences, fetchFacilityPreferences, can } = useAuth();
+  const { facilityPreferences, can } = useAuth();
   const navigate = useNavigate();
   const canEdit = can("coverage.manage");
   const [rules, setRules] = useState(null);
-  const [options, setOptions] = useState(null);
   const [applyTo, setApplyTo] = useState("unpublished");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -34,10 +33,7 @@ export default function StaffingTemplatePage() {
   useEffect(() => {
     api
       .get("/staffing-template")
-      .then((res) => {
-        setRules(res.data?.rules || []);
-        setOptions(res.data?.options || null);
-      })
+      .then((res) => setRules(res.data?.rules || []))
       .catch((err) => {
         console.error("Failed to load staffing template", err);
         setRules([]);
@@ -56,8 +52,6 @@ export default function StaffingTemplatePage() {
         { position: "top-right", autoClose: 3000 },
       );
       setDirty(false);
-      const added = res.data?.addedToPreferences || {};
-      if (added.unitAreas?.length || added.certificationTags?.length) fetchFacilityPreferences?.();
     } catch (err) {
       // Plan answers (402) are shown by the upgrade dialog.
       if (err?.response?.status === 402) return;
@@ -96,7 +90,6 @@ export default function StaffingTemplatePage() {
               setDirty(true);
             }}
             facilityPreferences={facilityPreferences}
-            options={options}
             disabled={!canEdit}
           />
         )}

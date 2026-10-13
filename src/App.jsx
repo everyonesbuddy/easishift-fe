@@ -70,6 +70,10 @@ export default function App() {
                 "&:hover": {
                   backgroundColor: `${secondaryColor} !important`,
                 },
+                "&.Mui-disabled": {
+                  backgroundColor: "rgba(118, 118, 128, 0.12) !important",
+                  color: "#AEAEB2",
+                },
               },
             },
           },

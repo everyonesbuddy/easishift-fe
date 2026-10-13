@@ -2,19 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Typography,
-  Paper,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   Button,
   CircularProgress,
   TextField,
   Select,
   MenuItem,
-  FormControl,
-  InputLabel,
-  Switch,
-  FormControlLabel,
   Stack,
   Alert,
   Autocomplete,
@@ -23,9 +15,15 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  IconButton,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
 } from "@mui/material";
-import { FiSave, FiInfo, FiRotateCcw, FiChevronDown } from "react-icons/fi";
-import { FiX, FiPlus } from "react-icons/fi";
+import { FiRotateCcw, FiX, FiPlus } from "react-icons/fi";
+import { IOS, segmentedSx, tint } from "../../../theme/ios";
+import { Field, Row, Section, TagEditor, Toggle } from "./PrefsUi";
+import { toLabel } from "../../../utils/labels";
 import api from "../../../config/api";
 import { trackEvent } from "../../../utils/analytics";
 import { toast } from "react-toastify";
@@ -338,7 +336,7 @@ const getFacilityPreferencesTourSteps = ({ canManageFacilityPreferences }) => {
 };
 
 export default function FacilityPreferencesPage() {
-  const { tenant, logout, can } = useAuth();
+  const { tenant, logout, can, fetchFacilityPreferences } = useAuth();
   const navigate = useNavigate();
   const canManageFacilityPreferences = can("facility_preferences.manage");
   const canViewFacilityPreferences =
@@ -365,14 +363,32 @@ export default function FacilityPreferencesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, canViewFacilityPreferences]);
 
-  // UI state for adding new items to arrays
-  const [arrayInputs, setArrayInputs] = useState({
-    roleFamilies: "",
-    unitAreas: "",
-    shiftTypes: "",
-    certificationTags: "",
-  });
   const [slotInputsByShiftType, setSlotInputsByShiftType] = useState({});
+  const [savedSnapshot, setSavedSnapshot] = useState("");
+  const [usageData, setUsageData] = useState({ rules: [], staff: [] });
+  const [pendingRemove, setPendingRemove] = useState(null); // { field, value, label, note }
+  const [newShiftType, setNewShiftType] = useState("");
+  const [activeSection, setActiveSection] = useState("shifts");
+
+  // What uses each role / area / certification / shift, for counts on the
+  // chips and a heads-up before removing something in use.
+  useEffect(() => {
+    if (!canViewFacilityPreferences) return;
+    Promise.allSettled([api.get("/staffing-template"), api.get("/staff")]).then(([t, st]) => {
+      setUsageData({
+        rules: t.status === "fulfilled" ? t.value.data?.rules || [] : [],
+        staff: st.status === "fulfilled" && Array.isArray(st.value.data) ? st.value.data : [],
+      });
+    });
+  }, [canViewFacilityPreferences]);
+
+  // Deep links like /facility-preferences#areas.
+  useEffect(() => {
+    if (loading) return;
+    const id = window.location.hash.replace("#", "");
+    if (id) document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading]);
+
   useEffect(() => {
     if (!canViewFacilityPreferences) {
       setLoading(false);
@@ -382,7 +398,9 @@ export default function FacilityPreferencesPage() {
     async function fetchPrefs() {
       try {
         const res = await api.get("/facility-preferences");
-        setPrefs(normalizeTaxonomyPrefs(res.data));
+        const loaded = normalizeTaxonomyPrefs(res.data);
+        setPrefs(loaded);
+        setSavedSnapshot(JSON.stringify(loaded));
       } catch (err) {
         console.error(err);
         setError("Failed to load facility preferences");
@@ -431,155 +449,9 @@ export default function FacilityPreferencesPage() {
     }));
   };
 
-  const handleArrayAdd = (field) => {
-    const value = toSnakeCase(arrayInputs[field]);
-    if (!value) return;
-
-    setPrefs((prev) => {
-      const existing = normalizeArrayValues(prev[field]);
-      if (existing.includes(value)) {
-        toast.warning(`${toDisplayLabel(value)} is already in the list`, {
-          autoClose: 1500,
-        });
-        return prev;
-      }
-      return { ...prev, [field]: [...existing, value] };
-    });
-
-    setArrayInputs((prev) => ({ ...prev, [field]: "" }));
-  };
-
-  const handleArrayRemove = (field, index) => {
-    setPrefs((prev) => ({
-      ...prev,
-      [field]: prev[field]?.filter((_, i) => i !== index) || [],
-    }));
-  };
-
-  const handleArrayInputChange = (field, value) => {
-    setArrayInputs((prev) => ({ ...prev, [field]: value }));
-  };
-
   const getShiftTypeDefinition = (shiftTypeKey) => {
     const key = toSnakeCase(shiftTypeKey);
     return (prefs.shiftTypeDefinitions || []).find((item) => item.key === key);
-  };
-
-  const getSlotInput = (shiftTypeKey) => {
-    const key = toSnakeCase(shiftTypeKey);
-    return (
-      slotInputsByShiftType[key] || {
-        tag: "",
-        startLocalTime: "",
-        endLocalTime: "",
-        spansOvernight: false,
-      }
-    );
-  };
-
-  const handleSlotInputChange = (shiftTypeKey, field, value) => {
-    const key = toSnakeCase(shiftTypeKey);
-    setSlotInputsByShiftType((prev) => ({
-      ...prev,
-      [key]: {
-        ...getSlotInput(key),
-        [field]: value,
-      },
-    }));
-  };
-
-  const handleAddShiftSlot = (shiftTypeKey) => {
-    const key = toSnakeCase(shiftTypeKey);
-    const input = getSlotInput(key);
-    const tag = toSnakeCase(input.tag);
-    const startLocalTime = String(input.startLocalTime || "").trim();
-    const endLocalTime = String(input.endLocalTime || "").trim();
-
-    if (!tag || !startLocalTime || !endLocalTime) {
-      toast.warning("Provide slot tag, start time, and end time", {
-        autoClose: 1500,
-      });
-      return;
-    }
-
-    setPrefs((prev) => {
-      const existingDefinitions = Array.isArray(prev.shiftTypeDefinitions)
-        ? prev.shiftTypeDefinitions
-        : [];
-
-      const defIndex = existingDefinitions.findIndex(
-        (item) => item.key === key,
-      );
-      const nextDefinitions = [...existingDefinitions];
-
-      if (defIndex === -1) {
-        nextDefinitions.push({
-          key,
-          label: null,
-          timeSlots: [
-            {
-              tag,
-              label: null,
-              startLocalTime,
-              endLocalTime,
-              spansOvernight: Boolean(
-                endLocalTime &&
-                startLocalTime &&
-                endLocalTime <= startLocalTime,
-              ),
-            },
-          ],
-        });
-      } else {
-        const definition = nextDefinitions[defIndex];
-        const currentSlots = Array.isArray(definition.timeSlots)
-          ? definition.timeSlots
-          : [];
-
-        if (currentSlots.some((slot) => slot.tag === tag)) {
-          toast.warning(
-            `${toDisplayLabel(tag)} already exists for ${toDisplayLabel(key)}`,
-            {
-              autoClose: 1500,
-            },
-          );
-          return prev;
-        }
-
-        nextDefinitions[defIndex] = {
-          ...definition,
-          timeSlots: [
-            ...currentSlots,
-            {
-              tag,
-              label: null,
-              startLocalTime,
-              endLocalTime,
-              spansOvernight: Boolean(
-                endLocalTime &&
-                startLocalTime &&
-                endLocalTime <= startLocalTime,
-              ),
-            },
-          ],
-        };
-      }
-
-      return {
-        ...prev,
-        shiftTypeDefinitions: nextDefinitions,
-      };
-    });
-
-    setSlotInputsByShiftType((prev) => ({
-      ...prev,
-      [key]: {
-        tag: "",
-        startLocalTime: "",
-        endLocalTime: "",
-        spansOvernight: false,
-      },
-    }));
   };
 
   const handleRemoveShiftSlot = (shiftTypeKey, slotIndex) => {
@@ -598,6 +470,107 @@ export default function FacilityPreferencesPage() {
         },
       ),
     }));
+  };
+
+  const addTag = (field, raw) => {
+    const value = toSnakeCase(raw);
+    if (!value) return false;
+    if ((prefs[field] || []).includes(value)) {
+      toast.warning(`${toDisplayLabel(value)} is already in the list`, { autoClose: 1500 });
+      return false;
+    }
+    setPrefs((prev) => ({ ...prev, [field]: [...(prev[field] || []), value] }));
+    return true;
+  };
+
+  const removeTagNow = (field, value) => {
+    setPrefs((prev) => {
+      const next = { ...prev, [field]: (prev[field] || []).filter((v) => v !== value) };
+      if (field === "shiftTypes") {
+        next.shiftTypeDefinitions = (prev.shiftTypeDefinitions || []).filter((d) => d.key !== value);
+      }
+      return next;
+    });
+  };
+
+  const usageFor = (field, value) => {
+    const key = toSnakeCase(value);
+    const rules = usageData.rules.filter((r) => {
+      if (field === "roleFamilies") return toSnakeCase(r.role) === key;
+      if (field === "unitAreas") return toSnakeCase(r.unitArea) === key;
+      if (field === "certificationTags") return (r.requiredCertificationTags || []).some((c) => toSnakeCase(c) === key);
+      if (field === "shiftTypes") return toSnakeCase(r.shiftType) === key;
+      return false;
+    }).length;
+    const staff = usageData.staff.filter((m) => {
+      if (field === "roleFamilies") return (m.roles?.length ? m.roles : [m.role]).some((r) => toSnakeCase(r) === key);
+      if (field === "unitAreas") return (m.allowedAreas || []).some((a) => toSnakeCase(a) === key);
+      if (field === "certificationTags") return (m.certificationTags || []).some((c) => toSnakeCase(c) === key);
+      return false;
+    }).length;
+    return { rules, staff };
+  };
+
+  const usageNote = (field) => (value) => {
+    const { staff } = usageFor(field, value);
+    return staff ? `${staff} staff` : "";
+  };
+
+  const askRemove = (field, value) => {
+    const { rules, staff } = usageFor(field, value);
+    if (!rules && !staff) {
+      removeTagNow(field, value);
+      return;
+    }
+    const parts = [];
+    if (staff) parts.push(`${staff} staff ${staff === 1 ? "is" : "are"} tagged with it`);
+    if (rules) parts.push(`${rules} Weekly Needs row${rules === 1 ? " uses" : "s use"} it`);
+    setPendingRemove({ field, value, label: toLabel(value), note: parts.join(" and ") });
+  };
+
+  const addShiftType = () => {
+    if (addTag("shiftTypes", newShiftType) !== false) setNewShiftType("");
+  };
+
+  const addSlot = (shiftTypeKey) => {
+    const key = toSnakeCase(shiftTypeKey);
+    const input = slotInputsByShiftType[key] || {};
+    const start = String(input.startLocalTime || "").trim();
+    const end = String(input.endLocalTime || "").trim();
+    if (!start || !end) {
+      toast.warning("Pick a start and end time", { autoClose: 1500 });
+      return;
+    }
+    const name = String(input.name || "").trim();
+    const tag = toSnakeCase(name) || `${key}_${start.replace(":", "")}_${end.replace(":", "")}`;
+    setPrefs((prev) => {
+      const defs = [...(prev.shiftTypeDefinitions || [])];
+      const i = defs.findIndex((d) => d.key === key);
+      const slot = { tag, label: name || null, startLocalTime: start, endLocalTime: end, spansOvernight: end <= start };
+      if (i === -1) defs.push({ key, label: null, timeSlots: [slot] });
+      else {
+        if ((defs[i].timeSlots || []).some((x) => x.tag === tag || (x.startLocalTime === start && x.endLocalTime === end))) {
+          toast.warning("That time is already listed", { autoClose: 1500 });
+          return prev;
+        }
+        defs[i] = { ...defs[i], timeSlots: [...(defs[i].timeSlots || []), slot] };
+      }
+      return { ...prev, shiftTypeDefinitions: defs };
+    });
+    setSlotInputsByShiftType((prev) => ({ ...prev, [key]: { name: "", startLocalTime: "", endLocalTime: "" } }));
+  };
+
+  const setSlotField = (shiftTypeKey, field, value) => {
+    const key = toSnakeCase(shiftTypeKey);
+    setSlotInputsByShiftType((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), [field]: value } }));
+  };
+
+  const slotUsage = (shiftTypeKey, tag) =>
+    usageData.rules.filter((r) => toSnakeCase(r.shiftType) === shiftTypeKey && toSnakeCase(r.shiftTag) === tag).length;
+
+  const discardChanges = () => {
+    if (savedSnapshot) setPrefs(JSON.parse(savedSnapshot));
+    setError("");
   };
 
   const handleSave = async () => {
@@ -638,14 +611,17 @@ export default function FacilityPreferencesPage() {
 
       const res = await api.post("/facility-preferences", payload);
       trackEvent("facility_settings_saved");
-      setPrefs(normalizeTaxonomyPrefs(res.data));
+      const saved = normalizeTaxonomyPrefs(res.data);
+      setPrefs(saved);
+      setSavedSnapshot(JSON.stringify(saved));
+      fetchFacilityPreferences?.();
       toast.success("Facility preferences saved", {
         position: "top-right",
         autoClose: 2000,
       });
     } catch (err) {
       console.error(err);
-      setError(err?.message || "Failed to save facility preferences");
+      setError(err?.response?.data?.message || err?.message || "Failed to save facility preferences");
     } finally {
       setSaving(false);
     }
@@ -656,7 +632,10 @@ export default function FacilityPreferencesPage() {
     setError("");
     try {
       const res = await api.delete("/facility-preferences/reset");
-      setPrefs(normalizeTaxonomyPrefs(res.data));
+      const reset = normalizeTaxonomyPrefs(res.data);
+      setPrefs(reset);
+      setSavedSnapshot(JSON.stringify(reset));
+      fetchFacilityPreferences?.();
       setResetDialogOpen(false);
       toast.info("Facility preferences reset to defaults", {
         position: "top-right",
@@ -707,1049 +686,604 @@ export default function FacilityPreferencesPage() {
     }
   };
 
+  const dirty = Boolean(savedSnapshot) && JSON.stringify(prefs) !== savedSnapshot;
+  const readOnly = !canManageFacilityPreferences;
+  const tt = prefs.timeTracking || TIME_TRACKING_DEFAULTS;
+  const shiftKeys = prefs.shiftTypes || [];
+  const NAV = [
+    { id: "shifts", label: "Shift times" },
+    { id: "roles", label: "Roles" },
+    { id: "areas", label: "Unit areas" },
+    { id: "certifications", label: "Certifications" },
+    { id: "facility", label: "Facility" },
+    { id: "time-tracking", label: "Time tracking" },
+    { id: "notifications", label: "Notifications" },
+    { id: "advanced", label: "Advanced" },
+    ...(canManageFacilityPreferences && can("tenant.delete") ? [{ id: "danger", label: "Delete account" }] : []),
+  ];
+  const goTo = (id) => {
+    setActiveSection(id);
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.history.replaceState(null, "", `#${id}`);
+  };
+  const selectSx = {
+    minWidth: 220,
+    borderRadius: "10px",
+    bgcolor: IOS.canvas,
+    fontSize: 14,
+    "& fieldset": { border: "none" },
+    "&:hover": { bgcolor: "#EDEDF0" },
+    "& .MuiSelect-select": { py: "8px" },
+  };
+  const unit = (text) => (
+    <Typography component="span" sx={{ fontSize: 14, color: IOS.secondary, ml: 1 }}>
+      {text}
+    </Typography>
+  );
+
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 980, margin: "0 auto" }}>
-      {/* Header */}
-      <Box
-        mb={3.5}
-        sx={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 2,
-        }}
-      >
-        <Box>
-          <Typography
-            variant="h4"
-            sx={{
-              fontSize: { xs: "1.35rem", md: "1.7rem" },
-              fontWeight: 700,
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-            }}
-          >
-            Facility Preferences
-            <GuideHelpButton
-              tourId="facility-preferences"
-              tourSteps={facilityTourSteps}
-            />
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Configure facility-level scheduling policy and rules
-          </Typography>
-        </Box>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
+    <Box sx={{ bgcolor: IOS.canvas, minHeight: "100%", px: { xs: 2, md: 4 }, py: { xs: 3, md: 4 } }}>
+      <Box sx={{ maxWidth: 1080, mx: "auto" }}>
+        {/* Header */}
+        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 2, mb: 3 }}>
+          <Box>
+            <Typography
+              component="h1"
+              sx={{ fontSize: { xs: 26, md: 32 }, fontWeight: 700, letterSpacing: "-0.02em", color: IOS.ink, display: "flex", alignItems: "center", gap: 1 }}
+            >
+              Facility Preferences
+              <GuideHelpButton tourId="facility-preferences" tourSteps={facilityTourSteps} />
+            </Typography>
+            <Typography sx={{ color: IOS.secondary, fontSize: 15, mt: 0.5, maxWidth: 640 }}>
+              The building blocks of your schedule: shift times, roles, areas and certifications. Weekly Needs and staff
+              profiles pick from these lists.
+            </Typography>
+          </Box>
           {canManageFacilityPreferences && (
             <Button
-              variant="outlined"
-              color="error"
-              startIcon={<FiRotateCcw size={16} />}
+              startIcon={<FiRotateCcw size={15} />}
               onClick={() => setResetDialogOpen(true)}
-              sx={{ borderRadius: 2, textTransform: "none" }}
+              sx={{ borderRadius: "10px", color: IOS.redText, "&:hover": { bgcolor: tint(IOS.red, 0.08) } }}
             >
-              Reset to Defaults
+              Reset to defaults
             </Button>
           )}
-        </Stack>
-      </Box>
+        </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2, borderRadius: "12px" }}>
+            {error}
+          </Alert>
+        )}
+        {readOnly && (
+          <Alert severity="info" sx={{ mb: 2, borderRadius: "12px" }}>
+            You can look at these settings but only the owner or a scheduler can change them.
+          </Alert>
+        )}
 
-      {!canManageFacilityPreferences && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          You have view-only access to these facility settings.
-        </Alert>
-      )}
-
-      {/* Info banner */}
-      <Paper
-        sx={{
-          p: { xs: 2, md: 2.5 },
-          borderRadius: 3,
-          mb: 3,
-          bgcolor: "info.lighter",
-          border: "1px solid",
-          borderColor: "info.light",
-        }}
-      >
-        <Stack direction="row" spacing={1.5} alignItems="flex-start">
-          <Box sx={{ mt: 0.25, color: "info.main", display: "flex" }}>
-            <FiInfo size={18} />
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "190px minmax(0, 1fr)" }, gap: { xs: 3, md: 4 }, alignItems: "start" }}>
+          {/* Section nav */}
+          <Box component="nav" aria-label="Sections" sx={{ display: { xs: "none", md: "block" }, position: "sticky", top: 88 }}>
+            {NAV.map((item) => (
+              <Box
+                key={item.id}
+                component="button"
+                type="button"
+                onClick={() => goTo(item.id)}
+                sx={{
+                  all: "unset",
+                  boxSizing: "border-box",
+                  display: "block",
+                  width: "100%",
+                  cursor: "pointer",
+                  px: 1.5,
+                  py: 0.9,
+                  borderRadius: "10px",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: item.id === "danger" ? IOS.redText : activeSection === item.id ? IOS.ink : IOS.secondary,
+                  bgcolor: activeSection === item.id ? "rgba(0,0,0,0.05)" : "transparent",
+                  "&:hover": { bgcolor: "rgba(0,0,0,0.04)", color: item.id === "danger" ? IOS.redText : IOS.ink },
+                  "&:focus-visible": { boxShadow: `0 0 0 3px ${tint(IOS.blue, 0.3)}` },
+                }}
+              >
+                {item.label}
+              </Box>
+            ))}
           </Box>
-          <Typography variant="body2" sx={{ color: "info.dark" }}>
-            These settings apply facility-wide and are used by the auto-generate
-            engine to enforce scheduling policy. Individual staff preferences
-            still apply within these constraints.
-          </Typography>
-        </Stack>
-      </Paper>
 
-      <Stack
-        sx={{
-          gap: { xs: 2, md: 3 },
-          ...(!canManageFacilityPreferences && {
-            "& .MuiAccordionDetails-root": {
-              pointerEvents: "none",
-              userSelect: "none",
-            },
-          }),
-        }}
-      >
-        {/* ── Scheduling Pattern ── */}
-        <Accordion
-          disableGutters
-          sx={ACCORDION_BASE_SX}
-          data-guide-id="guide-facility-scheduling-pattern"
-        >
-          <AccordionSummary
-            expandIcon={<FiChevronDown size={18} />}
-            sx={ACCORDION_SUMMARY_SX}
-          >
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Scheduling Pattern
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                The rotation pattern your facility uses for shift assignments
-              </Typography>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails sx={ACCORDION_DETAILS_SX}>
-            <FormControl fullWidth>
-              <InputLabel>Pattern</InputLabel>
-              <Select
-                label="Pattern"
-                value={prefs.schedulingPattern || "balance"}
-                onChange={(e) =>
-                  handleChange("schedulingPattern", e.target.value)
-                }
-                sx={{ borderRadius: 2 }}
+          <Stack spacing={4} sx={{ minWidth: 0 }}>
+            {/* ── Shift times ── */}
+            <Box data-guide-id="guide-facility-taxonomy">
+              <Section
+                id="shifts"
+                title="Shift times"
+                description="Your shifts and their hours. Each time you add here becomes a row in Weekly Needs."
               >
-                {SCHEDULING_PATTERNS.map((p) => (
-                  <MenuItem key={p.value} value={p.value}>
-                    {p.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </AccordionDetails>
-        </Accordion>
-
-        {/* ── Facility Timezone ── */}
-        <Accordion
-          disableGutters
-          sx={ACCORDION_BASE_SX}
-          data-guide-id="guide-facility-timezone"
-        >
-          <AccordionSummary
-            expandIcon={<FiChevronDown size={18} />}
-            sx={ACCORDION_SUMMARY_SX}
-          >
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Facility Timezone
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                The timezone shift-slot times (e.g. "7:00 AM") are resolved
-                against
-              </Typography>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails sx={ACCORDION_DETAILS_SX}>
-            <Alert
-              severity={prefs.facilityTimezoneConfirmed ? "success" : "warning"}
-              sx={{ mb: 2 }}
-            >
-              {prefs.facilityTimezoneConfirmed
-                ? `Confirmed. Shift-slot times resolve using ${prefs.facilityTimezone}.`
-                : "Not yet confirmed. Until you save a timezone here, coverage and schedule forms fall back to each device's own local time to avoid mis-scheduled shifts."}
-            </Alert>
-            <Autocomplete
-              options={IANA_TIMEZONES}
-              value={prefs.facilityTimezone || "UTC"}
-              onChange={(_, value) =>
-                handleChange("facilityTimezone", value || "UTC")
-              }
-              disableClearable
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Timezone"
-                  placeholder="e.g. America/New_York"
-                />
-              )}
-              sx={{ maxWidth: 420 }}
-            />
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ mt: 1.5, display: "block" }}
-            >
-              Saving this here marks it as confirmed and lets shift-slot based
-              coverage trust it directly instead of relying on each device's
-              local clock.
-            </Typography>
-          </AccordionDetails>
-        </Accordion>
-
-        {/* ── Facility Taxonomy ── */}
-        <Accordion
-          disableGutters
-          sx={ACCORDION_BASE_SX}
-          data-guide-id="guide-facility-taxonomy"
-        >
-          <AccordionSummary
-            expandIcon={<FiChevronDown size={18} />}
-            sx={ACCORDION_SUMMARY_SX}
-          >
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Facility Taxonomy
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Define the roles, areas, shift types, and certifications valid
-                at your facility
-              </Typography>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails sx={ACCORDION_DETAILS_SX}>
-            <Stack spacing={3}>
-              {/* Role Families */}
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                  Role Families
-                </Typography>
-                <Stack spacing={1} mb={2}>
-                  {(prefs.roleFamilies || []).map((role, idx) => (
-                    <Box
-                      key={idx}
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        p: 1.5,
-                        borderRadius: 2,
-                        bgcolor: "grey.50",
-                        border: "1px solid",
-                        borderColor: "divider",
-                      }}
-                    >
-                      <Typography>{toDisplayLabel(role)}</Typography>
-                      <Button
-                        size="small"
-                        color="error"
-                        onClick={() => handleArrayRemove("roleFamilies", idx)}
-                        startIcon={<FiX size={14} />}
-                        sx={{ minWidth: "auto" }}
-                      >
-                        Remove
-                      </Button>
-                    </Box>
-                  ))}
-                </Stack>
-                <Box sx={{ display: "flex", gap: 1 }}>
-                  <TextField
-                    size="small"
-                    placeholder="e.g., receptionist, nurse, doctor"
-                    value={arrayInputs.roleFamilies}
-                    onChange={(e) =>
-                      handleArrayInputChange("roleFamilies", e.target.value)
-                    }
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleArrayAdd("roleFamilies");
-                      }
-                    }}
-                    sx={{ flex: 1 }}
-                  />
-                  <Button
-                    variant="contained"
-                    size="small"
-                    startIcon={<FiPlus size={14} />}
-                    onClick={() => handleArrayAdd("roleFamilies")}
-                    sx={{ px: 2 }}
-                  >
-                    Add
-                  </Button>
-                </Box>
-              </Box>
-
-              {/* Unit Areas */}
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                  Unit Areas{" "}
-                  <Typography
-                    component="span"
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    (Optional)
-                  </Typography>
-                </Typography>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ display: "block", mb: 1.5 }}
-                >
-                  e.g., AL (Assisted Living), IL (Independent Living), MC
-                  (Memory Care) – leave empty if not applicable
-                </Typography>
-                <Stack spacing={1} mb={2}>
-                  {(prefs.unitAreas || []).map((area, idx) => (
-                    <Box
-                      key={idx}
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        p: 1.5,
-                        borderRadius: 2,
-                        bgcolor: "grey.50",
-                        border: "1px solid",
-                        borderColor: "divider",
-                      }}
-                    >
-                      <Typography>{toDisplayLabel(area)}</Typography>
-                      <Button
-                        size="small"
-                        color="error"
-                        onClick={() => handleArrayRemove("unitAreas", idx)}
-                        startIcon={<FiX size={14} />}
-                        sx={{ minWidth: "auto" }}
-                      >
-                        Remove
-                      </Button>
-                    </Box>
-                  ))}
-                </Stack>
-                <Box sx={{ display: "flex", gap: 1 }}>
-                  <TextField
-                    size="small"
-                    placeholder="e.g., AL, IL, MC"
-                    value={arrayInputs.unitAreas}
-                    onChange={(e) =>
-                      handleArrayInputChange("unitAreas", e.target.value)
-                    }
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleArrayAdd("unitAreas");
-                      }
-                    }}
-                    sx={{ flex: 1 }}
-                  />
-                  <Button
-                    variant="contained"
-                    size="small"
-                    startIcon={<FiPlus size={14} />}
-                    onClick={() => handleArrayAdd("unitAreas")}
-                    sx={{ px: 2 }}
-                  >
-                    Add
-                  </Button>
-                </Box>
-              </Box>
-
-              {/* Shift Types */}
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                  Shift Types
-                </Typography>
-                <Stack spacing={1} mb={2}>
-                  {(prefs.shiftTypes || []).map((shiftType, idx) => (
-                    <Box
-                      key={idx}
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        p: 1.5,
-                        borderRadius: 2,
-                        bgcolor: "grey.50",
-                        border: "1px solid",
-                        borderColor: "divider",
-                      }}
-                    >
-                      <Typography>{toDisplayLabel(shiftType)}</Typography>
-                      <Button
-                        size="small"
-                        color="error"
-                        onClick={() => handleArrayRemove("shiftTypes", idx)}
-                        startIcon={<FiX size={14} />}
-                        sx={{ minWidth: "auto" }}
-                      >
-                        Remove
-                      </Button>
-                    </Box>
-                  ))}
-                </Stack>
-                <Box sx={{ display: "flex", gap: 1 }}>
-                  <TextField
-                    size="small"
-                    placeholder="e.g., day, evening, night"
-                    value={arrayInputs.shiftTypes}
-                    onChange={(e) =>
-                      handleArrayInputChange("shiftTypes", e.target.value)
-                    }
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleArrayAdd("shiftTypes");
-                      }
-                    }}
-                    sx={{ flex: 1 }}
-                  />
-                  <Button
-                    variant="contained"
-                    size="small"
-                    startIcon={<FiPlus size={14} />}
-                    onClick={() => handleArrayAdd("shiftTypes")}
-                    sx={{ px: 2 }}
-                  >
-                    Add
-                  </Button>
-                </Box>
-              </Box>
-
-              {/* Shift Slot Definitions */}
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                  Shift Type Time Slots
-                </Typography>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ display: "block", mb: 1.5 }}
-                >
-                  Configure local-time slots for each shift type (e.g. day_am
-                  07:00-11:00). Coverage can then use shift type + slot tag.
-                </Typography>
-
-                {(prefs.shiftTypes || []).length === 0 ? (
-                  <Alert severity="info" sx={{ mb: 1.5 }}>
-                    Add at least one shift type before configuring time slots.
-                  </Alert>
-                ) : (
-                  <Stack spacing={2}>
-                    {(prefs.shiftTypes || []).map((shiftTypeKey) => {
-                      const definition = getShiftTypeDefinition(shiftTypeKey);
-                      const slots = definition?.timeSlots || [];
-                      const slotInput = getSlotInput(shiftTypeKey);
-
-                      return (
-                        <Box
-                          key={shiftTypeKey}
-                          sx={{
-                            p: 1.5,
-                            borderRadius: 2,
-                            bgcolor: "grey.50",
-                            border: "1px solid",
-                            borderColor: "divider",
-                          }}
-                        >
-                          <Typography
-                            variant="body2"
-                            sx={{ fontWeight: 600, mb: 1 }}
-                          >
-                            {toDisplayLabel(shiftTypeKey)}
-                          </Typography>
-
-                          <Stack spacing={1} mb={1.5}>
-                            {slots.length === 0 ? (
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                No slots configured yet.
-                              </Typography>
-                            ) : (
-                              slots.map((slot, idx) => (
-                                <Box
-                                  key={`${slot.tag}-${idx}`}
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    p: 1,
-                                    borderRadius: 1.5,
-                                    bgcolor: "background.paper",
-                                    border: "1px solid",
-                                    borderColor: "divider",
-                                  }}
-                                >
-                                  <Typography variant="body2">
-                                    {toDisplayLabel(slot.tag)} (
-                                    {to12HourTime(slot.startLocalTime)} -{" "}
-                                    {to12HourTime(slot.endLocalTime)})
-                                    {slot.spansOvernight ? " • Overnight" : ""}
-                                  </Typography>
-                                  <Button
-                                    size="small"
-                                    color="error"
-                                    onClick={() =>
-                                      handleRemoveShiftSlot(shiftTypeKey, idx)
-                                    }
-                                    startIcon={<FiX size={14} />}
-                                    sx={{ minWidth: "auto" }}
-                                  >
-                                    Remove
-                                  </Button>
-                                </Box>
-                              ))
-                            )}
-                          </Stack>
-
-                          <Stack
-                            direction={{ xs: "column", sm: "row" }}
-                            spacing={1}
-                          >
-                            <TextField
-                              size="small"
-                              label="Slot Tag"
-                              placeholder="e.g., day_am"
-                              value={slotInput.tag}
-                              onChange={(e) =>
-                                handleSlotInputChange(
-                                  shiftTypeKey,
-                                  "tag",
-                                  e.target.value,
-                                )
-                              }
-                              sx={{ flex: 1 }}
-                            />
-                            <TextField
-                              size="small"
-                              label="Start"
-                              type="time"
-                              value={slotInput.startLocalTime}
-                              onChange={(e) =>
-                                handleSlotInputChange(
-                                  shiftTypeKey,
-                                  "startLocalTime",
-                                  e.target.value,
-                                )
-                              }
-                              InputLabelProps={{ shrink: true }}
-                            />
-                            <TextField
-                              size="small"
-                              label="End"
-                              type="time"
-                              value={slotInput.endLocalTime}
-                              onChange={(e) =>
-                                handleSlotInputChange(
-                                  shiftTypeKey,
-                                  "endLocalTime",
-                                  e.target.value,
-                                )
-                              }
-                              InputLabelProps={{ shrink: true }}
-                            />
-                            <Button
-                              variant="contained"
-                              size="small"
-                              startIcon={<FiPlus size={14} />}
-                              onClick={() => handleAddShiftSlot(shiftTypeKey)}
-                            >
-                              Add Slot
-                            </Button>
-                          </Stack>
-                        </Box>
-                      );
-                    })}
-                  </Stack>
+                {shiftKeys.length === 0 && (
+                  <Typography sx={{ px: 2.5, py: 2, color: IOS.tertiary, fontSize: 14 }}>No shifts yet. Add one below, like Day or Night.</Typography>
                 )}
-              </Box>
-
-              {/* Certification Tags */}
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                  Certification Tags{" "}
-                  <Typography
-                    component="span"
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    (Optional)
-                  </Typography>
-                </Typography>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ display: "block", mb: 1.5 }}
-                >
-                  e.g., med-pass, bilingual, forklift-certified – leave empty if
-                  not applicable
-                </Typography>
-                <Stack spacing={1} mb={2}>
-                  {(prefs.certificationTags || []).map((cert, idx) => (
-                    <Box
-                      key={idx}
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        p: 1.5,
-                        borderRadius: 2,
-                        bgcolor: "grey.50",
-                        border: "1px solid",
-                        borderColor: "divider",
-                      }}
-                    >
-                      <Typography>{toDisplayLabel(cert)}</Typography>
-                      <Button
-                        size="small"
-                        color="error"
-                        onClick={() =>
-                          handleArrayRemove("certificationTags", idx)
+                {shiftKeys.map((shiftTypeKey, si) => {
+                  const definition = getShiftTypeDefinition(shiftTypeKey);
+                  const slots = [...(definition?.timeSlots || [])].sort((x, y) => x.startLocalTime.localeCompare(y.startLocalTime));
+                  const input = slotInputsByShiftType[toSnakeCase(shiftTypeKey)] || {};
+                  return (
+                    <Box key={shiftTypeKey} sx={{ px: { xs: 2, md: 2.5 }, py: 2, borderTop: si === 0 ? "none" : `1px solid ${IOS.separator}` }}>
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, mb: 1 }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: 16, color: IOS.ink }}>{definition?.label || toDisplayLabel(shiftTypeKey)}</Typography>
+                        {!readOnly && (
+                          <Button
+                            size="small"
+                            onClick={() => askRemove("shiftTypes", shiftTypeKey)}
+                            sx={{ color: IOS.secondary, borderRadius: "8px", "&:hover": { color: IOS.redText, bgcolor: tint(IOS.red, 0.08) } }}
+                          >
+                            Remove shift
+                          </Button>
+                        )}
+                      </Box>
+                      {slots.length === 0 ? (
+                        <Typography sx={{ fontSize: 14, color: IOS.orangeText, mb: 1 }}>Add the hours for this shift.</Typography>
+                      ) : (
+                        <Box sx={{ borderRadius: IOS.radius.cell, bgcolor: IOS.canvas, mb: 1.25, overflow: "hidden" }}>
+                          {slots.map((slot, idx) => {
+                            const used = slotUsage(toSnakeCase(shiftTypeKey), slot.tag);
+                            const originalIndex = (definition?.timeSlots || []).indexOf(slot);
+                            return (
+                              <Box
+                                key={slot.tag}
+                                sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 1.5, py: 1, borderTop: idx === 0 ? "none" : `1px solid ${IOS.hairline}` }}
+                              >
+                                <Typography sx={{ fontSize: 15, fontWeight: 600, color: IOS.ink, fontVariantNumeric: "tabular-nums", minWidth: 170 }}>
+                                  {to12HourTime(slot.startLocalTime)} – {to12HourTime(slot.endLocalTime)}
+                                </Typography>
+                                {slot.label && !slot.label.toLowerCase().startsWith(toDisplayLabel(shiftTypeKey).toLowerCase()) && <Typography sx={{ fontSize: 13, color: IOS.secondary }}>{slot.label}</Typography>}
+                                {slot.spansOvernight && (
+                                  <Box component="span" sx={{ fontSize: 11, fontWeight: 700, color: "#5856D6", bgcolor: tint("#5856D6", 0.12), px: 0.75, py: 0.25, borderRadius: "6px" }}>
+                                    Overnight
+                                  </Box>
+                                )}
+                                {used > 0 && <Typography sx={{ fontSize: 12, color: IOS.secondary }}>in Weekly Needs</Typography>}
+                                <Box sx={{ flex: 1 }} />
+                                {!readOnly && (
+                                  <Tooltip title={used ? "Used in Weekly Needs: remove it there first" : "Remove"}>
+                                    <span>
+                                      <IconButton
+                                        size="small"
+                                        aria-label={`Remove ${to12HourTime(slot.startLocalTime)} to ${to12HourTime(slot.endLocalTime)}`}
+                                        disabled={used > 0}
+                                        onClick={() => handleRemoveShiftSlot(shiftTypeKey, originalIndex)}
+                                        sx={{ color: IOS.tertiary, "&:hover": { color: IOS.red, bgcolor: tint(IOS.red, 0.08) } }}
+                                      >
+                                        <FiX size={15} />
+                                      </IconButton>
+                                    </span>
+                                  </Tooltip>
+                                )}
+                              </Box>
+                            );
+                          })}
+                        </Box>
+                      )}
+                      {!readOnly && (
+                        <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}>
+                          <Field
+                            type="time"
+                            aria-label={`${toDisplayLabel(shiftTypeKey)} start time`}
+                            value={input.startLocalTime || ""}
+                            onChange={(e) => setSlotField(shiftTypeKey, "startLocalTime", e.target.value)}
+                            sx={{ width: 130 }}
+                          />
+                          <Typography sx={{ color: IOS.secondary }}>to</Typography>
+                          <Field
+                            type="time"
+                            aria-label={`${toDisplayLabel(shiftTypeKey)} end time`}
+                            value={input.endLocalTime || ""}
+                            onChange={(e) => setSlotField(shiftTypeKey, "endLocalTime", e.target.value)}
+                            sx={{ width: 130 }}
+                          />
+                          <Field
+                            placeholder="Name (optional)"
+                            aria-label={`${toDisplayLabel(shiftTypeKey)} time name`}
+                            value={input.name || ""}
+                            onChange={(e) => setSlotField(shiftTypeKey, "name", e.target.value)}
+                            sx={{ width: 170 }}
+                          />
+                          <Button
+                            onClick={() => addSlot(shiftTypeKey)}
+                            disabled={!input.startLocalTime || !input.endLocalTime}
+                            startIcon={<FiPlus size={14} />}
+                            sx={{ borderRadius: "10px", px: 2, color: IOS.blue, bgcolor: tint(IOS.blue, 0.1), "&:hover": { bgcolor: tint(IOS.blue, 0.16) } }}
+                          >
+                            Add time
+                          </Button>
+                        </Box>
+                      )}
+                    </Box>
+                  );
+                })}
+                {!readOnly && (
+                  <Box sx={{ px: { xs: 2, md: 2.5 }, py: 2, bgcolor: "#FBFBFD", borderTop: `1px solid ${IOS.separator}`, display: "flex", gap: 1, maxWidth: "100%" }}>
+                    <Field
+                      placeholder="New shift, e.g. Day, Evening, Night"
+                      aria-label="New shift name"
+                      value={newShiftType}
+                      onChange={(e) => setNewShiftType(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addShiftType();
                         }
-                        startIcon={<FiX size={14} />}
-                        sx={{ minWidth: "auto" }}
-                      >
-                        Remove
-                      </Button>
-                    </Box>
-                  ))}
-                </Stack>
-                <Box sx={{ display: "flex", gap: 1 }}>
-                  <TextField
+                      }}
+                      sx={{ flex: 1, maxWidth: 360, bgcolor: "#fff", border: `1px solid ${IOS.separator}` }}
+                    />
+                    <Button
+                      onClick={addShiftType}
+                      disabled={!newShiftType.trim()}
+                      startIcon={<FiPlus size={14} />}
+                      sx={{ borderRadius: "10px", px: 2, color: IOS.blue, bgcolor: tint(IOS.blue, 0.1), "&:hover": { bgcolor: tint(IOS.blue, 0.16) } }}
+                    >
+                      Add shift
+                    </Button>
+                  </Box>
+                )}
+              </Section>
+            </Box>
+
+            {/* ── Roles ── */}
+            <Section id="roles" title="Roles" description="The jobs people do here. Staff get one or more roles; Weekly Needs asks for people by role.">
+              <TagEditor
+                items={prefs.roleFamilies || []}
+                format={toLabel}
+                placeholder="Add a role, e.g. CNA, Med Tech"
+                onAdd={(v) => addTag("roleFamilies", v)}
+                onRemove={(v) => askRemove("roleFamilies", v)}
+                usage={usageNote("roleFamilies")}
+                disabled={readOnly}
+                color={IOS.blue}
+                emptyText="No roles yet."
+              />
+            </Section>
+
+            {/* ── Unit areas ── */}
+            <Section
+              id="areas"
+              title="Unit areas"
+              description="Optional. Parts of the building, like Memory Care or Assisted Living. Tag staff with the areas they can work, then ask for an area in Weekly Needs."
+            >
+              <TagEditor
+                items={prefs.unitAreas || []}
+                format={toLabel}
+                placeholder="Add an area, e.g. Memory Care"
+                onAdd={(v) => addTag("unitAreas", v)}
+                onRemove={(v) => askRemove("unitAreas", v)}
+                usage={usageNote("unitAreas")}
+                disabled={readOnly}
+                color={IOS.green}
+                emptyText="No unit areas. Everyone can work anywhere."
+              />
+            </Section>
+
+            {/* ── Certifications ── */}
+            <Section
+              id="certifications"
+              title="Certifications"
+              description="Optional. Skills a shift may require, like Med Pass or CPR. Only staff tagged with them are offered those shifts."
+            >
+              <TagEditor
+                items={prefs.certificationTags || []}
+                format={toLabel}
+                placeholder="Add a certification, e.g. Med Pass"
+                onAdd={(v) => addTag("certificationTags", v)}
+                onRemove={(v) => askRemove("certificationTags", v)}
+                usage={usageNote("certificationTags")}
+                disabled={readOnly}
+                color={IOS.purple}
+                emptyText="No certifications."
+              />
+            </Section>
+
+            {/* ── Facility ── */}
+            <Section id="facility" title="Facility">
+              <Box data-guide-id="guide-facility-timezone">
+                <Row
+                  first
+                  label="Time zone"
+                  help={
+                    prefs.facilityTimezoneConfirmed
+                      ? "Shift times are read in this time zone."
+                      : "Not confirmed yet. Save a time zone so shift times don't depend on each device's clock."
+                  }
+                >
+                  <Autocomplete
+                    options={IANA_TIMEZONES}
+                    value={prefs.facilityTimezone || "UTC"}
+                    onChange={(_, value) => handleChange("facilityTimezone", value || "UTC")}
+                    disableClearable
+                    disabled={readOnly}
                     size="small"
-                    placeholder="e.g., med-pass, bilingual"
-                    value={arrayInputs.certificationTags}
-                    onChange={(e) =>
-                      handleArrayInputChange(
-                        "certificationTags",
-                        e.target.value,
-                      )
-                    }
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleArrayAdd("certificationTags");
-                      }
+                    renderInput={(params) => <TextField {...params} placeholder="America/New_York" inputProps={{ ...params.inputProps, "aria-label": "Time zone" }} />}
+                    sx={{
+                      width: { xs: "100%", sm: 280 },
+                      "& .MuiOutlinedInput-root": { borderRadius: "10px", bgcolor: IOS.canvas, "& fieldset": { border: "none" } },
                     }}
-                    sx={{ flex: 1 }}
                   />
-                  <Button
-                    variant="contained"
+                </Row>
+              </Box>
+              <Box data-guide-id="guide-facility-scheduling-pattern">
+                <Row label="Scheduling pattern" help="The rotation Auto-fill follows when it assigns shifts.">
+                  <Select
                     size="small"
-                    startIcon={<FiPlus size={14} />}
-                    onClick={() => handleArrayAdd("certificationTags")}
-                    sx={{ px: 2 }}
+                    value={prefs.schedulingPattern || "balance"}
+                    onChange={(e) => handleChange("schedulingPattern", e.target.value)}
+                    disabled={readOnly}
+                    inputProps={{ "aria-label": "Scheduling pattern" }}
+                    sx={{ ...selectSx, width: { xs: "100%", sm: 280 } }}
                   >
-                    Add
-                  </Button>
-                </Box>
+                    {SCHEDULING_PATTERNS.map((p) => (
+                      <MenuItem key={p.value} value={p.value}>
+                        {p.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </Row>
               </Box>
-            </Stack>
-          </AccordionDetails>
-        </Accordion>
-        {/* ── Workload Signals ── */}
-        <Accordion disableGutters sx={ACCORDION_BASE_SX}>
-          <AccordionSummary
-            expandIcon={<FiChevronDown size={18} />}
-            sx={ACCORDION_SUMMARY_SX}
-          >
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Workload Signals
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Thresholds used as signals during auto-generation ranking
-              </Typography>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails sx={ACCORDION_DETAILS_SX}>
-            <TextField
-              label="Weekly Overtime Threshold (hours)"
-              type="number"
-              value={prefs.weeklyOvertimeThresholdHours ?? 40}
-              onChange={(e) =>
-                handleChange(
-                  "weeklyOvertimeThresholdHours",
-                  parseInt(e.target.value) || 1,
-                )
-              }
-              inputProps={{ min: 1 }}
-              helperText="Hours/week at which projected overtime is flagged"
-              sx={{ maxWidth: 320 }}
-            />
-          </AccordionDetails>
-        </Accordion>
+            </Section>
 
-        {/* ── Fairness & Distribution ── */}
-        <Accordion disableGutters sx={ACCORDION_BASE_SX}>
-          <AccordionSummary
-            expandIcon={<FiChevronDown size={18} />}
-            sx={ACCORDION_SUMMARY_SX}
-          >
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Fairness &amp; Distribution
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Controls how auto-generate distributes high-demand shifts
-              </Typography>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails sx={ACCORDION_DETAILS_SX}>
-            <TextField
-              label="Fairness Lookback Period (days)"
-              type="number"
-              value={prefs.fairnessLookbackDays ?? 28}
-              onChange={(e) =>
-                handleChange(
-                  "fairnessLookbackDays",
-                  parseInt(e.target.value) || 7,
-                )
-              }
-              inputProps={{ min: 7, max: 90 }}
-              helperText="7 – 90 days of history used for workload fairness scoring"
-              sx={{ maxWidth: 320 }}
-            />
-          </AccordionDetails>
-        </Accordion>
-
-        {/* ── Notifications ── */}
-        <Accordion disableGutters sx={ACCORDION_BASE_SX}>
-          <AccordionSummary
-            expandIcon={<FiChevronDown size={18} />}
-            sx={ACCORDION_SUMMARY_SX}
-          >
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Time Tracking
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Configure open or geofence-based clock in/out behavior for your
-                facility
-              </Typography>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails sx={ACCORDION_DETAILS_SX}>
-            <Stack spacing={2.25}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: 2,
-                  bgcolor: "grey.50",
-                  border: "1px solid",
-                  borderColor: "divider",
-                }}
-              >
-                <FormControlLabel
-                  sx={{ m: 0, width: "100%" }}
-                  control={
-                    <Switch
-                      checked={Boolean(prefs.timeTracking?.enabled)}
-                      onChange={(e) =>
-                        handleTimeTrackingChange("enabled", e.target.checked)
-                      }
-                    />
-                  }
-                  label={
-                    <Box>
-                      <Typography>Enable Time Tracking</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        When disabled, clock in/out endpoints reject attendance
-                        actions
-                      </Typography>
+            {/* ── Time tracking ── */}
+            <Section id="time-tracking" title="Time tracking" description="Let staff clock in and out of their shifts.">
+              <Row first label="Time tracking" help={tt.enabled ? "Staff can clock in and out." : "Off. Clock in and out is turned off."}>
+                <Toggle checked={Boolean(tt.enabled)} onChange={(v) => handleTimeTrackingChange("enabled", v)} disabled={readOnly} label="Time tracking" />
+              </Row>
+              {tt.enabled && (
+                <>
+                  <Row label="Where staff can clock in" help={tt.mode === "geofence" ? "Only at the facility. Their location is checked." : "Anywhere. No location check."}>
+                    <ToggleButtonGroup
+                      exclusive
+                      size="small"
+                      value={tt.mode || "open"}
+                      onChange={(_, v) => v && handleTimeTrackingChange("mode", v)}
+                      disabled={readOnly}
+                      sx={segmentedSx}
+                    >
+                      <ToggleButton value="open">Anywhere</ToggleButton>
+                      <ToggleButton value="geofence">At the facility</ToggleButton>
+                    </ToggleButtonGroup>
+                  </Row>
+                  {tt.mode === "geofence" && (
+                    <Row stack label="Facility location" help="Set the address and how close staff must be.">
+                      <FacilityGeofenceMap geofence={tt.geofence} onChange={handleGeofenceChange} disabled={readOnly} />
+                      <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap", mt: 1.5 }}>
+                        <Box>
+                          <Typography sx={{ fontSize: 13, color: IOS.secondary, mb: 0.5 }}>Radius</Typography>
+                          <Field
+                            type="number"
+                            min={1}
+                            max={5000}
+                            aria-label="Geofence radius in meters"
+                            value={tt.geofence?.radiusMeters ?? 150}
+                            onChange={(e) => handleGeofenceChange("radiusMeters", Math.max(1, Number(e.target.value) || 1))}
+                            disabled={readOnly}
+                            sx={{ width: 96 }}
+                          />
+                          {unit("meters")}
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontSize: 13, color: IOS.secondary, mb: 0.5 }}>Location accuracy needed</Typography>
+                          <Field
+                            type="number"
+                            min={1}
+                            max={500}
+                            aria-label="Maximum location accuracy in meters"
+                            value={tt.geofence?.maxAccuracyMeters ?? 50}
+                            onChange={(e) => handleGeofenceChange("maxAccuracyMeters", Math.max(1, Number(e.target.value) || 1))}
+                            disabled={readOnly}
+                            sx={{ width: 96 }}
+                          />
+                          {unit("meters")}
+                        </Box>
+                      </Box>
+                    </Row>
+                  )}
+                  <Row label="Rounding" help={Number(tt.roundingMinutes) ? `Clock times round to the nearest ${tt.roundingMinutes} minutes.` : "Clock times are saved exactly."}>
+                    <Select
+                      size="small"
+                      value={tt.roundingMinutes ?? 0}
+                      onChange={(e) => handleTimeTrackingChange("roundingMinutes", Number(e.target.value))}
+                      disabled={readOnly}
+                      inputProps={{ "aria-label": "Rounding" }}
+                      sx={{ ...selectSx, minWidth: 160 }}
+                    >
+                      <MenuItem value={0}>No rounding</MenuItem>
+                      <MenuItem value={5}>5 minutes</MenuItem>
+                      <MenuItem value={6}>6 minutes</MenuItem>
+                      <MenuItem value={10}>10 minutes</MenuItem>
+                      <MenuItem value={15}>15 minutes</MenuItem>
+                    </Select>
+                  </Row>
+                  <Row label="Clock-in window" help="How early or late someone can clock in around the shift start.">
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <Field
+                        type="number"
+                        min={0}
+                        aria-label="Clock-in window in minutes"
+                        value={tt.clockInGraceMinutes ?? 15}
+                        onChange={(e) => handleTimeTrackingChange("clockInGraceMinutes", Math.max(0, Number(e.target.value) || 0))}
+                        disabled={readOnly}
+                        sx={{ width: 80, textAlign: "right" }}
+                      />
+                      {unit("min")}
                     </Box>
-                  }
+                  </Row>
+                  <Row label="Clock-out window" help="How early or late someone can clock out around the shift end.">
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <Field
+                        type="number"
+                        min={0}
+                        aria-label="Clock-out window in minutes"
+                        value={tt.clockOutGraceMinutes ?? 30}
+                        onChange={(e) => handleTimeTrackingChange("clockOutGraceMinutes", Math.max(0, Number(e.target.value) || 0))}
+                        disabled={readOnly}
+                        sx={{ width: 80, textAlign: "right" }}
+                      />
+                      {unit("min")}
+                    </Box>
+                  </Row>
+                </>
+              )}
+            </Section>
+
+            {/* ── Notifications ── */}
+            <Section id="notifications" title="Notifications">
+              <Row first label="Tell staff about open shifts" help="Message staff when a new open shift is posted.">
+                <Toggle
+                  checked={Boolean(prefs.notifyStaffOnCoveragePost)}
+                  onChange={(v) => handleChange("notifyStaffOnCoveragePost", v)}
+                  disabled={readOnly}
+                  label="Tell staff about open shifts"
                 />
-              </Box>
-
-              {!prefs.timeTracking?.enabled ? (
-                <Alert severity="info">
-                  Time tracking is off. Turn it on to configure attendance
-                  behavior.
-                </Alert>
-              ) : null}
-
-              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                <Box sx={{ flex: 1 }}>
-                  <FormControl fullWidth>
-                    <InputLabel>Tracking Mode</InputLabel>
-                    <Select
-                      label="Tracking Mode"
-                      value={prefs.timeTracking?.mode || "open"}
-                      onChange={(e) =>
-                        handleTimeTrackingChange("mode", e.target.value)
-                      }
-                      sx={{ borderRadius: 2 }}
-                    >
-                      <MenuItem value="open">Open</MenuItem>
-                      <MenuItem value="geofence">Geofence</MenuItem>
-                    </Select>
-                  </FormControl>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ mt: 0.75, display: "block" }}
-                  >
-                    {prefs.timeTracking?.mode === "geofence"
-                      ? "Geofence: staff location is checked against the facility boundary when clocking in and out."
-                      : "Open: Staff can clock in and out directly without location checks."}
-                  </Typography>
-                </Box>
-
-                <Box sx={{ flex: 1 }}>
-                  <FormControl fullWidth>
-                    <InputLabel>Rounding</InputLabel>
-                    <Select
-                      label="Rounding"
-                      value={prefs.timeTracking?.roundingMinutes ?? 0}
-                      onChange={(e) =>
-                        handleTimeTrackingChange(
-                          "roundingMinutes",
-                          Number(e.target.value),
-                        )
-                      }
-                      sx={{ borderRadius: 2 }}
-                    >
-                      <MenuItem value={0}>No Rounding</MenuItem>
-                      <MenuItem value={5}>5 Minutes</MenuItem>
-                      <MenuItem value={6}>6 Minutes</MenuItem>
-                      <MenuItem value={10}>10 Minutes</MenuItem>
-                      <MenuItem value={15}>15 Minutes</MenuItem>
-                    </Select>
-                  </FormControl>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ mt: 0.75, display: "block" }}
-                  >
-                    {Number(prefs.timeTracking?.roundingMinutes ?? 0) === 0
-                      ? "No rounding: clock times are saved exactly as recorded."
-                      : `Rounding: clock times round to the nearest ${prefs.timeTracking?.roundingMinutes} minutes.`}
-                  </Typography>
-                </Box>
-              </Stack>
-
-              {prefs.timeTracking?.mode === "geofence" ? (
-                <Stack spacing={1.5}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    Facility Geofence
-                  </Typography>
-                  <FacilityGeofenceMap
-                    geofence={prefs.timeTracking?.geofence}
-                    onChange={handleGeofenceChange}
-                    disabled={!canManageFacilityPreferences}
+              </Row>
+              <Row label="Shift reminder" help="How long before a shift staff get a reminder.">
+                <Box sx={{ display: "flex", alignItems: "center" }}>
+                  <Field
+                    type="number"
+                    min={1}
+                    aria-label="Shift reminder in hours"
+                    value={prefs.shiftReminderLeadHours ?? 24}
+                    onChange={(e) => handleChange("shiftReminderLeadHours", parseInt(e.target.value, 10) || 1)}
+                    disabled={readOnly}
+                    sx={{ width: 80, textAlign: "right" }}
                   />
-                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="Geofence radius (meters)"
-                      value={prefs.timeTracking?.geofence?.radiusMeters ?? 150}
-                      onChange={(e) =>
-                        handleGeofenceChange(
-                          "radiusMeters",
-                          Math.max(1, Number(e.target.value) || 1),
-                        )
-                      }
-                      inputProps={{ min: 1, max: 5000 }}
-                    />
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="Maximum location accuracy (meters)"
-                      value={
-                        prefs.timeTracking?.geofence?.maxAccuracyMeters ?? 50
-                      }
-                      onChange={(e) =>
-                        handleGeofenceChange(
-                          "maxAccuracyMeters",
-                          Math.max(1, Number(e.target.value) || 1),
-                        )
-                      }
-                      inputProps={{ min: 1, max: 500 }}
-                    />
-                  </Stack>
-                </Stack>
-              ) : null}
+                  {unit("hours before")}
+                </Box>
+              </Row>
+            </Section>
 
-              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="Clock In Grace (minutes)"
-                  value={prefs.timeTracking?.clockInGraceMinutes ?? 15}
-                  onChange={(e) =>
-                    handleTimeTrackingChange(
-                      "clockInGraceMinutes",
-                      Math.max(0, Number(e.target.value) || 0),
-                    )
-                  }
-                  inputProps={{ min: 0 }}
-                  helperText="Allow early/late clock-in around shift start"
-                />
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="Clock Out Grace (minutes)"
-                  value={prefs.timeTracking?.clockOutGraceMinutes ?? 30}
-                  onChange={(e) =>
-                    handleTimeTrackingChange(
-                      "clockOutGraceMinutes",
-                      Math.max(0, Number(e.target.value) || 0),
-                    )
-                  }
-                  inputProps={{ min: 0 }}
-                  helperText="Allow early/late clock-out around shift end"
-                />
-              </Stack>
-            </Stack>
-          </AccordionDetails>
-        </Accordion>
+            {/* ── Advanced ── */}
+            <Section id="advanced" title="Advanced" description="Used by Auto-fill when it ranks who should take a shift.">
+              <Row first label="Overtime starts at" help="Hours in a week after which a shift counts as overtime.">
+                <Box sx={{ display: "flex", alignItems: "center" }}>
+                  <Field
+                    type="number"
+                    min={1}
+                    aria-label="Overtime threshold in hours per week"
+                    value={prefs.weeklyOvertimeThresholdHours ?? 40}
+                    onChange={(e) => handleChange("weeklyOvertimeThresholdHours", parseInt(e.target.value, 10) || 1)}
+                    disabled={readOnly}
+                    sx={{ width: 80, textAlign: "right" }}
+                  />
+                  {unit("hours / week")}
+                </Box>
+              </Row>
+              <Row label="Fairness looks back" help="How many days of past shifts are used to share work out fairly (7 to 90).">
+                <Box sx={{ display: "flex", alignItems: "center" }}>
+                  <Field
+                    type="number"
+                    min={7}
+                    max={90}
+                    aria-label="Fairness lookback in days"
+                    value={prefs.fairnessLookbackDays ?? 28}
+                    onChange={(e) => handleChange("fairnessLookbackDays", parseInt(e.target.value, 10) || 7)}
+                    disabled={readOnly}
+                    sx={{ width: 80, textAlign: "right" }}
+                  />
+                  {unit("days")}
+                </Box>
+              </Row>
+            </Section>
 
-        {/* ── Notifications ── */}
-        <Accordion disableGutters sx={ACCORDION_BASE_SX}>
-          <AccordionSummary
-            expandIcon={<FiChevronDown size={18} />}
-            sx={ACCORDION_SUMMARY_SX}
-          >
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Notifications
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Configure facility-level notification behaviour
-              </Typography>
-            </Box>
-          </AccordionSummary>
-          <AccordionDetails sx={ACCORDION_DETAILS_SX}>
-            <Stack spacing={2} mb={2.5}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: 2,
-                  bgcolor: "grey.50",
-                  border: "1px solid",
-                  borderColor: "divider",
-                }}
-              >
-                <FormControlLabel
-                  sx={{ m: 0, width: "100%" }}
-                  control={
-                    <Switch
-                      checked={prefs.notifyStaffOnCoveragePost ?? false}
-                      onChange={(e) =>
-                        handleChange(
-                          "notifyStaffOnCoveragePost",
-                          e.target.checked,
-                        )
-                      }
-                    />
-                  }
-                  label={
-                    <Box>
-                      <Typography>Notify Staff on Coverage Post</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Broadcast to staff when a new open coverage slot is
-                        posted
-                      </Typography>
-                    </Box>
-                  }
-                />
-              </Box>
-            </Stack>
+            {/* ── Danger zone ── */}
+            {canManageFacilityPreferences && can("tenant.delete") && (
+              <Section id="danger" title="Delete account" tone="danger">
+                <Row first label="Delete this facility" help="Permanently removes all staff, schedules, messages and settings. This can't be undone.">
+                  <Button
+                    onClick={() => setDeleteDialogOpen(true)}
+                    disabled={deletingTenant || !tenant}
+                    sx={{ borderRadius: "10px", px: 2, color: "#fff", bgcolor: IOS.red, "&:hover": { bgcolor: "#E0352B" } }}
+                  >
+                    Delete facility
+                  </Button>
+                </Row>
+              </Section>
+            )}
+          </Stack>
+        </Box>
 
-            <TextField
-              label="Shift Reminder Lead Time (hours)"
-              type="number"
-              value={prefs.shiftReminderLeadHours ?? 24}
-              onChange={(e) =>
-                handleChange(
-                  "shiftReminderLeadHours",
-                  parseInt(e.target.value) || 1,
-                )
-              }
-              inputProps={{ min: 1 }}
-              helperText="How many hours before a shift staff receive a reminder"
-              sx={{ maxWidth: 320 }}
-            />
-          </AccordionDetails>
-        </Accordion>
-
-        {canManageFacilityPreferences && can("tenant.delete") && (
-          <Accordion
-            disableGutters
+        {/* Save bar */}
+        {canManageFacilityPreferences && (
+          <Box
             sx={{
-              ...ACCORDION_BASE_SX,
-              borderColor: "error.light",
-              bgcolor: "error.50",
-              "& .MuiAccordionSummary-root": {
-                bgcolor: "error.50",
-              },
-              "& .MuiAccordionDetails-root": {
-                bgcolor: "error.50",
-              },
+              position: "sticky",
+              bottom: 16,
+              mt: 4,
+              ml: { md: "calc(190px + 32px)" },
+              zIndex: 5,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 2,
+              px: 2.5,
+              py: 1.5,
+              borderRadius: IOS.radius.card,
+              bgcolor: "rgba(255,255,255,0.86)",
+              backdropFilter: "saturate(180%) blur(20px)",
+              border: `1px solid ${IOS.hairline}`,
+              boxShadow: dirty ? IOS.shadowRaised : IOS.shadow,
             }}
           >
-            <AccordionSummary
-              expandIcon={<FiChevronDown size={18} />}
-              sx={ACCORDION_SUMMARY_SX}
-            >
-              <Box>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  Danger Zone
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Delete this facility account and permanently remove all staff,
-                  schedules, messages, preferences, and tenant-scoped data.
-                </Typography>
-              </Box>
-            </AccordionSummary>
-            <AccordionDetails sx={ACCORDION_DETAILS_SX}>
+            <Typography sx={{ fontSize: 14, fontWeight: 600, color: dirty ? IOS.ink : IOS.secondary, display: "flex", alignItems: "center", gap: 1 }}>
+              <Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: dirty ? IOS.orange : IOS.green }} />
+              {dirty ? "You have unsaved changes" : "All changes saved"}
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              {dirty && (
+                <Button onClick={discardChanges} disabled={saving} sx={{ borderRadius: "10px", color: IOS.ink, bgcolor: IOS.fill, px: 2 }}>
+                  Discard
+                </Button>
+              )}
               <Button
-                variant="outlined"
-                color="error"
-                onClick={() => setDeleteDialogOpen(true)}
-                disabled={deletingTenant || !tenant}
-                sx={{ textTransform: "none", borderRadius: 2 }}
+                variant="contained"
+                disableElevation
+                onClick={handleSave}
+                disabled={saving || !dirty}
+                data-guide-id="guide-facility-save-btn"
+                startIcon={saving ? <CircularProgress size={14} color="inherit" /> : null}
+                sx={{ borderRadius: "10px", px: 2.5, bgcolor: IOS.blue, "&.Mui-disabled": { bgcolor: IOS.fill, color: IOS.tertiary } }}
               >
-                Delete Facility Account
+                {saving ? "Saving…" : "Save changes"}
               </Button>
-            </AccordionDetails>
-          </Accordion>
-        )}
-
-        {/* Save button */}
-        {canManageFacilityPreferences && (
-          <Box sx={{ display: "flex", justifyContent: "flex-end", pb: 2 }}>
-            <Button
-              variant="contained"
-              startIcon={
-                saving ? (
-                  <CircularProgress size={16} color="inherit" />
-                ) : (
-                  <FiSave size={16} />
-                )
-              }
-              onClick={handleSave}
-              disabled={saving}
-              data-guide-id="guide-facility-save-btn"
-              sx={{ borderRadius: 2, textTransform: "none", px: 3, py: 1.25 }}
-            >
-              {saving ? "Saving…" : "Save Preferences"}
-            </Button>
+            </Stack>
           </Box>
         )}
-      </Stack>
+      </Box>
+
+      <Dialog open={Boolean(pendingRemove)} onClose={() => setPendingRemove(null)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
+        <DialogTitle sx={{ fontWeight: 700 }}>Remove {pendingRemove?.label}?</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ color: IOS.secondary }}>
+            {pendingRemove?.note}. They keep it for now, but it won't be offered as a choice anymore. Remove it there too if it's no longer used.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setPendingRemove(null)} sx={{ borderRadius: "10px" }}>
+            Keep
+          </Button>
+          <Button
+            onClick={() => {
+              removeTagNow(pendingRemove.field, pendingRemove.value);
+              setPendingRemove(null);
+            }}
+            sx={{ borderRadius: "10px", color: "#fff", bgcolor: IOS.red, px: 2, "&:hover": { bgcolor: "#E0352B" } }}
+          >
+            Remove
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Reset confirmation dialog */}
       <Dialog
         open={resetDialogOpen}
         onClose={() => !resetting && setResetDialogOpen(false)}
+        PaperProps={{ sx: { borderRadius: "16px" } }}
       >
         <DialogTitle>Reset to Defaults?</DialogTitle>
         <DialogContent>
@@ -1782,6 +1316,7 @@ export default function FacilityPreferencesPage() {
       <Dialog
         open={deleteDialogOpen}
         onClose={() => !deletingTenant && setDeleteDialogOpen(false)}
+        PaperProps={{ sx: { borderRadius: "16px" } }}
       >
         <DialogTitle>Delete Facility Account?</DialogTitle>
         <DialogContent>

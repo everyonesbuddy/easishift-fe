@@ -1,19 +1,20 @@
 import { useMemo, useState } from "react";
 import {
-  Autocomplete,
   Box,
   Button,
+  Checkbox,
   Chip,
   IconButton,
   Menu,
   MenuItem,
-  TextField,
+  Select,
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
   Typography,
 } from "@mui/material";
 import { FiPlus, FiTrash2 } from "react-icons/fi";
+import { Link as RouterLink } from "react-router-dom";
 import { getRoleDisplayName } from "../../../constants/industryRoles";
 import { toLabel } from "../../../utils/labels";
 import { tagKey } from "../../../utils/tags";
@@ -57,20 +58,21 @@ const listShiftSlots = (prefs) =>
     })),
   );
 
-// Borderless, rounded field used for area and certification pickers.
-const fieldSx = {
-  "& .MuiOutlinedInput-root": {
-    borderRadius: "10px",
-    bgcolor: IOS.canvas,
-    minHeight: 36,
-    py: "2px !important",
-    pl: "8px !important",
-    fontSize: 13,
-    "& fieldset": { border: "none" },
-    "&:hover": { bgcolor: "#EDEDF0" },
-    "&.Mui-focused": { bgcolor: "#fff", boxShadow: `0 0 0 3px ${tint(IOS.blue, 0.25)}` },
-  },
-  "& .MuiAutocomplete-input": { fontSize: 13, py: "4px !important" },
+// Borderless, rounded selector used for area and certification pickers.
+const selectSx = {
+  borderRadius: "10px",
+  bgcolor: IOS.canvas,
+  minHeight: 36,
+  fontSize: 13,
+  "& fieldset": { border: "none" },
+  "&:hover": { bgcolor: "#EDEDF0" },
+  "&.Mui-focused": { bgcolor: "#fff", boxShadow: `0 0 0 3px ${tint(IOS.blue, 0.25)}` },
+  "&.Mui-disabled": { bgcolor: "transparent", border: `1px dashed ${IOS.separator}` },
+  "& .MuiSelect-select": { py: "6px", pl: "12px", display: "flex", alignItems: "center", minHeight: "24px !important" },
+};
+
+const menuProps = {
+  PaperProps: { sx: { borderRadius: "12px", boxShadow: IOS.shadowRaised, mt: 0.5, maxHeight: 320 } },
 };
 
 function CountInput({ value, onChange, disabled, label }) {
@@ -115,36 +117,24 @@ function CountInput({ value, onChange, disabled, label }) {
  * Weekly Needs: for each shift, which roles (optionally in a unit area and
  * with required certifications) and how many on each day.
  * Controlled: `rules` in, `onChange(rules)` out.
- * `options` ({ unitAreas, certificationTags }) adds areas and certifications
- * already used by staff or coverage; new ones can be typed in and are saved
- * to facility preferences with the template.
+ * Unit areas and certifications are picked from Facility Preferences (the
+ * same lists staff are tagged from); when a list is empty its picker is off.
  */
 export default function StaffingTemplateEditor({
   rules,
   onChange,
   facilityPreferences,
-  options,
   disabled = false,
 }) {
   const slots = useMemo(() => listShiftSlots(facilityPreferences), [facilityPreferences]);
   const roles = facilityPreferences?.roleFamilies || [];
-  const areas = useMemo(
-    () =>
-      mergeKeys(
-        facilityPreferences?.unitAreas || [],
-        options?.unitAreas || [],
-        rules.map((r) => r.unitArea),
-      ),
-    [facilityPreferences, options, rules],
-  );
+  const prefAreas = useMemo(() => mergeKeys(facilityPreferences?.unitAreas || []), [facilityPreferences]);
+  const prefCerts = useMemo(() => mergeKeys(facilityPreferences?.certificationTags || []), [facilityPreferences]);
+  // Values already on a rule stay selectable so older data still shows.
+  const areas = useMemo(() => mergeKeys(prefAreas, rules.map((r) => r.unitArea)), [prefAreas, rules]);
   const certs = useMemo(
-    () =>
-      mergeKeys(
-        facilityPreferences?.certificationTags || [],
-        options?.certificationTags || [],
-        rules.flatMap((r) => r.requiredCertificationTags || []),
-      ),
-    [facilityPreferences, options, rules],
+    () => mergeKeys(prefCerts, rules.flatMap((r) => r.requiredCertificationTags || [])),
+    [prefCerts, rules],
   );
   const [mode, setMode] = useState(() =>
     rules.every((rule) => isWeekdayWeekendShape(rule.countsByWeekday)) ? "weekday_weekend" : "each_day",
@@ -286,66 +276,75 @@ export default function StaffingTemplateEditor({
                         </Typography>
                       </Box>
 
-                      <Autocomplete
+                      <Select
                         size="small"
-                        freeSolo
-                        autoSelect
-                        disabled={disabled}
-                        options={areas}
-                        value={lower(rule.unitArea) || null}
-                        getOptionLabel={(o) => titleCase(o)}
-                        getOptionDisabled={(o) => isDuplicate({ ...rule, unitArea: o }, index)}
-                        onChange={(_, value) => {
-                          const next = lower(value) || null;
+                        displayEmpty
+                        disabled={disabled || !prefAreas.length}
+                        value={lower(rule.unitArea)}
+                        onChange={(e) => {
+                          const next = e.target.value || null;
                           if (next && isDuplicate({ ...rule, unitArea: next }, index)) return;
                           update(index, { unitArea: next });
                         }}
-                        renderInput={(params) => (
-                          <TextField
-                            {...params}
-                            placeholder="Any area"
-                            inputProps={{ ...params.inputProps, "aria-label": `Unit area for ${roleName} on ${slot.name}` }}
-                          />
-                        )}
-                        sx={fieldSx}
-                      />
+                        renderValue={(v) =>
+                          v ? (
+                            titleCase(v)
+                          ) : (
+                            <Box component="span" sx={{ color: IOS.tertiary }}>
+                              {prefAreas.length ? "Any area" : "None set up"}
+                            </Box>
+                          )
+                        }
+                        inputProps={{ "aria-label": `Unit area for ${roleName} on ${slot.name}` }}
+                        MenuProps={menuProps}
+                        sx={selectSx}
+                      >
+                        <MenuItem value="">Any area</MenuItem>
+                        {areas.map((a) => (
+                          <MenuItem key={a} value={a} disabled={isDuplicate({ ...rule, unitArea: a }, index)}>
+                            {titleCase(a)}
+                          </MenuItem>
+                        ))}
+                      </Select>
 
-                      <Autocomplete
+                      <Select
                         size="small"
                         multiple
-                        freeSolo
-                        autoSelect
-                        disableCloseOnSelect
-                        disabled={disabled}
-                        options={certs}
+                        displayEmpty
+                        disabled={disabled || !prefCerts.length}
                         value={(rule.requiredCertificationTags || []).map(lower)}
-                        getOptionLabel={(o) => titleCase(o)}
-                        onChange={(_, value) =>
-                          update(index, { requiredCertificationTags: [...new Set(value.map(lower).filter(Boolean))] })
+                        onChange={(e) =>
+                          update(index, { requiredCertificationTags: [...new Set(e.target.value.map(lower).filter(Boolean))] })
                         }
-                        renderTags={(value, getTagProps) =>
-                          value.map((c, i) => {
-                            const { key, ...tagProps } = getTagProps({ index: i });
-                            return (
-                              <Chip
-                                key={key}
-                                {...tagProps}
-                                size="small"
-                                label={titleCase(c)}
-                                sx={{ height: 22, fontSize: 12, fontWeight: 600, borderRadius: "6px", bgcolor: tint(IOS.purple, 0.12), color: "#8944AB" }}
-                              />
-                            );
-                          })
+                        renderValue={(v) =>
+                          v.length ? (
+                            <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                              {v.map((c) => (
+                                <Chip
+                                  key={c}
+                                  size="small"
+                                  label={titleCase(c)}
+                                  sx={{ height: 22, fontSize: 12, fontWeight: 600, borderRadius: "6px", bgcolor: tint(IOS.purple, 0.12), color: "#8944AB" }}
+                                />
+                              ))}
+                            </Box>
+                          ) : (
+                            <Box component="span" sx={{ color: IOS.tertiary }}>
+                              {prefCerts.length ? "Any certification" : "None set up"}
+                            </Box>
+                          )
                         }
-                        renderInput={(params) => (
-                          <TextField
-                            {...params}
-                            placeholder={(rule.requiredCertificationTags || []).length ? "" : "Any certification"}
-                            inputProps={{ ...params.inputProps, "aria-label": `Certifications for ${roleName} on ${slot.name}` }}
-                          />
-                        )}
-                        sx={fieldSx}
-                      />
+                        inputProps={{ "aria-label": `Certifications for ${roleName} on ${slot.name}` }}
+                        MenuProps={menuProps}
+                        sx={selectSx}
+                      >
+                        {certs.map((c) => (
+                          <MenuItem key={c} value={c} sx={{ gap: 1 }}>
+                            <Checkbox size="small" checked={(rule.requiredCertificationTags || []).map(lower).includes(c)} sx={{ p: 0 }} />
+                            {titleCase(c)}
+                          </MenuItem>
+                        ))}
+                      </Select>
 
                       {columns.map((col) => (
                         <Box key={col.label} sx={{ display: "flex", justifyContent: "center" }}>
@@ -426,8 +425,12 @@ export default function StaffingTemplateEditor({
       )}
       {slots.length > 0 && roles.length > 0 && (
         <Typography variant="body2" sx={{ color: IOS.secondary, mt: 1.5 }}>
-          Pick a unit area or certification to only match staff tagged with it. Type a new one to add it; it's
-          saved to Facility Preferences so you can tag staff with it too.
+          {prefAreas.length && prefCerts.length
+            ? "Pick a unit area or certification to only match staff tagged with it."
+            : `No ${[!prefAreas.length && "unit areas", !prefCerts.length && "certifications"].filter(Boolean).join(" or ")} set up yet.`}{" "}
+          <Box component={RouterLink} to="/facility-preferences#areas" sx={{ color: IOS.blue, fontWeight: 600, textDecoration: "none" }}>
+            Manage in Facility Preferences
+          </Box>
         </Typography>
       )}
 

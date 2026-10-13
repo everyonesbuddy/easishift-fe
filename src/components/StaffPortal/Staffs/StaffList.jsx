@@ -33,8 +33,11 @@ import {
   FiSearch,
   FiUsers,
   FiEdit,
-  FiDelete,
-  FiKey,
+  FiArchive,
+  FiLink,
+  FiSend,
+  FiRotateCcw,
+  FiTrash2,
 } from "react-icons/fi";
 import { useAuth } from "../../../context/AuthContext";
 import StaffCreateAndEditForm from "./StaffCreateAndEditForm";
@@ -47,7 +50,6 @@ import { Stack } from "@mui/material";
 import {
   getRoleDisplayName,
   getRoleColor,
-  getSystemRolesFromUser,
   getUserRoles,
   getUnitAreaDisplayName,
   getCertificationTagDisplayName,
@@ -80,14 +82,29 @@ const getStaffListTourSteps = ({ canManageStaff }) => {
   steps.push({
     target: "guide-staff-table",
     title: "Staff directory",
-    body: "Every profile shows role, contact info, and quick actions for editing or resetting a password.",
+    body: "Staff don't need an account. Each person has a personal link to see their shifts; send it by text or email, or copy it.",
   });
 
   return steps;
 };
 
+// Why a link didn't go out (from the backend's send result).
+const NOT_SENT_REASONS = {
+  no_contact: "they have no phone or email",
+  opted_out: "they replied STOP to texts",
+  sms_needs_pro: "texting is on Pro. Add an email or upgrade",
+  awaiting_opt_in: "we texted them to opt in first; the link follows when they reply START",
+  send_failed: "the message failed to send",
+};
+
+const SMS_STATUS_LABELS = {
+  opted_in: { label: "Texts on", color: "#15803D" },
+  pending: { label: "Awaiting START", color: "#B45309" },
+  opted_out: { label: "Opted out", color: "#B91C1C" },
+};
+
 export default function StaffList() {
-  const { can, facilityPreferences } = useAuth();
+  const { can, facilityPreferences, plan, usage } = useAuth();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -102,25 +119,104 @@ export default function StaffList() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
-  const [resetSendingId, setResetSendingId] = useState(null);
-  const [resetTargetStaff, setResetTargetStaff] = useState(null);
+  const [archiveTarget, setArchiveTarget] = useState(null);
+  const [busyId, setBusyId] = useState(null);
 
   // filters/search
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("active");
 
   useEffect(() => {
     fetchStaff();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
 
   useEffect(() => setPage(0), [staff, searchTerm, filterRole]);
 
   const fetchStaff = async () => {
     try {
-      const res = await api.get("/auth/users");
+      const res = await api.get("/staff", { params: { status: statusFilter } });
       setStaff(res.data || []);
     } catch (err) {
       console.error("Failed to fetch staff", err);
+    }
+  };
+
+  const toastError = (err, fallback) =>
+    toast.error(err?.response?.data?.message || fallback, {
+      position: "top-right",
+      autoClose: 3500,
+    });
+
+  const handleSendLink = async (staffUser) => {
+    try {
+      setBusyId(staffUser._id);
+      const res = await api.post(`/staff/${staffUser._id}/send-link`);
+      if (res.data?.delivered) {
+        toast.success(
+          `Link sent to ${staffUser.name} by ${res.data.channel === "sms" ? "text" : "email"}`,
+          { position: "top-right", autoClose: 2500 },
+        );
+      } else {
+        toast.info(
+          `Not sent: ${NOT_SENT_REASONS[res.data?.reason] || "couldn't reach them"}. You can copy the link instead.`,
+          { position: "top-right", autoClose: 5000 },
+        );
+      }
+    } catch (err) {
+      toastError(err, "Couldn't send the link");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleCopyLink = async (staffUser) => {
+    try {
+      setBusyId(staffUser._id);
+      const res = await api.get(`/staff/${staffUser._id}/link`);
+      await navigator.clipboard.writeText(res.data.url);
+      toast.success(`Copied ${staffUser.name}'s link`, {
+        position: "top-right",
+        autoClose: 2000,
+      });
+    } catch (err) {
+      toastError(err, "Couldn't copy the link");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleConfirmArchive = async () => {
+    const target = archiveTarget;
+    setArchiveTarget(null);
+    if (!target) return;
+    try {
+      const res = await api.post(`/staff/${target._id}/archive`);
+      const removed = res.data?.removedFutureShifts || 0;
+      toast.success(
+        `${target.name} archived${removed ? ` and removed from ${removed} upcoming shift${removed === 1 ? "" : "s"}` : ""}`,
+        { position: "top-right", autoClose: 3000 },
+      );
+      await fetchStaff();
+    } catch (err) {
+      toastError(err, "Couldn't archive");
+    }
+  };
+
+  const handleRestore = async (staffUser) => {
+    try {
+      setBusyId(staffUser._id);
+      await api.post(`/staff/${staffUser._id}/restore`);
+      toast.success(`${staffUser.name} restored`, {
+        position: "top-right",
+        autoClose: 2000,
+      });
+      await fetchStaff();
+    } catch (err) {
+      toastError(err, "Couldn't restore");
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -136,52 +232,13 @@ export default function StaffList() {
 
   const handleConfirmDelete = async () => {
     try {
-      await api.delete(`/auth/${deleteId}`);
+      await api.delete(`/staff/${deleteId}`);
       await fetchStaff();
     } catch (err) {
-      console.error("Failed to delete staff", err);
+      toastError(err, "Couldn't delete");
     } finally {
       setConfirmOpen(false);
       setDeleteId(null);
-    }
-  };
-
-  const handleAskPasswordReset = (staffUser) => {
-    const systemRoles = getSystemRolesFromUser(staffUser);
-    if (
-      !staffUser?.email ||
-      systemRoles.includes("admin") ||
-      systemRoles.includes("owner")
-    ) {
-      return;
-    }
-    setResetTargetStaff(staffUser);
-  };
-
-  const handleSendPasswordReset = async () => {
-    const staffUser = resetTargetStaff;
-    const userId = staffUser?._id || staffUser?.id;
-    if (!userId || !staffUser?.email) return;
-
-    try {
-      setResetSendingId(userId);
-      await api.post(`/auth/users/${userId}/send-password-reset`);
-      toast.success(`Password reset link sent to ${staffUser.email}`, {
-        position: "top-right",
-        autoClose: 2500,
-      });
-    } catch (err) {
-      console.error("Failed to send password reset link", err);
-      toast.error(
-        err?.response?.data?.message || "Failed to send password reset link",
-        {
-          position: "top-right",
-          autoClose: 3000,
-        },
-      );
-    } finally {
-      setResetSendingId(null);
-      setResetTargetStaff(null);
     }
   };
 
@@ -221,7 +278,8 @@ export default function StaffList() {
     return staff.filter((u) => {
       const matchesSearch =
         u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email?.toLowerCase().includes(searchTerm.toLowerCase());
+        u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (u.userPhone || "").includes(searchTerm.trim());
 
       const matchesRole =
         filterRole === "all" || getUserRoles(u).includes(filterRole);
@@ -253,9 +311,107 @@ export default function StaffList() {
     return normalized.length ? normalized.join(", ") : "-";
   };
 
-  const resetTargetId = resetTargetStaff?._id || resetTargetStaff?.id;
   const canManageStaff = can("staff.manage");
-  const canResetPassword = can("staff.reset_password");
+  const staffLimit = plan?.limits?.staff;
+  const atStaffLimit =
+    staffLimit !== null &&
+    staffLimit !== undefined &&
+    (usage?.staff || 0) >= staffLimit;
+
+  const renderSmsStatus = (u) => {
+    const info = u.hasPhone ? SMS_STATUS_LABELS[u.smsStatus] : null;
+    if (!info) return null;
+    return (
+      <Box
+        component="span"
+        sx={{ fontSize: "0.66rem", fontWeight: 700, color: info.color, ml: 0.5 }}
+      >
+        · {info.label}
+      </Box>
+    );
+  };
+
+  const renderActions = (u) => {
+    const id = u._id;
+    const busy = busyId === id;
+    if (u.status === "archived") {
+      return (
+        <>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<FiRotateCcw />}
+            disabled={!canManageStaff || busy}
+            onClick={() => handleRestore(u)}
+            sx={compactActionButtonSx}
+          >
+            Restore
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            color="error"
+            startIcon={<FiTrash2 />}
+            disabled={!canManageStaff}
+            onClick={() => handleAskDelete(id)}
+            sx={compactActionButtonSx}
+          >
+            Delete
+          </Button>
+        </>
+      );
+    }
+    return (
+      <>
+        {canManageStaff && (
+          <>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<FiSend />}
+              disabled={busy}
+              onClick={() => handleSendLink(u)}
+              sx={compactActionButtonSx}
+            >
+              Send link
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<FiLink />}
+              disabled={busy}
+              onClick={() => handleCopyLink(u)}
+              sx={compactActionButtonSx}
+            >
+              Copy link
+            </Button>
+          </>
+        )}
+        <Button
+          size="small"
+          variant="contained"
+          color="info"
+          startIcon={<FiEdit />}
+          disabled={!canManageStaff}
+          onClick={() => handleOpenEdit(u)}
+          sx={compactActionButtonSx}
+        >
+          Edit
+        </Button>
+        <Button
+          size="small"
+          variant="contained"
+          color="warning"
+          startIcon={<FiArchive />}
+          disabled={!canManageStaff}
+          onClick={() => setArchiveTarget(u)}
+          sx={compactActionButtonSx}
+        >
+          Archive
+        </Button>
+      </>
+    );
+  };
   const { startTourIfUnseen } = useGuideTour();
   const staffListTourSteps = useMemo(
     () => getStaffListTourSteps({ canManageStaff }),
@@ -297,7 +453,17 @@ export default function StaffList() {
               tourSteps={staffListTourSteps}
             />
           </Typography>
-          <Typography color="text.secondary">Manage your team</Typography>
+          <Typography color="text.secondary">
+            Staff don't need an account. They get a personal link to their
+            shifts.
+            {staffLimit !== undefined && (
+              <Box component="span" sx={{ ml: 1, fontWeight: 600 }}>
+                {usage?.staff ?? 0} of{" "}
+                {staffLimit === null ? "unlimited" : staffLimit} staff on{" "}
+                {plan?.label || "your plan"}
+              </Box>
+            )}
+          </Typography>
         </Box>
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
@@ -315,7 +481,7 @@ export default function StaffList() {
                   width: { xs: "100%", md: "auto" },
                 }}
               >
-                Bulk Add Staff
+                Paste or Import List
               </Button>
               <Button
                 size="small"
@@ -325,6 +491,7 @@ export default function StaffList() {
                   setEditingStaff(null);
                   setOpen(true);
                 }}
+                title={atStaffLimit ? "You're at your plan's staff limit" : undefined}
                 data-guide-id="guide-staff-add-btn"
                 sx={{
                   textTransform: "none",
@@ -350,7 +517,7 @@ export default function StaffList() {
             <TextField
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by name or email..."
+              placeholder="Search by name, email or phone..."
               variant="outlined"
               size="small"
               fullWidth
@@ -367,6 +534,18 @@ export default function StaffList() {
           </Box>
 
           <Box display="flex" gap={2} mt={{ xs: 2, lg: 0 }}>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={statusFilter}
+                label="Status"
+                onChange={(e) => setStatusFilter(e.target.value)}
+                sx={{ borderRadius: 2 }}
+              >
+                <MenuItem value="active">Active</MenuItem>
+                <MenuItem value="archived">Archived</MenuItem>
+              </Select>
+            </FormControl>
             <FormControl size="small" sx={{ minWidth: 180 }}>
               <InputLabel>Role</InputLabel>
               <Select
@@ -424,7 +603,9 @@ export default function StaffList() {
                         sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
                         noWrap
                       >
-                        {u.email || "No email"}
+                        {[u.email, u.phoneE164].filter(Boolean).join(" · ") ||
+                          "No contact"}
+                        {renderSmsStatus(u)}
                       </Typography>
                       <Typography
                         sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
@@ -454,48 +635,7 @@ export default function StaffList() {
                       flexWrap="wrap"
                       useFlexGap
                     >
-                      {canResetPassword && (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<FiKey />}
-                          disabled={
-                            !u.email ||
-                            getSystemRolesFromUser(u).includes("admin") ||
-                            getSystemRolesFromUser(u).includes("owner") ||
-                            resetSendingId === (u._id || u.id)
-                          }
-                          onClick={() => handleAskPasswordReset(u)}
-                          sx={compactActionButtonSx}
-                        >
-                          {resetSendingId === (u._id || u.id)
-                            ? "Sending..."
-                            : "Resend reset link"}
-                        </Button>
-                      )}
-                      <Button
-                        size="small"
-                        variant="contained"
-                        color="info"
-                        disabled={!canManageStaff}
-                        onClick={() => handleOpenEdit(u)}
-                        sx={compactActionButtonSx}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        color="error"
-                        disabled={
-                          !canManageStaff ||
-                          getSystemRolesFromUser(u).includes("owner")
-                        }
-                        onClick={() => handleAskDelete(u._id || u.id)}
-                        sx={compactActionButtonSx}
-                      >
-                        Delete
-                      </Button>
+                      {renderActions(u)}
                     </Stack>
                   </Box>
                 </Paper>
@@ -638,9 +778,8 @@ export default function StaffList() {
                           }}
                         >
                           <FiPhone />
-                          {u.userPhone !== undefined && u.userPhone !== null
-                            ? `${u.userPhoneCountryCode || ""}${u.userPhone || ""}`
-                            : "No phone"}
+                          {u.phoneE164 || "No phone"}
+                          {renderSmsStatus(u)}
                         </Typography>
                       </TableCell>
 
@@ -671,50 +810,7 @@ export default function StaffList() {
 
                       <TableCell sx={{ py: 1 }}>
                         <Box display="flex" gap={0.75} flexWrap="wrap">
-                          {canResetPassword && (
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              startIcon={<FiKey />}
-                              disabled={
-                                !u.email ||
-                                getSystemRolesFromUser(u).includes("admin") ||
-                                getSystemRolesFromUser(u).includes("owner") ||
-                                resetSendingId === (u._id || u.id)
-                              }
-                              onClick={() => handleAskPasswordReset(u)}
-                              sx={compactActionButtonSx}
-                            >
-                              {resetSendingId === (u._id || u.id)
-                                ? "Sending..."
-                                : "Resend password reset link"}
-                            </Button>
-                          )}
-                          <Button
-                            size="small"
-                            variant="contained"
-                            color="info"
-                            startIcon={<FiEdit />}
-                            disabled={!canManageStaff}
-                            onClick={() => handleOpenEdit(u)}
-                            sx={compactActionButtonSx}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            color="error"
-                            startIcon={<FiDelete />}
-                            disabled={
-                              !canManageStaff ||
-                              getSystemRolesFromUser(u).includes("owner")
-                            }
-                            onClick={() => handleAskDelete(u._id || u.id)}
-                            sx={compactActionButtonSx}
-                          >
-                            Delete
-                          </Button>
+                          {renderActions(u)}
                         </Box>
                       </TableCell>
                     </TableRow>
@@ -766,46 +862,19 @@ export default function StaffList() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={Boolean(resetTargetStaff)}
-        onClose={() => setResetTargetStaff(null)}
-        fullWidth
-        maxWidth="xs"
-        PaperProps={{ sx: { borderRadius: 3 } }}
-      >
-        <DialogTitle sx={{ fontWeight: 800 }}>
-          Resend password reset link?
-        </DialogTitle>
-        <DialogContent>
-          <Typography sx={{ color: "#334155", lineHeight: 1.6 }}>
-            This will email a new password reset link to{" "}
-            <Box component="span" sx={{ fontWeight: 800 }}>
-              {resetTargetStaff?.email}
-            </Box>
-            . Any previous reset link for this staff account will no longer be
-            usable.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setResetTargetStaff(null)}>Cancel</Button>
-          <Button
-            variant="contained"
-            startIcon={<FiKey />}
-            disabled={resetSendingId === resetTargetId}
-            onClick={handleSendPasswordReset}
-            sx={{ textTransform: "none", borderRadius: 2 }}
-          >
-            {resetSendingId === resetTargetId
-              ? "Sending..."
-              : "Send reset link"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ConfirmDialog
+        open={Boolean(archiveTarget)}
+        title={`Archive ${archiveTarget?.name || "staff member"}?`}
+        message="They come off upcoming shifts, their link stops working, and they no longer count toward your plan. Past shifts and timesheets are kept, and you can restore them any time."
+        onCancel={() => setArchiveTarget(null)}
+        onConfirm={handleConfirmArchive}
+        confirmLabel="Archive"
+      />
 
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete Staff Member?"
-        message="This action cannot be undone."
+        title="Delete permanently?"
+        message="This can't be undone. Staff with shift history can only be archived."
         onCancel={() => setConfirmOpen(false)}
         onConfirm={handleConfirmDelete}
       />

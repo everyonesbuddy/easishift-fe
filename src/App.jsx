@@ -29,6 +29,7 @@ import BillingCancel from "./components/StaffPortal/Billing/BillingCancel";
 import ScheduleList from "./components/StaffPortal/Schedule/ScheduleList";
 import ShiftSwapRequestsPage from "./components/StaffPortal/Schedule/ShiftSwapRequestsPage";
 import StaffList from "./components/StaffPortal/Staffs/StaffList";
+import MembersPage from "./components/StaffPortal/Members/MembersPage";
 import MessageList from "./components/StaffPortal/Messages/MessageList";
 import TimeOffRequestList from "./components/StaffPortal/TimeOff/TimeOffRequestList";
 import TimeOffDecision from "./components/StaffPortal/TimeOff/TimeOffDecision";
@@ -187,6 +188,14 @@ export default function App() {
               element={
                 <PrivateRoute>
                   <StaffList />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/members"
+              element={
+                <PrivateRoute>
+                  <MembersPage />
                 </PrivateRoute>
               }
             />

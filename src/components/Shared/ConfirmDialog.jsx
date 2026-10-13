@@ -13,6 +13,7 @@ export default function ConfirmDialog({
   message = "Are you sure?",
   onCancel,
   onConfirm,
+  confirmLabel = "Delete",
 }) {
   return (
     <Dialog open={open} onClose={onCancel}>
@@ -26,7 +27,7 @@ export default function ConfirmDialog({
         <Button onClick={onCancel}>Cancel</Button>
 
         <Button color="error" variant="contained" onClick={onConfirm}>
-          Delete
+          {confirmLabel}
         </Button>
       </DialogActions>
     </Dialog>

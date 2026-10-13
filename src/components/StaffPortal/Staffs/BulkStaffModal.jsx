@@ -3,17 +3,20 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   IconButton,
   Paper,
+  Tab,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
+  Tabs,
   TextField,
   Typography,
 } from "@mui/material";
@@ -22,9 +25,12 @@ import { toast } from "react-toastify";
 import ExcelJS from "exceljs";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
+import { parseStaffLines } from "../../../utils/staffPaste";
 
 const SAMPLE_CSV =
-  "name,email,role,userPhone,userPhoneCountryCode,profilePicture,allowedAreas,allowedShiftTypes,certificationTags\nA,a@x.com,nurse,5551112222,+1,https://example.com/a.jpg,AL|IL,day|evening,med-pass|bilingual\nB,b@x.com,doctor,5553334444,+1,,IL,day,rn";
+  "name,phone,email,role\nKim Tran,555 123 4567,,cna\nJo Diaz,,jo@example.com,med_tech";
+const PASTE_PLACEHOLDER =
+  "Kim Tran, 555 123 4567, CNA\nJo Diaz, jo@example.com, Med Tech\nSam Lee, (555) 987-6543";
 const MAX_ROWS = 500;
 
 const escapeCsvCell = (value) => {
@@ -35,115 +41,10 @@ const escapeCsvCell = (value) => {
   return text;
 };
 
-const parseCsvText = (text) => {
-  const rows = [];
-  let row = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i];
-    const next = text[i + 1];
-
-    if (char === '"') {
-      if (inQuotes && next === '"') {
-        current += '"';
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (!inQuotes && char === ",") {
-      row.push(current);
-      current = "";
-      continue;
-    }
-
-    if (!inQuotes && (char === "\n" || char === "\r")) {
-      if (char === "\r" && next === "\n") {
-        i += 1;
-      }
-      row.push(current);
-      rows.push(row);
-      row = [];
-      current = "";
-      continue;
-    }
-
-    current += char;
-  }
-
-  if (current.length > 0 || row.length > 0) {
-    row.push(current);
-    rows.push(row);
-  }
-
-  return rows;
-};
-
 const toCsvText = (rows) =>
   rows
     .map((row) => row.map((cell) => escapeCsvCell(cell)).join(","))
     .join("\n");
-
-const normalizeToken = (value) =>
-  String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_");
-
-const normalizePipeSeparatedTokens = (value) =>
-  String(value || "")
-    .split("|")
-    .map((token) => normalizeToken(token))
-    .filter(Boolean)
-    .join("|");
-
-const normalizeCsvFields = (csvText) => {
-  const rows = parseCsvText(csvText);
-  if (!rows.length) {
-    return "";
-  }
-
-  const header = rows[0].map((cell) =>
-    String(cell || "")
-      .trim()
-      .toLowerCase(),
-  );
-  const roleIndex = header.indexOf("role");
-  const allowedAreasIndex = header.indexOf("allowedareas");
-  const certificationTagsIndex = header.indexOf("certificationtags");
-
-  const normalizedRows = rows.map((row, rowIndex) => {
-    const nextRow = [...row];
-
-    if (rowIndex === 0) {
-      return nextRow;
-    }
-
-    if (roleIndex >= 0) {
-      nextRow[roleIndex] = normalizeToken(nextRow[roleIndex]);
-    }
-
-    if (allowedAreasIndex >= 0) {
-      nextRow[allowedAreasIndex] = normalizePipeSeparatedTokens(
-        nextRow[allowedAreasIndex],
-      );
-    }
-
-    if (certificationTagsIndex >= 0) {
-      nextRow[certificationTagsIndex] = normalizePipeSeparatedTokens(
-        nextRow[certificationTagsIndex],
-      );
-    }
-
-    return nextRow;
-  });
-
-  return toCsvText(normalizedRows);
-};
 
 const worksheetToCsvText = (worksheet) => {
   const rows = [];
@@ -171,38 +72,40 @@ const worksheetToCsvText = (worksheet) => {
 const statusLabel = (status) => {
   const labels = {
     created: "Created",
-    skipped_duplicate: "Skipped Duplicate",
-    failed_validation: "Failed Validation",
+    skipped_duplicate: "Already added",
+    failed_validation: "Needs fixing",
     failed: "Failed",
   };
   return labels[status] || status || "-";
 };
 
-export default function BulkStaffModal({
-  open,
-  onClose,
-  onSuccess,
-  staffList = [],
-}) {
-  const { tenant } = useAuth();
+export default function BulkStaffModal({ open, onClose, onSuccess }) {
+  const { facilityPreferences, hasFeature } = useAuth();
+  const canImportFile = hasFeature("import");
+  const defaultRole = facilityPreferences?.roleFamilies?.[0];
 
+  const [mode, setMode] = useState("paste");
+  const [pasteInput, setPasteInput] = useState("");
   const [csvInput, setCsvInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState(null);
   const [rows, setRows] = useState([]);
-  const [warning, setWarning] = useState("");
   const [selectedFileName, setSelectedFileName] = useState("");
 
   const rowsToRender = useMemo(() => rows || [], [rows]);
+  const pastedRows = useMemo(
+    () => parseStaffLines(pasteInput, defaultRole),
+    [pasteInput, defaultRole],
+  );
 
   const resetState = () => {
     setSummary(null);
     setRows([]);
-    setWarning("");
   };
 
   const handleClose = () => {
     setLoading(false);
+    setPasteInput("");
     setCsvInput("");
     setSelectedFileName("");
     resetState();
@@ -215,7 +118,7 @@ export default function BulkStaffModal({
     const link = document.createElement("a");
 
     link.href = url;
-    link.setAttribute("download", "bulk-staff-template.csv");
+    link.setAttribute("download", "staff-template.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -229,10 +132,7 @@ export default function BulkStaffModal({
 
   const handleFileChange = async (event) => {
     const file = event.target.files?.[0];
-
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     try {
       const fileName = file.name || "";
@@ -246,11 +146,9 @@ export default function BulkStaffModal({
         const buffer = await file.arrayBuffer();
         await workbook.xlsx.load(buffer);
         const worksheet = workbook.worksheets[0];
-
         if (!worksheet) {
           throw new Error("The selected Excel file does not contain any sheet");
         }
-
         text = worksheetToCsvText(worksheet);
       } else if (isCsvFile) {
         text = await file.text();
@@ -259,20 +157,10 @@ export default function BulkStaffModal({
       }
 
       const trimmed = text.trim();
-
-      if (!trimmed) {
-        throw new Error("The selected file is empty");
-      }
+      if (!trimmed) throw new Error("The selected file is empty");
 
       setCsvInput(trimmed);
       setSelectedFileName(file.name);
-      toast.success(
-        `Loaded ${file.name}. Review and click Import Staff to continue.`,
-        {
-          position: "top-right",
-          autoClose: 2500,
-        },
-      );
     } catch (err) {
       setSelectedFileName("");
       toast.error(err?.message || "Failed to read file", {
@@ -284,65 +172,36 @@ export default function BulkStaffModal({
     }
   };
 
+  const sendRequest = () => {
+    if (mode === "paste") {
+      if (!pastedRows.length) {
+        throw new Error("Paste at least one person, one per line");
+      }
+      if (pastedRows.length > MAX_ROWS) {
+        throw new Error(`Add up to ${MAX_ROWS} people at a time`);
+      }
+      return api.post("/staff/bulk", { rows: pastedRows });
+    }
+
+    const trimmed = (csvInput || "").trim();
+    if (!trimmed) {
+      throw new Error("Upload a spreadsheet or paste CSV content first");
+    }
+    const formData = new FormData();
+    formData.append(
+      "file",
+      new Blob([trimmed], { type: "text/csv" }),
+      selectedFileName.replace(/\.(xlsx|xls)$/i, ".csv") || "staff.csv",
+    );
+    return api.post("/staff/import", formData);
+  };
+
   const handleSubmit = async () => {
     setLoading(true);
     resetState();
 
     try {
-      const trimmed = (csvInput || "").trim();
-      if (!trimmed) {
-        throw new Error(
-          "Paste CSV content or upload a CSV/Excel file before importing",
-        );
-      }
-
-      const normalizedCsv = normalizeCsvFields(trimmed);
-
-      if (!normalizedCsv.trim()) {
-        throw new Error(
-          "Input must include a header row and at least one data row",
-        );
-      }
-
-      if (normalizedCsv !== trimmed) {
-        setCsvInput(normalizedCsv);
-      }
-
-      const seatLimit = Number(tenant?.seatLimit);
-      const hasSeatLimit = Number.isFinite(seatLimit) && seatLimit > 0;
-
-      if (hasSeatLimit) {
-        const existingStaffCount = Array.isArray(staffList)
-          ? staffList.length
-          : 0;
-        const lines = normalizedCsv
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter(Boolean);
-        const incomingStaffCount = Math.max(lines.length - 1, 0);
-
-        if (incomingStaffCount <= 0) {
-          throw new Error("CSV must include at least one data row");
-        }
-
-        const availableSeats = Math.max(seatLimit - existingStaffCount, 0);
-
-        if (existingStaffCount >= seatLimit) {
-          throw new Error(
-            `Staff seat limit reached (${existingStaffCount}/${seatLimit}). Upgrade your plan to add more staff.`,
-          );
-        }
-
-        if (incomingStaffCount > availableSeats) {
-          throw new Error(
-            `Import exceeds seat limit. You can add up to ${availableSeats} more staff but CSV contains ${incomingStaffCount} row(s).`,
-          );
-        }
-      }
-
-      const payload = { csv: normalizedCsv };
-
-      const res = await api.post("/auth/signup/staff/bulk", payload);
+      const res = await sendRequest();
       const data = res?.data || {};
 
       const nextSummary = {
@@ -354,24 +213,25 @@ export default function BulkStaffModal({
 
       setSummary(nextSummary);
       setRows(Array.isArray(data?.rows) ? data.rows : []);
-      setWarning(data?.warning || "");
 
       if (nextSummary.created > 0) {
         onSuccess?.();
+        if (mode === "paste" && !nextSummary.skipped && !nextSummary.failed) {
+          setPasteInput("");
+        }
       }
 
       toast.success(
-        `Import complete: ${nextSummary.created} created, ${nextSummary.skipped} skipped, ${nextSummary.failed} failed.`,
-        {
-          position: "top-right",
-          autoClose: 2500,
-        },
+        `Added ${nextSummary.created}. ${nextSummary.skipped} skipped, ${nextSummary.failed} need fixing.`,
+        { position: "top-right", autoClose: 3000 },
       );
     } catch (err) {
+      // Plan limits (402) open the upgrade dialog instead.
+      if (err?.response?.status === 402) return;
       const msg =
         err?.response?.data?.message ||
         err?.message ||
-        "We couldn't complete the staff import";
+        "We couldn't add these staff";
       toast.error(msg, { position: "top-right", autoClose: 4000 });
     } finally {
       setLoading(false);
@@ -387,7 +247,7 @@ export default function BulkStaffModal({
       scroll="paper"
     >
       <DialogTitle sx={{ pr: 6 }}>
-        Import Staff in Bulk
+        Add Several Staff
         <IconButton
           aria-label="Close"
           onClick={handleClose}
@@ -397,82 +257,122 @@ export default function BulkStaffModal({
         </IconButton>
       </DialogTitle>
       <DialogContent dividers>
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Upload a .csv/.xlsx/.xls file or paste CSV content below. Required
-          columns are name, email, and role. Optional columns are userPhone and
-          userPhoneCountryCode, profilePicture, allowedAreas, allowedShiftTypes,
-          and certificationTags. Use | to separate multiple values in array
-          fields. Role, allowedAreas, and certificationTags are normalized to
-          lowercase underscore format (for example, resident aide becomes
-          resident_aide). Maximum {MAX_ROWS} rows per import.
-        </Alert>
-
-        <Box
-          display="flex"
-          gap={1.5}
-          flexWrap="wrap"
-          alignItems="center"
-          mb={2}
+        <Tabs
+          value={mode}
+          onChange={(_, value) => {
+            setMode(value);
+            resetState();
+          }}
+          sx={{ mb: 2 }}
         >
-          <Button
-            variant="outlined"
-            component="label"
-            size="small"
-            sx={{ textTransform: "none", borderRadius: 2, px: 2 }}
-          >
-            Upload File
-            <input
-              hidden
-              type="file"
-              accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-              onChange={handleFileChange}
+          <Tab value="paste" label="Paste a list" sx={{ textTransform: "none" }} />
+          <Tab
+            value="file"
+            sx={{ textTransform: "none" }}
+            label={
+              <Box display="flex" alignItems="center" gap={1}>
+                Import a spreadsheet
+                {!canImportFile && <Chip size="small" label="Pro" />}
+              </Box>
+            }
+          />
+        </Tabs>
+
+        {mode === "paste" ? (
+          <>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              One person per line: name, then a mobile number or email, then
+              their role. Without a role they're added as{" "}
+              {String(defaultRole || "your first role").replace(/_/g, " ")}.
+              You can paste straight from a spreadsheet.
+            </Alert>
+            <TextField
+              fullWidth
+              multiline
+              minRows={8}
+              label="Staff list"
+              value={pasteInput}
+              onChange={(e) => setPasteInput(e.target.value)}
+              placeholder={PASTE_PLACEHOLDER}
+              helperText={
+                pastedRows.length
+                  ? `${pastedRows.length} ${pastedRows.length === 1 ? "person" : "people"} ready to add`
+                  : " "
+              }
             />
-          </Button>
+          </>
+        ) : (
+          <>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Upload a .csv/.xlsx/.xls file with columns name, phone, email and
+              role (a phone or an email is enough). Common column names like
+              "Mobile" or "Position" work too. Maximum {MAX_ROWS} rows.
+              {!canImportFile &&
+                " Spreadsheet import is on Pro; pasting a list is free."}
+            </Alert>
 
-          <Button
-            variant="text"
-            size="small"
-            onClick={handleDownloadSample}
-            sx={{ textTransform: "none", borderRadius: 2, px: 1.5 }}
-          >
-            Download Template
-          </Button>
-
-          {selectedFileName ? (
-            <Button
-              variant="outlined"
-              color="secondary"
-              size="small"
-              onClick={handleClearUploadedFile}
-              sx={{ textTransform: "none", borderRadius: 2, px: 2 }}
+            <Box
+              display="flex"
+              gap={1.5}
+              flexWrap="wrap"
+              alignItems="center"
+              mb={2}
             >
-              Remove File
-            </Button>
-          ) : null}
-        </Box>
+              <Button
+                variant="outlined"
+                component="label"
+                size="small"
+                sx={{ textTransform: "none", borderRadius: 2, px: 2 }}
+              >
+                Upload File
+                <input
+                  hidden
+                  type="file"
+                  accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  onChange={handleFileChange}
+                />
+              </Button>
 
-        {selectedFileName ? (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Selected file: {selectedFileName}
-          </Typography>
-        ) : null}
+              <Button
+                variant="text"
+                size="small"
+                onClick={handleDownloadSample}
+                sx={{ textTransform: "none", borderRadius: 2, px: 1.5 }}
+              >
+                Download Template
+              </Button>
 
-        <TextField
-          fullWidth
-          multiline
-          minRows={8}
-          label="CSV Content"
-          value={csvInput}
-          onChange={(e) => setCsvInput(e.target.value)}
-          placeholder={SAMPLE_CSV}
-          helperText="You can edit the CSV or Excel content before importing."
-        />
+              {selectedFileName ? (
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  size="small"
+                  onClick={handleClearUploadedFile}
+                  sx={{ textTransform: "none", borderRadius: 2, px: 2 }}
+                >
+                  Remove File
+                </Button>
+              ) : null}
+            </Box>
 
-        {warning ? (
-          <Alert severity="warning" sx={{ mt: 2 }}>
-            {warning}
-          </Alert>
-        ) : null}
+            {selectedFileName ? (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Selected file: {selectedFileName}
+              </Typography>
+            ) : null}
+
+            <TextField
+              fullWidth
+              multiline
+              minRows={8}
+              label="CSV Content"
+              value={csvInput}
+              onChange={(e) => setCsvInput(e.target.value)}
+              placeholder={SAMPLE_CSV}
+              helperText="You can edit the content before importing."
+            />
+          </>
+        )}
 
         {summary ? (
           <Paper variant="outlined" sx={{ mt: 2, p: 2 }}>
@@ -495,23 +395,19 @@ export default function BulkStaffModal({
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>CSV Row</TableCell>
-                  <TableCell>Email</TableCell>
+                  <TableCell>Row</TableCell>
+                  <TableCell>Name</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Details</TableCell>
-                  <TableCell>User ID</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {rowsToRender.map((row, index) => (
-                  <TableRow key={`${row?.email || "row"}-${index}`}>
+                  <TableRow key={`${row?.rowNumber || "row"}-${index}`}>
                     <TableCell>{row?.rowNumber ?? index + 1}</TableCell>
-                    <TableCell>{row?.email || "-"}</TableCell>
+                    <TableCell>{row?.name || "-"}</TableCell>
                     <TableCell>{statusLabel(row?.status)}</TableCell>
-                    <TableCell>
-                      {row?.reason || row?.warning || row?.message || "-"}
-                    </TableCell>
-                    <TableCell>{row?.userId || "-"}</TableCell>
+                    <TableCell>{row?.reason || "-"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -535,7 +431,7 @@ export default function BulkStaffModal({
           disabled={loading}
           sx={{ textTransform: "none", borderRadius: 2, px: 2.5 }}
         >
-          {loading ? "Importing Staff..." : "Import Staff"}
+          {loading ? "Adding..." : "Add Staff"}
         </Button>
       </DialogActions>
     </Dialog>

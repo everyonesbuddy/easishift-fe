@@ -697,6 +697,7 @@ export default function FacilityPreferencesPage() {
     { id: "certifications", label: "Certifications" },
     { id: "facility", label: "Facility" },
     { id: "time-tracking", label: "Time tracking" },
+    { id: "staff-links", label: "Staff links" },
     { id: "notifications", label: "Notifications" },
     { id: "advanced", label: "Advanced" },
     ...(canManageFacilityPreferences && can("tenant.delete") ? [{ id: "danger", label: "Delete account" }] : []),
@@ -1130,6 +1131,30 @@ export default function FacilityPreferencesPage() {
                   </Row>
                 </>
               )}
+            </Section>
+
+            {/* ── Staff links ── */}
+            <Section
+              id="staff-links"
+              title="Staff links"
+              description="Each staff member gets a personal link to see their shifts, swap, pick up shifts and call out. No app or password needed."
+            >
+              <Row
+                first
+                label="Require a PIN"
+                help={
+                  prefs.staffLinkPinRequired
+                    ? "Staff choose a 4-digit PIN the first time, then enter it once on each new phone or computer. Reset a forgotten PIN from Staff."
+                    : "Off. Anyone with the link can open it."
+                }
+              >
+                <Toggle
+                  checked={Boolean(prefs.staffLinkPinRequired)}
+                  onChange={(v) => handleChange("staffLinkPinRequired", v)}
+                  disabled={readOnly}
+                  label="Require a PIN on staff links"
+                />
+              </Row>
             </Section>
 
             {/* ── Notifications ── */}

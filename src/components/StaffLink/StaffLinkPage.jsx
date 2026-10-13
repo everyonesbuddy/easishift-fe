@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import {
@@ -15,14 +15,33 @@ import {
   MenuItem,
   Paper,
   Stack,
-  Tab,
-  Tabs,
   TextField,
   Typography,
 } from "@mui/material";
 import { API_BASE } from "../../config/api";
 import { getPunchLocation } from "../../utils/geolocation";
 import { toLabel } from "../../utils/labels";
+import { IOS, tint } from "../../theme/ios";
+import PinScreen from "./PinScreen";
+
+// This device's PIN pass for this link (only used when the facility
+// requires a PIN). Storage can be blocked; then they just enter the PIN.
+const deviceKey = (token) => `wisershifts_device_${String(token).slice(0, 16)}`;
+const readDevice = (token) => {
+  try {
+    return window.localStorage.getItem(deviceKey(token));
+  } catch {
+    return null;
+  }
+};
+const writeDevice = (token, value) => {
+  try {
+    if (value) window.localStorage.setItem(deviceKey(token), value);
+    else window.localStorage.removeItem(deviceKey(token));
+  } catch {
+    /* storage blocked */
+  }
+};
 
 /**
  * What a staff member sees from their personal link (/s/:token).
@@ -60,10 +79,28 @@ const todayKey = () => {
 
 export default function StaffLinkPage() {
   const { token } = useParams();
-  const client = useMemo(
-    () => axios.create({ baseURL: `${API_BASE}/api/v1/s/${token}` }),
-    [token],
-  );
+  const deviceRef = useRef(readDevice(token));
+  const relockRef = useRef(null);
+  const client = useMemo(() => {
+    const instance = axios.create({ baseURL: `${API_BASE}/api/v1/s/${token}` });
+    instance.interceptors.request.use((config) => {
+      if (deviceRef.current) config.headers["X-Staff-Device"] = deviceRef.current;
+      return config;
+    });
+    instance.interceptors.response.use(
+      (res) => res,
+      (err) => {
+        // This device's PIN pass was reset or signed out: ask again.
+        if (err?.response?.status === 401 && err.response.data?.errorCode === "PIN_REQUIRED") {
+          deviceRef.current = null;
+          writeDevice(token, null);
+          relockRef.current?.();
+        }
+        return Promise.reject(err);
+      },
+    );
+    return instance;
+  }, [token]);
 
   const [me, setMe] = useState(null);
   const [loadError, setLoadError] = useState("");
@@ -71,6 +108,10 @@ export default function StaffLinkPage() {
   const [notice, setNotice] = useState(null); // { severity, text }
 
   const [shifts, setShifts] = useState([]);
+  const [shiftView, setShiftView] = useState("upcoming"); // "upcoming" | "past"
+  const [pastShifts, setPastShifts] = useState(null);
+  const [pastWeeks, setPastWeeks] = useState(0); // how far back is loaded
+  const [pastLoading, setPastLoading] = useState(false);
   const [timezone, setTimezone] = useState(undefined);
   const [openShifts, setOpenShifts] = useState([]);
   const [swaps, setSwaps] = useState([]);
@@ -120,6 +161,33 @@ export default function StaffLinkPage() {
     setTimezone(res.data.timezone || undefined);
   }, [client]);
 
+  // Past shifts, 4 weeks at a time going back.
+  const PAST_STEP_WEEKS = 4;
+  const loadMorePast = useCallback(async () => {
+    setPastLoading(true);
+    try {
+      const DAY = 86400000;
+      const to = pastWeeks === 0 ? new Date() : new Date(Date.now() - pastWeeks * 7 * DAY);
+      const from = new Date(Date.now() - (pastWeeks + PAST_STEP_WEEKS) * 7 * DAY);
+      const res = await client.get("/schedule", { params: { from: from.toISOString(), to: to.toISOString() } });
+      const older = (res.data.shifts || []).filter((x) => new Date(x.endTime).getTime() <= Date.now());
+      setPastShifts((prev) => {
+        const seen = new Set((prev || []).map((x) => x._id));
+        return [...(prev || []), ...older.filter((x) => !seen.has(x._id))];
+      });
+      setPastWeeks((w) => w + PAST_STEP_WEEKS);
+      setTimezone(res.data.timezone || undefined);
+    } catch (err) {
+      setNotice({ severity: "error", text: errorText(err, "Couldn't load past shifts") });
+    } finally {
+      setPastLoading(false);
+    }
+  }, [client, pastWeeks]);
+
+  useEffect(() => {
+    if (me && !me.locked && tab === "shifts" && shiftView === "past" && pastShifts === null && !pastLoading) loadMorePast();
+  }, [me, tab, shiftView, pastShifts, pastLoading, loadMorePast]);
+
   const loadTab = useCallback(
     async (which) => {
       try {
@@ -139,30 +207,55 @@ export default function StaffLinkPage() {
     [client, loadShifts],
   );
 
-  useEffect(() => {
-    let cancelled = false;
-    client
-      .get("/me")
-      .then((res) => {
-        if (cancelled) return;
-        setMe(res.data);
-        setTimezone(res.data.facility?.timezone || undefined);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setLoadError(
-          err?.response?.status === 404
-            ? "This link isn't active any more. Ask your scheduler to send you a new one."
-            : "Couldn't load your schedule. Check your connection and try again.",
-        );
-      });
-    return () => {
-      cancelled = true;
-    };
+  const loadMe = useCallback(async () => {
+    try {
+      const res = await client.get("/me");
+      setMe(res.data);
+      if (res.data.facility?.timezone) setTimezone(res.data.facility.timezone);
+    } catch (err) {
+      setLoadError(
+        err?.response?.status === 404
+          ? "This link isn't active any more. Ask your scheduler to send you a new one."
+          : "Couldn't load your schedule. Check your connection and try again.",
+      );
+    }
   }, [client]);
 
   useEffect(() => {
-    if (me) loadTab(tab);
+    relockRef.current = loadMe;
+    loadMe();
+  }, [loadMe]);
+
+  const submitPin = async (mode, pin) => {
+    try {
+      const res = await client.post(`/pin/${mode}`, { pin });
+      deviceRef.current = res.data.deviceToken;
+      writeDevice(token, res.data.deviceToken);
+      await loadMe();
+      return null;
+    } catch (err) {
+      if (err?.response?.data?.errorCode === "PIN_ALREADY_SET" || err?.response?.data?.errorCode === "PIN_NOT_SET") {
+        await loadMe();
+      }
+      const left = err?.response?.data?.attemptsLeft;
+      return `${errorText(err, "Couldn't check your PIN. Try again.")}${left ? ` ${left} ${left === 1 ? "try" : "tries"} left.` : ""}`;
+    }
+  };
+
+  const signOutDevice = async () => {
+    try {
+      await client.post("/pin/sign-out");
+    } catch {
+      /* already signed out */
+    }
+    deviceRef.current = null;
+    writeDevice(token, null);
+    setMe(null);
+    await loadMe();
+  };
+
+  useEffect(() => {
+    if (me && !me.locked) loadTab(tab);
   }, [me, tab, loadTab]);
 
   const run = async (fn, success) => {
@@ -277,9 +370,20 @@ export default function StaffLinkPage() {
   }
   if (!me) {
     return (
-      <Box display="flex" justifyContent="center" mt={10}>
+      <Box sx={{ minHeight: "100vh", bgcolor: IOS.canvas, display: "flex", justifyContent: "center", pt: 12 }}>
         <CircularProgress />
       </Box>
+    );
+  }
+  if (me.locked) {
+    return (
+      <PinScreen
+        key={me.pin?.set ? "enter" : "choose"}
+        firstName={me.staff?.firstName}
+        facilityName={me.facility?.name}
+        pinSet={Boolean(me.pin?.set)}
+        onSubmit={submitPin}
+      />
     );
   }
 
@@ -306,6 +410,36 @@ export default function StaffLinkPage() {
     },
     { label: "Later", shifts: rest.filter((s) => new Date(s.startTime).getTime() >= weekStartMs + 2 * WEEK_MS) },
   ].filter((g) => g.shifts.length);
+  // Past shifts grouped by week, newest first.
+  const pastGroups = (() => {
+    const list = [...(pastShifts || [])].sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+    const groups = new Map();
+    for (const x of list) {
+      const t = new Date(x.startTime).getTime();
+      const weeksAgo = Math.floor((weekStartMs - t) / WEEK_MS) + 1;
+      const key = t >= weekStartMs ? 0 : weeksAgo;
+      if (!groups.has(key)) {
+        const start = new Date(weekStartMs - key * WEEK_MS);
+        groups.set(key, {
+          key,
+          label:
+            key === 0
+              ? "This week"
+              : key === 1
+                ? "Last week"
+                : `Week of ${start.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`,
+          shifts: [],
+          minutes: 0,
+        });
+      }
+      const g = groups.get(key);
+      g.shifts.push(x);
+      if (x.status !== "call_out") g.minutes += (new Date(x.endTime) - new Date(x.startTime)) / 60000;
+    }
+    return [...groups.values()]
+      .sort((a, b) => a.key - b.key)
+      .map((g) => ({ ...g, hours: Math.round((g.minutes / 60) * 10) / 10 }));
+  })();
   const relativeDay = (iso) => {
     const start = new Date(iso);
     const today = new Date(now);
@@ -327,34 +461,84 @@ export default function StaffLinkPage() {
     features.messages && { value: "messages", label: "Messages" },
   ].filter(Boolean);
 
-  const card = { p: 2, borderRadius: 3, border: "1px solid #e5e7eb" };
+  const card = { p: 2, borderRadius: IOS.radius.card, bgcolor: IOS.surface, boxShadow: IOS.shadow, border: `1px solid ${IOS.hairline}` };
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "#F8FAFC" }}>
-      <Box sx={{ bgcolor: "#111827", color: "#fff", px: 2, py: 2.5 }}>
-        <Container maxWidth="sm" disableGutters>
-          <Typography sx={{ opacity: 0.75, fontSize: 13 }}>{me.facility?.name}</Typography>
-          <Typography variant="h5" sx={{ fontWeight: 800 }}>
-            Hi {String(me.staff?.name || "").split(" ")[0]}
-          </Typography>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        bgcolor: IOS.canvas,
+        fontFamily: IOS.font,
+        "& .MuiTypography-root": { fontFamily: IOS.font },
+        "& .MuiButton-root": { textTransform: "none", borderRadius: IOS.radius.round, fontWeight: 600, boxShadow: "none" },
+        "& .MuiButton-contained": { bgcolor: IOS.blue, "&:hover": { bgcolor: "#0066DB" } },
+        "& .MuiButton-containedError": { bgcolor: IOS.red, "&:hover": { bgcolor: "#E0352B" } },
+        "& .MuiAlert-root": { borderRadius: "14px" },
+        "& .MuiOutlinedInput-root": { borderRadius: "12px", bgcolor: IOS.surface },
+        "& .MuiChip-root": { fontWeight: 600 },
+      }}
+    >
+      <Container maxWidth="sm" sx={{ pt: { xs: 4, sm: 6 }, pb: 1.5 }}>
+        <Typography sx={{ color: IOS.secondary, fontSize: 15, fontWeight: 500 }}>{me.facility?.name}</Typography>
+        <Typography sx={{ fontSize: 34, fontWeight: 700, letterSpacing: "-0.025em", color: IOS.ink, lineHeight: 1.15 }}>
+          Hi {String(me.staff?.name || "").split(" ")[0]}
+        </Typography>
+      </Container>
+
+      <Box
+        sx={{
+          position: "sticky",
+          top: 0,
+          zIndex: 5,
+          bgcolor: "rgba(245,245,247,0.85)",
+          backdropFilter: "saturate(180%) blur(20px)",
+          borderBottom: `1px solid ${IOS.hairline}`,
+        }}
+      >
+        <Container maxWidth="sm">
+          <Box
+            role="tablist"
+            aria-label="Sections"
+            sx={{ display: "flex", gap: 1, overflowX: "auto", py: 1.25, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}
+          >
+            {tabs.map((t) => {
+              const active = tab === t.value;
+              return (
+                <Box
+                  key={t.value}
+                  component="button"
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => {
+                    setNotice(null);
+                    setTab(t.value);
+                  }}
+                  sx={{
+                    all: "unset",
+                    flexShrink: 0,
+                    cursor: "pointer",
+                    px: 1.75,
+                    py: 0.85,
+                    borderRadius: IOS.radius.round,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: active ? "#fff" : IOS.ink,
+                    bgcolor: active ? IOS.ink : IOS.surface,
+                    boxShadow: active ? "none" : `inset 0 0 0 1px ${IOS.separator}`,
+                    transition: "background-color 120ms ease",
+                    "&:focus-visible": { boxShadow: `0 0 0 3px ${tint(IOS.blue, 0.35)}` },
+                  }}
+                >
+                  {t.label}
+                </Box>
+              );
+            })}
+          </Box>
         </Container>
       </Box>
 
-      <Container maxWidth="sm" sx={{ pb: 6 }}>
-        <Tabs
-          value={tab}
-          onChange={(_, v) => {
-            setNotice(null);
-            setTab(v);
-          }}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}
-        >
-          {tabs.map((t) => (
-            <Tab key={t.value} value={t.value} label={t.label} sx={{ textTransform: "none" }} />
-          ))}
-        </Tabs>
+      <Container maxWidth="sm" sx={{ pb: 6, pt: 2 }}>
 
         {me.staff?.hasPhone && me.staff?.smsStatus === "opted_out" && (
           <Alert severity="info" sx={{ mb: 2 }}>
@@ -368,6 +552,102 @@ export default function StaffLinkPage() {
         )}
 
         {tab === "shifts" && (
+          <Box sx={{ display: "flex", p: "3px", mb: 2, borderRadius: "10px", bgcolor: "rgba(118,118,128,0.12)" }} role="tablist" aria-label="Which shifts">
+            {[
+              { value: "upcoming", label: "Upcoming" },
+              { value: "past", label: "Past" },
+            ].map((opt) => (
+              <Box
+                key={opt.value}
+                component="button"
+                type="button"
+                role="tab"
+                aria-selected={shiftView === opt.value}
+                onClick={() => setShiftView(opt.value)}
+                sx={{
+                  all: "unset",
+                  flex: 1,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  py: 0.75,
+                  borderRadius: "8px",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "#1D1D1F",
+                  bgcolor: shiftView === opt.value ? "#fff" : "transparent",
+                  boxShadow: shiftView === opt.value ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
+                }}
+              >
+                {opt.label}
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        {tab === "shifts" && shiftView === "past" && (
+          <Stack spacing={2.5}>
+            {pastShifts === null ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : pastGroups.length === 0 ? (
+              <Paper elevation={0} sx={{ ...card, textAlign: "center", py: 4 }}>
+                <Typography sx={{ fontWeight: 700 }}>No past shifts in the last {pastWeeks} weeks</Typography>
+              </Paper>
+            ) : (
+              pastGroups.map((group) => (
+                <Box key={group.key}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", mb: 1 }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: 13, px: 0.5, color: IOS.secondary, textTransform: "uppercase", letterSpacing: "0.05em" }}>{group.label}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {group.shifts.filter((x) => x.status !== "call_out").length} shift
+                      {group.shifts.filter((x) => x.status !== "call_out").length === 1 ? "" : "s"} · {group.hours}h
+                    </Typography>
+                  </Box>
+                  <Paper elevation={0} sx={{ ...card, p: 0 }}>
+                    {group.shifts.map((x, i) => (
+                      <Box key={x._id} sx={{ display: "flex", gap: 2, alignItems: "center", px: 2, py: 1.5, borderTop: i ? `1px solid ${IOS.hairline}` : "none" }}>
+                        <Box sx={{ width: 44, textAlign: "center", flexShrink: 0 }}>
+                          <Typography sx={{ fontSize: 12, color: "text.secondary", fontWeight: 600 }}>
+                            {new Date(x.startTime).toLocaleDateString(undefined, { weekday: "short", timeZone: timezone })}
+                          </Typography>
+                          <Typography sx={{ fontSize: 20, fontWeight: 800, lineHeight: 1.1, color: "text.secondary" }}>
+                            {new Date(x.startTime).toLocaleDateString(undefined, { day: "numeric", timeZone: timezone })}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 700 }}>
+                            {fmtTime(x.startTime)}–{fmtTime(x.endTime)}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" noWrap>
+                            {pretty(x.role)}
+                            {x.unitArea ? `, ${pretty(x.unitArea)}` : ""}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          size="small"
+                          label={x.status === "call_out" ? "Called out" : x.status === "scheduled" || x.status === "completed" ? "Worked" : pretty(x.status)}
+                          sx={{
+                            fontWeight: 600,
+                            bgcolor: x.status === "call_out" ? "rgba(255,59,48,0.1)" : "rgba(52,199,89,0.12)",
+                            color: x.status === "call_out" ? "#D70015" : "#248A3D",
+                          }}
+                        />
+                      </Box>
+                    ))}
+                  </Paper>
+                </Box>
+              ))
+            )}
+            {pastShifts !== null && (
+              <Button onClick={loadMorePast} disabled={pastLoading} sx={{ textTransform: "none", alignSelf: "center" }}>
+                {pastLoading ? "Loading…" : `Show earlier (before ${pastWeeks} weeks ago)`}
+              </Button>
+            )}
+          </Stack>
+        )}
+
+        {tab === "shifts" && shiftView === "upcoming" && (
           <Stack spacing={2.5}>
             {upcoming.length === 0 && (
               <Paper elevation={0} sx={{ ...card, textAlign: "center", py: 4 }}>
@@ -379,7 +659,7 @@ export default function StaffLinkPage() {
             )}
 
             {nextShift && (
-              <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, bgcolor: "#2563EB", color: "#fff" }}>
+              <Paper elevation={0} sx={{ p: 2.75, borderRadius: "22px", color: "#fff", background: "linear-gradient(135deg, #0A84FF 0%, #0060DF 100%)", boxShadow: "0 10px 30px rgba(0,122,255,0.25)" }}>
                 <Typography sx={{ opacity: 0.85, fontSize: 14 }}>
                   Your next shift{relativeDay(nextShift.startTime) ? `, ${relativeDay(nextShift.startTime)}` : ""}
                 </Typography>
@@ -396,11 +676,11 @@ export default function StaffLinkPage() {
                 {nextShift.status === "scheduled" && new Date(nextShift.startTime).getTime() > now && (
                   <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
                     {features.swaps && (
-                      <Button size="small" variant="contained" onClick={() => openSwap(nextShift)} sx={{ textTransform: "none", bgcolor: "#fff !important", color: "#1E3A8A", fontWeight: 700 }}>
+                      <Button size="small" variant="contained" onClick={() => openSwap(nextShift)} sx={{ bgcolor: "#fff !important", color: "#0060DF", fontWeight: 700, px: 2 }}>
                         Swap
                       </Button>
                     )}
-                    <Button size="small" onClick={() => setCallOutShift(nextShift)} sx={{ textTransform: "none", color: "#fff", border: "1px solid rgba(255,255,255,0.5)" }}>
+                    <Button size="small" onClick={() => setCallOutShift(nextShift)} sx={{ color: "#fff", bgcolor: "rgba(255,255,255,0.18)", px: 2, "&:hover": { bgcolor: "rgba(255,255,255,0.28)" } }}>
                       Can't make it
                     </Button>
                   </Stack>
@@ -410,10 +690,10 @@ export default function StaffLinkPage() {
 
             {laterGroups.map((group) => (
               <Box key={group.label}>
-                <Typography sx={{ fontWeight: 800, fontSize: 15, mb: 1 }}>{group.label}</Typography>
+                <Typography sx={{ fontWeight: 700, fontSize: 13, mb: 1, px: 0.5, color: IOS.secondary, textTransform: "uppercase", letterSpacing: "0.05em" }}>{group.label}</Typography>
                 <Paper elevation={0} sx={{ ...card, p: 0 }}>
                   {group.shifts.map((s, i) => (
-                    <Box key={s._id} sx={{ display: "flex", gap: 2, alignItems: "center", px: 2, py: 1.5, borderTop: i ? "1px solid #e5e7eb" : "none" }}>
+                    <Box key={s._id} sx={{ display: "flex", gap: 2, alignItems: "center", px: 2, py: 1.5, borderTop: i ? `1px solid ${IOS.hairline}` : "none" }}>
                       <Box sx={{ width: 44, textAlign: "center", flexShrink: 0 }}>
                         <Typography sx={{ fontSize: 12, color: "text.secondary", fontWeight: 600 }}>
                           {new Date(s.startTime).toLocaleDateString(undefined, { weekday: "short", timeZone: timezone })}
@@ -423,7 +703,7 @@ export default function StaffLinkPage() {
                         </Typography>
                       </Box>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography sx={{ fontWeight: 700 }}>
+                        <Typography noWrap sx={{ fontWeight: 700, fontSize: 15 }}>
                           {fmtTime(s.startTime)}–{fmtTime(s.endTime)}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" noWrap>
@@ -433,13 +713,13 @@ export default function StaffLinkPage() {
                         </Typography>
                       </Box>
                       {s.status === "scheduled" && new Date(s.startTime).getTime() > now && (
-                        <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+                        <Stack spacing={0.25} sx={{ flexShrink: 0, alignItems: "flex-end" }}>
                           {features.swaps && (
-                            <Button size="small" onClick={() => openSwap(s)} sx={{ textTransform: "none", minWidth: 0 }}>
+                            <Button size="small" onClick={() => openSwap(s)} sx={{ minWidth: 0, py: 0.25, px: 1, color: IOS.blue }}>
                               Swap
                             </Button>
                           )}
-                          <Button size="small" color="error" onClick={() => setCallOutShift(s)} sx={{ textTransform: "none", minWidth: 0, whiteSpace: "nowrap" }}>
+                          <Button size="small" onClick={() => setCallOutShift(s)} sx={{ minWidth: 0, py: 0.25, px: 1, whiteSpace: "nowrap", color: IOS.redText }}>
                             Can't make it
                           </Button>
                         </Stack>
@@ -627,12 +907,19 @@ export default function StaffLinkPage() {
           </Stack>
         )}
 
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 4, textAlign: "center" }}>
-          This is your personal link. Don't share it. Powered by WiserShifts.
-        </Typography>
+        <Box sx={{ mt: 5, textAlign: "center" }}>
+          <Typography sx={{ fontSize: 12, color: IOS.secondary }}>
+            This is your personal link. Don't share it. Powered by WiserShifts.
+          </Typography>
+          {me.pin?.required && (
+            <Button size="small" onClick={signOutDevice} sx={{ mt: 1, color: IOS.blue }}>
+              Sign out on this device
+            </Button>
+          )}
+        </Box>
       </Container>
 
-      <Dialog open={Boolean(callOutShift)} onClose={() => setCallOutShift(null)} fullWidth maxWidth="xs">
+      <Dialog open={Boolean(callOutShift)} onClose={() => setCallOutShift(null)} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: "18px" } }}>
         <DialogTitle sx={{ fontWeight: 800 }}>Can't make this shift?</DialogTitle>
         <DialogContent>
           <Typography>
@@ -648,7 +935,7 @@ export default function StaffLinkPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={Boolean(swapShift)} onClose={() => setSwapShift(null)} fullWidth maxWidth="xs">
+      <Dialog open={Boolean(swapShift)} onClose={() => setSwapShift(null)} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: "18px" } }}>
         <DialogTitle sx={{ fontWeight: 800 }}>Ask someone to swap</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>

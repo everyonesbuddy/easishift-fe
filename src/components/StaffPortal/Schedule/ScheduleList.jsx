@@ -75,7 +75,6 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
 import ScheduleForm from "./ScheduleForm";
-import AutoGenerateScheduleForm from "./AutoGenerateScheduleForm";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import ShiftSwapRequestModal from "./ShiftSwapRequestModal";
 import WeekPublishBar from "./WeekPublishBar";
@@ -146,14 +145,6 @@ const getScheduleTourSteps = ({
     },
   ];
 
-  if (canManageSchedules) {
-    steps.push({
-      target: "guide-schedule-ai-drafts",
-      title: "Review AI-generated drafts",
-      body: "See draft schedules the AI proposed from open coverage, then edit assignments and publish selectively.",
-    });
-  }
-
   if (canManageSchedules || canUsePersonalSchedule) {
     steps.push({
       target: "guide-schedule-add-btn",
@@ -161,7 +152,7 @@ const getScheduleTourSteps = ({
         ? "Schedule a shift manually"
         : "Pick up an open shift",
       body: canManageSchedules
-        ? "Create a one-off shift for a specific staff member, outside the AI draft flow."
+        ? "Put a specific person on a shift by hand."
         : "Browse open coverage you are eligible for and claim a shift yourself.",
     });
   }
@@ -176,7 +167,7 @@ const getScheduleTourSteps = ({
 };
 
 export default function ScheduleList() {
-  const { user, can, hasFeature, facilityPreferences } = useAuth();
+  const { user, can, facilityPreferences } = useAuth();
   const rc = (role) => roleColor(role, facilityPreferences?.roleFamilies);
   const displayTimeZone = getDisplayTimeZone(facilityPreferences);
   const canManageSchedules = can("schedule.manage");
@@ -228,9 +219,6 @@ export default function ScheduleList() {
   const [schedules, setSchedules] = useState([]);
   const [staff, setStaff] = useState([]);
   const [open, setOpen] = useState(false);
-  const [openAutoModal, setOpenAutoModal] = useState(() =>
-    Boolean(location.state?.openDraftReview),
-  );
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [scheduleFormMode, setScheduleFormMode] = useState("manual");
   const [manualCoverageFromAuto, setManualCoverageFromAuto] = useState(null);
@@ -791,11 +779,6 @@ export default function ScheduleList() {
   }, [canViewAllSchedules]);
 
   useEffect(() => {
-    if (location.state?.openDraftReview) {
-      setOpenAutoModal(true);
-      navigate(location.pathname, { replace: true, state: {} });
-      return;
-    }
     if (location.state?.openView) {
       setView(location.state.openView);
       // Re-fetch since client-side navigation to the same route may not remount this component
@@ -833,7 +816,6 @@ export default function ScheduleList() {
   };
 
   const openManualFromCoverage = (coverage) => {
-    setOpenAutoModal(false);
     setScheduleFormMode("manual");
     setEditingSchedule(null);
     setManualCoverageFromAuto(coverage || null);
@@ -3067,29 +3049,6 @@ export default function ScheduleList() {
             </ToggleButton>
           </ToggleButtonGroup>
 
-          {canManageSchedules && hasFeature("autoFill") && (
-            <Button
-              size="small"
-              variant="contained"
-              startIcon={<FiPlus />}
-              onClick={() => setOpenAutoModal(true)}
-              data-guide-id="guide-schedule-ai-drafts"
-              sx={{
-                textTransform: "none",
-                borderRadius: 2,
-                px: 1.75,
-                py: 0.55,
-                minHeight: 32,
-                fontSize: "0.78rem",
-                bgcolor: "#1D4ED8",
-                color: "#fff",
-                width: { xs: "100%", md: "auto" },
-                "&:hover": { bgcolor: "#1146b1" },
-              }}
-            >
-              Review AI Drafts
-            </Button>
-          )}
 
           {canManageSchedules && view === "table" && (
             <Button
@@ -5522,32 +5481,6 @@ export default function ScheduleList() {
             Clock In
           </Button>
         </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={openAutoModal}
-        onClose={() => setOpenAutoModal(false)}
-        fullWidth
-        maxWidth="lg"
-        scroll="paper"
-        PaperProps={{
-          sx: {
-            borderRadius: { xs: 3, md: 4 },
-            overflow: "hidden",
-          },
-        }}
-      >
-        <DialogContent dividers sx={{ p: { xs: 1.25, md: 2 } }}>
-          <AutoGenerateScheduleForm
-            schedules={schedules}
-            onClose={() => setOpenAutoModal(false)}
-            onOpenManualSchedule={openManualFromCoverage}
-            onSuccess={() => {
-              fetchSchedules();
-              fetchCoverageGaps();
-            }}
-          />
-        </DialogContent>
       </Dialog>
 
       <ConfirmDialog

@@ -28,8 +28,6 @@ const STAFF_MANAGEMENT_VIDEO_URL =
   "https://youtu.be/GEzs9F-LysY?si=GRCGmE4iVgU88Zkj";
 const FACILITY_PREFERENCES_VIDEO_URL =
   "https://youtu.be/fI3JscDuFkk?si=AR-_eefXMBQ6UKH3";
-const SCHEDULE_AI_GENERATED_VIDEO_URL =
-  "https://youtu.be/r8kQbvdqWpA?si=FkDBEtKcx3tyJuCd";
 
 const TRACKS = [
   { id: "all", label: "All workflows", tone: "#0f172a" },
@@ -148,26 +146,18 @@ const TRAINING_MODULES = [
   {
     id: "schedule-builder",
     track: "schedule",
-    title: "Build, Review, and Publish Schedules",
+    title: "Build and Publish the Week",
     audience: "Schedulers and admins responsible for published schedules",
     access: "schedule.manage",
     summary:
-      "Create manual shifts, generate drafts from coverage, review warnings, and publish final schedules.",
-    videos: [
-      {
-        label: "AI-generated schedule walkthrough",
-        url: SCHEDULE_AI_GENERATED_VIDEO_URL,
-        description:
-          "Review AI-generated draft schedules before publishing them.",
-      },
-    ],
+      "Fill the week (by hand or with Auto-fill), check it, then publish so everyone gets their shifts.",
+    videos: [],
     steps: [
-      "Create single shifts manually for urgent edits or one-off coverage needs.",
-      "Generate drafts from selected open coverage records when planning a broader schedule.",
-      "Compare live schedules, open coverage, and draft assignments before publishing.",
-      "Use Fill with AI on an unfilled draft slot when one assignment needs another attempt.",
-      "Review overtime, consecutive-day, certification, unit, and role compatibility warnings.",
-      "Publish selected items or publish all only after review counts look right.",
+      "Open Schedule Builder. The week shows each shift and role with who's on it and dashed Open spots.",
+      "Click Auto-fill open slots to put the best available people on every open spot, or click a day to pick someone yourself.",
+      "New shifts show as Not sent yet. Change anyone you like; nobody is told until you publish.",
+      "Click Publish week. Each person gets one text or email with their shifts and their personal link.",
+      "After publishing, any change goes out right away to just the person affected.",
     ],
   },
   {

@@ -282,7 +282,10 @@ export default function WeekPublishBar({ refreshKey, onChanged }) {
             <Stack spacing={1.5}>
               <Typography>
                 {result?.messaged
-                  ? `Messaged ${plural(result.messaged, "person")}: ${result.sent?.sms || 0} by text, ${result.sent?.email || 0} by email.`
+                  ? (() => {
+                      const reached = (result.sent?.sms || 0) + (result.sent?.email || 0);
+                      return `${reached} of ${result.messaged} ${result.messaged === 1 ? "person" : "people"} got their schedule: ${result.sent?.sms || 0} by text, ${result.sent?.email || 0} by email.`;
+                    })()
                   : "Nobody needed a message."}
               </Typography>
               {result?.notReached?.length > 0 && (

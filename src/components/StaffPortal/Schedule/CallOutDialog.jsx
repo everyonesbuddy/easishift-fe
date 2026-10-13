@@ -146,9 +146,10 @@ export default function CallOutDialog({ open, schedule, onClose, onChanged }) {
 
             {textResult ? (
               <Alert severity="success">
-                Texted {textResult.sentTo} {textResult.sentTo === 1 ? "person" : "people"}
-                {textResult.byEmail ? ` (${textResult.byEmail} by email)` : ""}. The
-                first to reply YES gets the shift, and you'll get an email.
+                Offered to {textResult.sentTo}{" "}
+                {textResult.sentTo === 1 ? "person" : "people"}: {textResult.bySms || 0} by
+                text, {textResult.byEmail || 0} by email. The first to say yes gets the
+                shift, and you'll get an email.
                 {textResult.notReached?.length > 0 && (
                   <Box sx={{ mt: 1 }}>
                     Not reached:{" "}

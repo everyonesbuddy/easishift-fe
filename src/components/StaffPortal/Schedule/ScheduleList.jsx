@@ -171,7 +171,7 @@ const getScheduleTourSteps = ({
 };
 
 export default function ScheduleList() {
-  const { user, can, facilityPreferences } = useAuth();
+  const { user, can, hasFeature, facilityPreferences } = useAuth();
   const displayTimeZone = getDisplayTimeZone(facilityPreferences);
   const canManageSchedules = can("schedule.manage");
   const canViewAllSchedules = can("schedule.view");
@@ -3035,7 +3035,7 @@ export default function ScheduleList() {
             </ToggleButton>
           </ToggleButtonGroup>
 
-          {canManageSchedules && (
+          {canManageSchedules && hasFeature("autoFill") && (
             <Button
               size="small"
               variant="contained"

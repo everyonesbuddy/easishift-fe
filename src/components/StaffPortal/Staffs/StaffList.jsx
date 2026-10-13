@@ -43,6 +43,7 @@ import { useAuth } from "../../../context/AuthContext";
 import StaffCreateAndEditForm from "./StaffCreateAndEditForm";
 import BulkStaffModal from "./BulkStaffModal";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
+import { notSentReason } from "../../../utils/deliveryReasons";
 import GuideHelpButton from "../../Shared/GuideHelpButton";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
@@ -86,15 +87,6 @@ const getStaffListTourSteps = ({ canManageStaff }) => {
   });
 
   return steps;
-};
-
-// Why a link didn't go out (from the backend's send result).
-const NOT_SENT_REASONS = {
-  no_contact: "they have no phone or email",
-  opted_out: "they replied STOP to texts",
-  sms_needs_pro: "texting is on Pro. Add an email or upgrade",
-  awaiting_opt_in: "we texted them to opt in first; the link follows when they reply START",
-  send_failed: "the message failed to send",
 };
 
 const SMS_STATUS_LABELS = {
@@ -160,7 +152,7 @@ export default function StaffList() {
         );
       } else {
         toast.info(
-          `Not sent: ${NOT_SENT_REASONS[res.data?.reason] || "couldn't reach them"}. You can copy the link instead.`,
+          `Not sent: ${notSentReason(res.data?.reason)}. You can copy the link instead.`,
           { position: "top-right", autoClose: 5000 },
         );
       }

@@ -21,11 +21,11 @@ import {
 
 import StatCard from "./StatCard";
 import ScheduleAndCoverageCharts from "./ScheduleAndCoverageCharts";
+import WeekPublishBar from "../Schedule/WeekPublishBar";
 import { toast } from "react-toastify";
 import { useGuideTour } from "../../../context/GuideTourContext";
 import GuideHelpButton from "../../Shared/GuideHelpButton";
 import {
-  getFacilityRolesFromUser,
   getRoleDisplayName,
 } from "../../../constants/industryRoles";
 
@@ -48,7 +48,6 @@ export default function StaffDashboard() {
     roles,
     can,
     hasFeature,
-    facilityPreferences,
     updateCurrentUser,
   } =
     useAuth();
@@ -56,9 +55,8 @@ export default function StaffDashboard() {
   const canViewOperations = can("schedule.view");
   // The summary numbers are a Facility-plan feature.
   const canViewStaffSummary = can("staff.view") && hasFeature("dashboard");
-  const hasSchedulableRole =
-    getFacilityRolesFromUser(user, facilityPreferences).length > 0;
-  const canUsePersonalSchedule = hasSchedulableRole;
+  // Accounts are owners/schedulers/viewers; staff use their personal link.
+  const canUsePersonalSchedule = false;
 
   const [summary, setSummary] = useState(null);
   const [tenant, setTenant] = useState(null);
@@ -446,6 +444,12 @@ export default function StaffDashboard() {
           </Box>
         </Box>
       </Box>
+
+      {can("schedule.manage") && (
+        <Box sx={{ mb: 3 }}>
+          <WeekPublishBar />
+        </Box>
+      )}
 
       {/* {canViewOperations && summary.operational
         ? renderCardSection("Operational Summary", adminCards)

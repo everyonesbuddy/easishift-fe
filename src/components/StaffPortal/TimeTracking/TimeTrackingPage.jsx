@@ -158,14 +158,16 @@ export default function TimeTrackingPage() {
     return activeEntry.breaks.find((item) => item && !item.endAt) || null;
   }, [activeEntry]);
 
+  // Staff clock in from their personal link now; accounts only see attendance.
   const loadStaffEntries = useCallback(async () => {
+    if (isAdmin) return;
     const res = await api.get("/time-tracking/me");
     const normalizedEntries = safeSortByClockInDesc(
       normalizeEntriesFromResponse(res.data),
     );
     setEntries(normalizedEntries);
     setActiveEntry(getActiveEntryFromResponse(res.data, normalizedEntries));
-  }, []);
+  }, [isAdmin]);
 
   const loadStaffSchedules = useCallback(async () => {
     if (isAdmin) return;

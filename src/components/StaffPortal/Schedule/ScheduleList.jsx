@@ -65,6 +65,7 @@ import {
   FiSearch,
   FiX,
   FiFilter,
+  FiUserX,
 } from "react-icons/fi";
 import { MdDragIndicator } from "react-icons/md";
 import { jsPDF } from "jspdf";
@@ -74,6 +75,8 @@ import ScheduleForm from "./ScheduleForm";
 import AutoGenerateScheduleForm from "./AutoGenerateScheduleForm";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import ShiftSwapRequestModal from "./ShiftSwapRequestModal";
+import WeekPublishBar from "./WeekPublishBar";
+import CallOutDialog from "./CallOutDialog";
 import { useAuth } from "../../../context/AuthContext";
 import { getPunchLocation } from "../../../utils/geolocation";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -88,7 +91,6 @@ import {
   getShiftTypeDisplayName,
   getShiftTagDisplayName,
   getCertificationTagDisplayName,
-  getFacilityRolesFromUser,
   getRoleOptionsFromFacilityPreferences,
   getUserRoles,
 } from "../../../constants/industryRoles";
@@ -173,9 +175,34 @@ export default function ScheduleList() {
   const displayTimeZone = getDisplayTimeZone(facilityPreferences);
   const canManageSchedules = can("schedule.manage");
   const canViewAllSchedules = can("schedule.view");
-  const hasSchedulableRole =
-    getFacilityRolesFromUser(user, facilityPreferences).length > 0;
-  const canUsePersonalSchedule = hasSchedulableRole;
+  // Everyone who logs in is an owner, scheduler or viewer. Staff use their
+  // personal link (/s/:token) for their own shifts, swaps and clock-in, so
+  // the "my schedule" actions on this page are switched off.
+  const canUsePersonalSchedule = false;
+  const [callOutSchedule, setCallOutSchedule] = useState(null);
+  const canCallOut = (s) =>
+    canManageSchedules &&
+    s?.status === "scheduled" &&
+    new Date(s?.endTime).getTime() > Date.now();
+  const draftBadge = (s) =>
+    s?.state === "draft" ? (
+      <Box
+        component="span"
+        title="Not sent yet. Staff see it when you publish the week."
+        sx={{
+          ml: 0.5,
+          px: 0.6,
+          py: 0.2,
+          borderRadius: 1,
+          bgcolor: "#FEF3C7",
+          color: "#92400E",
+          fontWeight: 700,
+          fontSize: "0.6rem",
+        }}
+      >
+        DRAFT
+      </Box>
+    ) : null;
   const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
@@ -2738,6 +2765,7 @@ export default function ScheduleList() {
           >
             {getScheduleStatusLabel(s.status)}
           </Box>
+          {draftBadge(s)}
         </TableCell>
         <TableCell sx={{ whiteSpace: "nowrap", py: 0.75 }}>
           <Tooltip title="View details">
@@ -2786,6 +2814,17 @@ export default function ScheduleList() {
                 </IconButton>
               </Tooltip>
             )}
+          {canCallOut(s) && (
+            <Tooltip title="Called out">
+              <IconButton
+                size="small"
+                onClick={() => setCallOutSchedule(s)}
+                sx={{ mr: 0.5, color: "#b91c1c" }}
+              >
+                <FiUserX />
+              </IconButton>
+            </Tooltip>
+          )}
           {canManageSchedules && (
             <Tooltip title="Delete schedule">
               <IconButton
@@ -3150,6 +3189,16 @@ export default function ScheduleList() {
           )}
         </Box>
       </Box>
+
+      {canManageSchedules && (
+        <WeekPublishBar
+          refreshKey={schedules}
+          onChanged={() => {
+            fetchSchedules();
+            fetchCoverageGaps();
+          }}
+        />
+      )}
 
       {/* FILTER BAR */}
       <Paper
@@ -5199,6 +5248,7 @@ export default function ScheduleList() {
                     {(selectedSchedule.status || "-")
                       .replace("_", " ")
                       .toUpperCase()}
+                    {draftBadge(selectedSchedule)}
                   </Typography>
                 </Box>
               </Box>
@@ -5229,10 +5279,38 @@ export default function ScheduleList() {
                   Overnight shift
                 </Typography>
               )}
+
+              {canCallOut(selectedSchedule) && (
+                <Box display="flex" justifyContent="flex-end" gap={1} mt={1}>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    startIcon={<FiUserX />}
+                    onClick={() => {
+                      const target = selectedSchedule;
+                      closeDetailsModal();
+                      setCallOutSchedule(target);
+                    }}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Called out
+                  </Button>
+                </Box>
+              )}
             </Box>
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <CallOutDialog
+        open={Boolean(callOutSchedule)}
+        schedule={callOutSchedule}
+        onClose={() => setCallOutSchedule(null)}
+        onChanged={() => {
+          fetchSchedules();
+          fetchCoverageGaps();
+        }}
+      />
 
       <Dialog
         open={timeEntryOpen}

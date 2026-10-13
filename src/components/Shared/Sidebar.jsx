@@ -90,7 +90,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
           {
             id: "staff",
             icon: MdPeople,
-            label: "Staff Management",
+            label: "Staff",
             to: "/staffs",
           },
         ]
@@ -100,7 +100,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
           {
             id: "members",
             icon: MdAccountCircle,
-            label: "Team Members",
+            label: "Schedulers & viewers",
             to: "/members",
           },
         ]

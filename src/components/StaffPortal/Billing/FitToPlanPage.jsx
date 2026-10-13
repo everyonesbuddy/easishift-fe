@@ -21,15 +21,13 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
+import { toLabel } from "../../../utils/labels";
 
 const INK = "#1F2937";
 const MUTED = "#6B7280";
 const LINE = "#E5E7EB";
 
-const pretty = (value) =>
-  String(value || "")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+const pretty = toLabel;
 
 function PickList({ title, help, people, chosen, onToggle, limit, search, onSearch, renderMeta }) {
   const full = chosen.size >= limit;

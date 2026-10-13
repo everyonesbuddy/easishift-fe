@@ -283,6 +283,7 @@ export const AuthProvider = ({ children }) => {
         // page), so a Free workspace isn't nagged on every screen.
         const method = String(error.config?.method || "get").toLowerCase();
         if (error.response?.status === 402 && method !== "get") {
+          window.__wisershiftsPlanNoticeAt = Date.now();
           window.dispatchEvent(
             new CustomEvent("wisershifts:plan-required", {
               detail: error.response.data || {},

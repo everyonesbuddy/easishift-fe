@@ -439,7 +439,7 @@ export default function StaffList() {
             variant="h5"
             sx={{ display: "flex", alignItems: "center", gap: 1 }}
           >
-            Staff Management
+            Staff
             <GuideHelpButton
               tourId="staff-list"
               tourSteps={staffListTourSteps}

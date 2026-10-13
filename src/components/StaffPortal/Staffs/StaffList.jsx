@@ -36,6 +36,7 @@ import {
   FiArchive,
   FiLink,
   FiSend,
+  FiLock,
   FiRotateCcw,
   FiTrash2,
 } from "react-icons/fi";
@@ -174,6 +175,22 @@ export default function StaffList() {
       });
     } catch (err) {
       toastError(err, "Couldn't copy the link");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleResetPin = async (staffUser) => {
+    try {
+      setBusyId(staffUser._id);
+      await api.post(`/staff/${staffUser._id}/reset-pin`);
+      toast.success(`${staffUser.name}'s PIN was reset. They'll choose a new one next time they open their link.`, {
+        position: "top-right",
+        autoClose: 4000,
+      });
+      fetchStaff();
+    } catch (err) {
+      toastError(err, "Couldn't reset the PIN");
     } finally {
       setBusyId(null);
     }
@@ -377,6 +394,18 @@ export default function StaffList() {
             >
               Copy link
             </Button>
+            {facilityPreferences?.staffLinkPinRequired && u.linkPinSet && (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<FiLock />}
+                disabled={busy}
+                onClick={() => handleResetPin(u)}
+                sx={compactActionButtonSx}
+              >
+                Reset PIN
+              </Button>
+            )}
           </>
         )}
         <Button

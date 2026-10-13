@@ -71,6 +71,10 @@ export default function StaffLinkPage() {
   const [notice, setNotice] = useState(null); // { severity, text }
 
   const [shifts, setShifts] = useState([]);
+  const [shiftView, setShiftView] = useState("upcoming"); // "upcoming" | "past"
+  const [pastShifts, setPastShifts] = useState(null);
+  const [pastWeeks, setPastWeeks] = useState(0); // how far back is loaded
+  const [pastLoading, setPastLoading] = useState(false);
   const [timezone, setTimezone] = useState(undefined);
   const [openShifts, setOpenShifts] = useState([]);
   const [swaps, setSwaps] = useState([]);
@@ -119,6 +123,33 @@ export default function StaffLinkPage() {
     setShifts(res.data.shifts || []);
     setTimezone(res.data.timezone || undefined);
   }, [client]);
+
+  // Past shifts, 4 weeks at a time going back.
+  const PAST_STEP_WEEKS = 4;
+  const loadMorePast = useCallback(async () => {
+    setPastLoading(true);
+    try {
+      const DAY = 86400000;
+      const to = pastWeeks === 0 ? new Date() : new Date(Date.now() - pastWeeks * 7 * DAY);
+      const from = new Date(Date.now() - (pastWeeks + PAST_STEP_WEEKS) * 7 * DAY);
+      const res = await client.get("/schedule", { params: { from: from.toISOString(), to: to.toISOString() } });
+      const older = (res.data.shifts || []).filter((x) => new Date(x.endTime).getTime() <= Date.now());
+      setPastShifts((prev) => {
+        const seen = new Set((prev || []).map((x) => x._id));
+        return [...(prev || []), ...older.filter((x) => !seen.has(x._id))];
+      });
+      setPastWeeks((w) => w + PAST_STEP_WEEKS);
+      setTimezone(res.data.timezone || undefined);
+    } catch (err) {
+      setNotice({ severity: "error", text: errorText(err, "Couldn't load past shifts") });
+    } finally {
+      setPastLoading(false);
+    }
+  }, [client, pastWeeks]);
+
+  useEffect(() => {
+    if (tab === "shifts" && shiftView === "past" && pastShifts === null && !pastLoading) loadMorePast();
+  }, [tab, shiftView, pastShifts, pastLoading, loadMorePast]);
 
   const loadTab = useCallback(
     async (which) => {
@@ -306,6 +337,36 @@ export default function StaffLinkPage() {
     },
     { label: "Later", shifts: rest.filter((s) => new Date(s.startTime).getTime() >= weekStartMs + 2 * WEEK_MS) },
   ].filter((g) => g.shifts.length);
+  // Past shifts grouped by week, newest first.
+  const pastGroups = (() => {
+    const list = [...(pastShifts || [])].sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+    const groups = new Map();
+    for (const x of list) {
+      const t = new Date(x.startTime).getTime();
+      const weeksAgo = Math.floor((weekStartMs - t) / WEEK_MS) + 1;
+      const key = t >= weekStartMs ? 0 : weeksAgo;
+      if (!groups.has(key)) {
+        const start = new Date(weekStartMs - key * WEEK_MS);
+        groups.set(key, {
+          key,
+          label:
+            key === 0
+              ? "This week"
+              : key === 1
+                ? "Last week"
+                : `Week of ${start.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`,
+          shifts: [],
+          minutes: 0,
+        });
+      }
+      const g = groups.get(key);
+      g.shifts.push(x);
+      if (x.status !== "call_out") g.minutes += (new Date(x.endTime) - new Date(x.startTime)) / 60000;
+    }
+    return [...groups.values()]
+      .sort((a, b) => a.key - b.key)
+      .map((g) => ({ ...g, hours: Math.round((g.minutes / 60) * 10) / 10 }));
+  })();
   const relativeDay = (iso) => {
     const start = new Date(iso);
     const today = new Date(now);
@@ -368,6 +429,102 @@ export default function StaffLinkPage() {
         )}
 
         {tab === "shifts" && (
+          <Box sx={{ display: "flex", p: "3px", mb: 2, borderRadius: "10px", bgcolor: "rgba(118,118,128,0.12)" }} role="tablist" aria-label="Which shifts">
+            {[
+              { value: "upcoming", label: "Upcoming" },
+              { value: "past", label: "Past" },
+            ].map((opt) => (
+              <Box
+                key={opt.value}
+                component="button"
+                type="button"
+                role="tab"
+                aria-selected={shiftView === opt.value}
+                onClick={() => setShiftView(opt.value)}
+                sx={{
+                  all: "unset",
+                  flex: 1,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  py: 0.75,
+                  borderRadius: "8px",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "#1D1D1F",
+                  bgcolor: shiftView === opt.value ? "#fff" : "transparent",
+                  boxShadow: shiftView === opt.value ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
+                }}
+              >
+                {opt.label}
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        {tab === "shifts" && shiftView === "past" && (
+          <Stack spacing={2.5}>
+            {pastShifts === null ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : pastGroups.length === 0 ? (
+              <Paper elevation={0} sx={{ ...card, textAlign: "center", py: 4 }}>
+                <Typography sx={{ fontWeight: 700 }}>No past shifts in the last {pastWeeks} weeks</Typography>
+              </Paper>
+            ) : (
+              pastGroups.map((group) => (
+                <Box key={group.key}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", mb: 1 }}>
+                    <Typography sx={{ fontWeight: 800, fontSize: 15 }}>{group.label}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {group.shifts.filter((x) => x.status !== "call_out").length} shift
+                      {group.shifts.filter((x) => x.status !== "call_out").length === 1 ? "" : "s"} · {group.hours}h
+                    </Typography>
+                  </Box>
+                  <Paper elevation={0} sx={{ ...card, p: 0 }}>
+                    {group.shifts.map((x, i) => (
+                      <Box key={x._id} sx={{ display: "flex", gap: 2, alignItems: "center", px: 2, py: 1.5, borderTop: i ? "1px solid #e5e7eb" : "none" }}>
+                        <Box sx={{ width: 44, textAlign: "center", flexShrink: 0 }}>
+                          <Typography sx={{ fontSize: 12, color: "text.secondary", fontWeight: 600 }}>
+                            {new Date(x.startTime).toLocaleDateString(undefined, { weekday: "short", timeZone: timezone })}
+                          </Typography>
+                          <Typography sx={{ fontSize: 20, fontWeight: 800, lineHeight: 1.1, color: "text.secondary" }}>
+                            {new Date(x.startTime).toLocaleDateString(undefined, { day: "numeric", timeZone: timezone })}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 700 }}>
+                            {fmtTime(x.startTime)}–{fmtTime(x.endTime)}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" noWrap>
+                            {pretty(x.role)}
+                            {x.unitArea ? `, ${pretty(x.unitArea)}` : ""}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          size="small"
+                          label={x.status === "call_out" ? "Called out" : x.status === "scheduled" || x.status === "completed" ? "Worked" : pretty(x.status)}
+                          sx={{
+                            fontWeight: 600,
+                            bgcolor: x.status === "call_out" ? "rgba(255,59,48,0.1)" : "rgba(52,199,89,0.12)",
+                            color: x.status === "call_out" ? "#D70015" : "#248A3D",
+                          }}
+                        />
+                      </Box>
+                    ))}
+                  </Paper>
+                </Box>
+              ))
+            )}
+            {pastShifts !== null && (
+              <Button onClick={loadMorePast} disabled={pastLoading} sx={{ textTransform: "none", alignSelf: "center" }}>
+                {pastLoading ? "Loading…" : `Show earlier (before ${pastWeeks} weeks ago)`}
+              </Button>
+            )}
+          </Stack>
+        )}
+
+        {tab === "shifts" && shiftView === "upcoming" && (
           <Stack spacing={2.5}>
             {upcoming.length === 0 && (
               <Paper elevation={0} sx={{ ...card, textAlign: "center", py: 4 }}>

@@ -30,6 +30,7 @@ import ScheduleList from "./components/StaffPortal/Schedule/ScheduleList";
 import ShiftSwapRequestsPage from "./components/StaffPortal/Schedule/ShiftSwapRequestsPage";
 import StaffList from "./components/StaffPortal/Staffs/StaffList";
 import MembersPage from "./components/StaffPortal/Members/MembersPage";
+import StaffLinkPage from "./components/StaffLink/StaffLinkPage";
 import StaffingTemplatePage from "./components/StaffPortal/Coverage/StaffingTemplatePage";
 import MessageList from "./components/StaffPortal/Messages/MessageList";
 import TimeOffDecision from "./components/StaffPortal/TimeOff/TimeOffDecision";
@@ -71,12 +72,16 @@ export default function App() {
       }),
     [primaryColor, secondaryColor],
   );
+  // Staff open their personal link without logging in; show it bare.
+  const isStaffLink = window.location.pathname.startsWith("/s/");
+  const showAppChrome = Boolean(user) && !isStaffLink;
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <BrowserRouter>
         <AnalyticsTracker />
-        {user && (
+        {showAppChrome && (
           <Sidebar
             mobileOpen={mobileOpen}
             onMobileClose={() => setMobileOpen(false)}
@@ -84,11 +89,13 @@ export default function App() {
         )}
         <Box
           sx={{
-            marginLeft: user ? { xs: 0, sm: "260px" } : 0,
+            marginLeft: showAppChrome ? { xs: 0, sm: "260px" } : 0,
             position: "relative",
           }}
         >
-          <Navbar onMobileOpen={() => setMobileOpen(true)} />
+          {!isStaffLink && (
+            <Navbar onMobileOpen={() => setMobileOpen(true)} />
+          )}
           <Routes>
             <Route
               path="/"
@@ -132,6 +139,7 @@ export default function App() {
               element={user ? <Navigate to="/dashboard" replace /> : <Login />}
             />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/s/:token" element={<StaffLinkPage />} />
             <Route
               path="/signup-tenant"
               element={
@@ -277,7 +285,7 @@ export default function App() {
           </Routes>
           <ToastContainer />
           <GuideTourOverlay />
-          {user && <UpgradeDialog />}
+          {showAppChrome && <UpgradeDialog />}
         </Box>
       </BrowserRouter>
     </ThemeProvider>

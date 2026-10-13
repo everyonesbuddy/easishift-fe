@@ -6,6 +6,10 @@ import {
   Chip,
   CircularProgress,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   LinearProgress,
   Paper,
   Stack,
@@ -94,11 +98,16 @@ export default function ManageSubscription() {
   const plans = useMemo(() => (Array.isArray(data?.plans) ? data.plans : []), [data]);
   const byKey = useMemo(() => Object.fromEntries(plans.map((p) => [p.key, p])), [plans]);
   const effective = data?.effectivePlan || "free";
-  const isPaying =
+  const paidStatus =
     data?.currentPlan &&
     data.currentPlan !== "free" &&
     ["active", "trialing", "past_due"].includes(data?.subscriptionStatus);
-  const onTrial = !isPaying && effective !== "free" && data?.trialEndsAt;
+  // Paying through Stripe: switch the subscription in place.
+  const isPaying = Boolean(paidStatus && data?.hasSubscription);
+  // On a paid plan set up by hand (comped/invoiced): no Stripe subscription.
+  const isManual = Boolean(paidStatus && !data?.hasSubscription);
+  const onTrial = !paidStatus && effective !== "free" && data?.trialEndsAt;
+  const [confirmPlan, setConfirmPlan] = useState(null); // plan that's smaller than the team
   const effectivePlan = byKey[effective];
   const trialDays = data?.checkoutTrialDays?.[interval] || 0;
   const grace = session?.grace;
@@ -111,8 +120,11 @@ export default function ManageSubscription() {
     try {
       await fn();
     } catch (err) {
-      // 402 / 409 limit answers are explained inline.
-      setError(errorMessage(err));
+      // 402 / 409 limit answers are explained inline, and as a toast so
+      // they're seen even when the page is scrolled down to the plans.
+      const message = errorMessage(err);
+      setError(message);
+      if (err?.response?.status !== 402) toast.error(message, { autoClose: 7000 });
     } finally {
       setBusy(null);
     }
@@ -128,14 +140,27 @@ export default function ManageSubscription() {
 
   const choosePlan = (plan) =>
     run(plan, async () => {
-      if (isPaying) {
-        await api.post("/stripe/change-plan", { plan, interval });
+      const afterSwitch = async (needsFit) => {
         trackEvent("subscription_change_requested");
-        toast.success("Plan changed.");
         await refreshAll();
+        if (needsFit) {
+          toast.info("Plan changed. Now choose who to keep on it.");
+          navigate("/billing/keep");
+        } else {
+          toast.success("Plan changed.");
+        }
+      };
+      if (isPaying) {
+        const res = await api.post("/stripe/change-plan", { plan, interval });
+        await afterSwitch(res.data?.needsFit);
         return;
       }
       const res = await api.post("/stripe/create-checkout-session", { plan, interval });
+      if (res.data?.changed) {
+        // Already had a subscription: it was switched in place.
+        await afterSwitch(res.data?.needsFit);
+        return;
+      }
       if (!res.data?.url) throw new Error("Checkout didn't open. Try again.");
       trackEvent("begin_checkout");
       window.location.href = res.data.url;
@@ -157,6 +182,14 @@ export default function ManageSubscription() {
 
   const freePlan = byKey.free;
   const paidPlans = PAID_PLAN_KEYS.map((key) => byKey[key]).filter(Boolean);
+
+  const overText = (plan) =>
+    `${plan.label} includes ${[
+      plan.over?.schedulers ? `${plan.limits?.schedulers} schedulers (you have ${data?.usage?.schedulers})` : null,
+      plan.over?.staff ? `${plan.limits?.staff} active staff (you have ${data?.usage?.staff})` : null,
+    ]
+      .filter(Boolean)
+      .join(" and ")}`;
 
   const ctaLabel = (plan) => {
     if (busy === plan.key) return "Opening checkout…";
@@ -208,6 +241,8 @@ export default function ManageSubscription() {
             <Typography variant="body2" sx={{ color: MUTED, mt: 0.5 }}>
               {isPaying
                 ? `Billed ${data?.billingInterval === "year" ? "yearly" : "monthly"}`
+                : isManual
+                  ? "Set up by WiserShifts. Choosing a plan below starts card billing."
                 : onTrial
                   ? "When the trial ends you go back to Free. Nothing is deleted."
                   : "Free forever for one scheduler and up to 15 staff."}
@@ -393,17 +428,23 @@ export default function ManageSubscription() {
 
               <Box sx={{ flex: 1 }} />
 
-              {canManage && plan.purchasable && !(isCurrent && isPaying) && (
+              {canManage && plan.purchasable && !(isCurrent && paidStatus) && plan.fitsUsage === false && (
+                <Alert severity="info" icon={false} sx={{ py: 0.5, "& .MuiAlert-message": { fontSize: 13 } }}>
+                  {overText(plan)}. You can still choose it: right after, you'll pick who stays and the rest are
+                  archived or become free viewers. Nothing is deleted.
+                </Alert>
+              )}
+              {canManage && plan.purchasable && !(isCurrent && paidStatus) && (
                 <Button
                   variant={popular ? "contained" : "outlined"}
-                  onClick={() => choosePlan(plan.key)}
+                  onClick={() => (plan.fitsUsage === false ? setConfirmPlan(plan) : choosePlan(plan.key))}
                   disabled={Boolean(busy)}
                   sx={{ textTransform: "none", fontWeight: 700, py: 1 }}
                 >
                   {ctaLabel(plan)}
                 </Button>
               )}
-              {!isPaying && trialDays > 0 && (
+              {!paidStatus && trialDays > 0 && (
                 <Typography variant="caption" sx={{ color: MUTED, textAlign: "center", mt: -1 }}>
                   Card needed. Cancel before day {trialDays} and you won't be charged.
                 </Typography>
@@ -476,6 +517,35 @@ export default function ManageSubscription() {
       {!canManage && (
         <Typography sx={{ color: MUTED, mt: 3 }}>Only the workspace owner can change the plan.</Typography>
       )}
+      <Dialog open={Boolean(confirmPlan)} onClose={() => setConfirmPlan(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800 }}>Switch to {confirmPlan?.label}?</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: "#334155", lineHeight: 1.6 }}>
+            {confirmPlan ? overText(confirmPlan) : ""}.
+          </Typography>
+          <Typography sx={{ color: "#334155", lineHeight: 1.6, mt: 1.5 }}>
+            {isPaying ? "After switching" : "After you pay"}, you'll choose who to keep:
+            {confirmPlan?.over?.schedulers ? " extra schedulers become free viewers (they can still look)" : ""}
+            {confirmPlan?.over?.schedulers && confirmPlan?.over?.staff ? " and" : ""}
+            {confirmPlan?.over?.staff ? " extra staff are archived (restorable, history kept)" : ""}.
+            Until then, adding people and publishing new weeks stay paused.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setConfirmPlan(null)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              const key = confirmPlan.key;
+              setConfirmPlan(null);
+              choosePlan(key);
+            }}
+            sx={{ textTransform: "none", fontWeight: 700 }}
+          >
+            {isPaying ? `Switch to ${confirmPlan?.label}` : "Continue to payment"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

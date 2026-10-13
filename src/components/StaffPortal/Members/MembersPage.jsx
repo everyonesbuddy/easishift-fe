@@ -24,6 +24,7 @@ import { toast } from "react-toastify";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
+import { getRoleDisplayName } from "../../../constants/industryRoles";
 
 const ROLE_INFO = {
   owner: "Everything, including billing and members",
@@ -38,10 +39,14 @@ const errorMessage = (err, fallback) =>
 
 /**
  * Members are the people who log in (owner, schedulers, viewers).
- * Staff who are only scheduled live under Staff Management.
+ * Staff who are only scheduled live under Staff.
  */
 export default function MembersPage() {
-  const { user, can, plan, usage, refreshSession } = useAuth();
+  const { user, can, plan, usage, refreshSession, facilityPreferences } = useAuth();
+  const canAddStaff = can("staff.manage");
+  const [scheduleTarget, setScheduleTarget] = useState(null);
+  const [scheduleRole, setScheduleRole] = useState("");
+  const [schedulePhone, setSchedulePhone] = useState("");
   const canManage = can("roles.manage");
   const [members, setMembers] = useState([]);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -148,15 +153,41 @@ export default function MembersPage() {
     }
   };
 
+  const openSchedule = (member) => {
+    setScheduleTarget(member);
+    setScheduleRole(facilityPreferences?.roleFamilies?.[0] || "");
+    setSchedulePhone("");
+  };
+
+  const handleAddToSchedule = async () => {
+    const member = scheduleTarget;
+    setSaving(true);
+    try {
+      await api.post(`/members/${member._id}/staff-profile`, {
+        role: scheduleRole,
+        ...(schedulePhone.trim() ? { userPhone: schedulePhone.trim(), userPhoneCountryCode: "+1" } : {}),
+      });
+      toast.success(`${member.name} can now be put on shifts`, { position: "top-right", autoClose: 2500 });
+      setScheduleTarget(null);
+      afterChange();
+    } catch (err) {
+      if (err?.response?.status !== 402) {
+        toast.error(errorMessage(err, "Couldn't add them to the schedule"), { position: "top-right" });
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const schedulerLimit = plan?.limits?.schedulers;
 
   return (
     <Container sx={{ mt: 4 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" gap={2} flexWrap="wrap">
         <Box>
-          <Typography variant="h5">Team Members</Typography>
+          <Typography variant="h5">Schedulers & viewers</Typography>
           <Typography color="text.secondary">
-            People who log in to build and view schedules.
+            People who log in to build or look at the schedule. The people you schedule are under Staff.
             {schedulerLimit !== undefined && (
               <Box component="span" sx={{ ml: 1, fontWeight: 600 }}>
                 {usage?.schedulers ?? 0} of{" "}
@@ -211,6 +242,20 @@ export default function MembersPage() {
                     )}
                     {member.invitePending && (
                       <Chip size="small" label="Invite pending" sx={{ ml: 1 }} />
+                    )}
+                    {member.staffProfileId ? (
+                      <Chip size="small" label="Also on the schedule" sx={{ ml: 1, bgcolor: "#F0FDFA", color: "#0F766E" }} />
+                    ) : (
+                      canAddStaff &&
+                      (isMe || canManage) && (
+                        <Button
+                          size="small"
+                          onClick={() => openSchedule(member)}
+                          sx={{ ml: 1, textTransform: "none", minWidth: 0, p: 0.25 }}
+                        >
+                          {isMe ? "Put me on the schedule" : "Put on the schedule"}
+                        </Button>
+                      )
                     )}
                   </TableCell>
                   <TableCell>{member.email}</TableCell>
@@ -296,6 +341,42 @@ export default function MembersPage() {
           <Button onClick={() => setInviteOpen(false)}>Cancel</Button>
           <Button variant="contained" disabled={saving} onClick={handleInvite} sx={{ textTransform: "none" }}>
             {saving ? "Sending..." : "Send invite"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(scheduleTarget)} onClose={() => setScheduleTarget(null)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontWeight: 800 }}>
+          {scheduleTarget && String(scheduleTarget._id) === String(user?._id)
+            ? "Put yourself on the schedule"
+            : `Put ${scheduleTarget?.name || "them"} on the schedule`}
+        </DialogTitle>
+        <DialogContent>
+          <Typography color="text.secondary" sx={{ mb: 2 }}>
+            For people who run the schedule and also work shifts. They'll show up under Staff and get a personal
+            link like everyone else.
+          </Typography>
+          <Stack spacing={2}>
+            <TextField select label="Works as" value={scheduleRole} onChange={(e) => setScheduleRole(e.target.value)}>
+              {(facilityPreferences?.roleFamilies || []).map((role) => (
+                <MenuItem key={role} value={role}>
+                  {getRoleDisplayName(role)}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              label="Mobile number (optional)"
+              value={schedulePhone}
+              onChange={(e) => setSchedulePhone(e.target.value)}
+              inputProps={{ inputMode: "tel" }}
+              helperText="Leave empty to get shifts by email."
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setScheduleTarget(null)}>Cancel</Button>
+          <Button variant="contained" disabled={saving || !scheduleRole} onClick={handleAddToSchedule} sx={{ textTransform: "none" }}>
+            {saving ? "Adding…" : "Add to the schedule"}
           </Button>
         </DialogActions>
       </Dialog>

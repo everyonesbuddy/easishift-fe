@@ -12,10 +12,9 @@ export const GRID = {
   over: "#6D28D9",
 };
 
-export const titleCase = (value) =>
-  String(value || "")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+import { toLabel } from "../../../utils/labels";
+
+export const titleCase = toLabel;
 
 const compactTime = (hhmm) => {
   const [h, m] = String(hhmm || "").split(":").map(Number);

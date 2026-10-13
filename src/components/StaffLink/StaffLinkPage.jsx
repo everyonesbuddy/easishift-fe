@@ -22,6 +22,7 @@ import {
 } from "@mui/material";
 import { API_BASE } from "../../config/api";
 import { getPunchLocation } from "../../utils/geolocation";
+import { toLabel } from "../../utils/labels";
 
 /**
  * What a staff member sees from their personal link (/s/:token).
@@ -29,10 +30,7 @@ import { getPunchLocation } from "../../utils/geolocation";
  * /api/v1/s/:token/... with its own axios instance (no account session).
  */
 
-const pretty = (value) =>
-  String(value || "")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+const pretty = toLabel;
 
 const errorText = (err, fallback) =>
   err?.response?.data?.message || fallback;
@@ -286,6 +284,40 @@ export default function StaffLinkPage() {
   }
 
   const upcoming = shifts.filter((s) => new Date(s.endTime).getTime() > now);
+  const nextShift = upcoming.find((s) => s.status === "scheduled" || s.status === "in_progress") || null;
+  const rest = upcoming.filter((s) => s !== nextShift);
+  // Group the rest by week: this week, next week, later.
+  const weekStartMs = (() => {
+    const d = new Date(now);
+    const offset = (d.getDay() - (me.facility?.weekStartsOn ?? 0) + 7) % 7;
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - offset);
+    return d.getTime();
+  })();
+  const WEEK_MS = 7 * 86400000;
+  const laterGroups = [
+    { label: "This week", shifts: rest.filter((s) => new Date(s.startTime).getTime() < weekStartMs + WEEK_MS) },
+    {
+      label: "Next week",
+      shifts: rest.filter((s) => {
+        const t = new Date(s.startTime).getTime();
+        return t >= weekStartMs + WEEK_MS && t < weekStartMs + 2 * WEEK_MS;
+      }),
+    },
+    { label: "Later", shifts: rest.filter((s) => new Date(s.startTime).getTime() >= weekStartMs + 2 * WEEK_MS) },
+  ].filter((g) => g.shifts.length);
+  const relativeDay = (iso) => {
+    const start = new Date(iso);
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    const day = new Date(start);
+    day.setHours(0, 0, 0, 0);
+    const diff = Math.round((day - today) / 86400000);
+    if (diff === 0) return "today";
+    if (diff === 1) return "tomorrow";
+    if (diff > 1 && diff < 7) return `in ${diff} days`;
+    return "";
+  };
   const tabs = [
     { value: "shifts", label: "My shifts" },
     features.pickup && { value: "open", label: "Open shifts" },
@@ -336,43 +368,86 @@ export default function StaffLinkPage() {
         )}
 
         {tab === "shifts" && (
-          <Stack spacing={1.5}>
+          <Stack spacing={2.5}>
             {upcoming.length === 0 && (
-              <Typography color="text.secondary">No upcoming shifts.</Typography>
+              <Paper elevation={0} sx={{ ...card, textAlign: "center", py: 4 }}>
+                <Typography sx={{ fontWeight: 700 }}>No upcoming shifts</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {features.pickup ? "Check Open shifts to pick one up." : "You'll get a message when your schedule is out."}
+                </Typography>
+              </Paper>
             )}
-            {upcoming.map((s) => (
-              <Paper key={s._id} elevation={0} sx={card}>
-                <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={1}>
-                  <Box>
-                    <Typography sx={{ fontWeight: 700 }}>{shiftLine(s)}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {pretty(s.role)}
-                      {s.unitArea ? ` · ${pretty(s.unitArea)}` : ""}
-                    </Typography>
-                  </Box>
-                  {s.status !== "scheduled" && (
-                    <Chip size="small" label={pretty(s.status)} />
-                  )}
-                </Box>
-                {s.status === "scheduled" && new Date(s.startTime).getTime() > now && (
-                  <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+
+            {nextShift && (
+              <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, bgcolor: "#2563EB", color: "#fff" }}>
+                <Typography sx={{ opacity: 0.85, fontSize: 14 }}>
+                  Your next shift{relativeDay(nextShift.startTime) ? `, ${relativeDay(nextShift.startTime)}` : ""}
+                </Typography>
+                <Typography sx={{ fontWeight: 800, fontSize: 26, lineHeight: 1.2, mt: 0.5 }}>
+                  {fmtDay(nextShift.startTime)}
+                </Typography>
+                <Typography sx={{ fontWeight: 700, fontSize: 20 }}>
+                  {fmtTime(nextShift.startTime)}–{fmtTime(nextShift.endTime)}
+                </Typography>
+                <Typography sx={{ opacity: 0.85, mt: 0.5 }}>
+                  {pretty(nextShift.role)}
+                  {nextShift.unitArea ? `, ${pretty(nextShift.unitArea)}` : ""}
+                </Typography>
+                {nextShift.status === "scheduled" && new Date(nextShift.startTime).getTime() > now && (
+                  <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
                     {features.swaps && (
-                      <Button size="small" variant="outlined" onClick={() => openSwap(s)} sx={{ textTransform: "none" }}>
+                      <Button size="small" variant="contained" onClick={() => openSwap(nextShift)} sx={{ textTransform: "none", bgcolor: "#fff !important", color: "#1E3A8A", fontWeight: 700 }}>
                         Swap
                       </Button>
                     )}
-                    <Button
-                      size="small"
-                      color="error"
-                      variant="outlined"
-                      onClick={() => setCallOutShift(s)}
-                      sx={{ textTransform: "none" }}
-                    >
+                    <Button size="small" onClick={() => setCallOutShift(nextShift)} sx={{ textTransform: "none", color: "#fff", border: "1px solid rgba(255,255,255,0.5)" }}>
                       Can't make it
                     </Button>
                   </Stack>
                 )}
               </Paper>
+            )}
+
+            {laterGroups.map((group) => (
+              <Box key={group.label}>
+                <Typography sx={{ fontWeight: 800, fontSize: 15, mb: 1 }}>{group.label}</Typography>
+                <Paper elevation={0} sx={{ ...card, p: 0 }}>
+                  {group.shifts.map((s, i) => (
+                    <Box key={s._id} sx={{ display: "flex", gap: 2, alignItems: "center", px: 2, py: 1.5, borderTop: i ? "1px solid #e5e7eb" : "none" }}>
+                      <Box sx={{ width: 44, textAlign: "center", flexShrink: 0 }}>
+                        <Typography sx={{ fontSize: 12, color: "text.secondary", fontWeight: 600 }}>
+                          {new Date(s.startTime).toLocaleDateString(undefined, { weekday: "short", timeZone: timezone })}
+                        </Typography>
+                        <Typography sx={{ fontSize: 20, fontWeight: 800, lineHeight: 1.1 }}>
+                          {new Date(s.startTime).toLocaleDateString(undefined, { day: "numeric", timeZone: timezone })}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography sx={{ fontWeight: 700 }}>
+                          {fmtTime(s.startTime)}–{fmtTime(s.endTime)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" noWrap>
+                          {pretty(s.role)}
+                          {s.unitArea ? `, ${pretty(s.unitArea)}` : ""}
+                          {s.status !== "scheduled" ? `, ${pretty(s.status)}` : ""}
+                        </Typography>
+                      </Box>
+                      {s.status === "scheduled" && new Date(s.startTime).getTime() > now && (
+                        <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+                          {features.swaps && (
+                            <Button size="small" onClick={() => openSwap(s)} sx={{ textTransform: "none", minWidth: 0 }}>
+                              Swap
+                            </Button>
+                          )}
+                          <Button size="small" color="error" onClick={() => setCallOutShift(s)} sx={{ textTransform: "none", minWidth: 0, whiteSpace: "nowrap" }}>
+                            Can't make it
+                          </Button>
+                        </Stack>
+                      )}
+                    </Box>
+                  ))}
+                </Paper>
+              </Box>
             ))}
           </Stack>
         )}

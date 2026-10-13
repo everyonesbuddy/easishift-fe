@@ -323,7 +323,7 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
                     </Typography>
                   ))}
                   <Typography variant="body2" sx={{ mt: 1 }}>
-                    You can copy their link from Staff Management and share it yourself.
+                    You can copy their link from Staff and share it yourself.
                   </Typography>
                 </Alert>
               )}

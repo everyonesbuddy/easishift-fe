@@ -51,8 +51,23 @@ const writeDevice = (token, value) => {
 
 const pretty = toLabel;
 
-const errorText = (err, fallback) =>
-  err?.response?.data?.message || fallback;
+// Plain-language answers for clock-in location checks.
+const GEOFENCE_TEXT = {
+  GEOFENCE_OUTSIDE: (d) =>
+    `You're ${d.distanceMeters >= 1000 ? `${(d.distanceMeters / 1000).toFixed(1)} km` : `${Math.round(d.distanceMeters)} m`} from the facility. Clock in when you're there.`,
+  GEOFENCE_UNAVAILABLE: () =>
+    "We couldn't get your location. Allow location for this page in your browser settings, then try again.",
+  GEOFENCE_INACCURATE: () =>
+    "Your location isn't precise enough yet. Step outside or turn on Wi-Fi, wait a moment, then try again.",
+  GEOFENCE_INVALID: () => "We couldn't read your location. Try again.",
+};
+
+const errorText = (err, fallback) => {
+  const data = err?.response?.data || {};
+  const geo = GEOFENCE_TEXT[data.errorCode];
+  if (geo) return geo(data);
+  return data.message || fallback;
+};
 
 const SWAP_STATUS = {
   pending_admin: "Waiting for scheduler",

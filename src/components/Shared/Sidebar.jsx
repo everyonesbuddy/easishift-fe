@@ -96,6 +96,16 @@ function Sidebar({ mobileOpen, onMobileClose }) {
           },
         ]
       : []),
+    ...(can("staff.view")
+      ? [
+          {
+            id: "members",
+            icon: MdAccountCircle,
+            label: "Team Members",
+            to: "/members",
+          },
+        ]
+      : []),
     ...(canViewFacilityPreferences
       ? [
           {

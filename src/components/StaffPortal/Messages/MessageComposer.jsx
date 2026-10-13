@@ -38,8 +38,8 @@ export default function MessageComposer({
   useEffect(() => {
     async function loadStaff() {
       try {
-        const res = await api.get("/auth/users");
-        setStaffList(res.data.filter((u) => u._id !== user._id)); // don't message yourself
+        const res = await api.get("/staff");
+        setStaffList(res.data || []);
       } catch (err) {
         console.error("Failed to load staff", err);
       } finally {
@@ -103,7 +103,7 @@ export default function MessageComposer({
         return;
       }
 
-      await api.post("/messages", {
+      const res = await api.post("/messages", {
         senderId: user._id,
         senderModel: "User",
         receiverIds,
@@ -112,7 +112,20 @@ export default function MessageComposer({
         body: form.body,
       });
 
-      toast.success("Message sent", { position: "top-right", autoClose: 2000 });
+      const delivery = res.data?.delivery;
+      const notReached = delivery?.notReached || [];
+      toast.success(
+        delivery
+          ? `Sent: ${delivery.sms} by text, ${delivery.email} by email`
+          : "Message sent",
+        { position: "top-right", autoClose: 2500 },
+      );
+      if (notReached.length) {
+        toast.info(
+          `Not reached: ${notReached.map((p) => p.name).join(", ")}. They'll see it on their link.`,
+          { position: "top-right", autoClose: 5000 },
+        );
+      }
       onSuccess(); // close
     } catch (err) {
       console.error("Failed to send message", err);

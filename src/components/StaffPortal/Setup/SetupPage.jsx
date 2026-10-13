@@ -20,6 +20,7 @@ import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 import { trackEvent } from "../../../utils/analytics";
 import StaffingTemplateEditor from "./StaffingTemplateEditor";
+import { parseStaffLines } from "../../../utils/staffPaste";
 
 const STEPS = ["Facility type", "Shifts and roles", "What a week needs", "Add staff"];
 
@@ -37,24 +38,6 @@ const roleKey = (value) =>
 
 const errorMessage = (err) =>
   err?.response?.data?.message || err?.message || "Something went wrong";
-
-/** "Kim Tran, 555 123 4567, CNA" or "Kim Tran, kim@x.com, cna" per line. */
-const parseStaffLines = (text, defaultRole) =>
-  text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const parts = line.split(/[,\t]/).map((part) => part.trim()).filter(Boolean);
-      const row = { name: parts[0] || "" };
-      for (const part of parts.slice(1)) {
-        if (part.includes("@")) row.email = part;
-        else if (/\d{4,}/.test(part.replace(/\D/g, "")) && /^[+\d\s().-]+$/.test(part)) row.phone = part;
-        else row.role = part;
-      }
-      if (!row.role && defaultRole) row.role = defaultRole;
-      return row;
-    });
 
 export default function SetupPage() {
   const navigate = useNavigate();

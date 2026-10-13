@@ -1146,7 +1146,7 @@ export default function AutoGenerateScheduleForm({
 
   const loadStaff = async () => {
     try {
-      const res = await api.get("/auth/users");
+      const res = await api.get("/staff");
       setStaffList(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error(err);

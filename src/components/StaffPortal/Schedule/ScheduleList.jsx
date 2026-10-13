@@ -661,10 +661,8 @@ export default function ScheduleList() {
   // ---------------------------
   const fetchStaff = async () => {
     try {
-      // Staff without staff.view get the scoped swap directory instead.
-      const res = await api.get(
-        can("staff.view") ? "/auth/users" : "/auth/users/directory",
-      );
+      // Include archived staff so past shifts still show their names.
+      const res = await api.get("/staff", { params: { status: "all" } });
       setStaff(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Failed to fetch staff", err);

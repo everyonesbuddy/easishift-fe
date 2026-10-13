@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Container,
   TextField,
@@ -7,123 +7,31 @@ import {
   Box,
   Alert,
   Paper,
-  InputAdornment,
-  CircularProgress,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import api, { API_BASE } from "../../config/api";
+import api from "../../config/api";
 import ForgotPasswordModal from "./ForgotPasswordModal";
 import { trackEvent } from "../../utils/analytics";
-import {
-  getWorkspaceDomainLabel,
-  getTenantLoginUrl,
-  isRootWorkspaceHost,
-  isTenantWorkspaceHost,
-} from "../../utils/tenantWorkspace";
-
-const LAST_WORKSPACE_KEY = "lastWorkspace";
-
-const readLastWorkspace = () => {
-  try {
-    return JSON.parse(localStorage.getItem(LAST_WORKSPACE_KEY) || "null");
-  } catch {
-    return null;
-  }
-};
-
 export default function Login() {
-  const { login, publicBranding, publicBrandingLoading } = useAuth();
+  const { login, publicBranding } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
-  const [workspace, setWorkspace] = useState(
-    () => readLastWorkspace()?.subdomain || "",
-  );
-  const [lastWorkspace, setLastWorkspace] = useState(readLastWorkspace);
-  const isWorkspaceFinder = isRootWorkspaceHost();
-  const normalizedWorkspace = workspace.trim().toLowerCase();
-  const isRememberedWorkspace =
-    normalizedWorkspace &&
-    normalizedWorkspace === lastWorkspace?.subdomain?.toLowerCase();
-
-  useEffect(() => {
-    if (publicBranding?.logoUrl?.startsWith("/")) {
-      setBrandLogoUrl(`${API_BASE}${publicBranding.logoUrl}`);
-      return;
-    }
-    setBrandLogoUrl(publicBranding?.logoUrl || "");
-  }, [publicBranding]);
-  const [brandLogoUrl, setBrandLogoUrl] = useState("");
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const continueToWorkspace = async (requestedSubdomain) => {
-    const subdomain = String(requestedSubdomain || "")
-      .trim()
-      .toLowerCase();
-    setError("");
-
-    if (
-      !/^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/.test(subdomain) ||
-      subdomain.includes("--")
-    ) {
-      setError(
-        "Enter a valid workspace name using letters, numbers, or single hyphens.",
-      );
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const response = await api.get("/public/tenant-branding", {
-        params: { subdomain },
-      });
-      const branding = response.data?.branding;
-      if (!branding) throw new Error("Workspace not found");
-
-      const rememberedWorkspace = {
-        subdomain,
-        displayName: branding.displayName || branding.name || subdomain,
-      };
-      try {
-        localStorage.setItem(
-          LAST_WORKSPACE_KEY,
-          JSON.stringify(rememberedWorkspace),
-        );
-      } catch (storageError) {
-        console.warn("Unable to remember the last workspace", storageError);
-      }
-      setLastWorkspace(rememberedWorkspace);
-      trackEvent("workspace_selected");
-      window.location.assign(getTenantLoginUrl(subdomain));
-    } catch (err) {
-      setError(
-        err.response?.status === 404
-          ? "We couldn't find that workspace. Check the name and try again."
-          : err.response?.data?.message ||
-              "Unable to find that workspace right now.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isWorkspaceFinder) {
-      await continueToWorkspace(workspace);
-      return;
-    }
     setError("");
     setLoading(true);
 
     try {
-      const res = await api.post("/auth/login/staff", form);
+      const res = await api.post("/auth/login", form);
 
       // if server returns a token, persist it and attach to api defaults
       const token = res.data?.token;
@@ -162,92 +70,6 @@ export default function Login() {
     },
   };
 
-  if (isTenantWorkspaceHost() && publicBrandingLoading) {
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", py: 12 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (isTenantWorkspaceHost() && !publicBranding) {
-    return (
-      <Container maxWidth="sm" sx={{ py: 8 }}>
-        <Alert severity="error">
-          This workspace could not be loaded. Check the address or return to the
-          workspace finder.
-        </Alert>
-      </Container>
-    );
-  }
-
-  if (isWorkspaceFinder) {
-    return (
-      <Container maxWidth="sm" sx={{ py: { xs: 7, md: 12 } }}>
-        <Paper
-          elevation={0}
-          sx={{
-            p: { xs: 3, sm: 5 },
-            border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 2,
-          }}
-        >
-          <Box
-            component="form"
-            onSubmit={handleSubmit}
-            sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
-          >
-            <Box>
-              <Typography variant="h4" sx={{ fontWeight: 750, mb: 1 }}>
-                Find your workspace
-              </Typography>
-              <Typography color="text.secondary">
-                Enter your organization&apos;s workspace name to continue.
-              </Typography>
-            </Box>
-            {error && <Alert severity="error">{error}</Alert>}
-            <TextField
-              autoFocus
-              label="Workspace name"
-              value={workspace}
-              onChange={(event) =>
-                setWorkspace(
-                  event.target.value.toLowerCase().replace(/\s/g, ""),
-                )
-              }
-              placeholder="test-hospital"
-              autoComplete="organization"
-              inputProps={{
-                maxLength: 40,
-                "aria-label": "Workspace subdomain",
-              }}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    .{getWorkspaceDomainLabel()}
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <Button
-              type="submit"
-              variant="contained"
-              size="large"
-              disabled={loading || !workspace.trim()}
-            >
-              {loading
-                ? "Finding workspace..."
-                : isRememberedWorkspace
-                  ? `Continue to ${lastWorkspace.displayName || lastWorkspace.subdomain}`
-                  : "Continue"}
-            </Button>
-          </Box>
-        </Paper>
-      </Container>
-    );
-  }
-
   return (
     <Container maxWidth="sm">
       <Paper
@@ -268,22 +90,8 @@ export default function Login() {
             gap: 3,
           }}
         >
-          {brandLogoUrl && (
-            <Box
-              component="img"
-              src={brandLogoUrl}
-              alt={publicBranding?.displayName || "Facility logo"}
-              sx={{
-                maxWidth: 220,
-                maxHeight: 72,
-                objectFit: "contain",
-                mx: "auto",
-              }}
-            />
-          )}
-
           <Typography variant="h4" sx={{ color: "black" }} align="center">
-            {publicBranding?.displayName || "Login"}
+            Log in
           </Typography>
 
           {error && <Alert severity="error">{error}</Alert>}
@@ -333,7 +141,11 @@ export default function Login() {
             align="center"
             sx={{ color: "black", mt: 2 }}
           >
-            Don’t have an account? Contact your facility admin.
+            New here?{" "}
+            <RouterLink to="/signup-tenant">Start free</RouterLink>
+            <br />
+            Staff: use the link your scheduler texted or emailed you — no
+            login needed.
           </Typography>
 
           <Box

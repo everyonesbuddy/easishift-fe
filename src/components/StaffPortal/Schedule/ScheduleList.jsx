@@ -65,6 +65,10 @@ import {
   FiSearch,
   FiX,
   FiFilter,
+  FiUserX,
+  FiGrid,
+  FiChevronLeft,
+  FiChevronRight,
 } from "react-icons/fi";
 import { MdDragIndicator } from "react-icons/md";
 import { jsPDF } from "jspdf";
@@ -74,6 +78,9 @@ import ScheduleForm from "./ScheduleForm";
 import AutoGenerateScheduleForm from "./AutoGenerateScheduleForm";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import ShiftSwapRequestModal from "./ShiftSwapRequestModal";
+import WeekPublishBar from "./WeekPublishBar";
+import WeekGrid from "./WeekGrid";
+import CallOutDialog from "./CallOutDialog";
 import { useAuth } from "../../../context/AuthContext";
 import { getPunchLocation } from "../../../utils/geolocation";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -81,14 +88,14 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import Stack from "@mui/material/Stack";
 import { useLocation, useNavigate } from "react-router-dom";
 import GuideHelpButton from "../../Shared/GuideHelpButton";
+import { IOS, roleColor, segmentedSx, tint } from "../../../theme/ios";
+import { tagKey } from "../../../utils/tags";
 import {
-  getRoleColor,
   getRoleDisplayName,
   getUnitAreaDisplayName,
   getShiftTypeDisplayName,
   getShiftTagDisplayName,
   getCertificationTagDisplayName,
-  getFacilityRolesFromUser,
   getRoleOptionsFromFacilityPreferences,
   getUserRoles,
 } from "../../../constants/industryRoles";
@@ -124,7 +131,7 @@ const getScheduleStatusLabel = (status) =>
     .toUpperCase();
 
 // Weekend column tint; only shown on cells with no real assignment/coverage data
-const WEEKEND_BG = "#FEF9C3";
+const WEEKEND_BG = "#FAFAFC";
 
 // Steps differ by permission since managers/staff see different action buttons.
 const getScheduleTourSteps = ({
@@ -169,13 +176,39 @@ const getScheduleTourSteps = ({
 };
 
 export default function ScheduleList() {
-  const { user, can, facilityPreferences } = useAuth();
+  const { user, can, hasFeature, facilityPreferences } = useAuth();
+  const rc = (role) => roleColor(role, facilityPreferences?.roleFamilies);
   const displayTimeZone = getDisplayTimeZone(facilityPreferences);
   const canManageSchedules = can("schedule.manage");
   const canViewAllSchedules = can("schedule.view");
-  const hasSchedulableRole =
-    getFacilityRolesFromUser(user, facilityPreferences).length > 0;
-  const canUsePersonalSchedule = hasSchedulableRole;
+  // Everyone who logs in is an owner, scheduler or viewer. Staff use their
+  // personal link (/s/:token) for their own shifts, swaps and clock-in, so
+  // the "my schedule" actions on this page are switched off.
+  const canUsePersonalSchedule = false;
+  const [callOutSchedule, setCallOutSchedule] = useState(null);
+  const canCallOut = (s) =>
+    canManageSchedules &&
+    s?.status === "scheduled" &&
+    new Date(s?.endTime).getTime() > Date.now();
+  const draftBadge = (s) =>
+    s?.state === "draft" ? (
+      <Box
+        component="span"
+        title="Not sent yet. Staff see it when you publish the week."
+        sx={{
+          ml: 0.5,
+          px: 0.6,
+          py: 0.2,
+          borderRadius: 1,
+          bgcolor: "#FEF3C7",
+          color: "#92400E",
+          fontWeight: 700,
+          fontSize: "0.6rem",
+        }}
+      >
+        DRAFT
+      </Box>
+    ) : null;
   const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
@@ -201,7 +234,9 @@ export default function ScheduleList() {
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [scheduleFormMode, setScheduleFormMode] = useState("manual");
   const [manualCoverageFromAuto, setManualCoverageFromAuto] = useState(null);
-  const [view, setView] = useState("table");
+  // Schedulers land on the week grid (needs vs people); others on the list.
+  const [view, setView] = useState(canManageSchedules ? "week" : "table");
+  const [weekBoard, setWeekBoard] = useState(null);
   const [listGroupBy, setListGroupBy] = useState("date");
 
   // Scoped storage keys for individual user preferences
@@ -346,7 +381,9 @@ export default function ScheduleList() {
       : [];
     const scheduleUnits = schedules.map((s) => s.unitArea).filter(Boolean);
     const gapUnits = coverageGaps.map((c) => c.unitArea).filter(Boolean);
-    return Array.from(new Set([...prefUnits, ...scheduleUnits, ...gapUnits]))
+    return Array.from(
+      new Set([...prefUnits, ...scheduleUnits, ...gapUnits].map(tagKey)),
+    )
       .filter(Boolean)
       .sort();
   }, [facilityPreferences?.unitAreas, schedules, coverageGaps]);
@@ -370,7 +407,7 @@ export default function ScheduleList() {
     px: 1,
     py: 0.35,
     borderRadius: 1,
-    backgroundColor: getRoleColor(role),
+    backgroundColor: rc(role),
     color: "#fff",
     fontSize: "0.72rem",
     fontWeight: 700,
@@ -661,10 +698,8 @@ export default function ScheduleList() {
   // ---------------------------
   const fetchStaff = async () => {
     try {
-      // Staff without staff.view get the scoped swap directory instead.
-      const res = await api.get(
-        can("staff.view") ? "/auth/users" : "/auth/users/directory",
-      );
+      // Include archived staff so past shifts still show their names.
+      const res = await api.get("/staff", { params: { status: "all" } });
       setStaff(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Failed to fetch staff", err);
@@ -681,6 +716,35 @@ export default function ScheduleList() {
   };
 
   // Facility-wide open coverage; only managers see this, never personal-schedule-only staff
+  // Calendar and roster show whole months: open every week they show so
+  // each week's needs exist (created from Weekly Needs the first time).
+  const openedRangeRef = useRef("");
+  useEffect(() => {
+    const toKey = (d) => {
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+    let from;
+    let to;
+    if (view === "calendar" && calendarRange.start && calendarRange.end) {
+      from = toKey(new Date(calendarRange.start));
+      to = toKey(new Date(new Date(calendarRange.end).getTime() - 86400000));
+    } else if (view === "month") {
+      from = toKey(new Date(monthDate.getFullYear(), monthDate.getMonth(), 1));
+      to = toKey(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0));
+    } else {
+      return;
+    }
+    const rangeKey = `${from}|${to}`;
+    if (openedRangeRef.current === rangeKey) return;
+    openedRangeRef.current = rangeKey;
+    api
+      .get("/weeks", { params: { from, to } })
+      .then(() => fetchCoverageGaps())
+      .catch((err) => console.error("Failed to open weeks", err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, calendarRange.start, calendarRange.end, monthDate]);
+
   const fetchCoverageGaps = async () => {
     if (!canManageSchedules) {
       setCoverageGaps([]);
@@ -1168,7 +1232,7 @@ export default function ScheduleList() {
       // Multi-select Unit Area
       if (
         selectedUnitAreas.length > 0 &&
-        !selectedUnitAreas.includes(s.unitArea || "")
+        !selectedUnitAreas.map(tagKey).includes(tagKey(s.unitArea))
       ) {
         return false;
       }
@@ -1246,7 +1310,7 @@ export default function ScheduleList() {
       }
       if (
         selectedUnitAreas.length > 0 &&
-        !selectedUnitAreas.includes(coverage.unitArea || "")
+        !selectedUnitAreas.map(tagKey).includes(tagKey(coverage.unitArea))
       ) {
         return false;
       }
@@ -1727,7 +1791,8 @@ export default function ScheduleList() {
       entry.members.forEach((member) => {
         items.push({
           type: "staff",
-          key: member.staffId,
+          // Someone can work in more than one group (area / shift block).
+          key: `${entry.groupKey}-${member.staffId}`,
           member,
           groupKey: entry.groupKey,
         });
@@ -2671,7 +2736,7 @@ export default function ScheduleList() {
                 width: 10,
                 height: 10,
                 borderRadius: "50%",
-                backgroundColor: getRoleColor(s.role),
+                backgroundColor: rc(s.role),
               }}
             />
             <Box sx={{ fontSize: "0.7rem", fontWeight: 600, lineHeight: 1.2 }}>
@@ -2740,6 +2805,7 @@ export default function ScheduleList() {
           >
             {getScheduleStatusLabel(s.status)}
           </Box>
+          {draftBadge(s)}
         </TableCell>
         <TableCell sx={{ whiteSpace: "nowrap", py: 0.75 }}>
           <Tooltip title="View details">
@@ -2788,6 +2854,17 @@ export default function ScheduleList() {
                 </IconButton>
               </Tooltip>
             )}
+          {canCallOut(s) && (
+            <Tooltip title="Called out">
+              <IconButton
+                size="small"
+                onClick={() => setCallOutSchedule(s)}
+                sx={{ mr: 0.5, color: "#b91c1c" }}
+              >
+                <FiUserX />
+              </IconButton>
+            </Tooltip>
+          )}
           {canManageSchedules && (
             <Tooltip title="Delete schedule">
               <IconButton
@@ -2959,46 +3036,38 @@ export default function ScheduleList() {
             exclusive
             onChange={(e, next) => next && setView(next)}
             data-guide-id="guide-schedule-view-toggle"
-            sx={{
-              backgroundColor: "#f3f4f6",
-              borderRadius: 2,
-              width: { xs: "100%", md: "auto" },
-              "& .MuiToggleButton-root": {
-                textTransform: "none",
-                color: "#374151",
-                px: 1.5,
-                py: 0.55,
-                fontSize: "0.78rem",
-              },
-              "& .MuiToggleButton-root.Mui-selected": {
-                backgroundColor: "primary.main",
-                color: "primary.contrastText",
-                "&:hover": { backgroundColor: "primary.dark" },
-              },
-            }}
+            sx={{ ...segmentedSx, width: { xs: "100%", md: "auto" } }}
             size="small"
           >
+            {canManageSchedules && (
+              <ToggleButton
+                value="week"
+                sx={{ width: { xs: "25%", md: "auto" } }}
+              >
+                <FiGrid style={{ marginRight: 6 }} /> Week
+              </ToggleButton>
+            )}
             <ToggleButton
               value="table"
-              sx={{ width: { xs: "33%", md: "auto" } }}
+              sx={{ width: { xs: "25%", md: "auto" } }}
             >
               <FiList style={{ marginRight: 6 }} /> List
             </ToggleButton>
             <ToggleButton
               value="calendar"
-              sx={{ width: { xs: "33%", md: "auto" } }}
+              sx={{ width: { xs: "25%", md: "auto" } }}
             >
               <FiCalendar style={{ marginRight: 6 }} /> Calendar
             </ToggleButton>
             <ToggleButton
               value="month"
-              sx={{ width: { xs: "34%", md: "auto" } }}
+              sx={{ width: { xs: "25%", md: "auto" } }}
             >
               <FiPrinter style={{ marginRight: 6 }} /> Roster
             </ToggleButton>
           </ToggleButtonGroup>
 
-          {canManageSchedules && (
+          {canManageSchedules && hasFeature("autoFill") && (
             <Button
               size="small"
               variant="contained"
@@ -3153,7 +3222,30 @@ export default function ScheduleList() {
         </Box>
       </Box>
 
+      {canManageSchedules && (
+        <WeekPublishBar
+          refreshKey={schedules}
+          onData={setWeekBoard}
+          onChanged={() => {
+            fetchSchedules();
+            fetchCoverageGaps();
+          }}
+        />
+      )}
+
+      {view === "week" && canManageSchedules && (
+        <WeekGrid
+          week={weekBoard}
+          onChanged={() => {
+            fetchSchedules();
+            fetchCoverageGaps();
+          }}
+          onCallOut={(schedule) => setCallOutSchedule(schedule)}
+        />
+      )}
+
       {/* FILTER BAR */}
+      {view !== "week" && (
       <Paper
         elevation={0}
         data-guide-id="guide-schedule-filters"
@@ -3350,7 +3442,7 @@ export default function ScheduleList() {
                           width: 10,
                           height: 10,
                           borderRadius: "50%",
-                          backgroundColor: getRoleColor(r),
+                          backgroundColor: rc(r),
                           mr: 1,
                           flexShrink: 0,
                         }}
@@ -3668,7 +3760,7 @@ export default function ScheduleList() {
                       width: 8,
                       height: 8,
                       borderRadius: "50%",
-                      backgroundColor: getRoleColor(role),
+                      backgroundColor: rc(role),
                       ml: 1,
                     }}
                   />
@@ -3764,6 +3856,7 @@ export default function ScheduleList() {
           </Box>
         )}
       </Paper>
+      )}
 
       {view === "table" && !isCompact && (
         <Box
@@ -3800,7 +3893,7 @@ export default function ScheduleList() {
       )}
 
       {/* TABLE VIEW */}
-      {view === "table" ? (
+      {view === "week" ? null : view === "table" ? (
         isCompact ? (
           <Box sx={{ mt: 2, display: "grid", gap: 2 }}>
             {paginatedSchedules.map((s) => (
@@ -4093,39 +4186,36 @@ export default function ScheduleList() {
           >
             <Typography
               variant="h6"
-              sx={{ fontWeight: 700, fontSize: "0.95rem" }}
+              sx={{ fontWeight: 700, fontSize: "1.35rem", letterSpacing: "-0.02em", color: IOS.ink }}
             >
               {monthYear}
             </Typography>
-            <Stack direction="row" spacing={0.5} className="no-print">
+            <Stack direction="row" spacing={0} className="no-print" sx={{ ...segmentedSx, display: "inline-flex", "& .MuiButton-root": { minWidth: 0, px: 1.5, py: 0.4, fontSize: 13, fontWeight: 600, color: IOS.ink, borderRadius: "8px", border: "none", "&:hover": { bgcolor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.12)", border: "none" } } }}>
               <Button
                 size="small"
-                variant="outlined"
                 onClick={() =>
                   setMonthDate(
                     new Date(monthDate.getFullYear(), monthDate.getMonth() - 1),
                   )
                 }
               >
-                Previous
+                <FiChevronLeft style={{ marginRight: 2 }} /> Previous
               </Button>
               <Button
                 size="small"
-                variant="outlined"
                 onClick={() => setMonthDate(new Date())}
               >
                 Today
               </Button>
               <Button
                 size="small"
-                variant="outlined"
                 onClick={() =>
                   setMonthDate(
                     new Date(monthDate.getFullYear(), monthDate.getMonth() + 1),
                   )
                 }
               >
-                Next
+                Next <FiChevronRight style={{ marginLeft: 2 }} />
               </Button>
             </Stack>
           </Box>
@@ -4134,9 +4224,11 @@ export default function ScheduleList() {
           <Box
             sx={{
               background: "white",
-              borderRadius: 2,
-              border: "1px solid #e5e7eb",
+              borderRadius: IOS.radius.card,
+              border: `1px solid ${IOS.hairline}`,
+              boxShadow: IOS.shadow,
               overflowX: "auto",
+              "& .MuiTableCell-root": { borderBottomColor: IOS.hairline },
               "@media print": {
                 border: "none",
                 borderRadius: 0,
@@ -4151,19 +4243,20 @@ export default function ScheduleList() {
               }}
             >
               <TableHead>
-                <TableRow sx={{ background: "#BDD7EE" }}>
+                <TableRow sx={{ background: IOS.canvas }}>
                   <TableCell
                     sx={{
-                      fontWeight: 700,
+                      fontWeight: 600,
+                      fontSize: 12,
                       width: 175,
                       minWidth: 175,
-                      borderRight: "1px solid #e5e7eb",
+                      borderRight: `1px solid ${IOS.separator}`,
                       position: "sticky",
                       left: 0,
                       zIndex: 3,
-                      background: "#BDD7EE",
-                      color: "#0F172A",
-                      py: 0.7,
+                      background: IOS.canvas,
+                      color: IOS.secondary,
+                      py: 1,
                     }}
                   >
                     Employee
@@ -4176,18 +4269,18 @@ export default function ScheduleList() {
                       <TableCell
                         key={day}
                         sx={{
-                          fontWeight: 700,
+                          fontWeight: 600,
                           minWidth: 140,
-                          borderLeft: "1px solid #eef2f7",
-                          background: isWeekend ? "#FEF9C3" : "#BDD7EE",
-                          color: isWeekend ? "#111827" : "#0F172A",
-                          py: 0.7,
+                          borderLeft: `1px solid ${IOS.hairline}`,
+                          background: isWeekend ? "#EDEDF0" : IOS.canvas,
+                          color: IOS.ink,
+                          py: 1,
                         }}
                       >
                         <Typography
                           sx={{
-                            fontSize: "0.64rem",
-                            fontWeight: 700,
+                            fontSize: 13,
+                            fontWeight: 600,
                             color: "inherit",
                           }}
                         >
@@ -4198,10 +4291,11 @@ export default function ScheduleList() {
                         </Typography>
                         <Typography
                           sx={{
-                            fontSize: "0.58rem",
+                            fontSize: 11,
                             fontWeight: 600,
-                            color: "inherit",
-                            opacity: 0.8,
+                            color: IOS.secondary,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.05em",
                           }}
                         >
                           {date.toLocaleDateString("default", {
@@ -4235,16 +4329,22 @@ export default function ScheduleList() {
                           <TableCell
                             colSpan={monthDays.length + 1}
                             sx={{
-                              background: "#BDD7EE",
-                              color: "#0F172A",
+                              background: "#FBFBFD",
+                              color: IOS.ink,
                               fontWeight: 700,
-                              fontSize: "0.68rem",
-                              py: 0.6,
+                              fontSize: 13,
+                              py: 0.9,
+                              borderTop: `1px solid ${IOS.separator}`,
                               position: "sticky",
                               left: 0,
                             }}
                           >
-                            {item.label}
+                            <Box
+                              component="span"
+                              sx={{ position: "sticky", left: 16, display: "inline-block" }}
+                            >
+                              {item.label}
+                            </Box>
                           </TableCell>
                         </TableRow>
                       );
@@ -4255,7 +4355,7 @@ export default function ScheduleList() {
                         <TableRow key={item.key}>
                           <TableCell
                             sx={{
-                              borderRight: "1px solid #e5e7eb",
+                              borderRight: `1px solid ${IOS.separator}`,
                               verticalAlign: "top",
                               position: "sticky",
                               left: 0,
@@ -4282,9 +4382,10 @@ export default function ScheduleList() {
                                 sx={{
                                   minWidth: 140,
                                   verticalAlign: "top",
-                                  borderLeft: "1px solid #eef2f7",
+                                  borderLeft: `1px solid ${IOS.hairline}`,
                                   background: isWeekend ? WEEKEND_BG : "#fff",
-                                  py: 0.35,
+                                  px: 0.6,
+                                  py: 0.6,
                                 }}
                               >
                                 {gap ? (
@@ -4295,26 +4396,25 @@ export default function ScheduleList() {
                                           openManualFromCoverage(gap);
                                       }}
                                       sx={{
-                                        border: "1px solid #FCA5A5",
-                                        borderLeft: "3px solid #EF4444",
-                                        borderRadius: 1,
-                                        px: 0.5,
-                                        py: 0.32,
-                                        background: "transparent",
+                                        border: `1px dashed ${tint(IOS.orange, 0.75)}`,
+                                        borderRadius: IOS.radius.pill,
+                                        px: 0.85,
+                                        py: 0.5,
+                                        background: tint(IOS.orange, 0.06),
                                         cursor: canManageSchedules
                                           ? "pointer"
                                           : "default",
                                         "&:hover": canManageSchedules
-                                          ? { background: "#FEF2F2" }
+                                          ? { background: tint(IOS.orange, 0.14) }
                                           : {},
                                       }}
                                     >
                                       <Typography
                                         sx={{
-                                          fontSize: "0.6rem",
-                                          fontWeight: 700,
-                                          color: "#B91C1C",
-                                          lineHeight: 1.15,
+                                          fontSize: 12,
+                                          fontWeight: 600,
+                                          color: IOS.orangeText,
+                                          lineHeight: 1.25,
                                         }}
                                       >
                                         Needs {getRoleDisplayName(item.role)}
@@ -4322,9 +4422,10 @@ export default function ScheduleList() {
                                       {gap.unitArea && (
                                         <Typography
                                           sx={{
-                                            fontSize: "0.56rem",
-                                            color: "#B91C1C",
-                                            lineHeight: 1.1,
+                                            fontSize: 11,
+                                            color: IOS.orangeText,
+                                            opacity: 0.85,
+                                            lineHeight: 1.25,
                                           }}
                                         >
                                           {getUnitAreaDisplayName(gap.unitArea)}
@@ -4333,9 +4434,10 @@ export default function ScheduleList() {
                                       {(gap.startTime || gap.endTime) && (
                                         <Typography
                                           sx={{
-                                            fontSize: "0.56rem",
-                                            color: "#B91C1C",
-                                            lineHeight: 1.1,
+                                            fontSize: 11,
+                                            color: IOS.orangeText,
+                                            opacity: 0.85,
+                                            lineHeight: 1.25,
                                           }}
                                         >
                                           {formatScheduleTimeRange(gap)}
@@ -4344,9 +4446,10 @@ export default function ScheduleList() {
                                       {certTags.length > 0 && (
                                         <Typography
                                           sx={{
-                                            fontSize: "0.54rem",
-                                            color: "#B91C1C",
-                                            lineHeight: 1.1,
+                                            fontSize: 11,
+                                            color: IOS.orangeText,
+                                            opacity: 0.85,
+                                            lineHeight: 1.25,
                                           }}
                                         >
                                           {certTags
@@ -4363,8 +4466,8 @@ export default function ScheduleList() {
                                 ) : (
                                   <Typography
                                     sx={{
-                                      fontSize: "0.7rem",
-                                      color: "#cbd5e1",
+                                      fontSize: 12,
+                                      color: IOS.tertiary,
                                     }}
                                   >
                                     -
@@ -4381,7 +4484,7 @@ export default function ScheduleList() {
 
                     return (
                       <TableRow
-                        key={member.staffId}
+                        key={`${item.groupKey}-${member.staffId}`}
                         draggable={canManageSchedules}
                         onDragStart={(e) =>
                           handleStaffDragStart(e, member, item.groupKey)
@@ -4395,7 +4498,7 @@ export default function ScheduleList() {
                         }
                         sx={{
                           userSelect: "none",
-                          "&:hover": { background: "#f8fbff" },
+                          "&:hover": { background: "#FAFAFC" },
                           "@media print": { pageBreakInside: "avoid" },
                           cursor: canManageSchedules ? "grab" : "default",
                           "&:active": {
@@ -4405,7 +4508,7 @@ export default function ScheduleList() {
                       >
                         <TableCell
                           sx={{
-                            borderRight: "1px solid #e5e7eb",
+                            borderRight: `1px solid ${IOS.separator}`,
                             verticalAlign: "top",
                             position: "sticky",
                             left: 0,
@@ -4454,16 +4557,16 @@ export default function ScheduleList() {
                             )}
                             <Box>
                               <Typography
-                                sx={{ fontSize: "0.68rem", fontWeight: 700 }}
+                                sx={{ fontSize: 13, fontWeight: 600, color: IOS.ink }}
                               >
                                 {member.name}
                               </Typography>
                               <Typography
                                 sx={{
-                                  fontSize: "0.58rem",
+                                  fontSize: 11,
                                   color: member.groupIsRotating
-                                    ? "#B45309"
-                                    : "text.secondary",
+                                    ? IOS.orangeText
+                                    : IOS.secondary,
                                   mt: 0,
                                 }}
                               >
@@ -4487,18 +4590,18 @@ export default function ScheduleList() {
                               sx={{
                                 minWidth: 140,
                                 verticalAlign: "top",
-                                borderLeft: "1px solid #eef2f7",
+                                borderLeft: `1px solid ${IOS.hairline}`,
                                 background: isWeekend ? WEEKEND_BG : "#fff",
-                                py: 0.35,
+                                px: 0.6,
+                                py: 0.6,
                               }}
                             >
                               {shifts.length === 0 ? (
                                 <Typography
                                   variant="caption"
                                   sx={{
-                                    color: "text.disabled",
-                                    fontStyle: "italic",
-                                    fontSize: "0.58rem",
+                                    color: IOS.tertiary,
+                                    fontSize: 12,
                                   }}
                                 >
                                   -
@@ -4519,17 +4622,29 @@ export default function ScheduleList() {
                                         }}
                                         sx={{
                                           position: "relative",
-                                          border: "1px solid #dbeafe",
-                                          borderLeft: `3px solid ${getRoleColor(shift.role)}`,
-                                          borderRadius: 1,
-                                          px: 0.5,
-                                          py: 0.32,
-                                          background: "transparent",
+                                          border: shift.state === "draft"
+                                            ? `1px dashed ${tint(rc(shift.role), 0.6)}`
+                                            : "1px solid transparent",
+                                          borderRadius: IOS.radius.pill,
+                                          pl: 1.25,
+                                          pr: 0.75,
+                                          py: 0.5,
+                                          background: tint(rc(shift.role), shift.state === "draft" ? 0.07 : 0.14),
+                                          "&::before": {
+                                            content: '""',
+                                            position: "absolute",
+                                            left: 4,
+                                            top: 5,
+                                            bottom: 5,
+                                            width: 3,
+                                            borderRadius: 2,
+                                            background: rc(shift.role),
+                                          },
                                           cursor: canManageSchedule(shift)
                                             ? "pointer"
                                             : "default",
                                           "&:hover": canManageSchedule(shift)
-                                            ? { background: "#f0f7ff" }
+                                            ? { background: tint(rc(shift.role), 0.22) }
                                             : {},
                                           "&:hover .roster-shift-actions": {
                                             opacity: 1,
@@ -4549,10 +4664,13 @@ export default function ScheduleList() {
                                             className="roster-shift-actions"
                                             sx={{
                                               position: "absolute",
-                                              top: 1,
-                                              right: 1,
+                                              top: 3,
+                                              right: 3,
                                               display: "flex",
-                                              gap: 0.1,
+                                              gap: 0.25,
+                                              bgcolor: "rgba(255,255,255,0.9)",
+                                              borderRadius: "6px",
+                                              boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
                                               opacity: 0,
                                               transition: "opacity 0.15s ease",
                                               "@media print": {
@@ -4605,31 +4723,33 @@ export default function ScheduleList() {
                                         )}
                                         <Typography
                                           sx={{
-                                            fontSize: "0.6rem",
-                                            fontWeight: 700,
-                                            color: "#111827",
-                                            lineHeight: 1.1,
+                                            fontSize: 12,
+                                            fontWeight: 600,
+                                            color: IOS.ink,
+                                            lineHeight: 1.25,
                                           }}
                                         >
                                           {getRoleDisplayName(shift.role)}
                                         </Typography>
-                                        <Typography
+                                        {shift.unitArea && (
+<Typography
                                           sx={{
-                                            fontSize: "0.54rem",
-                                            color: "#111827",
-                                            lineHeight: 1.1,
+                                            fontSize: 11,
+                                            color: IOS.secondary,
+                                            lineHeight: 1.25,
                                             mt: 0,
                                           }}
                                         >
                                           {getUnitAreaDisplayName(
                                             shift.unitArea,
-                                          ) || "No unit"}
+                                          )}
                                         </Typography>
+                                        )}
                                         <Typography
                                           sx={{
-                                            fontSize: "0.54rem",
-                                            color: "#111827",
-                                            lineHeight: 1.1,
+                                            fontSize: 11,
+                                            color: IOS.secondary,
+                                            lineHeight: 1.25,
                                           }}
                                         >
                                           {formatScheduleTimeRange(shift, {
@@ -4678,7 +4798,7 @@ export default function ScheduleList() {
                     width: 12,
                     height: 12,
                     borderRadius: 1,
-                    background: getRoleColor(role),
+                    background: rc(role),
                   }}
                 />
                 <Typography variant="caption">
@@ -5021,15 +5141,15 @@ export default function ScheduleList() {
                 const isUrgentStatus = URGENT_SCHEDULE_STATUSES.has(
                   String(s.status || "").toLowerCase(),
                 );
-                const roleColor = getRoleColor(s.role);
+                const roleTone = rc(s.role);
 
                 return {
                   id: s._id,
                   title: s.staffId?.name,
                   start: getTimeZoneDateTimeValue(s.startTime, displayTimeZone),
                   end: getTimeZoneDateTimeValue(s.endTime, displayTimeZone),
-                  backgroundColor: isUrgentStatus ? "#EF4444" : roleColor,
-                  borderColor: isUrgentStatus ? "#EF4444" : roleColor,
+                  backgroundColor: isUrgentStatus ? IOS.red : roleTone,
+                  borderColor: isUrgentStatus ? IOS.red : roleTone,
                   textColor: "#fff",
                   extendedProps: {
                     type: "schedule",
@@ -5201,6 +5321,7 @@ export default function ScheduleList() {
                     {(selectedSchedule.status || "-")
                       .replace("_", " ")
                       .toUpperCase()}
+                    {draftBadge(selectedSchedule)}
                   </Typography>
                 </Box>
               </Box>
@@ -5231,10 +5352,38 @@ export default function ScheduleList() {
                   Overnight shift
                 </Typography>
               )}
+
+              {canCallOut(selectedSchedule) && (
+                <Box display="flex" justifyContent="flex-end" gap={1} mt={1}>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    startIcon={<FiUserX />}
+                    onClick={() => {
+                      const target = selectedSchedule;
+                      closeDetailsModal();
+                      setCallOutSchedule(target);
+                    }}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Called out
+                  </Button>
+                </Box>
+              )}
             </Box>
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <CallOutDialog
+        open={Boolean(callOutSchedule)}
+        schedule={callOutSchedule}
+        onClose={() => setCallOutSchedule(null)}
+        onChanged={() => {
+          fetchSchedules();
+          fetchCoverageGaps();
+        }}
+      />
 
       <Dialog
         open={timeEntryOpen}

@@ -21,11 +21,11 @@ import {
 
 import StatCard from "./StatCard";
 import ScheduleAndCoverageCharts from "./ScheduleAndCoverageCharts";
+import WeekPublishBar from "../Schedule/WeekPublishBar";
 import { toast } from "react-toastify";
 import { useGuideTour } from "../../../context/GuideTourContext";
 import GuideHelpButton from "../../Shared/GuideHelpButton";
 import {
-  getFacilityRolesFromUser,
   getRoleDisplayName,
 } from "../../../constants/industryRoles";
 
@@ -43,14 +43,20 @@ const DASHBOARD_TOUR_STEPS = [
 ];
 
 export default function StaffDashboard() {
-  const { user, roles, can, facilityPreferences, updateCurrentUser } =
+  const {
+    user,
+    roles,
+    can,
+    hasFeature,
+    updateCurrentUser,
+  } =
     useAuth();
   const theme = useTheme();
   const canViewOperations = can("schedule.view");
-  const canViewStaffSummary = can("staff.view");
-  const hasSchedulableRole =
-    getFacilityRolesFromUser(user, facilityPreferences).length > 0;
-  const canUsePersonalSchedule = hasSchedulableRole;
+  // The summary numbers are a Facility-plan feature.
+  const canViewStaffSummary = can("staff.view") && hasFeature("dashboard");
+  // Accounts are owners/schedulers/viewers; staff use their personal link.
+  const canUsePersonalSchedule = false;
 
   const [summary, setSummary] = useState(null);
   const [tenant, setTenant] = useState(null);
@@ -93,7 +99,7 @@ export default function StaffDashboard() {
       });
 
       // Tenant
-      const tenantRes = await api.get(`/tenants/${user.tenantId}`);
+      const tenantRes = await api.get("/tenants/me");
       setTenant(tenantRes.data);
     } catch (err) {
       console.error("Failed to load dashboard", err);
@@ -140,7 +146,7 @@ export default function StaffDashboard() {
     try {
       setUploadingProfile(true);
       const base64Image = await fileToBase64(file);
-      const response = await api.put(`/auth/${user._id}`, {
+      const response = await api.patch("/auth/me", {
         profilePicture: base64Image,
       });
 
@@ -438,6 +444,12 @@ export default function StaffDashboard() {
           </Box>
         </Box>
       </Box>
+
+      {can("schedule.manage") && (
+        <Box sx={{ mb: 3 }}>
+          <WeekPublishBar />
+        </Box>
+      )}
 
       {/* {canViewOperations && summary.operational
         ? renderCardSection("Operational Summary", adminCards)

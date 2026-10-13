@@ -3,6 +3,9 @@ export const COMMON_STAFF_ROLES = ["staff"];
 export const ADMIN_ROLES = ["admin", "owner"];
 export const FACILITY_BASELINE_ROLE = "staff";
 
+// Care credentials people write in capitals.
+const ACRONYMS = new Set(["cna", "lpn", "lvn", "rn", "np", "cma", "cmt", "hha", "pca", "qmap", "don", "adon", "cpr", "bls", "acls"]);
+
 const toDisplayLabel = (value) =>
   String(value || "")
     .trim()
@@ -13,7 +16,7 @@ const toDisplayLabel = (value) =>
     .map((part) => {
       const normalized = part.toLowerCase();
       if (/^\d+[ap]m?$/.test(normalized)) return normalized;
-      if (normalized.length <= 2 && /^[a-z]+$/.test(normalized)) {
+      if (ACRONYMS.has(normalized) || (normalized.length <= 2 && /^[a-z]+$/.test(normalized))) {
         return normalized.toUpperCase();
       }
       return normalized.charAt(0).toUpperCase() + normalized.slice(1);

@@ -25,10 +25,8 @@ import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 import {
   getRoleOptionsFromFacilityPreferences,
-  getRoleDisplayName,
   getUserRoles,
   isSystemRole,
-  SYSTEM_ROLE_OPTIONS,
 } from "../../../constants/industryRoles";
 
 const validateEmail = (email) => {
@@ -344,38 +342,18 @@ const SectionCard = ({ eyebrow, title, description, children }) => (
   </Paper>
 );
 
-export default function StaffCreateAndEditForm({
-  staff,
-  onSuccess,
-  onClose,
-  staffList = [],
-}) {
-  const { user, can, facilityPreferences, tenant } = useAuth();
-
-  const canAssignOwnerRole = can("roles.manage");
+export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
+  const { facilityPreferences } = useAuth();
 
   const facilityRoleOptions = useMemo(
     () => getRoleOptionsFromFacilityPreferences(facilityPreferences),
     [facilityPreferences],
   );
 
-  const systemRoleOptions = useMemo(
-    () =>
-      SYSTEM_ROLE_OPTIONS.filter(
-        (systemRole) =>
-          systemRole !== "staff" &&
-          (systemRole !== "owner" || canAssignOwnerRole),
-      ).map((systemRole) => ({
-        value: systemRole,
-        label: getRoleDisplayName(systemRole),
-      })),
-    [canAssignOwnerRole],
-  );
-
   const [form, setForm] = useState({
     name: "",
     email: "",
-    phoneCountryCode: "",
+    phoneCountryCode: "+1",
     phone: "",
     allowedAreas: [],
     allowedShiftTags: [],
@@ -496,8 +474,7 @@ export default function StaffCreateAndEditForm({
     return lookup;
   }, [shiftSlotOptions]);
 
-  const isEditingSelf = staff && staff._id === user._id;
-  const disableRoleChange = Boolean(isEditingSelf);
+  const disableRoleChange = false;
   const hasFacilityRole = form.roles.some((roleValue) =>
     facilityRoleOptions.some((option) => option.value === roleValue),
   );
@@ -564,9 +541,9 @@ export default function StaffCreateAndEditForm({
 
       setForm({
         name: staff.name,
-        email: staff.email,
+        email: staff.email || "",
         phoneCountryCode:
-          staff.userPhoneCountryCode || staff.phoneCountryCode || "",
+          staff.userPhoneCountryCode || staff.phoneCountryCode || "+1",
         phone: staff.userPhone || staff.phone || "",
         allowedAreas: normalizeStringArray(staff.allowedAreas),
         allowedShiftTags: derivedShiftTags,
@@ -582,7 +559,7 @@ export default function StaffCreateAndEditForm({
         rotationAnchorDate: "",
         emailNotificationsEnabled: true,
         smsNotificationsEnabled: true,
-        roles: getUserRoles(staff),
+        roles: getUserRoles(staff).filter((role) => !isSystemRole(role)),
       });
 
       fetchStaffPreferences(staff._id || staff.id);
@@ -617,16 +594,25 @@ export default function StaffCreateAndEditForm({
     const normalizedPhone = (form.phone || "").trim();
     const normalizedPhoneCountryCode = (form.phoneCountryCode || "").trim();
 
-    if (!validateEmail(form.email)) {
+    const normalizedEmail = (form.email || "").trim();
+
+    if (!form.name?.trim()) {
+      toast.error("Enter a name", { position: "top-right", autoClose: 3000 });
+      return;
+    }
+
+    if (!normalizedEmail && !normalizedPhone) {
+      setPhoneError("Add a phone number or an email so they can get their shifts");
+      return;
+    }
+
+    if (normalizedEmail && !validateEmail(normalizedEmail)) {
       setEmailError("Please enter a valid email address");
       return;
     }
 
-    if (
-      (normalizedPhone && !normalizedPhoneCountryCode) ||
-      (!normalizedPhone && normalizedPhoneCountryCode)
-    ) {
-      setPhoneError("Please provide both country code and phone number");
+    if (normalizedPhone && !normalizedPhoneCountryCode) {
+      setPhoneError("Pick a country code");
       return;
     }
 
@@ -663,7 +649,7 @@ export default function StaffCreateAndEditForm({
 
       if (!normalizedAssignedRoles.length) {
         toast.error(
-          "Select at least one system permission or facility/job role.",
+          "Pick at least one role.",
           {
             position: "top-right",
             autoClose: 3500,
@@ -697,82 +683,41 @@ export default function StaffCreateAndEditForm({
         smsNotificationsEnabled: !!form.smsNotificationsEnabled,
       };
 
+      const payload = {
+        name: form.name.trim(),
+        email: normalizedEmail || null,
+        userPhone: normalizedPhone || null,
+        userPhoneCountryCode: normalizedPhone ? normalizedPhoneCountryCode : null,
+        roles: normalizedAssignedRoles,
+        allowedAreas: normalizeStringArray(form.allowedAreas),
+        allowedShiftTypes: normalizedShiftTypes,
+        certificationTags: normalizeStringArray(form.certificationTags),
+      };
+
       if (staff) {
-        // Prevent self-role modification
-        const nextRoles = disableRoleChange
-          ? getUserRoles(staff)
-          : normalizedAssignedRoles;
-        const payload = {
-          name: form.name,
-          email: form.email,
-          roles: nextRoles,
-          allowedAreas: normalizeStringArray(form.allowedAreas),
-          allowedShiftTags: normalizedShiftTags,
-          allowedShiftTypes: normalizedShiftTypes,
-          certificationTags: normalizeStringArray(form.certificationTags),
-        };
-
-        if (normalizedPhone && normalizedPhoneCountryCode) {
-          payload.userPhoneCountryCode = normalizedPhoneCountryCode;
-          payload.userPhone = normalizedPhone;
-          payload.phoneCountryCode = normalizedPhoneCountryCode;
-          payload.phone = normalizedPhone;
-        }
-
-        await api.put(`/auth/${staff._id}`, payload);
+        await api.patch(`/staff/${staff._id}`, payload);
         await saveStaffPreferences(staff._id || staff.id, preferencesPayload);
         toast.success("Staff updated", {
           position: "top-right",
           autoClose: 2500,
         });
       } else {
-        const seatLimit = Number(tenant?.seatLimit);
-        const hasSeatLimit = Number.isFinite(seatLimit) && seatLimit > 0;
-        const existingStaffCount = Array.isArray(staffList)
-          ? staffList.length
-          : 0;
-
-        if (hasSeatLimit && existingStaffCount >= seatLimit) {
-          toast.error(
-            `Staff seat limit reached (${existingStaffCount}/${seatLimit}). Upgrade your plan to add more staff.`,
-            { position: "top-right", autoClose: 4000 },
-          );
-          return;
-        }
-
-        const res = await api.post("/auth/signup/staff", {
-          name: form.name,
-          email: form.email,
-          roles: normalizedAssignedRoles,
-          allowedAreas: normalizeStringArray(form.allowedAreas),
-          allowedShiftTags: normalizedShiftTags,
-          allowedShiftTypes: normalizedShiftTypes,
-          certificationTags: normalizeStringArray(form.certificationTags),
-          ...(normalizedPhone && normalizedPhoneCountryCode
-            ? {
-                userPhoneCountryCode: normalizedPhoneCountryCode,
-                userPhone: normalizedPhone,
-                phoneCountryCode: normalizedPhoneCountryCode,
-                phone: normalizedPhone,
-              }
-            : {}),
-        });
-
+        const res = await api.post("/staff", payload);
         const createdStaffId = extractStaffIdFromResponse(res?.data);
-
         if (createdStaffId) {
           await saveStaffPreferences(createdStaffId, preferencesPayload);
         }
-
-        toast.success("Staff created", {
-          position: "top-right",
-          autoClose: 2500,
-        });
+        toast.success(
+          `${payload.name} added. They'll get their link when you publish the schedule.`,
+          { position: "top-right", autoClose: 3500 },
+        );
       }
 
       onSuccess();
     } catch (err) {
       console.error(err);
+      // Plan limits (402) open the upgrade dialog instead.
+      if (err?.response?.status === 402) return;
       const msg = err?.response?.data?.message || "Failed to save staff";
       toast.error(msg, { position: "top-right", autoClose: 4000 });
     }
@@ -814,7 +759,7 @@ export default function StaffCreateAndEditForm({
         <SectionCard
           eyebrow="Staff Info"
           title="Basic Information"
-          description="Core details used to identify the staff member and assign their role."
+          description="A name, a phone or email, and a role. Staff don't log in; they get a personal link to their shifts."
         >
           <TextField
             fullWidth
@@ -825,7 +770,7 @@ export default function StaffCreateAndEditForm({
 
           <TextField
             fullWidth
-            label="Email"
+            label="Email (optional if you add a phone)"
             type="email"
             value={form.email}
             onChange={(e) => {
@@ -857,7 +802,7 @@ export default function StaffCreateAndEditForm({
 
             <TextField
               fullWidth
-              label="Phone Number"
+              label="Mobile number"
               value={form.phone}
               onChange={(e) => {
                 setForm({ ...form, phone: e.target.value });
@@ -871,47 +816,18 @@ export default function StaffCreateAndEditForm({
 
           <Stack spacing={2}>
             <MultiChipSelector
-              label="System permissions"
-              helperText="Optional access roles. Scheduler can manage schedules; Admin can manage staff and facility operations. Only owners can assign Owner."
-              options={systemRoleOptions}
-              values={form.roles.filter((roleValue) => isSystemRole(roleValue))}
-              onChange={(nextSystemRoles) => {
-                const facilityRoles = form.roles.filter(
-                  (roleValue) => !isSystemRole(roleValue),
-                );
-                setForm({
-                  ...form,
-                  roles: normalizeStringArray([
-                    ...nextSystemRoles,
-                    ...facilityRoles,
-                  ]),
-                });
-              }}
-              getOptionValue={(option) => option.value}
-              getOptionLabel={(option) => option.label}
-              hideLabel={false}
-              disabled={disableRoleChange}
-            />
-
-            <MultiChipSelector
-              label="Facility/job roles"
-              helperText="Select schedulable job roles. A user can have a system permission role, a facility role, or both."
+              label="Role"
+              helperText="What they can be scheduled as. Schedulers and viewers who log in are added under Members."
               options={facilityRoleOptions}
               values={form.roles.filter(
                 (roleValue) => !isSystemRole(roleValue),
               )}
-              onChange={(nextFacilityRoles) => {
-                const systemRoles = form.roles.filter((roleValue) =>
-                  isSystemRole(roleValue),
-                );
+              onChange={(nextFacilityRoles) =>
                 setForm({
                   ...form,
-                  roles: normalizeStringArray([
-                    ...systemRoles,
-                    ...nextFacilityRoles,
-                  ]),
-                });
-              }}
+                  roles: normalizeStringArray(nextFacilityRoles),
+                })
+              }
               getOptionValue={(option) => option.value}
               getOptionLabel={(option) => option.label}
               hideLabel={false}

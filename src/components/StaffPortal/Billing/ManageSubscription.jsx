@@ -1,622 +1,481 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
+  Alert,
   Box,
-  Paper,
-  Typography,
   Button,
+  Chip,
   CircularProgress,
   Container,
+  LinearProgress,
+  Paper,
   Stack,
-  Divider,
-  Chip,
-  Alert,
   ToggleButton,
   ToggleButtonGroup,
+  Typography,
 } from "@mui/material";
-import ArrowOutwardRoundedIcon from "@mui/icons-material/ArrowOutwardRounded";
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
-import { useTheme } from "@mui/material/styles";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
 import api from "../../../config/api";
-import { trackEvent } from "../../../utils/analytics";
-import { toast } from "react-toastify";
 import useBillingPlans from "../../../hooks/useBillingPlans";
+import { trackEvent } from "../../../utils/analytics";
 import {
-  SHARED_FEATURE_LIST,
-  ENTERPRISE_PLAN,
-  getSupportLabel,
-  getCapacityLabel,
-  decoratePlan,
+  ENTERPRISE_FEATURES,
+  FREE_FEATURES,
+  PAID_FEATURES,
+  PAID_PLAN_KEYS,
+  PLAN_TAGLINES,
+  POPULAR_PLAN,
+  SUPPORT_LABELS,
+  daysLeft,
+  formatLimit,
+  formatMoney,
 } from "../../../config/billingPlans";
 
+const errorMessage = (err) =>
+  err?.response?.data?.message || err?.message || "Request failed";
+
+const INK = "#1F2937";
+const MUTED = "#6B7280";
+const LINE = "#E5E7EB";
+
+function UsageMeter({ label, used, limit }) {
+  const unlimited = limit === null || limit === undefined;
+  const over = !unlimited && used > limit;
+  const pct = unlimited ? 8 : Math.min(100, (used / Math.max(limit, 1)) * 100);
+  return (
+    <Box sx={{ minWidth: 160 }}>
+      <Stack direction="row" sx={{ justifyContent: "space-between", mb: 0.5 }}>
+        <Typography variant="body2" sx={{ color: MUTED }}>
+          {label}
+        </Typography>
+        <Typography
+          variant="body2"
+          sx={{ fontWeight: 700, color: over ? "error.main" : INK, fontVariantNumeric: "tabular-nums" }}
+        >
+          {used} of {unlimited ? "unlimited" : limit}
+        </Typography>
+      </Stack>
+      <LinearProgress
+        variant="determinate"
+        value={pct}
+        color={over ? "error" : "primary"}
+        sx={{ height: 6, borderRadius: 3, bgcolor: "#EEF2F7" }}
+      />
+    </Box>
+  );
+}
+
+function FeatureList({ items, dense = false }) {
+  return (
+    <Stack spacing={dense ? 0.5 : 0.75}>
+      {items.map((feature) => (
+        <Stack key={feature} direction="row" spacing={1} sx={{ alignItems: "flex-start" }}>
+          <CheckRoundedIcon sx={{ fontSize: 18, mt: "2px", color: "primary.main" }} />
+          <Typography variant="body2" sx={{ color: INK }}>
+            {feature}
+          </Typography>
+        </Stack>
+      ))}
+    </Stack>
+  );
+}
+
 export default function ManageSubscription() {
-  const theme = useTheme();
-  const { tenant, refreshTenant } = useAuth();
-  const {
-    data,
-    loading: plansLoading,
-    error: plansError,
-    refetch,
-  } = useBillingPlans();
-  const [billingInterval, setBillingInterval] = useState("year");
-  const [loadingPlan, setLoadingPlan] = useState(null);
+  const { can, refreshSession, session } = useAuth();
+  const navigate = useNavigate();
+  const { data, loading, error: loadError, refetch } = useBillingPlans();
+  const [interval, setBillingInterval] = useState("month");
+  const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
 
-  const currentPlanKey = data?.currentPlanKey ?? null;
+  const canManage = can("billing.manage");
+  const plans = useMemo(() => (Array.isArray(data?.plans) ? data.plans : []), [data]);
+  const byKey = useMemo(() => Object.fromEntries(plans.map((p) => [p.key, p])), [plans]);
+  const effective = data?.effectivePlan || "free";
+  const isPaying =
+    data?.currentPlan &&
+    data.currentPlan !== "free" &&
+    ["active", "trialing", "past_due"].includes(data?.subscriptionStatus);
+  const onTrial = !isPaying && effective !== "free" && data?.trialEndsAt;
+  const effectivePlan = byKey[effective];
+  const trialDays = data?.checkoutTrialDays?.[interval] || 0;
+  const grace = session?.grace;
 
-  const plans = useMemo(() => {
-    const rawPlans = Array.isArray(data?.plans) ? data.plans : [];
-    const filtered = rawPlans
-      .filter((plan) => plan.interval === billingInterval)
-      .map(decoratePlan);
-    return [...filtered, ENTERPRISE_PLAN];
-  }, [data, billingInterval]);
+  const refreshAll = () => Promise.all([refetch(), refreshSession?.()]);
 
-  const currentPlanName =
-    data?.plans?.find((plan) => plan.planKey === currentPlanKey)?.name ||
-    "No plan";
-
-  if (!tenant) return <Typography>Loading tenant...</Typography>;
-
-  const handleChoosePlan = async (planKey) => {
+  const run = async (key, fn) => {
     setError(null);
-    setLoadingPlan(planKey);
+    setBusy(key);
     try {
-      const res = await api.post("/stripe/create-checkout-session", {
-        tenantId: tenant._id,
-        planKey,
-      });
-
-      const { url } = res.data;
-      if (url) {
-        trackEvent("begin_checkout");
-        window.location.href = url;
-      } else setError("Missing checkout URL from server");
+      await fn();
     } catch (err) {
-      const responseData = err?.response?.data;
-      if (responseData?.errorCode === "SUBSCRIPTION_ALREADY_ACTIVE") {
-        await refetch();
-      }
-      console.error(err);
-      setError(responseData?.message || err.message || "Request failed");
+      // 402 / 409 limit answers are explained inline.
+      setError(errorMessage(err));
     } finally {
-      setLoadingPlan(null);
+      setBusy(null);
     }
   };
 
-  const handleChangePlan = async (planKey) => {
-    setError(null);
-    setLoadingPlan(planKey);
-    try {
-      await api.post("/stripe/change-plan", { planKey });
-      trackEvent("subscription_change_requested");
-      await Promise.all([refetch(), refreshTenant()]);
-      toast.success("Plan updated successfully.", {
-        position: "top-right",
-        autoClose: 3000,
-      });
-    } catch (err) {
-      const responseData = err?.response?.data;
-      if (responseData?.errorCode === "NO_ACTIVE_SUBSCRIPTION") {
-        await handleChoosePlan(planKey);
+  const startTrial = () =>
+    run("trial", async () => {
+      await api.post("/billing/start-trial");
+      trackEvent("trial_started");
+      toast.success("Your 14-day Starter trial has started.");
+      await refreshAll();
+    });
+
+  const choosePlan = (plan) =>
+    run(plan, async () => {
+      if (isPaying) {
+        await api.post("/stripe/change-plan", { plan, interval });
+        trackEvent("subscription_change_requested");
+        toast.success("Plan changed.");
+        await refreshAll();
         return;
       }
-      console.error("Failed to change plan", err);
-      setError(responseData?.message || err.message || "Request failed");
-    } finally {
-      setLoadingPlan(null);
-    }
-  };
-
-  const handleCancelSubscription = async (opts = { atPeriodEnd: true }) => {
-    setError(null);
-    const ok = window.confirm(
-      opts.atPeriodEnd
-        ? "Cancel subscription at period end? Your users will keep access until the billing period ends."
-        : "Cancel subscription immediately? This will stop access now.",
-    );
-    if (!ok) return;
-
-    try {
-      setLoadingPlan("cancel");
-      await api.post("/stripe/cancel-subscription", {
-        tenantId: tenant._id,
-        atPeriodEnd: !!opts.atPeriodEnd,
-      });
-      trackEvent("subscription_cancellation_requested");
-      await Promise.all([refreshTenant(), refetch()]);
-      toast.success(
-        "Subscription cancellation requested. Changes may take a moment to appear.",
-        { position: "top-right", autoClose: 3000 },
-      );
-    } catch (err) {
-      console.error("Failed to cancel subscription", err);
-      setError(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Failed to cancel subscription",
-      );
-    } finally {
-      setLoadingPlan(null);
-    }
-  };
-
-  const handleGetQuote = () => {
-    trackEvent("book_demo_click", {
-      cta_path: "/portal",
-      cta_location: "billing_quote",
+      const res = await api.post("/stripe/create-checkout-session", { plan, interval });
+      if (!res.data?.url) throw new Error("Checkout didn't open. Try again.");
+      trackEvent("begin_checkout");
+      window.location.href = res.data.url;
     });
-    window.open(
-      "https://calendly.com/wisershifts-info/30min",
-      "_blank",
-      "noopener,noreferrer",
+
+  const openPortal = () =>
+    run("portal", async () => {
+      const res = await api.post("/stripe/portal");
+      if (res.data?.url) window.location.href = res.data.url;
+    });
+
+  if (loading) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
+        <CircularProgress />
+      </Box>
     );
-  };
+  }
 
-  const getPlanAction = (plan) => {
-    if (plan.isEnterprise) return handleGetQuote;
-    if (currentPlanKey) return () => handleChangePlan(plan.planKey);
-    return () => handleChoosePlan(plan.planKey);
-  };
+  const freePlan = byKey.free;
+  const paidPlans = PAID_PLAN_KEYS.map((key) => byKey[key]).filter(Boolean);
 
-  const getButtonLabel = (plan) => {
-    if (loadingPlan === plan.planKey) return "Processing...";
-    if (plan.isEnterprise) return "Get quote";
-    if (currentPlanKey) return "Change plan";
-    return plan.trialPeriodDays > 0 ? "Start trial" : "Subscribe";
-  };
-
-  const getTrialNote = (plan) => {
-    if (plan.isEnterprise) return null;
-    return plan.trialPeriodDays > 0
-      ? `Includes a free ${plan.trialPeriodDays}-day trial`
-      : "You've already used your free trial, you'll be charged today";
+  const ctaLabel = (plan) => {
+    if (busy === plan.key) return "Opening checkout…";
+    if (isPaying) return `Switch to ${plan.label}`;
+    return trialDays ? `Start ${trialDays}-day trial` : `Choose ${plan.label}`;
   };
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 6, mb: 6, px: { xs: 2, sm: 3 } }}>
-      <Box sx={{ textAlign: "center", mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 900 }}>
-          Manage subscription
-        </Typography>
-        <Typography sx={{ color: "text.secondary", mt: 1 }}>
-          View your current plan, billing details, and upgrade options.
-        </Typography>
-      </Box>
+    <Container maxWidth="lg" sx={{ mt: 5, mb: 8, px: { xs: 2, sm: 3 } }}>
+      <Typography variant="h4" sx={{ fontWeight: 800, color: INK, letterSpacing: "-0.02em" }}>
+        Plan and billing
+      </Typography>
+      <Typography sx={{ color: MUTED, mt: 0.5, mb: 3 }}>
+        One price per facility. Viewers are always free.
+      </Typography>
 
-      <Box sx={{ display: "flex", justifyContent: "center" }}>
-        <Box sx={{ width: "100%", maxWidth: 1100 }}>
-          <Paper
-            sx={{
-              p: { xs: 2, md: 3 },
-              mb: 3,
-              borderRadius: 4,
-              border: "1px solid rgba(15, 23, 42, 0.08)",
-              background:
-                "linear-gradient(135deg, rgba(37, 99, 235, 0.06) 0%, rgba(255,255,255,1) 100%)",
-            }}
-          >
-            <Stack
-              direction={{ xs: "column", md: "row" }}
-              spacing={2.5}
-              justifyContent="space-between"
-              alignItems={{ xs: "flex-start", md: "flex-start" }}
-            >
-              <Box sx={{ flex: 1 }}>
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  spacing={1.5}
-                  alignItems={{ xs: "flex-start", sm: "center" }}
-                  sx={{ mb: 1.5 }}
-                >
-                  <Typography sx={{ fontWeight: 800, fontSize: "1.05rem" }}>
-                    Current subscription
-                  </Typography>
-                  <Chip
-                    label={
-                      data?.subscriptionStatus ||
-                      tenant.subscriptionStatus ||
-                      "Inactive"
-                    }
-                    color={
-                      (data?.subscriptionStatus ||
-                        tenant.subscriptionStatus ||
-                        "inactive") === "active"
-                        ? "success"
-                        : "default"
-                    }
-                    size="small"
-                    sx={{ fontWeight: 700 }}
-                  />
-                </Stack>
+      {(error || loadError) && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error || loadError}
+        </Alert>
+      )}
 
-                <Typography
-                  variant="body2"
-                  sx={{
-                    color: "text.secondary",
-                    mb: 1.5,
-                    fontSize: { xs: "0.85rem", md: "0.95rem" },
-                  }}
-                >
-                  Your active plan, seats, and billing contact are shown here.
-                </Typography>
-
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: {
-                      xs: "1fr",
-                      sm: "repeat(3, minmax(0, 1fr))",
-                    },
-                    gap: 1.25,
-                  }}
-                >
-                  <Box
-                    sx={{
-                      p: 1.25,
-                      borderRadius: 3,
-                      bgcolor: "rgba(255,255,255,0.7)",
-                      border: "1px solid rgba(15, 23, 42, 0.06)",
-                    }}
-                  >
-                    <Typography
-                      variant="caption"
-                      sx={{ color: "text.secondary" }}
-                    >
-                      Plan
-                    </Typography>
-                    <Typography sx={{ fontWeight: 800, mt: 0.3 }}>
-                      {currentPlanName}
-                    </Typography>
-                  </Box>
-
-                  <Box
-                    sx={{
-                      p: 1.25,
-                      borderRadius: 3,
-                      bgcolor: "rgba(255,255,255,0.7)",
-                      border: "1px solid rgba(15, 23, 42, 0.06)",
-                    }}
-                  >
-                    <Typography
-                      variant="caption"
-                      sx={{ color: "text.secondary" }}
-                    >
-                      Seats
-                    </Typography>
-                    <Typography sx={{ fontWeight: 800, mt: 0.3 }}>
-                      {data
-                        ? `${data.seatsInUse} / ${data.seatLimit ?? "—"}`
-                        : (tenant.seatLimit ?? "1")}
-                    </Typography>
-                  </Box>
-
-                  <Box
-                    sx={{
-                      p: 1.25,
-                      borderRadius: 3,
-                      bgcolor: "rgba(255,255,255,0.7)",
-                      border: "1px solid rgba(15, 23, 42, 0.06)",
-                    }}
-                  >
-                    <Typography
-                      variant="caption"
-                      sx={{ color: "text.secondary" }}
-                    >
-                      Billing
-                    </Typography>
-                    <Typography sx={{ fontWeight: 800, mt: 0.3 }}>
-                      {tenant.billingEmail || "Not set"}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Box>
-
-              <Button
-                variant="contained"
-                color="error"
-                onClick={() => handleCancelSubscription()}
-                disabled={!currentPlanKey}
-                sx={{
-                  textTransform: "none",
-                  borderRadius: 2,
-                  px: 3,
-                  minWidth: { xs: "100%", md: 220 },
-                  alignSelf: { xs: "stretch", md: "flex-start" },
-                  fontWeight: 700,
-                }}
-              >
-                {loadingPlan === "cancel"
-                  ? "Processing..."
-                  : "Cancel subscription"}
-              </Button>
+      {/* Where this workspace stands */}
+      <Paper
+        elevation={0}
+        sx={{ p: { xs: 2, md: 3 }, mb: 4, borderRadius: 3, border: `1px solid ${LINE}` }}
+      >
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={3}
+          sx={{ justifyContent: "space-between", alignItems: { md: "center" } }}
+        >
+          <Box>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
+              <Typography sx={{ fontWeight: 800, fontSize: "1.25rem", color: INK }}>
+                {effectivePlan?.label || "Free"}
+              </Typography>
+              {onTrial && (
+                <Chip
+                  size="small"
+                  color="primary"
+                  label={`Free trial, ${daysLeft(data.trialEndsAt)} days left`}
+                />
+              )}
+              {data?.subscriptionStatus === "past_due" && (
+                <Chip size="small" color="error" label="Payment failed" />
+              )}
             </Stack>
-          </Paper>
-
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            justifyContent="space-between"
-            alignItems={{ xs: "flex-start", sm: "center" }}
-            spacing={1.5}
-            sx={{ mb: 2 }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              Upgrade options
+            <Typography variant="body2" sx={{ color: MUTED, mt: 0.5 }}>
+              {isPaying
+                ? `Billed ${data?.billingInterval === "year" ? "yearly" : "monthly"}`
+                : onTrial
+                  ? "When the trial ends you go back to Free. Nothing is deleted."
+                  : "Free forever for one scheduler and up to 15 staff."}
             </Typography>
-            <ToggleButtonGroup
-              value={billingInterval}
-              exclusive
-              onChange={(e, next) => next && setBillingInterval(next)}
-              size="small"
-            >
-              <ToggleButton
-                value="year"
-                sx={{ textTransform: "none", fontWeight: 700, px: 2.5 }}
-              >
-                Yearly
-              </ToggleButton>
-              <ToggleButton
-                value="month"
-                sx={{ textTransform: "none", fontWeight: 700, px: 2.5 }}
-              >
-                Monthly
-              </ToggleButton>
-            </ToggleButtonGroup>
+          </Box>
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={3}>
+            <UsageMeter label="Active staff" used={data?.usage?.staff ?? 0} limit={effectivePlan?.limits?.staff} />
+            <UsageMeter
+              label="Schedulers"
+              used={data?.usage?.schedulers ?? 0}
+              limit={effectivePlan?.limits?.schedulers}
+            />
           </Stack>
 
-          {plansError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {plansError}
-            </Alert>
-          )}
+          <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+            {canManage && data?.trialAvailable && (
+              <Button variant="contained" onClick={startTrial} disabled={busy === "trial"} sx={{ textTransform: "none", fontWeight: 700 }}>
+                {busy === "trial" ? "Starting…" : "Try Starter free for 14 days"}
+              </Button>
+            )}
+            {canManage && isPaying && (
+              <Button variant="outlined" onClick={openPortal} disabled={busy === "portal"} sx={{ textTransform: "none" }}>
+                Invoices, card and cancel
+              </Button>
+            )}
+          </Stack>
+        </Stack>
 
-          {plansLoading ? (
-            <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  lg: "repeat(2, minmax(0, 280px))",
-                  xl: "repeat(4, minmax(0, 250px))",
-                },
-                justifyContent: "center",
-                rowGap: { xs: 3.25, sm: 3.75, md: 4, lg: 4.25 },
-                columnGap: { xs: 0, lg: 3.25, xl: 3.5 },
-                px: { xs: 1.25, sm: 1.75, md: 2, lg: 0.75, xl: 0 },
-                pb: 5,
-              }}
-            >
-              {plans.map((p) => {
-                const isCurrent =
-                  currentPlanKey && currentPlanKey === p.planKey;
-                const trialNote = getTrialNote(p);
+        {data?.usage?.overLimit && (
+          <Alert
+            severity="warning"
+            sx={{ mt: 2.5 }}
+            action={
+              canManage && (
+                <Button color="inherit" size="small" onClick={() => navigate("/billing/keep")} sx={{ textTransform: "none", fontWeight: 700 }}>
+                  Choose who to keep
+                </Button>
+              )
+            }
+          >
+            You have more people than {effectivePlan?.label || "this plan"} allows, so adding people and
+            publishing new weeks are paused.
+            {grace?.available && !grace.weekStart
+              ? " You can still publish one more week until " +
+                new Date(grace.endsAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
+                "."
+              : ""}{" "}
+            Upgrade, or choose who to keep. Nothing has been deleted.
+          </Alert>
+        )}
+      </Paper>
 
-                return (
-                  <Box
-                    key={p.planKey}
-                    sx={{
-                      width: "100%",
-                      maxWidth: { xs: 340, sm: 360, md: 380, lg: "none" },
-                      mx: "auto",
-                    }}
-                  >
-                    <Paper
-                      sx={{
-                        p: { xs: 1.75, sm: 2.25, md: 3 },
-                        height: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "space-between",
-                        textAlign: "left",
-                        borderRadius: 4,
-                        border: p.highlight
-                          ? `2px solid ${theme.palette.primary.main}`
-                          : "1px solid rgba(15, 23, 42, 0.08)",
-                        boxShadow: p.highlight
-                          ? "0 12px 30px rgba(16,24,40,0.12)"
-                          : "0 6px 18px rgba(15,23,42,0.06)",
-                      }}
-                    >
-                      <Box>
-                        {p.highlight && (
-                          <Chip
-                            label="Most popular"
-                            color="primary"
-                            size="small"
-                            sx={{
-                              fontWeight: 700,
-                              fontSize: "0.65rem",
-                              height: 20,
-                              mb: 1,
-                              "& .MuiChip-label": { px: 1 },
-                            }}
-                          />
-                        )}
-                        <Typography
-                          variant="h6"
-                          sx={{
-                            fontWeight: 900,
-                            lineHeight: 1.15,
-                            fontSize: { xs: "1.05rem", md: "1.1rem" },
-                          }}
-                        >
-                          {p.name}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: "text.secondary",
-                            mt: 0.35,
-                            mb: 1.5,
-                            fontSize: { xs: "0.76rem", md: "0.78rem" },
-                          }}
-                        >
-                          {p.isEnterprise
-                            ? "Custom package"
-                            : `Per facility / ${p.interval === "month" ? "month" : "year"}`}
-                        </Typography>
-                        <Typography
-                          variant="h5"
-                          sx={{
-                            fontWeight: 900,
-                            mt: 0.75,
-                            fontSize: { xs: "1.28rem", md: "1.4rem" },
-                            lineHeight: 1.15,
-                          }}
-                        >
-                          {p.isEnterprise ? "Custom pricing" : p.priceLabel}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: "text.secondary",
-                            mt: 0.75,
-                            fontSize: { xs: "0.76rem", md: "0.8rem" },
-                            lineHeight: 1.3,
-                          }}
-                        >
-                          {p.isEnterprise
-                            ? "Custom annual package"
-                            : p.cadenceNote}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: "text.primary",
-                            mt: 2,
-                            fontSize: { xs: "0.9rem", md: "0.92rem" },
-                            lineHeight: 1.3,
-                            fontWeight: 700,
-                          }}
-                        >
-                          {getCapacityLabel(p)}
-                        </Typography>
+      {/* Interval */}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        sx={{ alignItems: { sm: "center" }, justifyContent: "space-between", mb: 2 }}
+      >
+        <Typography sx={{ fontWeight: 700, color: INK }}>Plans</Typography>
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          value={interval}
+          onChange={(_, value) => value && setBillingInterval(value)}
+        >
+          <ToggleButton value="month" sx={{ px: 2.5, textTransform: "none" }}>
+            Monthly
+          </ToggleButton>
+          <ToggleButton value="year" sx={{ px: 2.5, textTransform: "none" }}>
+            Yearly, save up to 20%
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </Stack>
 
-                        {!p.isEnterprise && p.seatsOverLimit > 0 && (
-                          <Chip
-                            label={`Requires removing ${p.seatsOverLimit} staff`}
-                            color="warning"
-                            size="small"
-                            sx={{ mt: 1, fontWeight: 700 }}
-                          />
-                        )}
-
-                        <Divider sx={{ my: 1.5 }} />
-                        <Stack
-                          spacing={0.8}
-                          sx={{
-                            color: "text.secondary",
-                            alignItems: "flex-start",
-                          }}
-                        >
-                          {[getSupportLabel(p), ...SHARED_FEATURE_LIST].map(
-                            (feature) => (
-                              <Stack
-                                direction="row"
-                                spacing={1}
-                                alignItems="center"
-                                key={feature}
-                                sx={{ justifyContent: "flex-start" }}
-                              >
-                                <CheckCircleRoundedIcon
-                                  fontSize="small"
-                                  sx={{ color: theme.palette.primary.main }}
-                                />
-                                <Typography
-                                  variant="body2"
-                                  sx={{
-                                    lineHeight: 1.3,
-                                    color: "text.primary",
-                                    fontSize: { xs: "0.82rem", md: "0.84rem" },
-                                  }}
-                                >
-                                  {feature}
-                                </Typography>
-                              </Stack>
-                            ),
-                          )}
-                        </Stack>
-                      </Box>
-
-                      <Box>
-                        {isCurrent ? (
-                          <Button disabled fullWidth variant="contained">
-                            Current plan
-                          </Button>
-                        ) : (
-                          <>
-                            {trialNote && (
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  display: "block",
-                                  mb: 1,
-                                  color: "text.secondary",
-                                }}
-                              >
-                                {trialNote}
-                              </Typography>
-                            )}
-                            <Button
-                              variant={p.highlight ? "contained" : "outlined"}
-                              disabled={
-                                (!p.isEnterprise && p.seatsOverLimit > 0) ||
-                                loadingPlan === p.planKey
-                              }
-                              onClick={getPlanAction(p)}
-                              startIcon={
-                                loadingPlan === p.planKey ? (
-                                  <CircularProgress size={16} />
-                                ) : (
-                                  <ArrowOutwardRoundedIcon fontSize="small" />
-                                )
-                              }
-                              fullWidth
-                              sx={{
-                                mt: 0.5,
-                                py: 1,
-                                textTransform: "none",
-                                fontWeight: 800,
-                                fontSize: { xs: "0.9rem", md: "0.92rem" },
-                              }}
-                            >
-                              {getButtonLabel(p)}
-                            </Button>
-                          </>
-                        )}
-                      </Box>
-                    </Paper>
-                  </Box>
-                );
-              })}
-            </Box>
-          )}
-
-          {error && (
-            <Typography color="error" sx={{ mt: 2 }}>
-              {error}
-            </Typography>
-          )}
-
-          <Typography
-            variant="caption"
+      <Box
+        sx={{
+          display: "grid",
+          gap: 2,
+          gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "0.85fr repeat(3, 1fr)" },
+          alignItems: "stretch",
+        }}
+      >
+        {/* Free */}
+        {freePlan && (
+          <Paper
+            elevation={0}
             sx={{
-              display: "block",
-              textAlign: "center",
-              color: "text.secondary",
-              mt: 3.5,
-              px: 2,
-              lineHeight: 1.5,
+              p: 2.5,
+              borderRadius: 3,
+              bgcolor: "#F8FAFC",
+              border: `1px solid ${LINE}`,
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
             }}
           >
-            One price per facility. Each facility is billed independently.
-          </Typography>
-        </Box>
+            <Box>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <Typography sx={{ fontWeight: 800, fontSize: "1.1rem", color: INK }}>Free</Typography>
+                {effective === "free" && <Chip size="small" label="Current" />}
+              </Stack>
+              <Typography variant="body2" sx={{ color: MUTED }}>
+                {PLAN_TAGLINES.free}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography sx={{ fontWeight: 800, fontSize: "2rem", color: INK, lineHeight: 1.1 }}>$0</Typography>
+              <Typography variant="body2" sx={{ color: MUTED }}>
+                {formatLimit(freePlan.limits?.staff, "staff")}, {formatLimit(freePlan.limits?.schedulers, "schedulers")}
+              </Typography>
+            </Box>
+            <FeatureList items={FREE_FEATURES} dense />
+          </Paper>
+        )}
+
+        {/* Starter / Growth / Premium */}
+        {paidPlans.map((plan) => {
+          const isCurrent = plan.key === effective;
+          const popular = plan.key === POPULAR_PLAN;
+          const monthly = plan.prices?.month;
+          const yearly = plan.prices?.year;
+          const shown = interval === "year" ? yearly : monthly;
+          const savings = monthly && yearly ? monthly * 12 - yearly : 0;
+          return (
+            <Paper
+              key={plan.key}
+              elevation={0}
+              sx={{
+                p: 2.5,
+                borderRadius: 3,
+                border: popular ? "2px solid" : `1px solid ${LINE}`,
+                borderColor: popular ? "primary.main" : LINE,
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                position: "relative",
+              }}
+            >
+              {popular && (
+                <Chip
+                  label="Most popular"
+                  color="primary"
+                  size="small"
+                  sx={{ position: "absolute", top: -12, left: 20, fontWeight: 700 }}
+                />
+              )}
+              <Box>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                  <Typography sx={{ fontWeight: 800, fontSize: "1.1rem", color: INK }}>{plan.label}</Typography>
+                  {isCurrent && <Chip size="small" label={onTrial ? "Trial" : "Current"} />}
+                </Stack>
+                <Typography variant="body2" sx={{ color: MUTED }}>
+                  {PLAN_TAGLINES[plan.key]}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Stack direction="row" spacing={0.5} sx={{ alignItems: "baseline" }}>
+                  <Typography sx={{ fontWeight: 800, fontSize: "2rem", color: INK, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>
+                    {formatMoney(shown)}
+                  </Typography>
+                  <Typography sx={{ color: MUTED }}>/{interval === "year" ? "year" : "month"}</Typography>
+                </Stack>
+                <Typography variant="body2" sx={{ color: MUTED, minHeight: 20 }}>
+                  {interval === "year"
+                    ? `${formatMoney(Math.round(yearly / 12))}/mo billed yearly, save ${formatMoney(savings)}`
+                    : `or ${formatMoney(yearly)}/year`}
+                </Typography>
+              </Box>
+
+              <Stack spacing={0.5}>
+                {[
+                  formatLimit(plan.limits?.staff, "active staff"),
+                  formatLimit(plan.limits?.schedulers, "schedulers"),
+                  SUPPORT_LABELS[plan.support] || "Standard support",
+                ].map((line) => (
+                  <Typography key={line} sx={{ fontWeight: 600, color: INK, fontSize: "0.95rem" }}>
+                    {line}
+                  </Typography>
+                ))}
+              </Stack>
+
+              <Box sx={{ flex: 1 }} />
+
+              {canManage && plan.purchasable && !(isCurrent && isPaying) && (
+                <Button
+                  variant={popular ? "contained" : "outlined"}
+                  onClick={() => choosePlan(plan.key)}
+                  disabled={Boolean(busy)}
+                  sx={{ textTransform: "none", fontWeight: 700, py: 1 }}
+                >
+                  {ctaLabel(plan)}
+                </Button>
+              )}
+              {!isPaying && trialDays > 0 && (
+                <Typography variant="caption" sx={{ color: MUTED, textAlign: "center", mt: -1 }}>
+                  Card needed. Cancel before day {trialDays} and you won't be charged.
+                </Typography>
+              )}
+            </Paper>
+          );
+        })}
       </Box>
+
+      {/* What every paid plan includes */}
+      <Paper
+        elevation={0}
+        sx={{ mt: 2, p: { xs: 2, md: 3 }, borderRadius: 3, border: `1px solid ${LINE}` }}
+      >
+        <Typography sx={{ fontWeight: 800, color: INK, mb: 1.5 }}>
+          Starter, Growth and Premium all include
+        </Typography>
+        <Box
+          sx={{
+            display: "grid",
+            gap: 1,
+            gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(3, 1fr)" },
+          }}
+        >
+          {PAID_FEATURES.map((feature) => (
+            <FeatureList key={feature} items={[feature]} />
+          ))}
+        </Box>
+      </Paper>
+
+      {/* Enterprise */}
+      <Paper
+        elevation={0}
+        sx={{
+          mt: 2,
+          p: { xs: 2, md: 3 },
+          borderRadius: 3,
+          bgcolor: "#111827",
+          color: "#fff",
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          gap: 3,
+          alignItems: { md: "center" },
+          justifyContent: "space-between",
+        }}
+      >
+        <Box>
+          <Typography sx={{ fontWeight: 800, fontSize: "1.1rem" }}>Enterprise</Typography>
+          <Typography sx={{ color: "rgba(255,255,255,0.72)", mb: 1.5 }}>
+            Custom pricing on an annual package.
+          </Typography>
+          <Box sx={{ display: "grid", gap: 0.75, gridTemplateColumns: { xs: "1fr", sm: "repeat(2, auto)" }, columnGap: 4 }}>
+            {ENTERPRISE_FEATURES.map((feature) => (
+              <Stack key={feature} direction="row" spacing={1}>
+                <CheckRoundedIcon sx={{ fontSize: 18, mt: "2px", color: "#93C5FD" }} />
+                <Typography variant="body2">{feature}</Typography>
+              </Stack>
+            ))}
+          </Box>
+        </Box>
+        <Button
+          variant="contained"
+          href="/contact"
+          sx={{ bgcolor: "#fff !important", color: "#111827", textTransform: "none", fontWeight: 700, flexShrink: 0, "&:hover": { bgcolor: "#E5E7EB !important" } }}
+        >
+          Talk to us
+        </Button>
+      </Paper>
+
+      {!canManage && (
+        <Typography sx={{ color: MUTED, mt: 3 }}>Only the workspace owner can change the plan.</Typography>
+      )}
     </Container>
   );
 }

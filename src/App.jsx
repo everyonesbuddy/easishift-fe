@@ -21,20 +21,24 @@ import Sidebar from "./components/Shared/Sidebar";
 import HowToUsePage from "./components/Shared/HowToUsePage";
 import GuideTourOverlay from "./components/Shared/GuideTourOverlay";
 import AnalyticsTracker from "./components/Shared/AnalyticsTracker";
-import Paywall from "./components/StaffPortal/Dashboard/Paywall";
+import UpgradeDialog from "./components/Shared/UpgradeDialog";
+import SetupPage from "./components/StaffPortal/Setup/SetupPage";
 import ManageSubscription from "./components/StaffPortal/Billing/ManageSubscription";
 import BillingSuccess from "./components/StaffPortal/Billing/BillingSuccess";
 import BillingCancel from "./components/StaffPortal/Billing/BillingCancel";
 import ScheduleList from "./components/StaffPortal/Schedule/ScheduleList";
 import ShiftSwapRequestsPage from "./components/StaffPortal/Schedule/ShiftSwapRequestsPage";
 import StaffList from "./components/StaffPortal/Staffs/StaffList";
+import MembersPage from "./components/StaffPortal/Members/MembersPage";
+import FitToPlanPage from "./components/StaffPortal/Billing/FitToPlanPage";
+import PlanBanner from "./components/Shared/PlanBanner";
+import { IOS } from "./theme/ios";
+import StaffLinkPage from "./components/StaffLink/StaffLinkPage";
+import StaffingTemplatePage from "./components/StaffPortal/Coverage/StaffingTemplatePage";
 import MessageList from "./components/StaffPortal/Messages/MessageList";
-import TimeOffRequestList from "./components/StaffPortal/TimeOff/TimeOffRequestList";
 import TimeOffDecision from "./components/StaffPortal/TimeOff/TimeOffDecision";
-import PreferencesPage from "./components/StaffPortal/NoAdminPreferences/PreferencesPage";
 import FacilityPreferencesPage from "./components/StaffPortal/FacilityPreferences/FacilityPreferencesPage";
 import TenantBrandingPage from "./components/StaffPortal/FacilityPreferences/TenantBrandingPage";
-import CoveragePlanningPage from "./components/StaffPortal/Coverage/CoveragePlanningPage";
 import TimeTrackingPage from "./components/StaffPortal/TimeTracking/TimeTrackingPage";
 import PayrollExportsPage from "./components/StaffPortal/Exports/PayrollExportsPage";
 import { ToastContainer } from "react-toastify";
@@ -44,7 +48,7 @@ import { useAuth } from "./context/AuthContext";
 import { useMemo, useState } from "react";
 
 export default function App() {
-  const { user, tenant, can, publicBranding } = useAuth();
+  const { user, publicBranding } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const primaryColor = publicBranding?.primaryColor || "#2563eb";
   const secondaryColor = publicBranding?.secondaryColor || "#1e40af";
@@ -55,13 +59,20 @@ export default function App() {
           primary: { main: primaryColor },
           secondary: { main: secondaryColor },
         },
+        typography: { fontFamily: IOS.font },
+        shape: { borderRadius: 10 },
         components: {
           MuiButton: {
             styleOverrides: {
+              root: { textTransform: "none", fontWeight: 600, borderRadius: 10 },
               containedPrimary: {
                 backgroundColor: `${primaryColor} !important`,
                 "&:hover": {
                   backgroundColor: `${secondaryColor} !important`,
+                },
+                "&.Mui-disabled": {
+                  backgroundColor: "rgba(118, 118, 128, 0.12) !important",
+                  color: "#AEAEB2",
                 },
               },
             },
@@ -70,39 +81,16 @@ export default function App() {
       }),
     [primaryColor, secondaryColor],
   );
-  const hasPaywallExemptStatus =
-    tenant && ["active", "trialing"].includes(tenant.subscriptionStatus);
-
-  const showPaywall =
-    can("billing.manage") &&
-    tenant &&
-    (!hasPaywallExemptStatus || (tenant.seatLimit && tenant.seatLimit <= 1));
-
-  // Billing-only mode for admins with inactive/limited tenant
-  if (user && showPaywall) {
-    return (
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <BrowserRouter>
-          <AnalyticsTracker />
-          <Box sx={{ marginLeft: 0 }}>
-            <Navbar />
-            <Routes>
-              <Route path="/billing" element={<Paywall tenant={tenant} />} />
-              <Route path="*" element={<Navigate to="/billing" replace />} />
-            </Routes>
-          </Box>
-        </BrowserRouter>
-      </ThemeProvider>
-    );
-  }
+  // Staff open their personal link without logging in; show it bare.
+  const isStaffLink = window.location.pathname.startsWith("/s/");
+  const showAppChrome = Boolean(user) && !isStaffLink;
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <BrowserRouter>
         <AnalyticsTracker />
-        {user && (
+        {showAppChrome && (
           <Sidebar
             mobileOpen={mobileOpen}
             onMobileClose={() => setMobileOpen(false)}
@@ -110,22 +98,19 @@ export default function App() {
         )}
         <Box
           sx={{
-            marginLeft: user ? { xs: 0, sm: "260px" } : 0,
+            marginLeft: showAppChrome ? { xs: 0, sm: "260px" } : 0,
             position: "relative",
           }}
         >
-          <Navbar onMobileOpen={() => setMobileOpen(true)} />
+          {!isStaffLink && (
+            <Navbar onMobileOpen={() => setMobileOpen(true)} />
+          )}
+          {showAppChrome && <PlanBanner />}
           <Routes>
             <Route
               path="/"
               element={
-                user ? (
-                  <Navigate to="/dashboard" replace />
-                ) : publicBranding ? (
-                  <Navigate to="/login" replace />
-                ) : (
-                  <Home />
-                )
+                user ? <Navigate to="/dashboard" replace /> : <Home />
               }
             />
             <Route path="/pricing" element={<PricingPage />} />
@@ -164,14 +149,32 @@ export default function App() {
               element={user ? <Navigate to="/dashboard" replace /> : <Login />}
             />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/s/:token" element={<StaffLinkPage />} />
             <Route
               path="/signup-tenant"
               element={
                 user ? <Navigate to="/dashboard" replace /> : <SignupTenant />
               }
             />
+            <Route path="/signup" element={<Navigate to="/signup-tenant" replace />} />
+            <Route
+              path="/setup"
+              element={
+                <PrivateRoute>
+                  <SetupPage />
+                </PrivateRoute>
+              }
+            />
             <Route path="/billing" element={<ManageSubscription />} />
             <Route path="/billing/success" element={<BillingSuccess />} />
+            <Route
+              path="/billing/keep"
+              element={
+                <PrivateRoute>
+                  <FitToPlanPage />
+                </PrivateRoute>
+              }
+            />
             <Route path="/billing/cancel" element={<BillingCancel />} />
             <Route
               path="/dashboard"
@@ -181,13 +184,10 @@ export default function App() {
                 </PrivateRoute>
               }
             />
+            {/* Needs now live on the schedule's week grid. */}
             <Route
               path="/coverage-planning"
-              element={
-                <PrivateRoute>
-                  <CoveragePlanningPage />
-                </PrivateRoute>
-              }
+              element={<Navigate to="/schedule" replace />}
             />
             <Route
               path="/schedule"
@@ -214,6 +214,22 @@ export default function App() {
               }
             />
             <Route
+              path="/staffing-template"
+              element={
+                <PrivateRoute>
+                  <StaffingTemplatePage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/members"
+              element={
+                <PrivateRoute>
+                  <MembersPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
               path="/timeoff-decisions"
               element={
                 <PrivateRoute>
@@ -232,17 +248,13 @@ export default function App() {
             <Route
               path="/preferences"
               element={
-                <PrivateRoute>
-                  <PreferencesPage />
-                </PrivateRoute>
+                <Navigate to="/dashboard" replace />
               }
             />
             <Route
               path="/timeoff-requests"
               element={
-                <PrivateRoute>
-                  <TimeOffRequestList />
-                </PrivateRoute>
+                <Navigate to="/timeoff-decisions" replace />
               }
             />
             <Route
@@ -288,6 +300,7 @@ export default function App() {
           </Routes>
           <ToastContainer />
           <GuideTourOverlay />
+          {showAppChrome && <UpgradeDialog />}
         </Box>
       </BrowserRouter>
     </ThemeProvider>

@@ -28,10 +28,6 @@ const STAFF_MANAGEMENT_VIDEO_URL =
   "https://youtu.be/GEzs9F-LysY?si=GRCGmE4iVgU88Zkj";
 const FACILITY_PREFERENCES_VIDEO_URL =
   "https://youtu.be/fI3JscDuFkk?si=AR-_eefXMBQ6UKH3";
-const COVERAGE_SAVE_REQUIREMENTS_VIDEO_URL =
-  "https://youtu.be/-7mv6I-eqG0?si=R5HL90-Jbcm8Daol";
-const COVERAGE_AI_DRAFT_VIDEO_URL =
-  "https://youtu.be/qJpZoB-dL7A?si=y3DR44Q0fzPw5MUs";
 const SCHEDULE_AI_GENERATED_VIDEO_URL =
   "https://youtu.be/r8kQbvdqWpA?si=FkDBEtKcx3tyJuCd";
 
@@ -134,32 +130,19 @@ const TRAINING_MODULES = [
   {
     id: "coverage-planning",
     track: "coverage",
-    title: "Create Coverage Requirements",
-    audience: "Schedulers, admins, and coverage planners",
+    title: "Set Weekly Needs and Fill the Week",
+    audience: "Schedulers and admins",
     access: "coverage.manage",
     summary:
-      "Define staffing demand by date, slot, role, area, certification, and required headcount.",
-    videos: [
-      {
-        label: "Create and save requirements",
-        url: COVERAGE_SAVE_REQUIREMENTS_VIDEO_URL,
-        description:
-          "Create coverage requirements without generating a draft schedule.",
-      },
-      {
-        label: "Create and AI-generate a draft",
-        url: COVERAGE_AI_DRAFT_VIDEO_URL,
-        description:
-          "Create coverage and immediately generate a draft schedule with AI.",
-      },
-    ],
+      "Say what a normal week needs once; every new week fills in its open slots, and the week grid shows what's still open.",
+    videos: [],
     steps: [
-      "Use calendar view for time-based planning and list view for fast review.",
-      "Choose a role, date range, time slot, and required count for each requirement.",
-      "Add unit area, shift type, shift tag, and certifications when they matter for matching.",
-      "Save the requirement only when you are still planning demand.",
-      "Save and generate a draft when the requirement is ready for assignment review.",
-      "Edit headcount when demand changes; metadata may lock after draft or schedule links exist.",
+      "Open Weekly Needs and set how many of each role every shift needs, for weekdays and weekends or each day.",
+      "Add a unit area or required certifications to a row when only some people can work it.",
+      "On the schedule's Week view, each cell shows one dot per person needed; filled dots are people assigned.",
+      "Click a cell to assign someone who can take it, change that day's count, or handle a call-out.",
+      "Use Add a one-off need for a single day, like an extra caregiver on Friday.",
+      "Publish the week when it looks right; everyone gets one text or email with their shifts.",
     ],
   },
   {

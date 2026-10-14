@@ -380,6 +380,13 @@ export default function StaffLinkPage() {
     return (
       <Container maxWidth="sm" sx={{ py: 6 }}>
         <Alert severity="warning">{loadError}</Alert>
+        <Button
+          variant="contained"
+          href="/login?as=staff"
+          sx={{ mt: 2, textTransform: "none", borderRadius: IOS.radius.round, bgcolor: IOS.blue, boxShadow: "none" }}
+        >
+          Send me my link again
+        </Button>
       </Container>
     );
   }

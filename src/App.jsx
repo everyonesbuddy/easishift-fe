@@ -149,6 +149,8 @@ export default function App() {
               element={user ? <Navigate to="/dashboard" replace /> : <Login />}
             />
             <Route path="/reset-password" element={<ResetPassword />} />
+            {/* Staff: get your personal link sent again (no password). */}
+            <Route path="/my-schedule" element={<Navigate to="/login?as=staff" replace />} />
             <Route path="/s/:token" element={<StaffLinkPage />} />
             <Route
               path="/signup-tenant"

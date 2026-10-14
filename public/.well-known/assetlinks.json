@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.wisershifts.mobile",
+      "sha256_cert_fingerprints": ["00:DA:C3:E1:98:E9:87:1A:86:30:78:31:CA:3F:98:F2:FE:AD:EF:B2:CF:9E:09:96:55:71:D4:56:02:A2:64:94"]
+    }
+  }
+]

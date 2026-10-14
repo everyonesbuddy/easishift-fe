@@ -284,14 +284,13 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
     setAutoFilling(true);
     try {
       const res = await api.post(`/weeks/${weekStart}/auto-fill`, {});
-      const { filled = 0, stillOpen = 0, notified = 0 } = res.data || {};
+      const { filled = 0, stillOpen = 0 } = res.data || {};
       setAutoFillOpen(false);
       if (!filled) {
         toast.info(stillOpen ? "Nobody available for the open slots. Try the slot panel to see why." : "Nothing open to fill.");
       } else {
         const parts = [`Filled ${filled} slot${filled === 1 ? "" : "s"}`];
-        if (isPublished) parts.push(`${notified} ${notified === 1 ? "person" : "people"} told`);
-        else parts.push("not sent yet");
+        parts.push(isPublished ? "not sent yet (press Send changes)" : "not sent yet");
         if (stillOpen) parts.push(`${stillOpen} still open`);
         toast.success(`${parts.join(", ")}.`);
       }
@@ -514,6 +513,8 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
         open={Boolean(openRow)}
         row={openRow}
         weekStart={weekStart}
+        weekPublished={data?.week?.status === "published"}
+        callOuts={openRow ? callOutsByCoverage.get(String(openRow._id)) || 0 : 0}
         people={openRow ? peopleByCoverage.get(String(openRow._id)) || [] : []}
         canEdit={canEdit}
         onClose={() => setOpenRowId(null)}
@@ -530,7 +531,7 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
           </Typography>
           <Typography sx={{ color: IOS.ink, lineHeight: 1.6, mt: 1.5, fontWeight: 600 }}>
             {isPublished
-              ? "This week is already published, so each person added gets a text or email right away."
+              ? "This week is already published. They'll show as Not sent yet; press Send changes when you're ready and only the people affected get a message."
               : "They'll show as Not sent yet. Nobody is told until you publish the week, and you can change anyone first."}
           </Typography>
         </DialogContent>

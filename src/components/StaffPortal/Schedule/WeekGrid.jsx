@@ -2,11 +2,13 @@ import { useMemo, useState } from "react";
 import {
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   IconButton,
   Tooltip,
   Typography,
@@ -20,6 +22,8 @@ import SlotDrawer from "./SlotDrawer";
 import AddNeedDialog from "./AddNeedDialog";
 import { GRID, slotLabel, titleCase } from "./weekGridUtils";
 import { IOS, roleColor, tint } from "../../../theme/ios";
+import SectionPicker from "./SectionPicker";
+import { emptySection, inSection, sectionBody, sectionChosen, sectionLabel, sectionOptions } from "./sectionUtils";
 
 /**
  * The week, as needs vs people. Rows are shift + role (+ area), columns are
@@ -188,6 +192,9 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
   const [addFor, setAddFor] = useState(null); // { date, shiftType, shiftTag, role, unitArea } | {}
   const [autoFillOpen, setAutoFillOpen] = useState(false);
   const [autoFilling, setAutoFilling] = useState(false);
+  // "Fill all" or "Fill a section", and keep last week's people (on by default).
+  const [fillSection, setFillSection] = useState(emptySection);
+  const [keepLastWeek, setKeepLastWeek] = useState(true);
 
   const data = week?.data;
   const weekStart = week?.weekStart;
@@ -278,18 +285,24 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
   const roleList = facilityPreferences?.roleFamilies || [];
   const totalOpen = dayTotals.reduce((sum, t) => sum + (t.needed - t.filled), 0);
   const fillableOpen = dayTotals.reduce((sum, t, i) => sum + (days[i] >= today ? t.needed - t.filled : 0), 0);
+  const fillOptions = sectionOptions(data);
+  // Open spots the chosen section would fill (today onward).
+  const sectionOpen = (data?.coverage || [])
+    .filter((row) => row.dateKey >= today && inSection(row, fillSection))
+    .reduce((sum, row) => sum + Math.max(0, row.requiredCount - row.assignedCount), 0);
   const isPublished = data?.week?.status === "published";
 
   const runAutoFill = async () => {
     setAutoFilling(true);
     try {
-      const res = await api.post(`/weeks/${weekStart}/auto-fill`, {});
-      const { filled = 0, stillOpen = 0 } = res.data || {};
+      const res = await api.post(`/weeks/${weekStart}/auto-fill`, { ...sectionBody(fillSection), keepLastWeek });
+      const { filled = 0, stillOpen = 0, keptFromLastWeek = 0 } = res.data || {};
+      setFillSection(emptySection);
       setAutoFillOpen(false);
       if (!filled) {
         toast.info(stillOpen ? "Nobody available for the open slots. Try the slot panel to see why." : "Nothing open to fill.");
       } else {
-        const parts = [`Filled ${filled} slot${filled === 1 ? "" : "s"}`];
+        const parts = [`Filled ${filled} slot${filled === 1 ? "" : "s"}${keptFromLastWeek ? ` (${keptFromLastWeek} same as last week)` : ""}`];
         parts.push(isPublished ? "not sent yet (press Send changes)" : "not sent yet");
         if (stillOpen) parts.push(`${stillOpen} still open`);
         toast.success(`${parts.join(", ")}.`);
@@ -523,13 +536,34 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
       />
 
       <Dialog open={autoFillOpen} onClose={() => !autoFilling && setAutoFillOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Auto-fill {fillableOpen} open slot{fillableOpen === 1 ? "" : "s"}?</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          {fillSection.mode === "section" && sectionChosen(fillSection)
+            ? `Auto-fill ${sectionLabel(fillSection, fillOptions)}: ${sectionOpen} open slot${sectionOpen === 1 ? "" : "s"}?`
+            : `Auto-fill ${fillableOpen} open slot${fillableOpen === 1 ? "" : "s"}?`}
+        </DialogTitle>
         <DialogContent>
-          <Typography sx={{ color: IOS.secondary, lineHeight: 1.6 }}>
-            We'll put the best available people on each open slot: right role, area and certifications, not on time off,
-            no double-booking, and work shared out fairly.
+          {(fillOptions.roles.length > 1 || fillOptions.areas.length > 0) && (
+            <Box sx={{ mb: 2 }}>
+              <SectionPicker value={fillSection} onChange={setFillSection} options={fillOptions} allLabel="All open slots" />
+            </Box>
+          )}
+          <FormControlLabel
+            sx={{ mb: 1, alignItems: "flex-start", "& .MuiCheckbox-root": { pt: 0.25 } }}
+            control={<Checkbox checked={keepLastWeek} onChange={(e) => setKeepLastWeek(e.target.checked)} />}
+            label={
+              <Box>
+                <Typography sx={{ fontWeight: 600, color: IOS.ink }}>Keep last week's people</Typography>
+                <Typography sx={{ fontSize: 13, color: IOS.secondary }}>
+                  Whoever worked the same shift on the same day last week gets it again, if they still can (not on time off, no
+                  overtime). Everything else is filled fairly.
+                </Typography>
+              </Box>
+            }
+          />
+          <Typography sx={{ color: IOS.secondary, lineHeight: 1.6, fontSize: 14 }}>
+            Right role, area and certifications, nobody on time off or double-booked.
           </Typography>
-          <Typography sx={{ color: IOS.ink, lineHeight: 1.6, mt: 1.5, fontWeight: 600 }}>
+          <Typography sx={{ color: IOS.ink, lineHeight: 1.6, mt: 1, fontSize: 14 }}>
             {isPublished
               ? "This week is already published. They'll show as Not sent yet; press Send changes when you're ready and only the people affected get a message."
               : "They'll show as Not sent yet. Nobody is told until you publish the week, and you can change anyone first."}
@@ -541,7 +575,7 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
           </Button>
           <Button
             onClick={runAutoFill}
-            disabled={autoFilling}
+            disabled={autoFilling || !sectionChosen(fillSection) || (fillSection.mode === "section" && sectionOpen === 0)}
             startIcon={autoFilling ? <CircularProgress size={14} color="inherit" /> : <FiZap />}
             sx={{ borderRadius: "10px", px: 2, color: "#fff", bgcolor: IOS.blue, "&:hover": { bgcolor: "#0066DB" } }}
           >

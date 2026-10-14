@@ -30,6 +30,14 @@ const FALLBACK_SYSTEM_ROLE_PERMISSIONS = {
   scheduler: SCHEDULER_PERMISSIONS,
   // "admin" is the old name for scheduler.
   admin: SCHEDULER_PERMISSIONS,
+  // Admin: owner powers except deleting the facility / transferring ownership.
+  administrator: [
+    ...SCHEDULER_PERMISSIONS,
+    "billing.view",
+    "billing.manage",
+    "tenant.settings",
+    "roles.manage",
+  ],
   viewer: [
     "schedule.view",
     "coverage.view",
@@ -43,6 +51,7 @@ const FALLBACK_SYSTEM_ROLE_PERMISSIONS = {
     "tenant.settings",
     "tenant.delete",
     "roles.manage",
+    "ownership.transfer",
   ],
 };
 
@@ -387,7 +396,7 @@ export const AuthProvider = ({ children }) => {
     [session],
   );
   const isOwner = hasRole("owner");
-  const isAdmin = hasRole("admin") || hasRole("scheduler") || isOwner;
+  const isAdmin = hasRole("administrator") || hasRole("admin") || hasRole("scheduler") || isOwner;
   const isStaff = Boolean(user) && !isPatient;
 
   const contextValue = useMemo(

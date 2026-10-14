@@ -275,8 +275,8 @@ export default function SlotDrawer({ open, row, weekStart, weekPublished, callOu
                 <Avatar name={s.staffId?.name} color={color} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography sx={{ fontWeight: 600, color: GRID.ink }}>{s.staffId?.name || "Someone"}</Typography>
-                  <Typography sx={{ fontSize: 12, color: s.state === "draft" ? GRID.short : GRID.muted }}>
-                    {s.state === "draft" ? "Not sent yet" : titleCase(s.status)}
+                  <Typography sx={{ fontSize: 12, color: s.status === "no_show" ? IOS.redText : s.state === "draft" ? GRID.short : GRID.muted }}>
+                    {s.status === "no_show" ? "No-show (didn't clock in)" : s.state === "draft" ? "Not sent yet" : titleCase(s.status)}
                   </Typography>
                 </Box>
                 {canEdit && !isPast && (

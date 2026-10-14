@@ -31,6 +31,22 @@ export default function Login() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState("");
   const [linkError, setLinkError] = useState("");
+  const [pasted, setPasted] = useState("");
+  const [pasteError, setPasteError] = useState("");
+
+  // A full link (https://wisershifts.com/s/…) or just the code at the end.
+  const openPasted = (e) => {
+    e.preventDefault();
+    const text = pasted.trim();
+    const match = text.match(/\/s\/([A-Za-z0-9._~-]{16,})/);
+    const token = match ? match[1] : /^[A-Za-z0-9._~-]{16,}$/.test(text) ? text : null;
+    if (!token) {
+      setPasteError("That doesn't look like a WiserShifts link. It looks like wisershifts.com/s/…");
+      return;
+    }
+    // Full load, same as tapping the link (the staff page has no site menu).
+    window.location.assign(`/s/${token}`);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -207,6 +223,36 @@ export default function Login() {
             </Box>
           )}
         </Box>
+
+        {who === "staff" && (
+          <Box
+            component="form"
+            onSubmit={openPasted}
+            sx={{ mt: 2, bgcolor: IOS.surface, borderRadius: IOS.radius.card, boxShadow: IOS.shadow, border: `1px solid ${IOS.hairline}`, p: { xs: 2.5, sm: 3 }, display: "flex", flexDirection: "column", gap: 2 }}
+          >
+            <Typography sx={{ fontWeight: 700, fontSize: 17, color: IOS.ink }}>Already have your link?</Typography>
+            {pasteError && <Alert severity="error" sx={{ borderRadius: "12px" }}>{pasteError}</Alert>}
+            <TextField
+              label="Paste it here"
+              placeholder="https://wisershifts.com/s/…"
+              value={pasted}
+              onChange={(e) => {
+                setPasted(e.target.value);
+                setPasteError("");
+              }}
+              autoComplete="off"
+              sx={field}
+            />
+            <Button
+              variant="text"
+              type="submit"
+              disabled={!pasted.trim()}
+              sx={{ ...primary, bgcolor: IOS.fill, color: IOS.ink, "&:hover": { bgcolor: "rgba(118,118,128,0.2)", boxShadow: "none" } }}
+            >
+              Open my schedule
+            </Button>
+          </Box>
+        )}
 
         {who === "scheduler" && (
           <Typography sx={{ color: IOS.secondary, fontSize: 14, textAlign: "center", mt: 3 }}>

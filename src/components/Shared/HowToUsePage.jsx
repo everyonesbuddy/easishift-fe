@@ -157,7 +157,7 @@ const TRAINING_MODULES = [
       "Click Auto-fill open slots to put the best available people on every open spot, or click a day to pick someone yourself.",
       "New shifts show as Not sent yet. Change anyone you like; nobody is told until you publish.",
       "Click Publish week. Each person gets one text or email with their shifts and their personal link.",
-      "After publishing, any change goes out right away to just the person affected.",
+      "After publishing, changes wait as Not sent yet. Press Send changes and only the people affected get one message (cover for a call-out goes out right away).",
     ],
   },
   {

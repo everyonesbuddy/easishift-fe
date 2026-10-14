@@ -56,7 +56,9 @@ const errorText = (err, fallback) => err?.response?.data?.message || fallback;
  * One day's need for one shift + role: who's on it, who could be, and how
  * many are needed that day.
  */
-export default function SlotDrawer({ open, row, weekStart, people, canEdit, onClose, onChanged, onCallOut }) {
+const SOON_MS = 48 * 60 * 60 * 1000;
+
+export default function SlotDrawer({ open, row, weekStart, weekPublished, callOuts = 0, people, canEdit, onClose, onChanged, onCallOut }) {
   const { facilityPreferences } = useAuth();
   const [candidates, setCandidates] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -102,6 +104,45 @@ export default function SlotDrawer({ open, row, weekStart, people, canEdit, onCl
     }
   };
 
+  // In a published week, edits wait for "Send changes". For a shift in the
+  // next 48 hours, offer to send right away.
+  const sendWeekNow = async () => {
+    try {
+      const res = await api.post(`/weeks/${weekStart}/publish`);
+      const n = res.data?.messaged || 0;
+      toast.success(n ? `Sent to ${n} ${n === 1 ? "person" : "people"}.` : "Nobody needed a message.");
+      onChanged?.();
+    } catch (err) {
+      if (err?.response?.status !== 402) toast.error(errorText(err, "Couldn't send"));
+    }
+  };
+  const afterEdit = (message, sentAlready) => {
+    const soon = row && new Date(row.startTime).getTime() - Date.now() < SOON_MS;
+    if (weekPublished && !sentAlready && soon) {
+      toast.info(
+        ({ closeToast }) => (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Typography sx={{ fontSize: 14, flex: 1 }}>{message}. Not sent yet, and this shift is soon.</Typography>
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => {
+                closeToast?.();
+                sendWeekNow();
+              }}
+              sx={{ textTransform: "none", flexShrink: 0 }}
+            >
+              Send now
+            </Button>
+          </Box>
+        ),
+        { autoClose: 10000 },
+      );
+    } else {
+      toast.success(`${message}${weekPublished && !sentAlready ? ". Not sent yet" : ""}`, { autoClose: 2200 });
+    }
+  };
+
   const assign = async (candidate) => {
     setBusyId(candidate.staffId);
     try {
@@ -114,8 +155,10 @@ export default function SlotDrawer({ open, row, weekStart, people, canEdit, onCl
         shiftTag: row.shiftTag || null,
         startTime: row.startTime,
         endTime: row.endTime,
+        // Covering a call-out is urgent: tell them now.
+        ...(weekPublished && callOuts > 0 ? { sendNow: true } : {}),
       });
-      toast.success(`${candidate.name} added`, { autoClose: 1800 });
+      afterEdit(`${candidate.name} added`, weekPublished && callOuts > 0);
       onChanged?.();
     } catch (err) {
       if (err?.response?.status !== 402) toast.error(errorText(err, "Couldn't assign"));
@@ -128,7 +171,7 @@ export default function SlotDrawer({ open, row, weekStart, people, canEdit, onCl
     setBusyId(schedule._id);
     try {
       await api.delete(`/schedules/${schedule._id}`);
-      toast.success(`${schedule.staffId?.name || "Shift"} removed`, { autoClose: 1800 });
+      afterEdit(`${schedule.staffId?.name || "Shift"} removed`, false);
       setConfirmRemoveId(null);
       onChanged?.();
     } catch (err) {

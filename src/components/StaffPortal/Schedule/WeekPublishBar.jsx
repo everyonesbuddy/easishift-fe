@@ -55,7 +55,7 @@ const formatWhen = (iso) =>
       })
     : "";
 
-const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const plural = (n, word, many) => `${n} ${n === 1 ? word : many || `${word}s`}`;
 
 /**
  * The week strip on the schedule page: which week, how full it is,
@@ -151,8 +151,20 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
   const week = data?.week;
   const counts = data?.counts || {};
   const isPublished = week?.status === "published";
-  const changes = counts.unpublishedChanges || 0;
+  // People who'd get a message if we sent now (published weeks).
+  const changes = isPublished ? counts.pendingPeople ?? counts.unpublishedChanges ?? 0 : counts.unpublishedChanges || 0;
   const canPublish = !isPublished || changes > 0;
+
+  // Unsent changes: warn before closing or reloading the page.
+  useEffect(() => {
+    if (!(isPublished && changes > 0)) return undefined;
+    const onBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isPublished, changes]);
   const notReachedLast = week?.lastPublish?.notReached || [];
 
   return (
@@ -161,9 +173,9 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
       sx={{
         mt: 2,
         p: { xs: 1.5, md: 2 },
-        border: `1px solid ${IOS.hairline}`,
+        border: `1px solid ${isPublished && changes > 0 ? tint(IOS.orange, 0.5) : IOS.hairline}`,
         borderRadius: IOS.radius.card,
-        backgroundColor: IOS.surface,
+        backgroundColor: isPublished && changes > 0 ? tint(IOS.orange, 0.06) : IOS.surface,
         boxShadow: IOS.shadow,
       }}
     >
@@ -235,7 +247,7 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
           <Tooltip
             title={
               isPublished && !changes
-                ? "Published. Edits from now on notify just the person affected."
+                ? "Published. Edits wait as changes until you send them."
                 : ""
             }
           >
@@ -259,7 +271,7 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
                   ? "Publishing…"
                   : isPublished
                     ? changes
-                      ? `Send ${plural(changes, "change")}`
+                      ? `Send changes (${changes})`
                       : "Published"
                     : "Publish week"}
               </Button>
@@ -271,7 +283,9 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
       {week && (
         <Typography variant="caption" sx={{ display: "block", mt: 1, color: IOS.secondary }}>
           {isPublished
-            ? `Published ${formatWhen(week.publishedAt)}. ${week.lastPublish ? `Last send: ${week.lastPublish.sms || 0} by text, ${week.lastPublish.email || 0} by email${notReachedLast.length ? `, ${notReachedLast.length} not reached` : ""}.` : ""}`
+            ? changes
+              ? `${plural(changes, "person has", "people have")} changes not sent yet. Nobody is told until you press Send changes.`
+              : `Published ${formatWhen(week.publishedAt)}. Changes wait here until you send them.${week.lastPublish ? ` Last send: ${week.lastPublish.sms || 0} by text, ${week.lastPublish.email || 0} by email${notReachedLast.length ? `, ${notReachedLast.length} not reached` : ""}.` : ""}`
             : "Staff don't see this week yet. Fill the open slots, then publish: everyone gets one text or email with their shifts and their link."}
         </Typography>
       )}
@@ -283,10 +297,10 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
         <DialogContent>
           <Typography sx={{ color: "#334155", lineHeight: 1.6 }}>
             {isPublished
-              ? "Only people whose shifts changed get a message."
+              ? `${changes === 1 ? "The 1 person whose shifts changed gets" : `The ${changes} people whose shifts changed each get`} one message with their updated week. Changes that cancel out aren't sent.`
               : "Everyone on this week gets one text or email with their shifts and a link to swap, pick up shifts or call out."}
           </Typography>
-          {counts.openSlots > 0 && (
+          {counts.openSlots > 0 && !isPublished && (
             <Alert severity="warning" sx={{ mt: 2 }}>
               {counts.openSlots === 1 ? "1 slot is" : `${counts.openSlots} slots are`}{" "}
               still open. You can publish now and fill them later.

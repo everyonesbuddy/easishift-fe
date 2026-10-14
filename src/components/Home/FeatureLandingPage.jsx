@@ -13,16 +13,16 @@ import Footer from "../Shared/Footer";
 const FEATURE_PAGES = {
   scheduling: {
     eyebrow: "Employee scheduling",
-    title: "Build schedules your team can actually follow.",
+    title: "Build the schedule in minutes. Send it in one click.",
     description:
-      "Create coverage-aware schedules, respond to call-outs, and keep every shift clear for the people who depend on it.",
+      "Set your weekly needs once, fill the week by hand or with auto-fill, and send everyone their own link by text or email. No app, no password.",
     icon: FiCalendar,
     accent: "#2563EB",
     softAccent: "#EFF6FF",
     points: [
-      "Plan coverage by role, unit, and shift type.",
-      "Handle open shifts, swaps, and last-minute changes in one place.",
-      "Publish a current schedule your team can trust.",
+      "Weekly needs by role, unit and shift, reused every week.",
+      "Open spots, call-outs and no-shows flagged right on the week.",
+      "Publish the whole week, or just one unit when it's ready.",
     ],
     panelTitle: "A calmer scheduling rhythm",
     panelText:
@@ -174,7 +174,7 @@ export default function FeatureLandingPage() {
                       "&:hover": { bgcolor: "#111827" },
                     }}
                   >
-                    Start free trial
+                    Start free
                   </Button>
                   <Button
                     component="a"

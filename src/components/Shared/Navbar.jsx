@@ -22,7 +22,6 @@ import {
   FiClock,
   FiLink,
   FiMessageCircle,
-  FiPhoneCall,
 } from "react-icons/fi";
 import logo from "../../assets/logos/wiserShifts-logo-light.svg";
 import { getRoleDisplayName } from "../../constants/industryRoles";
@@ -296,11 +295,8 @@ export default function Navbar({ onMobileOpen }) {
                     ))}
                   </Menu>
                   <Button
-                    component="a"
-                    href="https://calendly.com/wisershifts-info/30min"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    startIcon={<FiPhoneCall size={16} />}
+                    component={Link}
+                    to="/signup-tenant"
                     sx={{
                       display: { xs: "none", sm: "inline-flex" },
                       color: "#fff",
@@ -313,7 +309,7 @@ export default function Navbar({ onMobileOpen }) {
                       "&:hover": { bgcolor: "#0F172A", color: "#fff" },
                     }}
                   >
-                    Book a Demo
+                    Start free
                   </Button>
                 </>
               )}

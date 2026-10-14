@@ -65,19 +65,22 @@ const pillBase = {
 /** One person on the shift, as a calendar-style colored pill. */
 function PersonPill({ schedule, color }) {
   const draft = schedule.state === "draft";
+  // Didn't clock in: still shown on the shift, in red.
+  const noShow = schedule.status === "no_show";
+  const name = schedule.staffId?.name || "";
   return (
     <Box
       sx={{
         ...pillBase,
-        bgcolor: tint(color, draft ? 0.08 : 0.15),
-        color: IOS.ink,
+        bgcolor: noShow ? tint(IOS.red, 0.1) : tint(color, draft ? 0.08 : 0.15),
+        color: noShow ? IOS.redText : IOS.ink,
         border: draft ? `1px dashed ${tint(color, 0.6)}` : "1px solid transparent",
       }}
-      title={draft ? `${schedule.staffId?.name || ""} (not sent yet)` : schedule.staffId?.name}
+      title={noShow ? `${name}: no-show (didn't clock in)` : draft ? `${name} (not sent yet)` : name}
     >
-      <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: color, flexShrink: 0 }} />
-      <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {shortName(schedule.staffId?.name)}
+      <Box sx={{ width: 3, height: 14, borderRadius: 2, bgcolor: noShow ? IOS.red : color, flexShrink: 0 }} />
+      <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: noShow ? "line-through" : "none" }}>
+        {shortName(name)}
       </Box>
     </Box>
   );
@@ -127,7 +130,11 @@ function Cell({ row, people, callOuts, color, onOpen, onAdd, canEdit, isPast }) 
   }
   const needed = row.requiredCount;
   const filled = row.assignedCount;
-  const open = Math.max(0, needed - filled);
+  // A spot that has ended can't be filled: show how short it was, not "Open".
+  const ended = row.isPast ?? isPast;
+  const noShows = people.filter((p) => p.status === "no_show").length;
+  const short = Math.max(0, needed - filled);
+  const open = ended ? 0 : short;
   const extra = Math.max(0, filled - needed);
   const MAX_PEOPLE = 4;
   const shown = people.slice(0, MAX_PEOPLE);
@@ -164,11 +171,16 @@ function Cell({ row, people, callOuts, color, onOpen, onAdd, canEdit, isPast }) 
         <Typography sx={{ fontSize: 11, color: IOS.secondary, fontWeight: 600, pl: 0.5 }}>+{hidden} more</Typography>
       )}
       {open > 0 && (open <= 2 ? Array.from({ length: open }, (_, i) => <OpenPill key={`o${i}`} />) : <OpenPill count={open} />)}
-      {(extra > 0 || callOuts > 0) && (
+      {(extra > 0 || callOuts > 0 || noShows > 0) && (
         <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
           {extra > 0 && (
             <Typography sx={{ fontSize: 11, fontWeight: 600, color: GRID.over, bgcolor: tint(IOS.purple, 0.1), px: 0.75, py: 0.25, borderRadius: "6px" }}>
               +{extra} extra
+            </Typography>
+          )}
+          {noShows > 0 && (
+            <Typography sx={{ fontSize: 11, fontWeight: 600, color: IOS.redText, bgcolor: tint(IOS.red, 0.1), px: 0.75, py: 0.25, borderRadius: "6px" }}>
+              {noShows} no-show
             </Typography>
           )}
           {callOuts > 0 && (
@@ -177,6 +189,9 @@ function Cell({ row, people, callOuts, color, onOpen, onAdd, canEdit, isPast }) 
             </Typography>
           )}
         </Box>
+      )}
+      {ended && short > 0 && (
+        <Typography sx={{ fontSize: 11, color: IOS.secondary, fontWeight: 600, pl: 0.5 }}>{short} short</Typography>
       )}
       {needed === 0 && filled === 0 && (
         <Typography sx={{ fontSize: 11, color: IOS.tertiary, pl: 0.5 }}>None needed</Typography>
@@ -251,15 +266,18 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
       days.map((day) => {
         let needed = 0;
         let filled = 0;
+        let open = 0;
         for (const line of lines) {
           const row = byKey.get(`${line.key}|${day}`);
           if (!row) continue;
           needed += row.requiredCount;
           filled += Math.min(row.assignedCount, row.requiredCount);
+          // Only spots that haven't ended can still be filled.
+          if (!(row.isPast ?? day < today)) open += Math.max(0, row.requiredCount - row.assignedCount);
         }
-        return { needed, filled };
+        return { needed, filled, open };
       }),
-    [days, lines, byKey],
+    [days, lines, byKey, today],
   );
 
   const openRow = openRowId ? (data?.coverage || []).find((c) => c._id === openRowId) : null;
@@ -283,12 +301,12 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
 
   const columns = `minmax(180px, 1.15fr) repeat(${days.length || 7}, minmax(112px, 1fr))`;
   const roleList = facilityPreferences?.roleFamilies || [];
-  const totalOpen = dayTotals.reduce((sum, t) => sum + (t.needed - t.filled), 0);
-  const fillableOpen = dayTotals.reduce((sum, t, i) => sum + (days[i] >= today ? t.needed - t.filled : 0), 0);
+  const totalOpen = dayTotals.reduce((sum, t) => sum + t.open, 0);
+  const fillableOpen = totalOpen;
   const fillOptions = sectionOptions(data);
   // Open spots the chosen section would fill (today onward).
   const sectionOpen = (data?.coverage || [])
-    .filter((row) => row.dateKey >= today && inSection(row, fillSection))
+    .filter((row) => !(row.isPast ?? row.dateKey < today) && inSection(row, fillSection))
     .reduce((sum, row) => sum + Math.max(0, row.requiredCount - row.assignedCount), 0);
   const isPublished = data?.week?.status === "published";
 
@@ -381,7 +399,8 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
               const date = keyToDate(day);
               const isToday = day === today;
               const t = dayTotals[i];
-              const open = t.needed - t.filled;
+              const open = t.open;
+              const dayShort = t.needed - t.filled;
               return (
                 <Box key={day} sx={{ px: 1.25, py: 1.25, textAlign: "left" }}>
                   <Typography
@@ -421,11 +440,11 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
                         width: 6,
                         height: 6,
                         borderRadius: "50%",
-                        bgcolor: t.needed === 0 ? IOS.tertiary : open > 0 ? IOS.orange : IOS.green,
+                        bgcolor: t.needed === 0 ? IOS.tertiary : open > 0 ? IOS.orange : dayShort > 0 ? IOS.tertiary : IOS.green,
                       }}
                     />
-                    <Typography sx={{ fontSize: 11, color: t.needed === 0 ? IOS.tertiary : open > 0 ? IOS.orangeText : IOS.greenText, fontWeight: 600 }}>
-                      {t.needed === 0 ? "No needs" : open > 0 ? `${open} open` : "Filled"}
+                    <Typography sx={{ fontSize: 11, color: t.needed === 0 ? IOS.tertiary : open > 0 ? IOS.orangeText : dayShort > 0 ? IOS.secondary : IOS.greenText, fontWeight: 600 }}>
+                      {t.needed === 0 ? "No needs" : open > 0 ? `${open} open` : dayShort > 0 ? `${dayShort} short` : "Filled"}
                     </Typography>
                   </Box>
                 </Box>

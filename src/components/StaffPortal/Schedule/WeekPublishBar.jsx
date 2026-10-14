@@ -20,6 +20,10 @@ import api from "../../../config/api";
 import { notSentReason } from "../../../utils/deliveryReasons";
 import { useAuth } from "../../../context/AuthContext";
 import { IOS, tint } from "../../../theme/ios";
+import { getRoleDisplayName } from "../../../constants/industryRoles";
+import { toLabel } from "../../../utils/labels";
+import SectionPicker from "./SectionPicker";
+import { emptySection, inSection, sectionBody, sectionChosen, sectionLabel, sectionOptions } from "./sectionUtils";
 
 const navSx = { bgcolor: IOS.fill, color: IOS.ink, width: 30, height: 30, "&:hover": { bgcolor: "rgba(118,118,128,0.2)" } };
 
@@ -71,6 +75,8 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [result, setResult] = useState(null);
+  // "Publish all" or "Publish a section" (some roles / areas).
+  const [section, setSection] = useState(emptySection);
   const lastLoadedWeek = useRef(null);
   const onDataRef = useRef(onData);
   const loadWeekRef = useRef(null);
@@ -131,8 +137,9 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
     setConfirmOpen(false);
     setPublishing(true);
     try {
-      const res = await api.post(`/weeks/${weekStart}/publish`);
-      setResult(res.data);
+      const res = await api.post(`/weeks/${weekStart}/publish`, sectionBody(section));
+      setResult({ ...res.data, sectionText: section.mode === "section" ? sectionLabel(section, options) : null });
+      setSection(emptySection);
       if (res.data?.usedGraceWeek) refreshSession?.();
       await loadWeek(weekStart);
       onChanged?.();
@@ -166,6 +173,17 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [isPublished, changes]);
   const notReachedLast = week?.lastPublish?.notReached || [];
+  const options = sectionOptions(data);
+  // Sections still waiting to be sent, e.g. "Med Tech (1 person)".
+  const notSentText = (counts.notSentSections || [])
+    .map((g) => `${[g.role && getRoleDisplayName(g.role), g.unitArea && toLabel(g.unitArea)].filter(Boolean).join(", ") || "Other"} (${plural(g.people, "person", "people")})`)
+    .join(" · ");
+  // People with Not-sent-yet shifts in the chosen section.
+  const sectionPeople = new Set(
+    (data?.schedules || [])
+      .filter((s) => s.state === "draft" && s.status !== "call_out" && inSection(s, section))
+      .map((s) => String(s.staffId?._id || s.staffId)),
+  ).size;
 
   return (
     <Paper
@@ -284,23 +302,41 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
         <Typography variant="caption" sx={{ display: "block", mt: 1, color: IOS.secondary }}>
           {isPublished
             ? changes
-              ? `${plural(changes, "person has", "people have")} changes not sent yet. Nobody is told until you press Send changes.`
+              ? `${plural(changes, "person has", "people have")} changes not sent yet${notSentText ? `: ${notSentText}` : ""}. Nobody is told until you press Send changes.`
               : `Published ${formatWhen(week.publishedAt)}. Changes wait here until you send them.${week.lastPublish ? ` Last send: ${week.lastPublish.sms || 0} by text, ${week.lastPublish.email || 0} by email${notReachedLast.length ? `, ${notReachedLast.length} not reached` : ""}.` : ""}`
             : "Staff don't see this week yet. Fill the open slots, then publish: everyone gets one text or email with their shifts and their link."}
         </Typography>
       )}
 
-      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} maxWidth="xs" fullWidth>
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
         <DialogTitle sx={{ fontWeight: 800 }}>
           {isPublished ? "Send changes?" : `Publish week of ${formatWeek(weekStart)}?`}
         </DialogTitle>
         <DialogContent>
+          {(options.roles.length > 1 || options.areas.length > 0) && (
+            <Box sx={{ mb: 2 }}>
+              <SectionPicker
+                value={section}
+                onChange={setSection}
+                options={options}
+                allLabel={isPublished ? "All changes" : "Whole week"}
+              />
+            </Box>
+          )}
+          {section.mode === "section" ? (
+            <Typography sx={{ color: "#334155", lineHeight: 1.6 }}>
+              {sectionChosen(section)
+                ? `Only ${sectionLabel(section, options)} is sent: ${plural(sectionPeople, "person", "people")} with new shifts there${isPublished ? ", plus anyone whose shifts there changed," : ""} get one message with their week. Everything else stays Not sent yet.`
+                : "Pick the roles or areas to send."}
+            </Typography>
+          ) : (
           <Typography sx={{ color: "#334155", lineHeight: 1.6 }}>
             {isPublished
               ? `${changes === 1 ? "The 1 person whose shifts changed gets" : `The ${changes} people whose shifts changed each get`} one message with their updated week. Changes that cancel out aren't sent.`
               : "Everyone on this week gets one text or email with their shifts and a link to swap, pick up shifts or call out."}
           </Typography>
-          {counts.openSlots > 0 && !isPublished && (
+          )}
+          {counts.openSlots > 0 && !isPublished && section.mode !== "section" && (
             <Alert severity="warning" sx={{ mt: 2 }}>
               {counts.openSlots === 1 ? "1 slot is" : `${counts.openSlots} slots are`}{" "}
               still open. You can publish now and fill them later.
@@ -309,15 +345,15 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={publish} sx={{ textTransform: "none" }}>
-            {isPublished ? "Send" : "Publish"}
+          <Button variant="contained" onClick={publish} disabled={!sectionChosen(section)} sx={{ textTransform: "none" }}>
+            {section.mode === "section" ? "Send this section" : isPublished ? "Send" : "Publish"}
           </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={Boolean(result)} onClose={() => setResult(null)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 800 }}>
-          {result?.error ? "Couldn't publish" : "Schedule sent"}
+          {result?.error ? "Couldn't publish" : result?.sectionText ? `${result.sectionText} sent` : "Schedule sent"}
         </DialogTitle>
         <DialogContent>
           {result?.error ? (

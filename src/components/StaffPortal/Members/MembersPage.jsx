@@ -26,8 +26,11 @@ import { useAuth } from "../../../context/AuthContext";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import { getRoleDisplayName } from "../../../constants/industryRoles";
 
+const ROLE_NAME = { owner: "Owner", administrator: "Admin", scheduler: "Scheduler", viewer: "Viewer" };
+
 const ROLE_INFO = {
-  owner: "Everything, including billing and members",
+  owner: "Everything, including billing, members and deleting the facility",
+  administrator: "Everything the owner can do except delete the facility or transfer ownership",
   scheduler: "Builds and publishes schedules, manages staff",
   viewer: "Can look, can't change anything. Free.",
 };
@@ -38,7 +41,7 @@ const errorMessage = (err, fallback) =>
   err?.response?.data?.message || fallback;
 
 /**
- * Members are the people who log in (owner, schedulers, viewers).
+ * Members are the people who log in (owner, admins, schedulers, viewers).
  * Staff who are only scheduled live under Staff.
  */
 export default function MembersPage() {
@@ -48,6 +51,8 @@ export default function MembersPage() {
   const [scheduleRole, setScheduleRole] = useState("");
   const [schedulePhone, setSchedulePhone] = useState("");
   const canManage = can("roles.manage");
+  // Only the owner can hand over ownership (admins can't).
+  const canTransfer = can("ownership.transfer") || user?.roles?.includes("owner");
   const [members, setMembers] = useState([]);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [invite, setInvite] = useState({ name: "", email: "", role: "scheduler" });
@@ -185,14 +190,14 @@ export default function MembersPage() {
     <Container sx={{ mt: 4 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" gap={2} flexWrap="wrap">
         <Box>
-          <Typography variant="h5">Schedulers & viewers</Typography>
+          <Typography variant="h5">Team members</Typography>
           <Typography color="text.secondary">
             People who log in to build or look at the schedule. The people you schedule are under Staff.
             {schedulerLimit !== undefined && (
               <Box component="span" sx={{ ml: 1, fontWeight: 600 }}>
                 {usage?.schedulers ?? 0} of{" "}
-                {schedulerLimit === null ? "unlimited" : schedulerLimit} schedulers on{" "}
-                {plan?.label || "your plan"}. Viewers are free.
+                {schedulerLimit === null ? "unlimited" : schedulerLimit} seats used on{" "}
+                {plan?.label || "your plan"}. The owner, admins and schedulers each take a seat; viewers are free.
               </Box>
             )}
           </Typography>
@@ -268,13 +273,14 @@ export default function MembersPage() {
                         onChange={(e) => handleRoleChange(member, e.target.value)}
                         sx={{ minWidth: 140 }}
                       >
+                        <MenuItem value="administrator">Admin</MenuItem>
                         <MenuItem value="scheduler">Scheduler</MenuItem>
                         <MenuItem value="viewer">Viewer</MenuItem>
                       </TextField>
                     ) : (
                       <Box>
-                        <Typography sx={{ textTransform: "capitalize", fontWeight: 600, fontSize: 14 }}>
-                          {member.role}
+                        <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
+                          {ROLE_NAME[member.role] || member.role}
                         </Typography>
                         <Typography color="text.secondary" sx={{ fontSize: 12 }}>
                           {ROLE_INFO[member.role]}
@@ -291,7 +297,7 @@ export default function MembersPage() {
                               Resend invite
                             </Button>
                           )}
-                          {!member.invitePending && member.role === "scheduler" && (
+                          {canTransfer && !member.invitePending && ["scheduler", "administrator"].includes(member.role) && (
                             <Button size="small" variant="outlined" onClick={() => setOwnerTarget(member)} sx={{ textTransform: "none" }}>
                               Make owner
                             </Button>
@@ -332,6 +338,7 @@ export default function MembersPage() {
               onChange={(e) => setInvite({ ...invite, role: e.target.value })}
               helperText={ROLE_INFO[invite.role]}
             >
+              <MenuItem value="administrator">Admin</MenuItem>
               <MenuItem value="scheduler">Scheduler</MenuItem>
               <MenuItem value="viewer">Viewer</MenuItem>
             </TextField>

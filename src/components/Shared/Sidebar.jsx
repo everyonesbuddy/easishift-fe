@@ -100,7 +100,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
           {
             id: "members",
             icon: MdAccountCircle,
-            label: "Schedulers & viewers",
+            label: "Team members",
             to: "/members",
           },
         ]

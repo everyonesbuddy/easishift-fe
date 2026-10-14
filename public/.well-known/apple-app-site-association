@@ -2,7 +2,7 @@
   "applinks": {
     "details": [
       {
-        "appIDs": ["APPLE_TEAM_ID.com.wisershifts.mobile"],
+        "appIDs": ["A3FUGRZ394.com.wisershifts.mobile"],
         "components": [{ "/": "/s/*", "comment": "Staff personal links open the app" }]
       }
     ]

@@ -15,9 +15,16 @@ import {
   FiShuffle,
   FiCheckCircle,
   FiArrowRight,
-  FiTrendingDown,
   FiHome,
   FiDownload,
+  FiSend,
+  FiSmartphone,
+  FiRepeat,
+  FiLayers,
+  FiAlertTriangle,
+  FiX,
+  FiCheck,
+  FiHeart,
 } from "react-icons/fi";
 
 import heroImage from "../../assets/images/wisershifts-hero-visual.png";
@@ -29,11 +36,43 @@ import Footer from "../Shared/Footer";
 const NAVBAR_HEIGHT = 80;
 
 const HEALTHCARE_SETTINGS = [
-  { label: "Skilled Nursing", icon: <FiHome size={18} /> },
-  { label: "Assisted Living", icon: <FiUsers size={18} /> },
-  { label: "Senior Living", icon: <FiHome size={18} /> },
-  { label: "Long-Term Care", icon: <FiClock size={18} /> },
-  { label: "Post-Acute Care", icon: <FiCheckCircle size={18} /> },
+  { label: "Assisted Living", icon: <FiHome size={18} /> },
+  { label: "Memory Care", icon: <FiHeart size={18} /> },
+  { label: "Skilled Nursing", icon: <FiUsers size={18} /> },
+  { label: "Home Care", icon: <FiHome size={18} /> },
+  { label: "Small Clinics", icon: <FiCheckCircle size={18} /> },
+];
+
+const STEPS = [
+  {
+    icon: <FiLayers size={22} />,
+    title: "Set your weekly needs once",
+    text: "Say how many CNAs, med techs or nurses you need on each shift. Every new week starts from it.",
+  },
+  {
+    icon: <FiCalendar size={22} />,
+    title: "Build the week",
+    text: "Tap an open spot to put someone in it, or let auto-fill do it, keeping last week's people where they were.",
+  },
+  {
+    icon: <FiSend size={22} />,
+    title: "Send it in one click",
+    text: "Everyone gets their own link by text or email and sees just their shifts. No app to download, no password to forget.",
+  },
+];
+
+const BEFORE = [
+  "Excel files and paper on the wall",
+  "Group texts nobody can scroll back through",
+  "\u201cI didn\u2019t know I was on.\u201d",
+  "Your Sunday spent rebuilding next week",
+];
+
+const AFTER = [
+  "One schedule, built in minutes",
+  "Sent to everyone in one click",
+  "Each person sees their shifts on their phone",
+  "Next week starts from this week",
 ];
 
 const Section = ({ children, sx }) => (
@@ -85,7 +124,7 @@ const SectionTitle = ({ eyebrow, title, subtitle }) => (
   </Box>
 );
 
-const Feature = ({ icon, title, text }) => (
+const Feature = ({ icon, title, text, tag }) => (
   <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
     <Box
       sx={{
@@ -106,6 +145,25 @@ const Feature = ({ icon, title, text }) => (
         sx={{ fontWeight: 800, color: "#111827", fontSize: "1rem", mb: 0.5 }}
       >
         {title}
+        {tag && (
+          <Box
+            component="span"
+            sx={{
+              ml: 1,
+              px: 0.9,
+              py: 0.2,
+              borderRadius: 999,
+              bgcolor: "#F2F4F7",
+              color: "#475467",
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              verticalAlign: "middle",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {tag}
+          </Box>
+        )}
       </Typography>
       <Typography sx={{ color: "#667085", lineHeight: 1.55 }}>
         {text}
@@ -154,7 +212,7 @@ export default function Home() {
                 py: { xs: 7, md: 8 },
               }}
             >
-              <Box sx={{ maxWidth: { xs: 620, md: 680 }, color: "#fff" }}>
+              <Box sx={{ maxWidth: { xs: 620, md: 760 }, color: "#fff" }}>
                 <Typography
                   component="div"
                   sx={{
@@ -177,24 +235,25 @@ export default function Home() {
                       bgcolor: "#60A5FA",
                     }}
                   />
-                  Healthcare workforce management
+                  Scheduling for care facilities
                 </Typography>
                 <Typography
                   component="h1"
                   sx={{
                     fontWeight: 900,
                     letterSpacing: "-0.045em",
-                    lineHeight: 0.99,
+                    lineHeight: 1.02,
                     color: "#fff",
                     fontSize: {
-                      xs: "2.8rem",
-                      sm: "3.5rem",
-                      md: "4.05rem",
-                      lg: "4.45rem",
+                      xs: "2.35rem",
+                      sm: "3rem",
+                      md: "3.45rem",
+                      lg: "3.8rem",
                     },
                   }}
                 >
-                  Workforce management, built around your organization.
+                  Build the schedule in minutes. Text it to your whole team in
+                  one click.
                 </Typography>
                 <Typography
                   sx={{
@@ -205,9 +264,8 @@ export default function Home() {
                     mt: 3,
                   }}
                 >
-                  Scheduling, time tracking, call-outs, and workforce
-                  communication in one platform designed to fit the way your
-                  organization operates.
+                  Built for assisted living, memory care, nursing and home care.
+                  Free to start, no credit card.
                 </Typography>
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
@@ -217,11 +275,8 @@ export default function Home() {
                   <Button
                     variant="contained"
                     size="large"
-                    startIcon={<FiCalendar />}
-                    component="a"
-                    href="https://calendly.com/wisershifts-info/30min"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    endIcon={<FiArrowRight />}
+                    onClick={() => navigate("/signup-tenant")}
                     sx={{
                       minHeight: 54,
                       px: 3.2,
@@ -235,12 +290,13 @@ export default function Home() {
                       "&:hover": { bgcolor: "#3B82F6" },
                     }}
                   >
-                    Book a Demo
+                    Start free
                   </Button>
                   <Button
                     variant="outlined"
                     size="large"
-                    onClick={() => navigate("/pricing")}
+                    component="a"
+                    href="#how-it-works"
                     sx={{
                       minHeight: 54,
                       px: 3.2,
@@ -257,9 +313,18 @@ export default function Home() {
                       },
                     }}
                   >
-                    View Pricing
+                    See how it works
                   </Button>
                 </Stack>
+                <Typography
+                  sx={{
+                    color: "rgba(255,255,255,0.66)",
+                    fontSize: "0.88rem",
+                    mt: 1.75,
+                  }}
+                >
+                  Free for one scheduler and up to 15 staff.
+                </Typography>
                 <Box sx={{ mt: 5 }}>
                   <Typography
                     sx={{
@@ -271,7 +336,7 @@ export default function Home() {
                       mb: 1.5,
                     }}
                   >
-                    Built for healthcare organizations
+                    Made for 24/7 care teams
                   </Typography>
                   <Box
                     sx={{
@@ -369,7 +434,7 @@ export default function Home() {
                       textTransform: "uppercase",
                     }}
                   >
-                    Workforce calculators
+                    Free calculators
                   </Typography>
                   <Typography
                     sx={{
@@ -380,7 +445,7 @@ export default function Home() {
                       mt: 0.75,
                     }}
                   >
-                    See what inefficiency is costing you.
+                    What are call-outs and overtime costing you?
                   </Typography>
                   <Typography
                     sx={{
@@ -390,8 +455,8 @@ export default function Home() {
                       lineHeight: 1.55,
                     }}
                   >
-                    Use practical calculators to understand labor cost leakage
-                    and the impact of better workforce management.
+                    Put in your own numbers and see what last-minute coverage,
+                    overtime and turnover add up to each month.
                   </Typography>
                 </Box>
                 <Button
@@ -418,9 +483,156 @@ export default function Home() {
 
           <Section>
             <SectionTitle
-              eyebrow="Why WiserShifts"
-              title="A workforce platform that fits the way you work."
-              subtitle="Healthcare operations change every day. WiserShifts gives your team the tools and flexibility to keep up."
+              eyebrow="Sound familiar?"
+              title="Scheduling shouldn't eat your weekend."
+              subtitle="Most care schedules still live in a spreadsheet and a group chat. WiserShifts replaces both."
+            />
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                gap: 2.5,
+                maxWidth: 1000,
+                mx: "auto",
+              }}
+            >
+              {[
+                { label: "Before", items: BEFORE, good: false },
+                { label: "With WiserShifts", items: AFTER, good: true },
+              ].map((col) => (
+                <Box
+                  key={col.label}
+                  sx={{
+                    borderRadius: "20px",
+                    p: { xs: 3, md: 4 },
+                    border: "1px solid",
+                    borderColor: col.good ? "#BFDBFE" : "#E4E7EC",
+                    bgcolor: col.good ? "#EFF6FF" : "#F9FAFB",
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontWeight: 800,
+                      fontSize: "0.78rem",
+                      letterSpacing: "0.13em",
+                      textTransform: "uppercase",
+                      color: col.good ? "#2563EB" : "#667085",
+                      mb: 2,
+                    }}
+                  >
+                    {col.label}
+                  </Typography>
+                  <Stack spacing={1.5}>
+                    {col.items.map((item) => (
+                      <Box
+                        key={item}
+                        sx={{ display: "flex", gap: 1.25, alignItems: "flex-start" }}
+                      >
+                        <Box
+                          sx={{
+                            mt: "3px",
+                            display: "flex",
+                            color: col.good ? "#2563EB" : "#98A2B3",
+                          }}
+                        >
+                          {col.good ? <FiCheck size={18} /> : <FiX size={18} />}
+                        </Box>
+                        <Typography
+                          sx={{
+                            color: col.good ? "#111827" : "#475467",
+                            fontWeight: col.good ? 650 : 500,
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          {item}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+              ))}
+            </Box>
+          </Section>
+
+          <Section sx={{ pt: 0, scrollMarginTop: `${NAVBAR_HEIGHT}px` }}>
+            <Box id="how-it-works" sx={{ scrollMarginTop: `${NAVBAR_HEIGHT + 24}px` }}>
+              <SectionTitle
+                eyebrow="How it works"
+                title="From blank week to everyone's phone."
+                subtitle="Three steps. The first week takes a few minutes; every week after starts from the last one."
+              />
+            </Box>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
+                gap: { xs: 2.5, md: 3 },
+                maxWidth: 1100,
+                mx: "auto",
+              }}
+            >
+              {STEPS.map((step, index) => (
+                <Box
+                  key={step.title}
+                  sx={{
+                    position: "relative",
+                    borderRadius: "20px",
+                    border: "1px solid #E4E7EC",
+                    p: { xs: 3, md: 3.5 },
+                    bgcolor: "#fff",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      mb: 2.5,
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 46,
+                        height: 46,
+                        borderRadius: "14px",
+                        display: "grid",
+                        placeItems: "center",
+                        background: "rgba(37, 99, 235, 0.08)",
+                        color: "#2563EB",
+                      }}
+                    >
+                      {step.icon}
+                    </Box>
+                    <Typography
+                      sx={{
+                        fontWeight: 900,
+                        fontSize: "2rem",
+                        color: "#E4E7EC",
+                        lineHeight: 1,
+                      }}
+                    >
+                      {index + 1}
+                    </Typography>
+                  </Box>
+                  <Typography
+                    component="h3"
+                    sx={{ fontWeight: 800, color: "#111827", fontSize: "1.15rem", mb: 1 }}
+                  >
+                    {step.title}
+                  </Typography>
+                  <Typography sx={{ color: "#667085", lineHeight: 1.6 }}>
+                    {step.text}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </Section>
+
+          <Section sx={{ pt: 0 }}>
+            <SectionTitle
+              eyebrow="Why schedulers switch"
+              title="Less chasing. Fewer surprises."
+              subtitle="Everything you need to get the week out, and keep it covered once it's out."
             />
             <Box
               sx={{
@@ -432,26 +644,46 @@ export default function Home() {
               }}
             >
               <Feature
+                icon={<FiSmartphone size={21} />}
+                title="Staff don't need an account"
+                text="Each person gets a personal link. It opens the app if they have it, or their browser if they don't, showing just their shifts."
+              />
+              <Feature
+                icon={<FiRepeat size={21} />}
+                title="Last week's people, carried forward"
+                tag="Starter"
+                text="Auto-fill keeps the same people in the same spots, then fills the gaps with whoever is free and qualified."
+              />
+              <Feature
+                icon={<FiLayers size={21} />}
+                title="Send everyone, or just one unit"
+                text="Publish the whole week, or only Memory Care, or only the med techs, when one part is ready first."
+              />
+              <Feature
+                icon={<FiAlertTriangle size={21} />}
+                title="See the gaps before they bite"
+                text="Open spots, call-outs and no-shows are flagged right on the week, so you know what still needs covering."
+              />
+              <Feature
                 icon={<FiShuffle size={21} />}
-                title="Handle call-outs calmly"
-                text="Make last-minute changes without rebuilding the schedule or relying on scattered messages."
+                title="Call-outs without the group text"
+                tag="Starter"
+                text="Staff can ask to swap or pick up an open shift from their link. You approve it in one tap."
               />
               <Feature
-                icon={<FiTrendingDown size={21} />}
-                title="See risk before publishing"
-                text="Understand overtime and coverage concerns before the schedule goes live."
-              />
-              <Feature
-                icon={<FiUsers size={21} />}
-                title="Keep your team organized"
-                text="Manage part-time, float, and rotating employees with a clearer scheduling process."
-              />
-              <Feature
-                icon={<FiCheckCircle size={21} />}
-                title="Keep everyone informed"
-                text="Publish changes from one place so employees always have a clear, current schedule."
+                icon={<FiClock size={21} />}
+                title="Clock-ins that match the schedule"
+                tag="Starter"
+                text="Staff clock in from their phone, on site if you want. Hours line up with their shifts and export straight to payroll."
               />
             </Box>
+            <Typography
+              sx={{ textAlign: "center", color: "#667085", fontSize: "0.9rem", mt: 5 }}
+            >
+              Free sends schedules by email. Texting and the{" "}
+              <Box component="span" sx={{ fontWeight: 700 }}>Starter</Box>{" "}
+              features come with a 14-day free trial, no card needed.
+            </Typography>
           </Section>
 
           <Section sx={{ pb: { xs: 7, md: 8 } }}>
@@ -479,21 +711,20 @@ export default function Home() {
                     lineHeight: 1.1,
                   }}
                 >
-                  Connect the tools around your workforce.
+                  Hours that go straight to payroll.
                 </Typography>
                 <Typography
                   sx={{ color: "#667085", lineHeight: 1.65, mt: 1.5 }}
                 >
-                  Bring scheduling, time, payroll, and workforce information
-                  together without changing the systems your organization
-                  already relies on.
+                  Export clocked or scheduled hours in a file your payroll
+                  provider can import. Keep the payroll system you already use.
                 </Typography>
                 <Button
                   onClick={() => navigate("/integrations")}
                   endIcon={<FiArrowRight />}
                   sx={{ mt: 2, px: 0, textTransform: "none", fontWeight: 800 }}
                 >
-                  Explore workforce integrations
+                  See payroll exports
                 </Button>
               </Box>
               <Box
@@ -607,7 +838,7 @@ export default function Home() {
                       fontSize: { xs: "1.8rem", md: "2.35rem" },
                     }}
                   >
-                    Built around your organization.
+                    Get next week's schedule out tonight.
                   </Typography>
                   <Typography
                     sx={{
@@ -617,19 +848,16 @@ export default function Home() {
                       lineHeight: 1.55,
                     }}
                   >
-                    See how WiserShifts can simplify scheduling, call-outs,
-                    shift changes, and workforce communication while fitting the
-                    way your organization operates.
+                    Start free with one scheduler and up to 15 staff. Add your
+                    team, build the week and send it. Running several buildings?
+                    Book a demo and we'll set it up with you.
                   </Typography>
                 </Box>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
                   <Button
                     variant="contained"
-                    startIcon={<FiCalendar />}
-                    component="a"
-                    href="https://calendly.com/wisershifts-info/30min"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    endIcon={<FiArrowRight />}
+                    onClick={() => navigate("/signup-tenant")}
                     sx={{
                       minHeight: 50,
                       px: 2.75,
@@ -642,11 +870,15 @@ export default function Home() {
                       "&:hover": { bgcolor: "#3B82F6" },
                     }}
                   >
-                    Book a Demo
+                    Start free
                   </Button>
                   <Button
                     variant="outlined"
-                    onClick={() => navigate("/pricing")}
+                    startIcon={<FiCalendar />}
+                    component="a"
+                    href="https://calendly.com/wisershifts-info/30min"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     sx={{
                       minHeight: 50,
                       px: 2.75,
@@ -662,7 +894,7 @@ export default function Home() {
                       },
                     }}
                   >
-                    View Pricing
+                    Book a demo
                   </Button>
                 </Stack>
               </Box>

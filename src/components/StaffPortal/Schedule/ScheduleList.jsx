@@ -79,6 +79,8 @@ import ConfirmDialog from "../../Shared/ConfirmDialog";
 import ShiftSwapRequestModal from "./ShiftSwapRequestModal";
 import WeekPublishBar from "./WeekPublishBar";
 import WeekGrid from "./WeekGrid";
+import useViewFilter from "../../../hooks/useViewFilter";
+import { filterAsSection } from "./sectionUtils";
 import CallOutDialog from "./CallOutDialog";
 import { useAuth } from "../../../context/AuthContext";
 import { getPunchLocation } from "../../../utils/geolocation";
@@ -224,6 +226,8 @@ export default function ScheduleList() {
   const [manualCoverageFromAuto, setManualCoverageFromAuto] = useState(null);
   // Schedulers land on the week grid (needs vs people); others on the list.
   const [view, setView] = useState(canManageSchedules ? "week" : "table");
+  // Roles / areas this scheduler chose to see on the week view (saved on their account).
+  const [weekFilter, setWeekFilter] = useViewFilter("schedule");
   const [weekBoard, setWeekBoard] = useState(null);
   const [listGroupBy, setListGroupBy] = useState("date");
 
@@ -3184,6 +3188,7 @@ export default function ScheduleList() {
       {canManageSchedules && (
         <WeekPublishBar
           refreshKey={schedules}
+          defaultSection={view === "week" ? filterAsSection(weekFilter) : undefined}
           onData={setWeekBoard}
           onChanged={() => {
             fetchSchedules();
@@ -3200,6 +3205,8 @@ export default function ScheduleList() {
             fetchCoverageGaps();
           }}
           onCallOut={(schedule) => setCallOutSchedule(schedule)}
+          filter={weekFilter}
+          onFilterChange={setWeekFilter}
         />
       )}
 

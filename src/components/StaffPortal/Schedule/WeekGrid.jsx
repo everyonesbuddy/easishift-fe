@@ -23,7 +23,18 @@ import AddNeedDialog from "./AddNeedDialog";
 import { GRID, slotLabel, titleCase } from "./weekGridUtils";
 import { IOS, roleColor, tint } from "../../../theme/ios";
 import SectionPicker from "./SectionPicker";
-import { emptySection, inSection, sectionBody, sectionChosen, sectionLabel, sectionOptions } from "./sectionUtils";
+import {
+  emptySection,
+  filterActive,
+  filterAsSection,
+  inSection,
+  sectionBody,
+  sectionChosen,
+  sectionLabel,
+  sectionOptions,
+  withFilterOptions,
+} from "./sectionUtils";
+import ViewFilter from "./ViewFilter";
 
 /**
  * The week, as needs vs people. Rows are shift + role (+ area), columns are
@@ -200,7 +211,7 @@ function Cell({ row, people, callOuts, color, onOpen, onAdd, canEdit, isPast }) 
   );
 }
 
-export default function WeekGrid({ week, onChanged, onCallOut }) {
+export default function WeekGrid({ week, onChanged, onCallOut, filter, onFilterChange }) {
   const { facilityPreferences, can } = useAuth();
   const canEdit = can("schedule.manage");
   const [openRowId, setOpenRowId] = useState(null);
@@ -261,13 +272,20 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
     return { lines: sorted, byKey: map, peopleByCoverage: people, callOutsByCoverage: outs };
   }, [data, facilityPreferences]);
 
+  // Only the roles / areas this scheduler chose to see.
+  const filtered = filterActive(filter);
+  const shownLines = useMemo(() => {
+    const section = filterAsSection(filter);
+    return lines.filter((line) => inSection(line, section));
+  }, [lines, filter]);
+
   const dayTotals = useMemo(
     () =>
       days.map((day) => {
         let needed = 0;
         let filled = 0;
         let open = 0;
-        for (const line of lines) {
+        for (const line of shownLines) {
           const row = byKey.get(`${line.key}|${day}`);
           if (!row) continue;
           needed += row.requiredCount;
@@ -277,7 +295,7 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
         }
         return { needed, filled, open };
       }),
-    [days, lines, byKey, today],
+    [days, shownLines, byKey, today],
   );
 
   const openRow = openRowId ? (data?.coverage || []).find((c) => c._id === openRowId) : null;
@@ -292,7 +310,7 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
 
   // Group lines under their shift for a quiet section header.
   const groups = [];
-  for (const line of lines) {
+  for (const line of shownLines) {
     const groupKey = `${line.shiftType || ""}|${line.shiftType ? line.shiftTag : line.label.time}`;
     const last = groups[groups.length - 1];
     if (last && last.key === groupKey) last.lines.push(line);
@@ -302,8 +320,12 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
   const columns = `minmax(180px, 1.15fr) repeat(${days.length || 7}, minmax(112px, 1fr))`;
   const roleList = facilityPreferences?.roleFamilies || [];
   const totalOpen = dayTotals.reduce((sum, t) => sum + t.open, 0);
-  const fillableOpen = totalOpen;
+  // Auto-fill can still fill everything, so count all open spots for it.
+  const fillableOpen = (data?.coverage || [])
+    .filter((row) => !(row.isPast ?? row.dateKey < today))
+    .reduce((sum, row) => sum + Math.max(0, row.requiredCount - row.assignedCount), 0);
   const fillOptions = sectionOptions(data);
+  const filterOptions = withFilterOptions(fillOptions, filter);
   // Open spots the chosen section would fill (today onward).
   const sectionOpen = (data?.coverage || [])
     .filter((row) => !(row.isPast ?? row.dateKey < today) && inSection(row, fillSection))
@@ -339,6 +361,14 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
     <Box sx={{ mt: 2 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5, gap: 2, flexWrap: "wrap" }}>
         <Box sx={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
+          {onFilterChange && (
+            <ViewFilter
+              value={filter || { roles: [], areas: [] }}
+              onChange={onFilterChange}
+              options={filterOptions}
+              shownText={`${shownLines.length} of ${lines.length} rows`}
+            />
+          )}
           <Legend kind="person" label="On shift" />
           <Legend kind="draft" label="Not sent yet" />
           <Legend kind="open" label="Open" />
@@ -349,7 +379,11 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
             size="small"
             startIcon={<FiZap />}
             disabled={fillableOpen === 0}
-            onClick={() => setAutoFillOpen(true)}
+            onClick={() => {
+              // Start from what this scheduler is looking at.
+              setFillSection(filterAsSection(filter));
+              setAutoFillOpen(true);
+            }}
             sx={{ borderRadius: "10px", px: 1.5, color: "#fff", bgcolor: IOS.blue, "&:hover": { bgcolor: "#0066DB" }, "&.Mui-disabled": { bgcolor: IOS.fill, color: IOS.tertiary } }}
           >
             Auto-fill open slots
@@ -390,7 +424,7 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
             }}
           >
             <Box sx={{ px: 2, py: 1.5, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-              <Typography sx={{ fontSize: 12, color: IOS.secondary, fontWeight: 600 }}>This week</Typography>
+              <Typography sx={{ fontSize: 12, color: IOS.secondary, fontWeight: 600 }}>{filtered ? "Shown" : "This week"}</Typography>
               <Typography sx={{ fontSize: 13, fontWeight: 600, color: totalOpen > 0 ? IOS.orangeText : IOS.greenText }}>
                 {totalOpen > 0 ? `${totalOpen} open spot${totalOpen === 1 ? "" : "s"}` : "Everything filled"}
               </Typography>
@@ -451,6 +485,15 @@ export default function WeekGrid({ week, onChanged, onCallOut }) {
               );
             })}
           </Box>
+
+          {lines.length > 0 && shownLines.length === 0 && (
+            <Box sx={{ p: 5, textAlign: "center" }}>
+              <Typography sx={{ color: IOS.ink, fontWeight: 600 }}>Nothing this week matches your filter.</Typography>
+              <Button onClick={() => onFilterChange?.({ roles: [], areas: [] })} sx={{ mt: 1, borderRadius: "10px" }}>
+                Show everything
+              </Button>
+            </Box>
+          )}
 
           {lines.length === 0 && (
             <Box sx={{ p: 5, textAlign: "center" }}>

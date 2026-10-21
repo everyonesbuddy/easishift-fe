@@ -50,3 +50,24 @@ export const sectionLabel = (value, options) => {
 export const sectionChosen = (value) =>
   value?.mode !== "section" || value.roles.length > 0 || value.areas.length > 0;
 
+
+/** A saved view filter ({ roles, areas }) as a section value. */
+export const filterAsSection = (filter) =>
+  filter && (filter.roles?.length || filter.areas?.length)
+    ? { mode: "section", roles: filter.roles || [], areas: filter.areas || [] }
+    : emptySection;
+
+export const filterActive = (filter) => Boolean(filter?.roles?.length || filter?.areas?.length);
+
+/** Options plus anything already in the filter, so it can be turned off. */
+export const withFilterOptions = (options, filter) => {
+  const add = (list, keys, label) => {
+    const out = [...list];
+    for (const key of keys || []) if (!out.some((o) => o.key === key)) out.push({ key, label: label(key) });
+    return out;
+  };
+  return {
+    roles: add(options.roles, filter?.roles, (k) => getRoleDisplayName(k)),
+    areas: add(options.areas, filter?.areas, (k) => toLabel(k)),
+  };
+};

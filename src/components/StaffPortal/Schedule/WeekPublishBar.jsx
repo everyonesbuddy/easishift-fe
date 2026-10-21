@@ -66,7 +66,7 @@ const plural = (n, word, many) => `${n} ${n === 1 ? word : many || `${word}s`}`;
  * and the Publish button. Opening a week fills its open slots from the
  * staffing template.
  */
-export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
+export default function WeekPublishBar({ refreshKey, onChanged, onData, defaultSection }) {
   const navigate = useNavigate();
   const { refreshSession } = useAuth();
   const [weekStart, setWeekStart] = useState(null);
@@ -275,7 +275,11 @@ export default function WeekPublishBar({ refreshKey, onChanged, onData }) {
                 variant="contained"
                 startIcon={<FiSend />}
                 disabled={!week || !canPublish || publishing}
-                onClick={() => setConfirmOpen(true)}
+                onClick={() => {
+                  // Start from the scheduler's filter, if they have one.
+                  setSection(defaultSection || emptySection);
+                  setConfirmOpen(true);
+                }}
                 disableElevation
                 sx={{
                   borderRadius: IOS.radius.round,

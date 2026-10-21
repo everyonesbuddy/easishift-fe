@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -16,6 +16,12 @@ import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 import StaffingTemplateEditor from "../Setup/StaffingTemplateEditor";
 import { IOS } from "../../../theme/ios";
+import ViewFilter from "../Schedule/ViewFilter";
+import useViewFilter from "../../../hooks/useViewFilter";
+import { withFilterOptions } from "../Schedule/sectionUtils";
+import { getRoleDisplayName } from "../../../constants/industryRoles";
+import { toLabel } from "../../../utils/labels";
+import { tagKey } from "../../../utils/tags";
 
 /**
  * "What a normal week needs": how many of each role on each shift, by day.
@@ -29,6 +35,26 @@ export default function StaffingTemplatePage() {
   const [applyTo, setApplyTo] = useState("unpublished");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  // Roles / areas this scheduler chose to see (saved on their account).
+  const [filter, setFilter] = useViewFilter("needs");
+
+  const filterOptions = useMemo(() => {
+    const roles = new Map();
+    const areas = new Map();
+    for (const r of facilityPreferences?.roleFamilies || []) roles.set(tagKey(r), r);
+    for (const a of facilityPreferences?.unitAreas || []) areas.set(tagKey(a), a);
+    for (const rule of rules || []) {
+      if (rule.role) roles.set(tagKey(rule.role), rule.role);
+      if (rule.unitArea) areas.set(tagKey(rule.unitArea), rule.unitArea);
+    }
+    const sorted = (m, label) => [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([key, raw]) => ({ key, label: label(raw) }));
+    return withFilterOptions({ roles: sorted(roles, getRoleDisplayName), areas: sorted(areas, toLabel) }, filter);
+  }, [facilityPreferences, rules, filter]);
+  const shownCount = (rules || []).filter(
+    (rule) =>
+      (!filter.roles.length || filter.roles.includes(tagKey(rule.role))) &&
+      (!filter.areas.length || filter.areas.includes(tagKey(rule.unitArea))),
+  ).length;
 
   useEffect(() => {
     api
@@ -79,7 +105,18 @@ export default function StaffingTemplatePage() {
         </Button>
       </Box>
 
-      <Box sx={{ mt: 3 }}>
+      {rules !== null && (
+        <Box sx={{ mt: 3 }}>
+          <ViewFilter
+            value={filter}
+            onChange={setFilter}
+            options={filterOptions}
+            shownText={`${shownCount} of ${rules.length} rows · hidden rows are kept when you save`}
+          />
+        </Box>
+      )}
+
+      <Box sx={{ mt: 2 }}>
         {rules === null ? (
           <Typography color="text.secondary">Loading…</Typography>
         ) : (
@@ -91,6 +128,7 @@ export default function StaffingTemplatePage() {
             }}
             facilityPreferences={facilityPreferences}
             disabled={!canEdit}
+            filter={filter}
           />
         )}
       </Box>

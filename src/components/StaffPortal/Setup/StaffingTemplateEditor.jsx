@@ -125,6 +125,8 @@ export default function StaffingTemplateEditor({
   onChange,
   facilityPreferences,
   disabled = false,
+  // Optional { roles, areas }: show only these (Weekly Needs page filter).
+  filter = null,
 }) {
   const slots = useMemo(() => listShiftSlots(facilityPreferences), [facilityPreferences]);
   const roles = facilityPreferences?.roleFamilies || [];
@@ -173,8 +175,10 @@ export default function StaffingTemplateEditor({
   const addRole = (slot, role) => {
     // Same shift + role again is allowed in a different area; start it in
     // the first area not used yet.
-    let unitArea = null;
-    if (isDuplicate({ ...slot, role, unitArea: null })) {
+    // With an area filter on, start new rows in the first filtered area so they stay visible.
+    let unitArea = filterAreas.length ? filterAreas.find((a) => !isDuplicate({ ...slot, role, unitArea: a })) || null : null;
+    if (filterAreas.length && !unitArea) return;
+    if (!unitArea && isDuplicate({ ...slot, role, unitArea: null })) {
       unitArea = areas.find((a) => !isDuplicate({ ...slot, role, unitArea: a })) || null;
       if (!unitArea) return;
     }
@@ -192,7 +196,16 @@ export default function StaffingTemplateEditor({
   };
 
   const ruleSlotKey = (rule) => `${rule.shiftType}:${rule.shiftTag}`;
-  const totals = columns.map((col) => rules.reduce((sum, rule) => sum + (rule.countsByWeekday[col.days[0]] || 0), 0));
+  const filterRoles = filter?.roles || [];
+  const filterAreas = filter?.areas || [];
+  const filtering = filterRoles.length > 0 || filterAreas.length > 0;
+  const shown = (rule) =>
+    (!filterRoles.length || filterRoles.includes(lower(rule.role))) &&
+    (!filterAreas.length || filterAreas.includes(lower(rule.unitArea)));
+  const visibleRules = rules.filter(shown);
+  const totals = columns.map((col) => visibleRules.reduce((sum, rule) => sum + (rule.countsByWeekday[col.days[0]] || 0), 0));
+  // With a role filter on, "Add a role" offers those roles first.
+  const addRoles = filterRoles.length ? roles.filter((r) => filterRoles.includes(lower(r))) : roles;
   const countCols = `repeat(${columns.length}, ${mode === "each_day" ? "52px" : "72px"})`;
   const grid = `minmax(130px, 1fr) minmax(150px, 1fr) minmax(170px, 1.2fr) ${countCols} 36px`;
   const minWidth = mode === "each_day" ? 920 : 640;
@@ -207,8 +220,9 @@ export default function StaffingTemplateEditor({
           <ToggleButton value="weekday_weekend">Weekdays and weekends</ToggleButton>
           <ToggleButton value="each_day">Each day different</ToggleButton>
         </ToggleButtonGroup>
-        {rules.length > 0 && (
+        {visibleRules.length > 0 && (
           <Typography sx={{ color: IOS.secondary, fontSize: 14 }}>
+            {filtering ? "Shown: " : ""}
             {mode === "weekday_weekend"
               ? `${totals[0]} people on a weekday, ${totals[1]} on a weekend day`
               : `${Math.min(...totals)}–${Math.max(...totals)} people a day`}
@@ -242,7 +256,11 @@ export default function StaffingTemplateEditor({
           </Box>
 
           {sortedSlots.map((slot) => {
-            const inSlot = rules.map((rule, index) => ({ rule, index })).filter(({ rule }) => ruleSlotKey(rule) === slot.key);
+            const inSlot = rules
+              .map((rule, index) => ({ rule, index }))
+              .filter(({ rule }) => ruleSlotKey(rule) === slot.key && shown(rule));
+            // Filtered: skip shifts with nothing to show (unless you can add to them).
+            if (filtering && !inSlot.length && (disabled || !addRoles.length)) return null;
             return (
               <Box key={slot.key} sx={{ "& + &": { borderTop: `1px solid ${IOS.separator}` } }}>
                 <Box sx={{ px: 2, pt: 1.75, pb: 0.75, display: "flex", alignItems: "baseline", gap: 1 }}>
@@ -379,7 +397,7 @@ export default function StaffingTemplateEditor({
                       size="small"
                       startIcon={<FiPlus />}
                       onClick={(e) => setAddMenu({ anchor: e.currentTarget, slot })}
-                      disabled={!roles.length}
+                      disabled={!addRoles.length}
                       sx={{ color: IOS.blue, borderRadius: "8px", fontWeight: 600 }}
                     >
                       {inSlot.length ? "Add a role" : `Who works ${slot.name.toLowerCase()}?`}
@@ -390,7 +408,7 @@ export default function StaffingTemplateEditor({
             );
           })}
 
-          {rules.length > 0 && (
+          {visibleRules.length > 0 && (
             <Box
               sx={{
                 display: "grid",
@@ -403,7 +421,9 @@ export default function StaffingTemplateEditor({
                 borderTop: `1px solid ${IOS.separator}`,
               }}
             >
-              <Typography sx={{ fontWeight: 700, color: IOS.ink, fontSize: 14, gridColumn: "span 3" }}>People per day</Typography>
+              <Typography sx={{ fontWeight: 700, color: IOS.ink, fontSize: 14, gridColumn: "span 3" }}>
+                {filtering ? "People per day (shown roles and areas)" : "People per day"}
+              </Typography>
               {totals.map((total, i) => (
                 <Typography
                   key={columns[i].label}
@@ -440,7 +460,7 @@ export default function StaffingTemplateEditor({
         onClose={() => setAddMenu(null)}
         slotProps={{ paper: { sx: { borderRadius: "12px", boxShadow: IOS.shadowRaised, minWidth: 200 } } }}
       >
-        {roles.map((role) => (
+        {addRoles.map((role) => (
           <MenuItem
             key={role}
             onClick={() => {

@@ -17,6 +17,7 @@ export const FREE_FEATURES = [
 export const PAID_FEATURES = [
   "Everything in Free",
   "Automated scheduling",
+  "Set weekly needs by typing or voice",
   "Text the schedule and shift reminders",
   "Shift swaps and open-shift pickup",
   "Fill call-outs by text: first yes gets it",

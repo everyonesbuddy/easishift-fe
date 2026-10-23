@@ -26,6 +26,7 @@ const YEARLY_PLANS = [
     features: [
       "Standard support",
       "Automated scheduling",
+      "Set weekly needs by typing or voice",
       "Shift swaps",
       "Time-off management",
       "Internal messaging",
@@ -46,6 +47,7 @@ const YEARLY_PLANS = [
     features: [
       "Standard support",
       "Automated scheduling",
+      "Set weekly needs by typing or voice",
       "Shift swaps",
       "Time-off management",
       "Internal messaging",
@@ -65,6 +67,7 @@ const YEARLY_PLANS = [
     features: [
       "Priority support",
       "Automated scheduling",
+      "Set weekly needs by typing or voice",
       "Shift swaps",
       "Time-off management",
       "Internal messaging",
@@ -84,6 +87,7 @@ const YEARLY_PLANS = [
     features: [
       "Priority support",
       "Automated scheduling",
+      "Set weekly needs by typing or voice",
       "Shift swaps",
       "Time-off management",
       "Internal messaging",
@@ -107,6 +111,7 @@ const MONTHLY_PLANS = [
     features: [
       "Standard support",
       "Automated scheduling",
+      "Set weekly needs by typing or voice",
       "Shift swaps",
       "Time-off management",
       "Internal messaging",
@@ -127,6 +132,7 @@ const MONTHLY_PLANS = [
     features: [
       "Standard support",
       "Automated scheduling",
+      "Set weekly needs by typing or voice",
       "Shift swaps",
       "Time-off management",
       "Internal messaging",
@@ -146,6 +152,7 @@ const MONTHLY_PLANS = [
     features: [
       "Priority support",
       "Automated scheduling",
+      "Set weekly needs by typing or voice",
       "Shift swaps",
       "Time-off management",
       "Internal messaging",
@@ -165,6 +172,7 @@ const MONTHLY_PLANS = [
     features: [
       "Priority support",
       "Automated scheduling",
+      "Set weekly needs by typing or voice",
       "Shift swaps",
       "Time-off management",
       "Internal messaging",

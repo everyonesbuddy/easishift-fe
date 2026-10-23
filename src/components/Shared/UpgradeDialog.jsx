@@ -22,6 +22,7 @@ const FEATURE_COPY = {
   import: "Spreadsheet import",
   reminders: "Shift reminders",
   autoFill: "Automated scheduling",
+  describeNeeds: "Describing your week by typing or voice",
   timeClock: "The time clock",
   timesheets: "Timesheets and payroll export",
   messaging: "Messaging",

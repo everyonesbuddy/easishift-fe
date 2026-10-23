@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Box, Button, IconButton, Paper, TextField, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, IconButton, Paper, TextField, Tooltip, Typography } from "@mui/material";
 import { MdMic, MdMicOff } from "react-icons/md";
 import { toast } from "react-toastify";
 import api from "../../../config/api";
 import { mergeNeeds, describeMerge } from "../../../utils/mergeNeeds";
 import { IOS, tint } from "../../../theme/ios";
+import { useAuth } from "../../../context/AuthContext";
 
 const EXAMPLE =
   "4 CNAs on day shift during the week, 3 on weekends. 1 med tech every shift. Nights need 2 CNAs and a nurse.";
@@ -18,6 +19,9 @@ const getRecognizer = () =>
  * review. Nothing is saved until Save.
  */
 export default function DescribeNeeds({ rules, onRules }) {
+  const { hasFeature } = useAuth();
+  // Paid plans. On Free the box still shows; Fill in opens the upgrade dialog (402).
+  const included = hasFeature ? hasFeature("describeNeeds") : true;
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [notes, setNotes] = useState([]);
@@ -81,6 +85,8 @@ export default function DescribeNeeds({ rules, onRules }) {
         toast.info("Nothing to change from that. Try naming the shift, the role and how many.", { position: "top-right" });
       }
     } catch (err) {
+      // Plan answers (402) are shown by the upgrade dialog.
+      if (err?.response?.status === 402) return;
       const data = err?.response?.data;
       const gaps = (data?.gaps || []).map((g) => g.message);
       setNotes(gaps.length ? gaps : []);
@@ -97,7 +103,12 @@ export default function DescribeNeeds({ rules, onRules }) {
       elevation={0}
       sx={{ p: { xs: 2, md: 2.5 }, mb: 2, borderRadius: IOS.radius.card, boxShadow: IOS.shadow, border: `1px solid ${IOS.hairline}` }}
     >
-      <Typography sx={{ fontWeight: 700, color: IOS.ink }}>Describe your week</Typography>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <Typography sx={{ fontWeight: 700, color: IOS.ink }}>Describe your week</Typography>
+        {!included && (
+          <Chip label="Paid plans" size="small" sx={{ height: 22, fontSize: 12, fontWeight: 600, bgcolor: tint(IOS.blue, 0.1), color: IOS.blue }} />
+        )}
+      </Box>
       <Typography sx={{ color: IOS.secondary, fontSize: 14, mb: 1.5 }}>
         Type or say what a normal week needs. We fill in the table below; you check it and save.
       </Typography>

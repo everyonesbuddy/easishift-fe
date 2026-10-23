@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 import StaffingTemplateEditor from "../Setup/StaffingTemplateEditor";
+import DescribeNeeds from "./DescribeNeeds";
 import { IOS } from "../../../theme/ios";
 import ViewFilter from "../Schedule/ViewFilter";
 import useViewFilter from "../../../hooks/useViewFilter";
@@ -35,6 +36,9 @@ export default function StaffingTemplatePage() {
   const [applyTo, setApplyTo] = useState("unpublished");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  // Bumped after "Describe your week" fills the table, so the editor
+  // re-picks weekday/weekend vs each-day columns for the new numbers.
+  const [editorKey, setEditorKey] = useState(0);
   // Roles / areas this scheduler chose to see (saved on their account).
   const [filter, setFilter] = useViewFilter("needs");
 
@@ -105,8 +109,21 @@ export default function StaffingTemplatePage() {
         </Button>
       </Box>
 
-      {rules !== null && (
+      {canEdit && rules !== null && (
         <Box sx={{ mt: 3 }}>
+          <DescribeNeeds
+            rules={rules}
+            onRules={(next) => {
+              setRules(next);
+              setDirty(true);
+              setEditorKey((k) => k + 1);
+            }}
+          />
+        </Box>
+      )}
+
+      {rules !== null && (
+        <Box sx={{ mt: canEdit ? 0 : 3 }}>
           <ViewFilter
             value={filter}
             onChange={setFilter}
@@ -121,6 +138,7 @@ export default function StaffingTemplatePage() {
           <Typography color="text.secondary">Loading…</Typography>
         ) : (
           <StaffingTemplateEditor
+            key={editorKey}
             rules={rules}
             onChange={(next) => {
               setRules(next);

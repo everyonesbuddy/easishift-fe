@@ -2,10 +2,12 @@
  * Merges rows from "Describe your week" (POST /nl/parse, formType
  * weeklyNeeds) into the Weekly Needs rules.
  *
- * A row matches an existing rule on shift + role + unit area. Its counts are
- * Sunday-first; null means "not mentioned", so the existing number stays (0
- * for a new row). A row that ends up 0 every day is removed (or not added).
- * Returns the new rules and what changed.
+ * The only change ever made to an existing rule is its numbers: when a row
+ * has the same shift, role and unit area, the days it mentions get the new
+ * counts (null = not mentioned, keep). Area, certifications and every other
+ * rule are left alone, and nothing is ever deleted (a row set to 0 stays,
+ * with zeros, for the scheduler to remove by hand). Any other row is added;
+ * a new row that would be 0 every day isn't.
  */
 const lower = (v) => String(v || "").trim().toLowerCase();
 const keyOf = (r) => [lower(r.shiftType), lower(r.shiftTag), lower(r.role), lower(r.unitArea)].join("|");
@@ -13,10 +15,8 @@ const keyOf = (r) => [lower(r.shiftType), lower(r.shiftTag), lower(r.role), lowe
 export function mergeNeeds(rules, rows) {
   const next = rules.map((r) => ({ ...r, countsByWeekday: [...r.countsByWeekday] }));
   const index = new Map(next.map((r, i) => [keyOf(r), i]));
-  const removeAt = new Set();
+  const changedAt = new Set();
   let added = 0;
-  let changed = 0;
-  let removed = 0;
 
   for (const row of rows || []) {
     const counts = row.countsByWeekday || [];
@@ -24,13 +24,9 @@ export function mergeNeeds(rules, rows) {
     if (at !== undefined) {
       const before = next[at].countsByWeekday;
       const after = before.map((n, d) => (counts[d] ?? n));
-      if (after.every((n) => n === 0)) {
-        if (!removeAt.has(at)) removed += 1;
-        removeAt.add(at);
-      } else if (after.some((n, d) => n !== before[d])) {
-        if (removeAt.delete(at)) removed -= 1;
+      if (after.some((n, d) => n !== before[d])) {
         next[at] = { ...next[at], countsByWeekday: after };
-        changed += 1;
+        if (at < rules.length) changedAt.add(at);
       }
       continue;
     }
@@ -48,15 +44,14 @@ export function mergeNeeds(rules, rows) {
     added += 1;
   }
 
-  return { rules: next.filter((_, i) => !removeAt.has(i)), added, changed, removed };
+  return { rules: next, added, changed: changedAt.size };
 }
 
-/** "Added 3 rows, changed 1, removed 1" */
-export function describeMerge({ added, changed, removed }) {
+/** "Added 3 rows, updated the numbers on 1" */
+export function describeMerge({ added, changed }) {
   const parts = [];
   if (added) parts.push(`added ${added} row${added === 1 ? "" : "s"}`);
-  if (changed) parts.push(`changed ${changed}`);
-  if (removed) parts.push(`removed ${removed}`);
+  if (changed) parts.push(`updated the numbers on ${changed}`);
   if (!parts.length) return "Nothing changed";
   const text = parts.join(", ");
   return text.charAt(0).toUpperCase() + text.slice(1);

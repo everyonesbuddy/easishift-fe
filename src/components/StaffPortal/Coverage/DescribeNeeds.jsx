@@ -77,7 +77,7 @@ export default function DescribeNeeds({ rules, onRules }) {
       const draft = res.data?.draft || {};
       const result = mergeNeeds(rules, draft.rows || []);
       setNotes(draft.notUnderstood || []);
-      if (result.added || result.changed || result.removed) {
+      if (result.added || result.changed) {
         onRules(result.rules);
         setText("");
         toast.success(`${describeMerge(result)}. Look it over, then press Save.`, { position: "top-right", autoClose: 4000 });

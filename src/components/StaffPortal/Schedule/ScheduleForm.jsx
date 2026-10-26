@@ -393,9 +393,11 @@ export default function ScheduleForm({
       if (!selectedStaff) return;
 
       try {
+        // Only spots and shifts that haven't ended (past ones are filtered out below anyway).
+        const upcoming = { params: { from: new Date().toISOString() } };
         const [coverageRes, schedulesRes] = await Promise.all([
-          api.get(`/coverage`),
-          api.get(`/schedules`),
+          api.get(`/coverage`, upcoming),
+          api.get(`/schedules`, upcoming),
         ]);
 
         // Filter out past shifts (based on startTime)

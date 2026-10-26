@@ -172,7 +172,14 @@ export default function TimeTrackingPage() {
   const loadStaffSchedules = useCallback(async () => {
     if (isAdmin) return;
     try {
-      const res = await api.get("/schedules");
+      // Clock-in only needs shifts around now: 2 days back, 60 ahead.
+      const DAY = 24 * 60 * 60 * 1000;
+      const res = await api.get("/schedules", {
+        params: {
+          from: new Date(Date.now() - 2 * DAY).toISOString(),
+          to: new Date(Date.now() + 60 * DAY).toISOString(),
+        },
+      });
       const normalizedSchedules = normalizeSchedulesFromResponse(res.data);
       setStaffSchedules(
         Array.isArray(normalizedSchedules) ? normalizedSchedules : [],

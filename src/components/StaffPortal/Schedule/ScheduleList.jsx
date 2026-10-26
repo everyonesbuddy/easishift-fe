@@ -297,6 +297,38 @@ export default function ScheduleList() {
   );
   const [exportMenuAnchorEl, setExportMenuAnchorEl] = useState(null);
   const [coverageGaps, setCoverageGaps] = useState([]);
+  // List view: how far back to load (days); "all" = every shift ever.
+  const [listRangeDays, setListRangeDays] = useState(30);
+  // Bumped after any change so the week bar reloads its week.
+  const [weekRefresh, setWeekRefresh] = useState(0);
+
+  // Only load the shifts the current view shows (not every shift ever):
+  // calendar = the dates on screen, month = that month, list = recent and
+  // upcoming. The week view loads its own week (WeekPublishBar).
+  const scheduleQuery = useMemo(() => {
+    if (view === "week") return null;
+    if (view === "calendar") {
+      if (!calendarRange.start || !calendarRange.end) return null;
+      return {
+        from: new Date(calendarRange.start).toISOString(),
+        to: new Date(calendarRange.end).toISOString(),
+      };
+    }
+    if (view === "month") {
+      // A day either side covers time-zone edges.
+      const from = new Date(monthDate.getFullYear(), monthDate.getMonth(), 0);
+      const to = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 2);
+      return { from: from.toISOString(), to: to.toISOString() };
+    }
+    if (listRangeDays === "all") return {};
+    const from = new Date();
+    from.setHours(0, 0, 0, 0);
+    from.setDate(from.getDate() - listRangeDays);
+    return { from: from.toISOString() };
+  }, [view, calendarRange.start, calendarRange.end, monthDate, listRangeDays]);
+  const scheduleQueryKey = scheduleQuery ? JSON.stringify(scheduleQuery) : "";
+  const scheduleQueryRef = useRef(scheduleQuery);
+  const scheduleRequestRef = useRef(0);
 
   // Manual per-group staff ordering set by dragging Roster rows; keyed by unit/shift-block group
   const [staffOrderByGroup, setStaffOrderByGroup] = useState(() => {
@@ -698,14 +730,34 @@ export default function ScheduleList() {
     }
   };
 
-  const fetchSchedules = async () => {
+  const loadSchedules = async () => {
+    const params = scheduleQueryRef.current;
+    if (!params) return;
+    const request = ++scheduleRequestRef.current;
     try {
-      const res = await api.get("/schedules");
+      const res = await api.get("/schedules", { params });
+      // Ignore answers to an older range (view changed meanwhile).
+      if (request !== scheduleRequestRef.current) return;
       setSchedules(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Failed to fetch schedules", err);
     }
   };
+
+  // After a change: reload the shifts on screen and the week bar.
+  const fetchSchedules = async () => {
+    setWeekRefresh((n) => n + 1);
+    await loadSchedules();
+  };
+
+  useEffect(() => {
+    scheduleQueryRef.current = scheduleQuery;
+  });
+
+  // Load when the range on screen changes (loadSchedules reads it from the ref).
+  useEffect(() => {
+    loadSchedules();
+  }, [scheduleQueryKey]);
 
   // Facility-wide open coverage; only managers see this, never personal-schedule-only staff
   // Calendar and roster show whole months: open every week they show so
@@ -772,7 +824,6 @@ export default function ScheduleList() {
 
   useEffect(() => {
     fetchStaff();
-    fetchSchedules();
     fetchCoverageGaps();
   }, []);
 
@@ -1260,6 +1311,34 @@ export default function ScheduleList() {
     staffVisibility,
     user,
   ]);
+
+  // List view: how far back to load (shown on wide and narrow screens).
+  const listRangeSelect = (
+    <Box display="flex" alignItems="center" gap={1}>
+      <Typography
+        color="text.secondary"
+        sx={{ fontSize: "0.78rem", ml: { sm: 2 } }}
+      >
+        Showing:
+      </Typography>
+      <TextField
+        select
+        size="small"
+        value={listRangeDays}
+        onChange={(e) => {
+          setPage(0);
+          setListRangeDays(e.target.value);
+        }}
+        inputProps={{ "aria-label": "How far back to show" }}
+        sx={{ minWidth: 200, "& .MuiInputBase-input": { fontSize: "0.85rem", py: 0.75 } }}
+      >
+        <MenuItem value={30}>Upcoming + last 30 days</MenuItem>
+        <MenuItem value={90}>Upcoming + last 90 days</MenuItem>
+        <MenuItem value={365}>Upcoming + last year</MenuItem>
+        <MenuItem value="all">Everything</MenuItem>
+      </TextField>
+    </Box>
+  );
 
   const paginatedSchedules = useMemo(() => {
     const listOrdered = [...filteredSchedules].sort(
@@ -3187,7 +3266,7 @@ export default function ScheduleList() {
 
       {canManageSchedules && (
         <WeekPublishBar
-          refreshKey={schedules}
+          refreshKey={weekRefresh}
           defaultSection={view === "week" ? filterAsSection(weekFilter) : undefined}
           onData={setWeekBoard}
           onChanged={() => {
@@ -3855,6 +3934,7 @@ export default function ScheduleList() {
             <ToggleButton value="employee">Employee</ToggleButton>
             <ToggleButton value="unitArea">Unit Area</ToggleButton>
           </ToggleButtonGroup>
+          {listRangeSelect}
         </Box>
       )}
 
@@ -3862,6 +3942,7 @@ export default function ScheduleList() {
       {view === "week" ? null : view === "table" ? (
         isCompact ? (
           <Box sx={{ mt: 2, display: "grid", gap: 2 }}>
+            {listRangeSelect}
             {paginatedSchedules.map((s) => (
               <Paper key={s._id} sx={{ p: 2 }}>
                 <Box

@@ -601,11 +601,6 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
       return;
     }
 
-    if (!normalizedEmail && !normalizedPhone) {
-      setPhoneError("Add a phone number or an email so they can get their shifts");
-      return;
-    }
-
     if (normalizedEmail && !validateEmail(normalizedEmail)) {
       setEmailError("Please enter a valid email address");
       return;
@@ -759,7 +754,7 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
         <SectionCard
           eyebrow="Staff Info"
           title="Basic Information"
-          description="A name, a phone or email, and a role. Staff don't log in; they get a personal link to their shifts."
+          description="A name and a role. Add a phone or email so they get their shifts by text or email; without one, you share their personal link yourself. Staff don't log in."
         >
           <TextField
             fullWidth
@@ -770,7 +765,7 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
 
           <TextField
             fullWidth
-            label="Email (optional if you add a phone)"
+            label="Email (optional)"
             type="email"
             value={form.email}
             onChange={(e) => {
@@ -813,6 +808,15 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
               inputProps={{ inputMode: "tel" }}
             />
           </Stack>
+
+          {!(form.email || "").trim() && !(form.phone || "").trim() && (
+            <Alert severity="warning">
+              No phone or email: they won't get texts or emails (their
+              schedule, reminders, open shifts). After saving, use{" "}
+              <strong>Copy link</strong> on the staff list to share their
+              personal schedule link with them yourself.
+            </Alert>
+          )}
 
           <Stack spacing={2}>
             <MultiChipSelector

@@ -22,6 +22,8 @@ import {
   FormControl,
   InputLabel,
   Avatar,
+  Alert,
+  Tooltip,
 } from "@mui/material";
 import api from "../../../config/api";
 import { toast } from "react-toastify";
@@ -327,6 +329,33 @@ export default function StaffList() {
     staffLimit !== undefined &&
     (usage?.staff || 0) >= staffLimit;
 
+  // No phone and no email: they get no texts or emails; share their link.
+  const hasNoContact = (u) => !u.email && !u.phoneE164;
+  const NO_CONTACT_TIP =
+    "No phone or email: they won't get texts or emails. Use Copy link and share it with them yourself.";
+  const renderNoContact = () => (
+    <Tooltip title={NO_CONTACT_TIP}>
+      <Box
+        component="span"
+        sx={{
+          display: "inline-flex",
+          alignItems: "center",
+          px: 1,
+          py: 0.25,
+          borderRadius: 1,
+          fontSize: "0.7rem",
+          fontWeight: 700,
+          bgcolor: "#FEF3C7",
+          color: "#92400E",
+          whiteSpace: "nowrap",
+        }}
+      >
+        No contact info
+      </Box>
+    </Tooltip>
+  );
+  const noContactCount = staff.filter((u) => u.status !== "archived" && hasNoContact(u)).length;
+
   const renderSmsStatus = (u) => {
     const info = u.hasPhone ? SMS_STATUS_LABELS[u.smsStatus] : null;
     if (!info) return null;
@@ -374,16 +403,20 @@ export default function StaffList() {
       <>
         {canManageStaff && (
           <>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<FiSend />}
-              disabled={busy}
-              onClick={() => handleSendLink(u)}
-              sx={compactActionButtonSx}
-            >
-              Send link
-            </Button>
+            <Tooltip title={hasNoContact(u) ? NO_CONTACT_TIP : ""}>
+              <span>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<FiSend />}
+                  disabled={busy || hasNoContact(u)}
+                  onClick={() => handleSendLink(u)}
+                  sx={compactActionButtonSx}
+                >
+                  Send link
+                </Button>
+              </span>
+            </Tooltip>
             <Button
               size="small"
               variant="outlined"
@@ -587,6 +620,15 @@ export default function StaffList() {
         </Box>
       </Paper>
 
+      {noContactCount > 0 && (
+        <Alert severity="warning" sx={{ mt: 2, borderRadius: 2 }}>
+          {noContactCount} {noContactCount === 1 ? "person has" : "people have"} no
+          phone or email, so they won't get their schedule, reminders or open
+          shifts by text or email. Use <strong>Copy link</strong> on their row
+          and share it with them, or add a phone or email when you have one.
+        </Alert>
+      )}
+
       {/* table on desktop, cards on tablet/mobile */}
       {isCompact ? (
         <Box sx={{ mt: 3, display: "grid", gap: 2 }}>
@@ -625,8 +667,9 @@ export default function StaffList() {
                         sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}
                         noWrap
                       >
-                        {[u.email, u.phoneE164].filter(Boolean).join(" · ") ||
-                          "No contact"}
+                        {hasNoContact(u)
+                          ? renderNoContact()
+                          : [u.email, u.phoneE164].filter(Boolean).join(" · ")}
                         {renderSmsStatus(u)}
                       </Typography>
                       <Typography
@@ -777,6 +820,10 @@ export default function StaffList() {
                       </TableCell>
 
                       <TableCell sx={{ py: 1 }}>
+                        {hasNoContact(u) ? (
+                          renderNoContact()
+                        ) : (
+                          <>
                         <Typography
                           variant="body2"
                           color="text.secondary"
@@ -803,6 +850,8 @@ export default function StaffList() {
                           {u.phoneE164 || "No phone"}
                           {renderSmsStatus(u)}
                         </Typography>
+                          </>
+                        )}
                       </TableCell>
 
                       <TableCell sx={{ py: 1 }}>

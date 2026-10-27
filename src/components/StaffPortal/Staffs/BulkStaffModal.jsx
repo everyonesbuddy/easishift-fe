@@ -305,7 +305,7 @@ export default function BulkStaffModal({ open, onClose, onSuccess }) {
           <>
             <Alert severity="info" sx={{ mb: 2 }}>
               Upload a .csv/.xlsx/.xls file with columns name, phone, email and
-              role (a phone or an email is enough). Common column names like
+              role (phone and email are optional, but without one they won't get texts or emails). Common column names like
               "Mobile" or "Position" work too. Maximum {MAX_ROWS} rows.
               {!canImportFile &&
                 " Spreadsheet import is on Starter and up; pasting a list is free."}

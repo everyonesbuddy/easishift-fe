@@ -257,7 +257,6 @@ export default function SetupPage() {
     return parseStaffLines(staffText, prefs?.roleFamilies?.[0]).map((row) => {
       const problems = [];
       if (!row.name) problems.push("Add a name");
-      if (!row.phone && !row.email) problems.push("Add a phone or email");
       if (row.role && !known.has(roleKey(row.role))) problems.push(`"${row.role}" isn't one of your roles`);
       return { ...row, problems };
     });
@@ -530,7 +529,11 @@ export default function SetupPage() {
                       <Typography sx={{ color: C.muted, fontSize: 14 }}>{row.phone || row.email || "—"}</Typography>
                       <Typography sx={{ color: C.muted, fontSize: 14 }}>{row.role ? getRoleDisplayName(roleKey(row.role)) : "—"}</Typography>
                       <Typography sx={{ fontSize: 14, fontWeight: 600, color: row.problems.length ? "#B45309" : "#0F766E" }}>
-                        {row.problems.length ? row.problems.join("; ") : "Ready"}
+                        {row.problems.length
+                          ? row.problems.join("; ")
+                          : !row.phone && !row.email
+                            ? "Ready · no phone or email: share their link"
+                            : "Ready"}
                       </Typography>
                     </Box>
                   ))}

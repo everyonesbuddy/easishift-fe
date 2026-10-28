@@ -185,7 +185,7 @@ const TRAINING_MODULES = [
     summary:
       "Review assigned shifts, check changes, and act early when conflicts appear.",
     steps: [
-      "Open Overview to check today's shifts and upcoming assignments.",
+      "Open Today to see open spots, call-outs and requests waiting on you.",
       "Open My Schedule to review dates, times, assigned role, and location details.",
       "If a conflict appears, start a swap request or submit time off as soon as possible.",
       "Message a manager when a shift detail looks incorrect.",
@@ -228,7 +228,7 @@ const TRAINING_MODULES = [
 ];
 
 const DAILY_CHECKS = [
-  "Open Overview and handle urgent alerts first.",
+  "Open Today and fill what's still open first.",
   "Review open coverage, pending requests, and draft schedules before publishing.",
   "Check messages tied to staffing changes or conflicts.",
   "Confirm personal shifts if you are also schedulable.",

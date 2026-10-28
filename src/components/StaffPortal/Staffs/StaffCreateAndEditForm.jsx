@@ -359,6 +359,8 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
     allowedShiftTags: [],
     allowedShiftTypes: [],
     certificationTags: [],
+    // tag -> "YYYY-MM-DD" expiry date (optional)
+    certExpiry: {},
     preferredDaysOfWeek: [],
     avoidDaysOfWeek: [],
     targetHoursPerWeek: "",
@@ -549,6 +551,11 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
         allowedShiftTags: derivedShiftTags,
         allowedShiftTypes: normalizeStringArray(staff.allowedShiftTypes),
         certificationTags: normalizeStringArray(staff.certificationTags),
+        certExpiry: Object.fromEntries(
+          (staff.credentials || [])
+            .filter((c) => c?.tag && c?.expiresAt)
+            .map((c) => [String(c.tag).toLowerCase(), String(c.expiresAt).slice(0, 10)]),
+        ),
         preferredDaysOfWeek: [],
         avoidDaysOfWeek: [],
         targetHoursPerWeek: "",
@@ -687,6 +694,11 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
         allowedAreas: normalizeStringArray(form.allowedAreas),
         allowedShiftTypes: normalizedShiftTypes,
         certificationTags: normalizeStringArray(form.certificationTags),
+        // Expiry dates for the certifications they have (blank = no date).
+        credentials: normalizeStringArray(form.certificationTags)
+          .map((tag) => tag.toLowerCase())
+          .filter((tag) => form.certExpiry?.[tag])
+          .map((tag) => ({ tag, expiresAt: form.certExpiry[tag] })),
       };
 
       if (staff) {
@@ -990,6 +1002,30 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
                   certificationLabelLookup.get(option) || toDisplayLabel(option)
                 }
               />
+              {form.certificationTags.length > 0 && (
+                <Stack spacing={1.25} sx={{ mt: 2 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    Expiry dates (optional)
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: "-4px !important" }}>
+                    Shows on the Labor page and in the Monday email 30 days before it runs out.
+                  </Typography>
+                  {normalizeStringArray(form.certificationTags).map((tag) => (
+                    <TextField
+                      key={tag}
+                      size="small"
+                      type="date"
+                      label={certificationLabelLookup.get(tag) || toDisplayLabel(tag)}
+                      value={form.certExpiry?.[tag.toLowerCase()] || ""}
+                      onChange={(e) =>
+                        setForm({ ...form, certExpiry: { ...(form.certExpiry || {}), [tag.toLowerCase()]: e.target.value } })
+                      }
+                      InputLabelProps={{ shrink: true }}
+                      sx={{ maxWidth: 260 }}
+                    />
+                  ))}
+                </Stack>
+              )}
             </AccordionDetails>
           </Accordion>
         </SectionCard>

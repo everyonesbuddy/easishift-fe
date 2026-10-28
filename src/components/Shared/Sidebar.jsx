@@ -14,7 +14,8 @@ import {
   MenuItem,
 } from "@mui/material";
 import {
-  MdDashboard,
+  MdToday,
+  MdInsights,
   MdCalendarToday,
   MdPeople,
   MdSchedule,
@@ -57,7 +58,10 @@ function Sidebar({ mobileOpen, onMobileClose }) {
     can("facility_preferences.view") || can("facility_preferences.manage");
 
   const menuItems = [
-    { id: "overview", icon: MdDashboard, label: "Overview", to: "/dashboard" },
+    { id: "today", icon: MdToday, label: "Today", to: "/dashboard" },
+    ...(can("labor.view")
+      ? [{ id: "labor", icon: MdInsights, label: "Labor", to: "/labor" }]
+      : []),
     ...(can("coverage.manage")
       ? [
           {

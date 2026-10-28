@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Box, Button, ButtonBase, Container, IconButton, Typography } from "@mui/material";
-import { FiAlertTriangle, FiCheckCircle, FiChevronLeft, FiChevronRight, FiSettings } from "react-icons/fi";
+import { FiAlertTriangle, FiCheckCircle, FiChevronLeft, FiChevronRight, FiPrinter, FiSettings } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 import { IOS, roleColor, tint } from "../../../theme/ios";
 import LaborSettingsDialog from "./LaborSettingsDialog";
-import { certLabel, dayLabel, hours, money, roleLabel, weekLabel } from "./laborFormat";
+import LaborTrends from "./LaborTrends";
+import LaborPrint from "./LaborPrint";
+import OvertimeFixDrawer from "./OvertimeFixDrawer";
+import { certLabel, dayLabel, hours, money, periodLabel, printLaborSummary, roleLabel } from "./laborFormat";
 
 // Regular hours on the overtime bars: a calm slate so the red overtime stands out.
 const OT_REGULAR = "#8E9AAF";
@@ -30,7 +33,10 @@ function attentionItems(d) {
   const soon = d.credentials.expiringSoon.length;
   if (d.openShifts.unfilledPast) items.push({ tone: "bad", text: `${plural(d.openShifts.unfilledPast, "shift")} went unfilled`, target: "labor-shifts" });
   if (exp) items.push({ tone: "bad", text: `${plural(exp, "certification")} expired`, target: "labor-credentials" });
-  if (d.overtime.people.length) items.push({ tone: "warn", text: `${plural(d.overtime.people.length, "person", "people")} going into overtime`, target: "labor-overtime" });
+  if (d.overtime.people.length) {
+    const who = plural(d.overtime.people.length, "person", "people");
+    items.push({ tone: "warn", text: d.period === "month" ? `${who} went into overtime` : `${who} going into overtime`, target: "labor-overtime" });
+  }
   if (d.openShifts.openUpcoming) items.push({ tone: "warn", text: `${plural(d.openShifts.openUpcoming, "shift")} still open`, target: "labor-shifts" });
   if (soon) items.push({ tone: "warn", text: `${plural(soon, "certification")} expiring soon`, target: "labor-credentials" });
   if (d.turnoverWatch.length) items.push({ tone: "warn", text: `${plural(d.turnoverWatch.length, "person", "people")} to check in with`, target: "labor-watch" });
@@ -55,6 +61,11 @@ const Quiet = ({ children }) => (
   </Box>
 );
 
+const localMonth = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+};
+
 const fmt = (n, digits = 1) => Number(n).toLocaleString(undefined, { maximumFractionDigits: digits });
 
 /**
@@ -62,13 +73,13 @@ const fmt = (n, digits = 1) => Number(n).toLocaleString(undefined, { maximumFrac
  * or VP can follow it: the number, a bar with the target marked (and how
  * far filling the open shifts would get you), a plain verdict, and the math.
  */
-function BudgetGauge({ budget, hoursInfo, canManage, onSetup }) {
+function BudgetGauge({ budget, hoursInfo, canManage, onSetup, periodWord = "week", dayCount = 7 }) {
   if (!budget || budget.targetPPD === null) {
     return (
       <Box sx={{ p: 2, borderRadius: IOS.radius.cell, bgcolor: IOS.canvas }}>
         <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Hours per resident day</Typography>
         <Typography sx={{ color: IOS.secondary, fontSize: 13.5, mt: 0.5 }}>
-          {budget ? `${budget.scheduledPPD} this week. ` : ""}
+          {budget ? `${budget.scheduledPPD} this ${periodWord}. ` : ""}
           Set your usual number of residents and a target to compare staffing against your budget.
         </Typography>
         {canManage && (
@@ -88,12 +99,12 @@ function BudgetGauge({ budget, hoursInfo, canManage, onSetup }) {
   const gap = Math.abs(varianceHours);
   const open = hoursInfo?.open || 0;
   const verdict = over
-    ? `${fmt(gap)} hours over budget this week.`
+    ? `${fmt(gap)} hours over budget this ${periodWord}.`
     : under
       ? open
         ? `${fmt(gap)} hours under budget. ${fmt(Math.min(open, gap))} of those are open shifts nobody is assigned to yet.`
         : `${fmt(gap)} hours under budget. Check you're staffed safely.`
-      : "On budget this week.";
+      : `On budget this ${periodWord}.`;
   const line = { fontSize: 12.5, color: IOS.secondary, ...num };
   return (
     <Box sx={{ p: 2, borderRadius: IOS.radius.cell, bgcolor: IOS.canvas }}>
@@ -119,10 +130,10 @@ function BudgetGauge({ budget, hoursInfo, canManage, onSetup }) {
       <Box sx={{ mt: 1, pt: 1, borderTop: `1px solid ${IOS.separator}`, display: "grid", gap: 0.25 }}>
         <Typography sx={line}>
           {fmt(hoursInfo.scheduled)} h staffed ÷ {fmt(residentDays, 0)} resident days
-          {countedDays === 7 ? ` (${fmt(residentsPerDay)} residents × 7 days)` : ""} = {value}
+          {countedDays === dayCount ? ` (${fmt(residentsPerDay)} residents × ${dayCount} days)` : ""} = {value}
         </Typography>
         <Typography sx={line}>
-          Budget: {target} × {fmt(residentDays, 0)} = {fmt(budgetHours)} h this week
+          Budget: {target} × {fmt(residentDays, 0)} = {fmt(budgetHours)} h this {periodWord}
         </Typography>
         {ifFilled && (
           <Typography sx={line}>
@@ -198,19 +209,23 @@ function PersonLine({ name, color, detail, right, rightTone }) {
  * certifications, who to check in with and where the hours went. Paid plans.
  */
 export default function LaborPage() {
-  const { can, hasFeature, facilityPreferences } = useAuth();
+  const { can, hasFeature, facilityPreferences, tenant } = useAuth();
   const navigate = useNavigate();
   const included = hasFeature("labor");
-  const [weekStart, setWeekStart] = useState(null);
+  // { period: "week" | "month", key: weekStart or "YYYY-MM" (null = current) }
+  const [view, setView] = useState({ period: "week", key: null });
+  const [fixing, setFixing] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reload, setReload] = useState(0);
 
   const load = useCallback(
-    (key) =>
+    ({ period, key }) =>
       api
-        .get("/labor/report", { params: key ? { weekStart: key } : {} })
+        .get("/labor/report", {
+          params: period === "month" ? { month: key || localMonth() } : key ? { weekStart: key } : {},
+        })
         .then((res) => {
           setData(res.data);
           setError("");
@@ -223,8 +238,8 @@ export default function LaborPage() {
   );
 
   useEffect(() => {
-    if (included) load(weekStart);
-  }, [included, weekStart, reload, load]);
+    if (included) load(view);
+  }, [included, view, reload, load]);
 
   if (!can("labor.view")) {
     return (
@@ -258,7 +273,12 @@ export default function LaborPage() {
 
   const roles = facilityPreferences?.roleFamilies || [];
   const d = data;
-  const isThisWeek = d && d.weekStart === d.thisWeek;
+  const isMonth = d?.period === "month";
+  const periodWord = isMonth ? "month" : "week";
+  const isCurrent = d && (isMonth ? d.month === d.thisMonth : d.weekStart === d.thisWeek);
+  // Overtime can still be fixed in this week and later ones.
+  const canFix = d && !isMonth && d.canFixOvertime && d.weekStart >= d.thisWeek;
+  const go = (key) => setView((v) => ({ ...v, key }));
   const attention = d ? attentionItems(d) : [];
   const roleMax = d ? Math.max(1, ...d.hours.byRole.map((r) => r.scheduled)) : 1;
   const shiftMax = d ? Math.max(1, ...d.attendance.byShift.map((s) => s.callOuts + s.noShows)) : 1;
@@ -274,20 +294,50 @@ export default function LaborPage() {
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
         <Typography sx={{ fontSize: 30, fontWeight: 700, letterSpacing: "-0.025em", color: IOS.ink }}>Labor</Typography>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+          <Box role="group" aria-label="Week or month" sx={{ display: "flex", bgcolor: IOS.fill, borderRadius: "12px", p: "3px" }}>
+            {["week", "month"].map((p) => (
+              <ButtonBase
+                key={p}
+                onClick={() => setView({ period: p, key: null })}
+                aria-pressed={view.period === p}
+                sx={{
+                  px: 1.5,
+                  py: 0.6,
+                  borderRadius: "9px",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: IOS.ink,
+                  bgcolor: view.period === p ? IOS.surface : "transparent",
+                  boxShadow: view.period === p ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
+                }}
+              >
+                {p === "week" ? "Week" : "Month"}
+              </ButtonBase>
+            ))}
+          </Box>
           <Box sx={{ display: "flex", alignItems: "center", bgcolor: IOS.fill, borderRadius: "12px", p: "3px" }}>
-            <IconButton size="small" aria-label="Previous week" onClick={() => d && setWeekStart(d.previous)}>
+            <IconButton size="small" aria-label={`Previous ${periodWord}`} onClick={() => d && go(d.previous)}>
               <FiChevronLeft />
             </IconButton>
             <Typography sx={{ fontWeight: 600, fontSize: 14, px: 1, minWidth: 128, textAlign: "center", ...num }}>
-              {d ? weekLabel(d.days) : "…"}
+              {d ? periodLabel(d) : "…"}
             </Typography>
-            <IconButton size="small" aria-label="Next week" onClick={() => d && setWeekStart(d.next)}>
+            <IconButton size="small" aria-label={`Next ${periodWord}`} onClick={() => d && go(d.next)}>
               <FiChevronRight />
             </IconButton>
           </Box>
-          {d && !isThisWeek && (
-            <Button size="small" onClick={() => setWeekStart(d.thisWeek)} sx={{ fontWeight: 600 }}>
-              Back to this week
+          {d && !isCurrent && (
+            <Button size="small" onClick={() => go(isMonth ? d.thisMonth : d.thisWeek)} sx={{ fontWeight: 600 }}>
+              Back to this {periodWord}
+            </Button>
+          )}
+          {d && (
+            <Button
+              startIcon={<FiPrinter />}
+              onClick={printLaborSummary}
+              sx={{ bgcolor: IOS.fill, color: IOS.ink, borderRadius: "12px", px: 1.75, fontWeight: 600, "&:hover": { bgcolor: "rgba(118,118,128,0.2)" } }}
+            >
+              Print
             </Button>
           )}
           {d?.canManage && (
@@ -303,7 +353,7 @@ export default function LaborPage() {
       </Box>
 
       {error && <Alert severity="error" sx={{ mt: 2, borderRadius: "12px" }}>{error}</Alert>}
-      {!d && !error && <Typography sx={{ mt: 4, color: IOS.secondary }}>Loading this week…</Typography>}
+      {!d && !error && <Typography sx={{ mt: 4, color: IOS.secondary }}>Loading…</Typography>}
 
       {d && (
         <>
@@ -311,7 +361,7 @@ export default function LaborPage() {
           <Box sx={{ ...surface, mt: 2.5, p: { xs: 2, md: 3 }, display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.5fr 1fr" }, gap: { xs: 2, md: 4 }, alignItems: "center" }}>
             <Box>
               <Typography sx={{ color: IOS.secondary, fontSize: 14, fontWeight: 600 }}>
-                {isThisWeek ? "This week" : `Week of ${weekLabel(d.days)}`}
+                {isCurrent ? `This ${periodWord}` : isMonth ? periodLabel(d) : `Week of ${periodLabel(d)}`}
               </Typography>
               <Typography sx={{ fontSize: { xs: 22, md: 26 }, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.2, mt: 0.5, maxWidth: 620 }}>
                 {attention.length
@@ -349,7 +399,14 @@ export default function LaborPage() {
                 </Typography>
               )}
             </Box>
-            <BudgetGauge budget={d.budget} hoursInfo={d.hours} canManage={d.canManage} onSetup={() => setSettingsOpen(true)} />
+            <BudgetGauge
+              budget={d.budget}
+              hoursInfo={d.hours}
+              canManage={d.canManage}
+              onSetup={() => setSettingsOpen(true)}
+              periodWord={periodWord}
+              dayCount={d.days.length}
+            />
           </Box>
 
           {/* Key figures */}
@@ -420,12 +477,21 @@ export default function LaborPage() {
             </Typography>
           )}
 
+          {/* Trends */}
+          <Section title="Last 12 weeks" note="Is it getting better? Each point is one week." sx={{ mt: 1.5 }}>
+            <LaborTrends endWeek={!isMonth && d.weekStart < d.thisWeek ? d.weekStart : null} canSeeCosts={d.canSeeCosts} reloadKey={reload} />
+          </Section>
+
           {/* Overtime + certifications */}
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.2fr 1fr" }, gap: 1.5, mt: 1.5 }}>
             <Section
               id="labor-overtime"
-              title="Overtime coming"
-              note={`Everyone heading past ${threshold} hours this week, counting shifts already worked and still scheduled. Move a shift before it reaches payroll.`}
+              title={isMonth ? "Overtime" : "Overtime coming"}
+              note={
+                isMonth
+                  ? `Everyone who went past ${threshold} hours in a week this month (overtime is counted per payroll week).`
+                  : `Everyone heading past ${threshold} hours this week, counting shifts already worked and still scheduled.${canFix ? " Tap Fix to give a shift to someone with room." : " Move a shift before it reaches payroll."}`
+              }
             >
               {d.overtime.people.length > 0 && (
                 <Box sx={{ display: "flex", gap: 2, mb: 0.5, fontSize: 12, color: IOS.secondary }} aria-hidden>
@@ -445,9 +511,22 @@ export default function LaborPage() {
                         {o.name}
                         <Box component="span" sx={{ color: IOS.secondary, fontWeight: 400, fontSize: 13, ml: 1 }}>{roleLabel(o.role)}</Box>
                       </Typography>
-                      <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: IOS.redText, whiteSpace: "nowrap", ...num }}>
-                        +{o.overtimeHours} h
-                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
+                        <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: IOS.redText, whiteSpace: "nowrap", ...num }}>
+                          +{o.overtimeHours} h
+                        </Typography>
+                        {canFix && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            disableElevation
+                            onClick={() => setFixing(o)}
+                            sx={{ minWidth: 0, px: 1.5, py: 0.25, borderRadius: IOS.radius.round, fontWeight: 600, fontSize: 13 }}
+                          >
+                            Fix
+                          </Button>
+                        )}
+                      </Box>
                     </Box>
                     <Box sx={{ position: "relative", height: 8, borderRadius: 4, bgcolor: IOS.fill, mt: 0.75, overflow: "hidden" }} role="img" aria-label={`${o.projectedHours} hours of ${threshold}`}>
                       {/* Fixed colors (not the role color) and a white gap at the
@@ -457,12 +536,14 @@ export default function LaborPage() {
                       <Box sx={{ position: "absolute", left: `calc(${(threshold / otMax) * 100}% - 1px)`, top: 0, bottom: 0, width: 2, bgcolor: IOS.surface }} />
                     </Box>
                     <Typography sx={{ fontSize: 12.5, color: IOS.secondary, mt: 0.5, ...num }}>
-                      {hours(o.projectedHours)} this week, {o.alreadyOver ? "already over" : `goes over on ${dayLabel(o.crossesOn, { weekday: "long" })}`}
+                      {isMonth
+                        ? `Over in ${plural(o.weeksOver, "week")}, most was ${hours(o.projectedHours)} in a week`
+                        : `${hours(o.projectedHours)} this week, ${o.alreadyOver ? "already over" : `goes over on ${dayLabel(o.crossesOn, { weekday: "long" })}`}`}
                     </Typography>
                   </Box>
                 ))
               ) : (
-                <Quiet>No one goes over {threshold} hours this week.</Quiet>
+                <Quiet>No one goes over {threshold} hours in a week this {periodWord}.</Quiet>
               )}
             </Section>
 
@@ -518,7 +599,7 @@ export default function LaborPage() {
                     />
                   ))
                 ) : (
-                  <Quiet>No call-outs or no-shows this week.</Quiet>
+                  <Quiet>No call-outs or no-shows this {periodWord}.</Quiet>
                 )}
               </Section>
               <Section id="labor-shifts" title="Shifts">
@@ -546,25 +627,30 @@ export default function LaborPage() {
                   <BarRow key={r.role} label={roleLabel(r.role)} value={r.scheduled} max={roleMax} color={roleColor(r.role, roles)} display={hours(r.scheduled)} />
                 ))
               ) : (
-                <Quiet>No shifts this week.</Quiet>
+                <Quiet>No shifts this {periodWord}.</Quiet>
               )}
             </Section>
 
             <Section title="Hours by day" note={hasTarget ? "The dark line on each day is the budget for that day's residents." : undefined}>
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: { xs: 0.75, md: 1.5 }, alignItems: "end", height: 170 }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: `repeat(${d.days.length}, 1fr)`, gap: isMonth ? { xs: "2px", md: "4px" } : { xs: 0.75, md: 1.5 }, alignItems: "end", height: 170 }}>
                 {d.hours.byDay.map((day) => {
                   const budgetH = dayBudget(day);
                   const over = budgetH !== null && day.scheduled > budgetH * 1.03;
                   return (
                     <Box key={day.date} sx={{ display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
-                      <Typography sx={{ fontSize: 12, fontWeight: 700, mb: 0.5, ...num }}>{Math.round(day.scheduled)}</Typography>
+                      {!isMonth && <Typography sx={{ fontSize: 12, fontWeight: 700, mb: 0.5, ...num }}>{Math.round(day.scheduled)}</Typography>}
                       <Box sx={{ position: "relative", width: "100%", maxWidth: 44, height: 120, display: "flex", alignItems: "flex-end" }}>
-                        <Box sx={{ width: "100%", height: `${(day.scheduled / dayMax) * 100}%`, minHeight: 2, borderRadius: "6px 6px 2px 2px", bgcolor: over ? IOS.orange : IOS.blue }} />
+                        <Box
+                          title={isMonth ? `${dayLabel(day.date)}: ${Math.round(day.scheduled)} h` : undefined}
+                          sx={{ width: "100%", height: `${(day.scheduled / dayMax) * 100}%`, minHeight: 2, borderRadius: isMonth ? "3px 3px 1px 1px" : "6px 6px 2px 2px", bgcolor: over ? IOS.orange : IOS.blue }}
+                        />
                         {budgetH !== null && (
-                          <Box sx={{ position: "absolute", left: -4, right: -4, bottom: `${(budgetH / dayMax) * 100}%`, height: 2, bgcolor: IOS.ink, borderRadius: 1 }} />
+                          <Box sx={{ position: "absolute", left: isMonth ? -1 : -4, right: isMonth ? -1 : -4, bottom: `${(budgetH / dayMax) * 100}%`, height: 2, bgcolor: IOS.ink, borderRadius: 1 }} />
                         )}
                       </Box>
-                      <Typography sx={{ fontSize: 12, color: IOS.secondary, mt: 0.75 }}>{dayLabel(day.date, { weekday: "short" })}</Typography>
+                      <Typography sx={{ fontSize: isMonth ? 10 : 12, color: IOS.secondary, mt: 0.75, ...num }}>
+                        {isMonth ? (Number(day.date.slice(8)) % 7 === 1 ? Number(day.date.slice(8)) : "\u00a0") : dayLabel(day.date, { weekday: "short" })}
+                      </Typography>
                     </Box>
                   );
                 })}
@@ -579,6 +665,15 @@ export default function LaborPage() {
           )}
         </>
       )}
+
+      {d && <LaborPrint d={d} facilityName={tenant?.branding?.displayName || tenant?.name} />}
+
+      <OvertimeFixDrawer
+        person={fixing}
+        weekStart={d?.weekStart}
+        onClose={() => setFixing(null)}
+        onChanged={() => setReload((n) => n + 1)}
+      />
 
       {settingsOpen && (
         <LaborSettingsDialog

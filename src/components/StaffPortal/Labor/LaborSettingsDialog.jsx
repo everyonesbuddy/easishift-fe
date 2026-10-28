@@ -186,7 +186,7 @@ export default function LaborSettingsDialog({ onClose, onSaved, roles }) {
               </Stack>
             </Section>
 
-            <Section title="Budget" hint="Care hours per resident day (PPD) you aim for, and how many residents you usually have. Enter the exact count for a day on the Labor page when it differs.">
+            <Section title="Budget" hint="Care hours per resident day (PPD) you aim for, and how many residents you usually have. Update the number of residents when it changes.">
               <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
                 <TextField
                   size="small"

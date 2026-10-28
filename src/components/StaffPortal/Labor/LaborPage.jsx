@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Box, Button, Container, IconButton, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Container, IconButton, Typography } from "@mui/material";
 import { FiChevronLeft, FiChevronRight, FiSettings } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 import { IOS, roleColor } from "../../../theme/ios";
@@ -54,35 +53,6 @@ const Row = ({ left, right, sub, dot }) => (
     )}
   </Box>
 );
-
-/** Residents for one day (owners/admins), saved when the field loses focus. */
-function ResidentsInput({ date, value, onSaved }) {
-  const [text, setText] = useState(value ?? "");
-  const save = async () => {
-    const next = text === "" ? null : Number(text);
-    if (next === (value ?? null)) return;
-    try {
-      await api.put("/labor/census", { entries: [{ date, residents: next }] });
-      onSaved();
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Couldn't save residents", { position: "top-right" });
-      setText(value ?? "");
-    }
-  };
-  return (
-    <TextField
-      size="small"
-      type="number"
-      value={text}
-      placeholder="–"
-      onChange={(e) => setText(e.target.value)}
-      onBlur={save}
-      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-      inputProps={{ min: 0, max: 5000, "aria-label": `Residents on ${date}`, style: { textAlign: "center", padding: "4px 6px" } }}
-      sx={{ width: 76, "& .MuiOutlinedInput-root": { borderRadius: "8px" } }}
-    />
-  );
-}
 
 /**
  * Labor: one building's week for leadership (ED, DON, VP) and schedulers.
@@ -306,7 +276,7 @@ export default function LaborPage() {
             </Panel>
           </Box>
 
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 2fr" }, gap: 1.5, mt: 1.5 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 1.5, mt: 1.5 }}>
             <Panel title="Hours by role">
               {d.hours.byRole.length ? (
                 d.hours.byRole.map((r) => (
@@ -323,42 +293,15 @@ export default function LaborPage() {
               )}
             </Panel>
 
-            <Panel
-              title="By day"
-              hint={d.canManage ? "Type the number of residents for a day when it differs from usual." : undefined}
-            >
-              <Box sx={{ overflowX: "auto" }}>
-                <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: 14, "& td, & th": { py: 0.75, px: 1, textAlign: "center", borderTop: `1px solid ${IOS.hairline}` }, "& th": { color: IOS.secondary, fontWeight: 600, fontSize: 12.5, borderTop: "none" }, "& td:first-of-type, & th:first-of-type": { textAlign: "left", pl: 0 } }}>
-                  <thead>
-                    <tr>
-                      <th>Day</th>
-                      <th>Scheduled</th>
-                      {d.hours.timeClockUsed && <th>Worked</th>}
-                      <th>Residents</th>
-                      <th>Hours / resident</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {d.hours.byDay.map((day) => (
-                      <tr key={day.date}>
-                        <td>{dayLabel(day.date)}</td>
-                        <td>{hours(day.scheduled)}</td>
-                        {d.hours.timeClockUsed && <td>{hours(day.worked)}</td>}
-                        <td>
-                          {d.canManage ? (
-                            <ResidentsInput key={`${day.date}:${day.residents}`} date={day.date} value={day.residents} onSaved={() => setReload((n) => n + 1)} />
-                          ) : (
-                            day.residents ?? "–"
-                          )}
-                        </td>
-                        <td style={{ fontVariantNumeric: "tabular-nums" }}>
-                          {day.residents ? (Math.round((day.scheduled / day.residents) * 100) / 100).toFixed(2) : "–"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Box>
-              </Box>
+            <Panel title="Hours by day">
+              {d.hours.byDay.map((day) => (
+                <Row
+                  key={day.date}
+                  left={dayLabel(day.date)}
+                  sub={d.hours.timeClockUsed ? `${hours(day.worked)} worked` : undefined}
+                  right={hours(day.scheduled)}
+                />
+              ))}
             </Panel>
           </Box>
 

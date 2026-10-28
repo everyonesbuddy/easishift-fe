@@ -354,6 +354,30 @@ export default function StaffList() {
       </Box>
     </Tooltip>
   );
+  // Certification expired or expiring in 30 days (dates set on the person).
+  const certStatus = (u) => {
+    const tags = new Set((u.certificationTags || []).map((t) => String(t).toLowerCase()));
+    const days = (u.credentials || [])
+      .filter((c) => tags.has(String(c.tag).toLowerCase()) && c.expiresAt)
+      .map((c) => Math.ceil((new Date(c.expiresAt) - Date.now()) / 86400000));
+    if (!days.length) return null;
+    const soonest = Math.min(...days);
+    if (soonest <= 0) return { label: "Cert expired", bg: "#FEE4E2", color: "#B42318" };
+    if (soonest <= 30) return { label: `Cert expires in ${soonest} d`, bg: "#FEF3C7", color: "#92400E" };
+    return null;
+  };
+  const renderCertBadge = (u) => {
+    const st = certStatus(u);
+    if (!st) return null;
+    return (
+      <Box
+        component="span"
+        sx={{ ml: 1, px: 0.75, py: 0.1, borderRadius: 1, fontSize: "0.66rem", fontWeight: 700, bgcolor: st.bg, color: st.color, whiteSpace: "nowrap", verticalAlign: "middle" }}
+      >
+        {st.label}
+      </Box>
+    );
+  };
   const noContactCount = staff.filter((u) => u.status !== "archived" && hasNoContact(u)).length;
 
   const renderSmsStatus = (u) => {
@@ -656,6 +680,7 @@ export default function StaffList() {
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography sx={{ fontSize: 15, fontWeight: 600 }} noWrap>
                         {u.name}
+                        {renderCertBadge(u)}
                       </Typography>
                       <Typography
                         sx={{ fontSize: 12, color: "text.secondary" }}
@@ -795,6 +820,7 @@ export default function StaffList() {
                           <Box>
                             <Typography sx={{ fontSize: 15 }}>
                               {u.name}
+                              {renderCertBadge(u)}
                             </Typography>
                           </Box>
                         </Box>

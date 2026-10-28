@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import {
   MdDashboard,
+  MdInsights,
   MdCalendarToday,
   MdPeople,
   MdSchedule,
@@ -58,6 +59,9 @@ function Sidebar({ mobileOpen, onMobileClose }) {
 
   const menuItems = [
     { id: "overview", icon: MdDashboard, label: "Overview", to: "/dashboard" },
+    ...(can("labor.view")
+      ? [{ id: "labor", icon: MdInsights, label: "Labor", to: "/labor" }]
+      : []),
     ...(can("coverage.manage")
       ? [
           {

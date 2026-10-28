@@ -35,6 +35,7 @@ import PlanBanner from "./components/Shared/PlanBanner";
 import { IOS } from "./theme/ios";
 import StaffLinkPage from "./components/StaffLink/StaffLinkPage";
 import StaffingTemplatePage from "./components/StaffPortal/Coverage/StaffingTemplatePage";
+import LaborPage from "./components/StaffPortal/Labor/LaborPage";
 import MessageList from "./components/StaffPortal/Messages/MessageList";
 import TimeOffDecision from "./components/StaffPortal/TimeOff/TimeOffDecision";
 import FacilityPreferencesPage from "./components/StaffPortal/FacilityPreferences/FacilityPreferencesPage";
@@ -212,6 +213,14 @@ export default function App() {
               element={
                 <PrivateRoute>
                   <StaffList />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/labor"
+              element={
+                <PrivateRoute>
+                  <LaborPage />
                 </PrivateRoute>
               }
             />

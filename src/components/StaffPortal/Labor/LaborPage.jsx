@@ -52,15 +52,21 @@ const Quiet = ({ children }) => (
   </Box>
 );
 
-/** Hours per resident day against the target: a bar with a marker at the target. */
-function BudgetGauge({ budget, canManage, onSetup }) {
+const fmt = (n, digits = 1) => Number(n).toLocaleString(undefined, { maximumFractionDigits: digits });
+
+/**
+ * Hours per resident day against the target, written so an administrator
+ * or VP can follow it: the number, a bar with the target marked (and how
+ * far filling the open shifts would get you), a plain verdict, and the math.
+ */
+function BudgetGauge({ budget, hoursInfo, canManage, onSetup }) {
   if (!budget || budget.targetPPD === null) {
     return (
       <Box sx={{ p: 2, borderRadius: IOS.radius.cell, bgcolor: IOS.canvas }}>
         <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Hours per resident day</Typography>
         <Typography sx={{ color: IOS.secondary, fontSize: 13.5, mt: 0.5 }}>
           {budget ? `${budget.scheduledPPD} this week. ` : ""}
-          Set your usual residents and a target to compare against your budget.
+          Set your usual number of residents and a target to compare staffing against your budget.
         </Typography>
         {canManage && (
           <Button size="small" onClick={onSetup} sx={{ mt: 1, px: 0, fontWeight: 600 }}>
@@ -70,29 +76,56 @@ function BudgetGauge({ budget, canManage, onSetup }) {
       </Box>
     );
   }
-  const { scheduledPPD: value, targetPPD: target, varianceHours } = budget;
-  const max = Math.max(target * 1.4, value * 1.08);
+  const { scheduledPPD: value, targetPPD: target, varianceHours, residentDays, residentsPerDay, countedDays, budgetHours, neededPPD } = budget;
+  const ifFilled = neededPPD !== null && neededPPD > value ? neededPPD : null;
+  const max = Math.max(target * 1.3, value * 1.08, (ifFilled || 0) * 1.05);
   const over = value > target * 1.03;
-  const under = value < target * 0.9;
+  const under = value < target * 0.97;
   const color = over ? IOS.red : under ? IOS.orange : IOS.green;
+  const gap = Math.abs(varianceHours);
+  const open = hoursInfo?.open || 0;
   const verdict = over
-    ? `${Math.abs(varianceHours)} h over budget`
+    ? `${fmt(gap)} hours over budget this week.`
     : under
-      ? `${Math.abs(varianceHours)} h under budget, check you're staffed safely`
-      : "On budget";
+      ? open
+        ? `${fmt(gap)} hours under budget. ${fmt(Math.min(open, gap))} of those are open shifts nobody is assigned to yet.`
+        : `${fmt(gap)} hours under budget. Check you're staffed safely.`
+      : "On budget this week.";
+  const line = { fontSize: 12.5, color: IOS.secondary, ...num };
   return (
     <Box sx={{ p: 2, borderRadius: IOS.radius.cell, bgcolor: IOS.canvas }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 1 }}>
         <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Hours per resident day</Typography>
-        <Typography sx={{ fontWeight: 700, fontSize: 24, color: over ? IOS.redText : under ? IOS.orangeText : IOS.greenText, ...num }}>{value}</Typography>
+        <Typography sx={{ fontWeight: 700, fontSize: 26, color: over ? IOS.redText : under ? IOS.orangeText : IOS.greenText, ...num }}>
+          {value}
+          <Box component="span" sx={{ fontSize: 14, color: IOS.secondary, fontWeight: 600, ml: 0.75 }}>of {target}</Box>
+        </Typography>
       </Box>
-      <Box sx={{ position: "relative", height: 10, borderRadius: 5, bgcolor: IOS.fill, mt: 1.25 }} role="img" aria-label={`${value} against a target of ${target}`}>
-        <Box sx={{ position: "absolute", inset: 0, width: `${(value / max) * 100}%`, borderRadius: 5, bgcolor: color }} />
+      <Box
+        sx={{ position: "relative", height: 12, borderRadius: 6, bgcolor: IOS.fill, mt: 1.25 }}
+        role="img"
+        aria-label={`${value} hours per resident day against a target of ${target}${ifFilled ? `; ${ifFilled} if every open shift is filled` : ""}`}
+      >
+        {ifFilled && (
+          <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(ifFilled / max) * 100}%`, borderRadius: 6, bgcolor: tint(color, 0.3) }} />
+        )}
+        <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(value / max) * 100}%`, borderRadius: 6, bgcolor: color }} />
         <Box sx={{ position: "absolute", top: -4, bottom: -4, left: `${(target / max) * 100}%`, width: 2, bgcolor: IOS.ink, borderRadius: 1 }} />
       </Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.75, fontSize: 13, color: IOS.secondary }}>
-        <span>{verdict}</span>
-        <span style={num}>Target {target}</span>
+      <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: IOS.ink, mt: 1 }}>{verdict}</Typography>
+      <Box sx={{ mt: 1, pt: 1, borderTop: `1px solid ${IOS.separator}`, display: "grid", gap: 0.25 }}>
+        <Typography sx={line}>
+          {fmt(hoursInfo.scheduled)} h staffed ÷ {fmt(residentDays, 0)} resident days
+          {countedDays === 7 ? ` (${fmt(residentsPerDay)} residents × 7 days)` : ""} = {value}
+        </Typography>
+        <Typography sx={line}>
+          Budget: {target} × {fmt(residentDays, 0)} = {fmt(budgetHours)} h this week
+        </Typography>
+        {ifFilled && (
+          <Typography sx={line}>
+            With every open shift filled: {ifFilled} (lighter bar)
+          </Typography>
+        )}
       </Box>
     </Box>
   );
@@ -313,7 +346,7 @@ export default function LaborPage() {
                 </Typography>
               )}
             </Box>
-            <BudgetGauge budget={d.budget} canManage={d.canManage} onSetup={() => setSettingsOpen(true)} />
+            <BudgetGauge budget={d.budget} hoursInfo={d.hours} canManage={d.canManage} onSetup={() => setSettingsOpen(true)} />
           </Box>
 
           {/* Key figures */}
@@ -332,9 +365,15 @@ export default function LaborPage() {
             }}
           >
             <Figure
-              label="Hours scheduled"
+              label="Hours staffed"
               value={hours(d.hours.scheduled)}
-              detail={d.hours.timeClockUsed ? `${hours(d.hours.worked)} worked` : "From the schedule"}
+              detail={
+                d.hours.needed
+                  ? `of ${hours(d.hours.needed)} needed${d.hours.timeClockUsed ? `, ${hours(d.hours.worked)} worked` : ""}`
+                  : d.hours.timeClockUsed
+                    ? `${hours(d.hours.worked)} worked`
+                    : "Shifts with someone assigned"
+              }
             />
             {d.canSeeCosts && (
               <Figure
@@ -519,7 +558,7 @@ export default function LaborPage() {
 
           {!d.hours.timeClockUsed && (
             <Typography sx={{ color: IOS.secondary, fontSize: 13, mt: 2 }}>
-              Hours come from the schedule. Turn on the time clock to compare them with hours actually worked.
+              Hours staffed are shifts with someone assigned (published or draft). Open shifts aren't counted until someone takes them. Turn on the time clock to compare with hours actually worked.
             </Typography>
           )}
         </>

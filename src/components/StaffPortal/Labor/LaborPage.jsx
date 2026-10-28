@@ -8,6 +8,9 @@ import { IOS, roleColor, tint } from "../../../theme/ios";
 import LaborSettingsDialog from "./LaborSettingsDialog";
 import { certLabel, dayLabel, hours, money, roleLabel, weekLabel } from "./laborFormat";
 
+// Regular hours on the overtime bars: a calm slate so the red overtime stands out.
+const OT_REGULAR = "#8E9AAF";
+
 const surface = {
   bgcolor: IOS.surface,
   borderRadius: IOS.radius.card,
@@ -424,6 +427,16 @@ export default function LaborPage() {
               title="Overtime coming"
               note={`Everyone heading past ${threshold} hours this week, counting shifts already worked and still scheduled. Move a shift before it reaches payroll.`}
             >
+              {d.overtime.people.length > 0 && (
+                <Box sx={{ display: "flex", gap: 2, mb: 0.5, fontSize: 12, color: IOS.secondary }} aria-hidden>
+                  <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
+                    <Box component="span" sx={{ width: 10, height: 10, borderRadius: "3px", bgcolor: OT_REGULAR }} />First {threshold} h
+                  </Box>
+                  <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
+                    <Box component="span" sx={{ width: 10, height: 10, borderRadius: "3px", bgcolor: IOS.red }} />Overtime
+                  </Box>
+                </Box>
+              )}
               {d.overtime.people.length ? (
                 d.overtime.people.map((o) => (
                   <Box key={o.staffId} sx={{ py: 1.1, "& + &": { borderTop: `1px solid ${IOS.hairline}` } }}>
@@ -432,13 +445,16 @@ export default function LaborPage() {
                         {o.name}
                         <Box component="span" sx={{ color: IOS.secondary, fontWeight: 400, fontSize: 13, ml: 1 }}>{roleLabel(o.role)}</Box>
                       </Typography>
-                      <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: IOS.orangeText, whiteSpace: "nowrap", ...num }}>
+                      <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: IOS.redText, whiteSpace: "nowrap", ...num }}>
                         +{o.overtimeHours} h
                       </Typography>
                     </Box>
                     <Box sx={{ position: "relative", height: 8, borderRadius: 4, bgcolor: IOS.fill, mt: 0.75, overflow: "hidden" }} role="img" aria-label={`${o.projectedHours} hours of ${threshold}`}>
-                      <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(threshold / otMax) * 100}%`, bgcolor: roleColor(o.role, roles) }} />
-                      <Box sx={{ position: "absolute", left: `${(threshold / otMax) * 100}%`, top: 0, bottom: 0, width: `${((o.projectedHours - threshold) / otMax) * 100}%`, bgcolor: IOS.orange }} />
+                      {/* Fixed colors (not the role color) and a white gap at the
+                          threshold, so regular hours and overtime never blend. */}
+                      <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(threshold / otMax) * 100}%`, bgcolor: OT_REGULAR }} />
+                      <Box sx={{ position: "absolute", left: `${(threshold / otMax) * 100}%`, top: 0, bottom: 0, width: `${((o.projectedHours - threshold) / otMax) * 100}%`, bgcolor: IOS.red }} />
+                      <Box sx={{ position: "absolute", left: `calc(${(threshold / otMax) * 100}% - 1px)`, top: 0, bottom: 0, width: 2, bgcolor: IOS.surface }} />
                     </Box>
                     <Typography sx={{ fontSize: 12.5, color: IOS.secondary, mt: 0.5, ...num }}>
                       {hours(o.projectedHours)} this week, {o.alreadyOver ? "already over" : `goes over on ${dayLabel(o.crossesOn, { weekday: "long" })}`}

@@ -65,7 +65,7 @@ export default function Login() {
       }
       login(res.data.user);
       trackEvent("login", { method: "password" });
-      navigate("/dashboard");
+      navigate("/home");
     } catch (err) {
       setError(err.response?.data?.message || "Couldn't sign in. Check your email and password.");
     } finally {

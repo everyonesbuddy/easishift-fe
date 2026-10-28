@@ -2,7 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import PrivateRoute from "./components/Shared/PrivateRoute";
 import Login from "./components/Auth/Login";
 import ResetPassword from "./components/Auth/ResetPassword";
-import StaffDashboard from "./components/StaffPortal/Dashboard/StaffDashboard";
+import TodayPage from "./components/StaffPortal/Today/TodayPage";
+import HomeRedirect from "./components/StaffPortal/Today/HomeRedirect";
 import SignupTenant from "./components/Auth/SignupTenant";
 import Home from "./components/Home/Home";
 import PricingPage from "./components/Home/PricingPage";
@@ -111,7 +112,7 @@ export default function App() {
             <Route
               path="/"
               element={
-                user ? <Navigate to="/dashboard" replace /> : <Home />
+                user ? <Navigate to="/home" replace /> : <Home />
               }
             />
             <Route path="/pricing" element={<PricingPage />} />
@@ -147,7 +148,7 @@ export default function App() {
             <Route path="/features/:feature" element={<FeatureLandingPage />} />
             <Route
               path="/login"
-              element={user ? <Navigate to="/dashboard" replace /> : <Login />}
+              element={user ? <Navigate to="/home" replace /> : <Login />}
             />
             <Route path="/reset-password" element={<ResetPassword />} />
             {/* Staff: get your personal link sent again (no password). */}
@@ -156,7 +157,7 @@ export default function App() {
             <Route
               path="/signup-tenant"
               element={
-                user ? <Navigate to="/dashboard" replace /> : <SignupTenant />
+                user ? <Navigate to="/home" replace /> : <SignupTenant />
               }
             />
             <Route path="/signup" element={<Navigate to="/signup-tenant" replace />} />
@@ -180,10 +181,18 @@ export default function App() {
             />
             <Route path="/billing/cancel" element={<BillingCancel />} />
             <Route
+              path="/home"
+              element={
+                <PrivateRoute>
+                  <HomeRedirect />
+                </PrivateRoute>
+              }
+            />
+            <Route
               path="/dashboard"
               element={
                 <PrivateRoute>
-                  <StaffDashboard />
+                  <TodayPage />
                 </PrivateRoute>
               }
             />

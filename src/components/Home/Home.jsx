@@ -25,6 +25,10 @@ import {
   FiX,
   FiCheck,
   FiHeart,
+  FiTarget,
+  FiAward,
+  FiMail,
+  FiTrendingDown,
 } from "react-icons/fi";
 
 import heroImage from "../../assets/images/wisershifts-hero-visual.png";
@@ -32,6 +36,8 @@ import gustoLogo from "../../assets/images/gusto.jpg";
 import quickbooksLogo from "../../assets/images/quickbooks.jpg";
 import ripplingLogo from "../../assets/images/rippling.png";
 import Footer from "../Shared/Footer";
+import RoleShowcase from "./RoleShowcase";
+import { DEMO_URL, FAQ, NOT_AN_AGENCY } from "./roleContent";
 
 const NAVBAR_HEIGHT = 80;
 
@@ -190,7 +196,11 @@ export default function Home() {
             position: "relative",
             minHeight: { xs: "auto", md: 760 },
             overflow: "hidden",
-            backgroundImage: `linear-gradient(90deg, rgba(15,23,42,0.94) 0%, rgba(15,23,42,0.84) 25%, rgba(15,23,42,0.42) 52%, rgba(15,23,42,0.12) 100%), url("${heroImage}")`,
+            // Phones: the text covers the whole photo, so darken all of it.
+            backgroundImage: {
+              xs: `linear-gradient(rgba(15,23,42,0.86), rgba(15,23,42,0.86)), url("${heroImage}")`,
+              md: `linear-gradient(90deg, rgba(15,23,42,0.94) 0%, rgba(15,23,42,0.84) 25%, rgba(15,23,42,0.42) 52%, rgba(15,23,42,0.12) 100%), url("${heroImage}")`,
+            },
             backgroundSize: "cover",
             backgroundPosition: "center",
             borderBottom: "1px solid #EEF2F6",
@@ -235,11 +245,12 @@ export default function Home() {
                       bgcolor: "#60A5FA",
                     }}
                   />
-                  Scheduling for care facilities
+                  Software for senior living teams
                 </Typography>
                 <Typography
                   component="h1"
                   sx={{
+                    maxWidth: 640,
                     fontWeight: 900,
                     letterSpacing: "-0.045em",
                     lineHeight: 1.02,
@@ -252,20 +263,21 @@ export default function Home() {
                     },
                   }}
                 >
-                  Build the schedule in minutes. Text it to your whole team in
-                  one click.
+                  Scheduling and labor software for senior living.
                 </Typography>
                 <Typography
                   sx={{
                     color: "rgba(255,255,255,0.82)",
                     fontSize: { xs: "1.05rem", md: "1.18rem" },
                     lineHeight: 1.6,
-                    maxWidth: 560,
+                    maxWidth: 520,
                     mt: 3,
                   }}
                 >
-                  Built for assisted living, memory care, nursing and home care.
-                  Free to start, no credit card.
+                  Your schedulers build and send the week in minutes. Your DON
+                  sees overtime and open shifts before payroll. Your
+                  administrator and regional VP get hours per resident day
+                  against budget every Monday.
                 </Typography>
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
@@ -296,7 +308,10 @@ export default function Home() {
                     variant="outlined"
                     size="large"
                     component="a"
-                    href="#how-it-works"
+                    href={DEMO_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    startIcon={<FiCalendar />}
                     sx={{
                       minHeight: 54,
                       px: 3.2,
@@ -313,17 +328,18 @@ export default function Home() {
                       },
                     }}
                   >
-                    See how it works
+                    Book a demo
                   </Button>
                 </Stack>
                 <Typography
                   sx={{
-                    color: "rgba(255,255,255,0.66)",
+                    color: "rgba(255,255,255,0.72)",
                     fontSize: "0.88rem",
                     mt: 1.75,
+                    maxWidth: 480,
                   }}
                 >
-                  Free for one scheduler and up to 15 staff.
+                  Free for one scheduler and up to 15 staff. {NOT_AN_AGENCY}
                 </Typography>
                 <Box sx={{ mt: 5 }}>
                   <Typography
@@ -445,7 +461,7 @@ export default function Home() {
                       mt: 0.75,
                     }}
                   >
-                    What are call-outs and overtime costing you?
+                    Are you staffed to budget? What are call-outs costing you?
                   </Typography>
                   <Typography
                     sx={{
@@ -455,8 +471,9 @@ export default function Home() {
                       lineHeight: 1.55,
                     }}
                   >
-                    Put in your own numbers and see what last-minute coverage,
-                    overtime and turnover add up to each month.
+                    Work out your hours per resident day, the full-time positions
+                    your schedule needs, and what call-outs and overtime add up
+                    to. Your own numbers, with the math shown.
                   </Typography>
                 </Box>
                 <Button
@@ -481,7 +498,18 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          <Section>
+          <Section sx={{ scrollMarginTop: `${NAVBAR_HEIGHT}px` }}>
+            <Box id="roles" sx={{ scrollMarginTop: `${NAVBAR_HEIGHT + 24}px` }}>
+              <SectionTitle
+                eyebrow="Built for your role"
+                title="One schedule. What each person needs from it."
+                subtitle="Schedulers get the week out. DONs and administrators keep it on budget. Regional teams see every building's numbers on Monday."
+              />
+            </Box>
+            <RoleShowcase />
+          </Section>
+
+          <Section sx={{ pt: 0 }}>
             <SectionTitle
               eyebrow="Sound familiar?"
               title="Scheduling shouldn't eat your weekend."
@@ -630,9 +658,9 @@ export default function Home() {
 
           <Section sx={{ pt: 0 }}>
             <SectionTitle
-              eyebrow="Why schedulers switch"
+              eyebrow="What's inside"
               title="Less chasing. Fewer surprises."
-              subtitle="Everything you need to get the week out, and keep it covered once it's out."
+              subtitle="Everything you need to get the week out and keep it covered, and to run the building on your own team."
             />
             <Box
               sx={{
@@ -675,6 +703,58 @@ export default function Home() {
                 title="Clock-ins that match the schedule"
                 tag="Starter"
                 text="Staff clock in from their phone, on site if you want. Hours line up with their shifts and export straight to payroll."
+              />
+            </Box>
+            <Typography
+              component="h3"
+              sx={{ textAlign: "center", fontWeight: 900, color: "#111827", fontSize: { xs: "1.35rem", md: "1.6rem" }, mt: { xs: 7, md: 9 }, mb: { xs: 4, md: 5 } }}
+            >
+              And for running the building
+            </Typography>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                gap: { xs: 4, md: 5, lg: 6 },
+                maxWidth: 1000,
+                mx: "auto",
+              }}
+            >
+              <Feature
+                icon={<FiClock size={21} />}
+                title="Overtime before payroll"
+                tag="Starter"
+                text="See who's heading past 40 hours and on which day, and move a shift to someone on your team with room in one tap."
+              />
+              <Feature
+                icon={<FiTarget size={21} />}
+                title="Hours per resident day vs budget"
+                tag="Starter"
+                text="Staffed hours against your target every week, with the math written out and how much of a gap is open shifts."
+              />
+              <Feature
+                icon={<FiMail size={21} />}
+                title="A Monday labor email"
+                tag="Starter"
+                text="Last week's hours, budget, overtime, call-outs and certifications, sent to your administrator and anyone you add."
+              />
+              <Feature
+                icon={<FiAward size={21} />}
+                title="Certifications about to expire"
+                tag="Starter"
+                text="Expired, or expiring in the next 30 days, flagged before anyone works a shift they're not cleared for."
+              />
+              <Feature
+                icon={<FiHeart size={21} />}
+                title="Who to check in with"
+                tag="Starter"
+                text="Repeated call-outs, overtime streaks and hours dropping off: the early signs someone may leave."
+              />
+              <Feature
+                icon={<FiTrendingDown size={21} />}
+                title="Trends and a monthly summary"
+                tag="Starter"
+                text="Twelve weeks of the numbers that matter, and a one-page monthly summary to print for your review."
               />
             </Box>
             <Typography
@@ -794,6 +874,23 @@ export default function Home() {
             </Box>
           </Section>
 
+          <Section sx={{ pt: { xs: 2, md: 3 } }}>
+            <Box sx={{ maxWidth: 820, mx: "auto" }}>
+              <Typography
+                component="h2"
+                sx={{ fontWeight: 900, letterSpacing: "-0.03em", fontSize: { xs: "1.8rem", md: "2.3rem" }, color: "#111827", mb: 2.5, textAlign: "center" }}
+              >
+                Questions
+              </Typography>
+              {FAQ.map((f) => (
+                <Box key={f.q} sx={{ py: 2.25, borderTop: "1px solid #E4E7EC" }}>
+                  <Typography sx={{ fontWeight: 800, color: "#111827", fontSize: "1.05rem" }}>{f.q}</Typography>
+                  <Typography sx={{ color: "#667085", lineHeight: 1.6, mt: 0.5 }}>{f.a}</Typography>
+                </Box>
+              ))}
+            </Box>
+          </Section>
+
           <Section sx={{ pt: 1, pb: { xs: 8, md: 10 } }}>
             <Box
               sx={{
@@ -850,7 +947,7 @@ export default function Home() {
                   >
                     Start free with one scheduler and up to 15 staff. Add your
                     team, build the week and send it. Running several buildings?
-                    Book a demo and we'll set it up with you.
+                    Book a demo and we'll set each one up with you.
                   </Typography>
                 </Box>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
@@ -876,7 +973,7 @@ export default function Home() {
                     variant="outlined"
                     startIcon={<FiCalendar />}
                     component="a"
-                    href="https://calendly.com/wisershifts-info/30min"
+                    href={DEMO_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     sx={{

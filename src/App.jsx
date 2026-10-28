@@ -10,6 +10,9 @@ import Calculators from "./components/Home/Calculators";
 import CallOutCostCalculator from "./components/Home/CallOutCostCalculator";
 import OvertimeCostCalculator from "./components/Home/OvertimeCostCalculator";
 import TimeClockAccuracyCalculator from "./components/Home/TimeClockAccuracyCalculator";
+import HoursPerResidentDayCalculator from "./components/Home/HoursPerResidentDayCalculator";
+import ScheduleCoverageCalculator from "./components/Home/ScheduleCoverageCalculator";
+import RolePage from "./components/Home/RolePage";
 import TermsAndConditions from "./components/Home/TermsAndConditions";
 import PrivacyPolicy from "./components/Home/PrivacyPolicy";
 import EndUserLicenseAgreement from "./components/Home/EndUserLicenseAgreement";
@@ -144,6 +147,15 @@ export default function App() {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/integrations" element={<IntegrationsPage />} />
             <Route path="/features/:feature" element={<FeatureLandingPage />} />
+            <Route path="/for/:role" element={<RolePage />} />
+            <Route
+              path="/calculators/hours-per-resident-day-calculator"
+              element={<HoursPerResidentDayCalculator />}
+            />
+            <Route
+              path="/calculators/schedule-coverage-calculator"
+              element={<ScheduleCoverageCalculator />}
+            />
             <Route
               path="/login"
               element={user ? <Navigate to="/dashboard" replace /> : <Login />}

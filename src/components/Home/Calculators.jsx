@@ -5,6 +5,7 @@ import {
   FiActivity,
   FiClock,
   FiMapPin,
+  FiTarget,
   FiUsers,
 } from "react-icons/fi";
 import { Link as RouterLink } from "react-router-dom";
@@ -13,6 +14,34 @@ import Footer from "../Shared/Footer";
 const NAVBAR_HEIGHT = 80;
 
 const CALCULATORS = [
+  {
+    title: "Hours per Resident Day Calculator",
+    description:
+      "Work out your hours per resident day from who's on each shift, compare it to your budget, and see what every 0.1 costs a year.",
+    cta: "Calculate Hours per Resident Day",
+    to: "/calculators/hours-per-resident-day-calculator",
+    icon: <FiTarget size={18} />,
+    tag: "For administrators and DONs",
+    question: "Are we staffed to budget?",
+    details: ["Your census", "Your shifts", "Your target"],
+    accent: "#1D4ED8",
+    softAccent: "#EFF6FF",
+    time: "About 2 minutes",
+  },
+  {
+    title: "Schedule Coverage Calculator",
+    description:
+      "See how many full-time positions your schedule needs by role once time off is allowed for, and how that compares with your team.",
+    cta: "Calculate Positions Needed",
+    to: "/calculators/schedule-coverage-calculator",
+    icon: <FiUsers size={18} />,
+    tag: "For DONs and operators",
+    question: "Do we have enough people for this schedule?",
+    details: ["Shift pattern", "Time away", "Positions short"],
+    accent: "#4338CA",
+    softAccent: "#EEF2FF",
+    time: "About 3 minutes",
+  },
   {
     title: "Call-Out Cost Calculator",
     description:
@@ -104,8 +133,9 @@ export default function Calculators() {
                 Find the cost hiding in your workforce.
               </Typography>
               <Typography sx={{ color: "text.secondary", mt: 1 }}>
-                Use a focused estimator to turn staffing assumptions into a
-                clearer conversation about retention, labor spend, and savings.
+                Plan staffing levels from your own numbers, then see what
+                call-outs, overtime and unverified time are costing you. The
+                math is shown on every one.
               </Typography>
             </Box>
             <Box

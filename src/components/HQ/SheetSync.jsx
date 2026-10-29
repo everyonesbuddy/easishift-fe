@@ -9,7 +9,7 @@ import { ago, errorText, n } from "./hqFormat";
 
 // What a tab holds; "facilities:2" = call-list tier 2.
 const OPTIONS = [
-  ["", "Don't sync"],
+  ["", "Skip"],
   ["facilities:1", "Facilities: tier 1"],
   ["facilities:2", "Facilities: tier 2"],
   ["facilities:3", "Facilities: tier 3"],
@@ -78,7 +78,7 @@ export default function SheetSync({ reloadKey, onChanged }) {
     const others = (cfg?.sources || []).filter((s) => s.spreadsheetId !== found.spreadsheetId);
     const mine = found.tabs.filter((t) => t.value).map((t) => ({ spreadsheetId: found.spreadsheetId, title: found.title, tab: t.name, ...fromValue(t.value) }));
     if (await save([...others, ...mine])) {
-      toast.success(`Saved ${mine.length} tab${mine.length === 1 ? "" : "s"}. Syncing now…`);
+      toast.success(`Saved ${mine.length} tab${mine.length === 1 ? "" : "s"}. Bringing them in…`);
       setFound(null);
       setUrl("");
       sync();
@@ -93,7 +93,7 @@ export default function SheetSync({ reloadKey, onChanged }) {
       const res = await api.post("/hq/sheets/sync", {});
       const bad = res.data.results.filter((r) => r.error).length;
       if (bad) toast.warn(`${bad} tab${bad === 1 ? "" : "s"} didn't sync. See below.`);
-      else toast.success("Synced from Google Sheets");
+      else toast.success("Brought in from Google Sheets");
       setKey((k) => k + 1);
       onChanged?.();
     } catch (err) {
@@ -114,12 +114,12 @@ export default function SheetSync({ reloadKey, onChanged }) {
 
   return (
     <Section
-      title="Google Sheets"
-      note="Your CRM and call list stay in Google Sheets; HQ reads them every 2 hours. Edits you make in HQ (stage, next date, notes) are kept: a sync only changes what you changed in the sheet. New rows you add to the sheet come in as new people or buildings."
+      title="Bring in from Google Sheets"
+      note="HQ is the main record: edit people, facilities and history in HQ. Use this when you've added rows to the sheet. Only new rows, and cells you changed in the sheet since last time, come in, so your HQ edits stay."
       right={
         cfg?.sources?.length > 0 && (
           <Button size="small" variant="outlined" startIcon={<FiRefreshCw />} disabled={syncing} onClick={sync} sx={{ borderRadius: IOS.radius.round, textTransform: "none", flexShrink: 0 }}>
-            {syncing ? "Syncing…" : "Sync now"}
+            {syncing ? "Bringing in…" : "Bring in now"}
           </Button>
         )
       }
@@ -169,7 +169,7 @@ export default function SheetSync({ reloadKey, onChanged }) {
               ))}
               <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
                 <Button variant="contained" disableElevation onClick={saveFound} disabled={!found.tabs.some((t) => t.value)} sx={{ borderRadius: IOS.radius.round }}>
-                  Save and sync
+                  Save and bring in
                 </Button>
                 <Button onClick={() => setFound(null)}>Cancel</Button>
               </Box>
@@ -179,9 +179,9 @@ export default function SheetSync({ reloadKey, onChanged }) {
           {cfg.sources.length > 0 && (
             <Box sx={{ mt: 2 }}>
               <Typography sx={{ fontWeight: 700, fontSize: 14.5, mb: 0.5 }}>
-                Syncing {cfg.sources.length} tab{cfg.sources.length === 1 ? "" : "s"}
+                {cfg.sources.length} tab{cfg.sources.length === 1 ? "" : "s"} linked
                 <Box component="span" sx={{ fontWeight: 400, color: IOS.secondary, fontSize: 13, ml: 1 }}>
-                  {cfg.lastOkAt ? `last synced ${ago(cfg.lastOkAt)}` : cfg.lastRunAt ? `last tried ${ago(cfg.lastRunAt)}` : "not synced yet"}
+                  {cfg.lastOkAt ? `last brought in ${ago(cfg.lastOkAt)}` : cfg.lastRunAt ? `last tried ${ago(cfg.lastRunAt)}` : "not brought in yet"}
                 </Box>
               </Typography>
               {cfg.sources.map((s) => {
@@ -199,7 +199,7 @@ export default function SheetSync({ reloadKey, onChanged }) {
                         </Typography>
                       )}
                     </Box>
-                    <IconButton size="small" aria-label="Stop syncing this tab" onClick={() => remove(s)}>
+                    <IconButton size="small" aria-label="Unlink this tab" onClick={() => remove(s)}>
                       <FiTrash2 size={15} />
                     </IconButton>
                   </Box>

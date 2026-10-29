@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Alert, Box, Button, CircularProgress, MenuItem, TextField, Typography } from "@mui/material";
-import { FiCheckCircle, FiCircle, FiUpload } from "react-icons/fi";
+import { FiCheckCircle, FiCircle, FiDownload, FiUpload } from "react-icons/fi";
 import { toast } from "react-toastify";
 import api from "./hqApi";
 import { IOS } from "../../theme/ios";
@@ -51,6 +51,22 @@ export default function HqConnections({ reloadKey, onChanged }) {
       off = true;
     };
   }, [reloadKey]);
+
+  const download = async (kind) => {
+    try {
+      const res = await api.get(`/hq/export/${kind}`, { responseType: "blob" });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `wisershifts-hq-${kind}-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(errorText(err, "Couldn't download"));
+    }
+  };
 
   const pickFile = async (f) => {
     setFile(f);
@@ -104,6 +120,19 @@ export default function HqConnections({ reloadKey, onChanged }) {
   return (
     <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, alignItems: "start" }}>
       <SheetSync reloadKey={reloadKey} onChanged={onChanged} />
+      <Section title="Download a backup" note="Everything in HQ as spreadsheets you can open in Excel or Google Sheets." sx={{ gridColumn: "1 / -1" }}>
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+          {[
+            ["facilities", "Facilities"],
+            ["contacts", "People"],
+            ["activities", "History"],
+          ].map(([k, l]) => (
+            <Button key={k} variant="outlined" startIcon={<FiDownload />} onClick={() => download(k)} sx={{ borderRadius: IOS.radius.round }}>
+              {l}
+            </Button>
+          ))}
+        </Box>
+      </Section>
       <Section title="Connections" note="Keys live on the server (Heroku config vars), never in the browser. Add the ones listed and reload.">
         {error && <Alert severity="error">{error}</Alert>}
         {!list && !error && <CircularProgress size={22} />}

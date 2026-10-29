@@ -73,3 +73,11 @@ export const errorText = (err, fallback) => err?.response?.data?.message || fall
 
 /** "2026-11-03" for <input type="date"> from a Date/ISO string. */
 export const dateInput = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
+
+export const KINDS = [
+  ["call", "Call"],
+  ["email", "Email"],
+  ["linkedin", "LinkedIn"],
+  ["meeting", "Meeting"],
+  ["note", "Note"],
+];

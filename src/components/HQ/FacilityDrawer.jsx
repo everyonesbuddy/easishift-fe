@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Box, Button, CircularProgress, Drawer, IconButton, MenuItem, TextField, Typography } from "@mui/material";
-import { FiExternalLink, FiLinkedin, FiMail, FiPhone, FiX } from "react-icons/fi";
+import { FiEdit2, FiExternalLink, FiPhone, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
 import api from "./hqApi";
 import { IOS } from "../../theme/ios";
-import { ClickBadge, Empty, RolePill, Tag } from "./HqBits";
-import { ROLE_LABELS, ago, dateInput, errorText, shortDate } from "./hqFormat";
+import { Empty, Tag } from "./HqBits";
+import { KINDS, ROLE_LABELS, ago, dateInput, errorText, shortDate } from "./hqFormat";
+import { DeleteButton, EditFacility, HistoryRow, PersonRow } from "./FacilityParts";
+import usePlaybookPlays from "./usePlaybookPlays";
 
-const KINDS = [
-  ["call", "Call"],
-  ["email", "Email"],
-  ["linkedin", "LinkedIn"],
-  ["meeting", "Meeting"],
-  ["note", "Note"],
-];
 const STAGES = [
   "Trying (no answer / voicemail)",
   "Got scheduler name",
@@ -33,46 +28,13 @@ const Label = ({ children }) => (
   </Typography>
 );
 
-function Person({ c }) {
-  return (
-    <Box sx={{ py: 1, "& + &": { borderTop: `1px solid ${IOS.hairline}` } }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
-        <Typography sx={{ fontWeight: 700, fontSize: 14.5 }}>{c.name || c.email}</Typography>
-        <RolePill role={c.role} />
-        {c.facilityName && c.facilityName !== c.name && <Typography sx={{ fontSize: 12, color: IOS.secondary }}>{c.facilityName}</Typography>}
-      </Box>
-      {c.title && <Typography sx={{ fontSize: 13, color: IOS.secondary }}>{c.title}</Typography>}
-      <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap", mt: 0.25 }}>
-        {c.email && (
-          <Box component="a" href={`mailto:${c.email}`} sx={{ fontSize: 13, color: IOS.blue, display: "inline-flex", alignItems: "center", gap: 0.5 }}>
-            <FiMail size={12} /> {c.email}
-          </Box>
-        )}
-        {c.phone && (
-          <Box component="a" href={`tel:${c.phone}`} sx={{ fontSize: 13, color: IOS.blue, display: "inline-flex", alignItems: "center", gap: 0.5 }}>
-            <FiPhone size={12} /> {c.phone}
-          </Box>
-        )}
-        {c.linkedin && (
-          <Box component="a" href={c.linkedin} target="_blank" rel="noreferrer" sx={{ fontSize: 13, color: IOS.blue, display: "inline-flex", alignItems: "center", gap: 0.5 }}>
-            <FiLinkedin size={12} /> LinkedIn
-          </Box>
-        )}
-      </Box>
-      {c.email && (
-        <Box sx={{ mt: 0.25 }}>
-          <ClickBadge signal={c.signal} />
-        </Box>
-      )}
-    </Box>
-  );
-}
-
 /** One facility: where it stands, the people there, what we've done, and logging the next touch. */
 export default function FacilityDrawer({ id, onClose, onChanged }) {
   const [d, setD] = useState(null);
   const [error, setError] = useState("");
-  const [log, setLog] = useState({ kind: "call", outcome: "", notes: "", contactId: "", stage: "", nextStep: "", nextDate: "" });
+  const [log, setLog] = useState({ kind: "call", outcome: "", notes: "", contactId: "", playId: "", stage: "", nextStep: "", nextDate: "" });
+  const [editing, setEditing] = useState(false);
+  const plays = usePlaybookPlays();
   const [saving, setSaving] = useState(false);
   const [adding, setAdding] = useState(false);
   const [person, setPerson] = useState({ name: "", title: "", email: "", phone: "" });
@@ -101,6 +63,7 @@ export default function FacilityDrawer({ id, onClose, onChanged }) {
       await api.post("/hq/activities", {
         facilityId: id,
         contactId: log.contactId || null,
+        playId: log.playId || null,
         kind: log.kind,
         outcome: log.outcome,
         notes: log.notes,
@@ -130,6 +93,21 @@ export default function FacilityDrawer({ id, onClose, onChanged }) {
     }
   };
 
+  const removeFacility = async () => {
+    try {
+      await api.delete(`/hq/facilities/${id}`);
+      toast.success("Facility removed");
+      onChanged?.();
+      onClose();
+    } catch (err) {
+      toast.error(errorText(err, "Couldn't remove"));
+    }
+  };
+  const changed = () => {
+    load();
+    onChanged?.();
+  };
+
   const f = d?.facility;
   const w = d?.workspace;
   const field = { size: "small", fullWidth: true, sx: { bgcolor: IOS.surface } };
@@ -156,15 +134,34 @@ export default function FacilityDrawer({ id, onClose, onChanged }) {
             </Box>
           )}
         </Box>
-        <IconButton onClick={onClose} aria-label="Close" size="small" sx={{ alignSelf: "flex-start", bgcolor: IOS.fill, color: IOS.secondary }}>
-          <FiX />
-        </IconButton>
+        <Box sx={{ display: "flex", gap: 0.5, alignSelf: "flex-start", alignItems: "center" }}>
+          {f && !editing && (
+            <IconButton onClick={() => setEditing(true)} aria-label="Edit facility" size="small" sx={{ color: IOS.secondary }}>
+              <FiEdit2 size={16} />
+            </IconButton>
+          )}
+          {f && !f.tenantId && <DeleteButton onConfirm={removeFacility} label="Remove facility" size={16} />}
+          <IconButton onClick={onClose} aria-label="Close" size="small" sx={{ bgcolor: IOS.fill, color: IOS.secondary }}>
+            <FiX />
+          </IconButton>
+        </Box>
       </Box>
 
       <Box sx={{ p: 2.5, overflowY: "auto" }}>
         {error && <Alert severity="error">{error}</Alert>}
         {!d && !error && <CircularProgress size={22} />}
-        {d && (
+        {d && editing && (
+          <EditFacility
+            facility={f}
+            stages={STAGES}
+            onSaved={() => {
+              setEditing(false);
+              changed();
+            }}
+            onCancel={() => setEditing(false)}
+          />
+        )}
+        {d && !editing && (
           <>
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", fontSize: 13.5 }}>
               {f.frontDeskPhone && (
@@ -205,7 +202,7 @@ export default function FacilityDrawer({ id, onClose, onChanged }) {
             {(f.scheduler?.name || f.scheduler?.email) && (
               <>
                 <Label>Scheduler</Label>
-                <Person c={{ ...f.scheduler, role: "scheduler" }} />
+                <PersonRow c={{ ...f.scheduler, role: "scheduler" }} editable={false} />
               </>
             )}
 
@@ -227,14 +224,14 @@ export default function FacilityDrawer({ id, onClose, onChanged }) {
               </Box>
             )}
             <Box sx={{ bgcolor: IOS.surface, borderRadius: IOS.radius.cell, px: 1.5 }}>
-              {d.contacts.length ? d.contacts.map((c) => <Person key={c._id} c={c} />) : <Empty>No one yet.</Empty>}
+              {d.contacts.length ? d.contacts.map((c) => <PersonRow key={c._id} c={c} onChanged={changed} />) : <Empty>No one yet.</Empty>}
             </Box>
 
             {d.groupContacts.length > 0 && (
               <>
                 <Label>Elsewhere in {f.group}</Label>
                 <Box sx={{ bgcolor: IOS.surface, borderRadius: IOS.radius.cell, px: 1.5 }}>
-                  {d.groupContacts.slice(0, 12).map((c) => <Person key={c._id} c={c} />)}
+                  {d.groupContacts.slice(0, 12).map((c) => <PersonRow key={c._id} c={c} onChanged={changed} />)}
                 </Box>
               </>
             )}
@@ -246,15 +243,21 @@ export default function FacilityDrawer({ id, onClose, onChanged }) {
                   <MenuItem key={v} value={v}>{l}</MenuItem>
                 ))}
               </TextField>
-              <TextField {...field} select label="With" value={log.contactId} onChange={(e) => setLog({ ...log, contactId: e.target.value })}>
+              <TextField {...field} select label="With" value={log.contactId} onChange={(e) => setLog({ ...log, contactId: e.target.value })} SelectProps={{ displayEmpty: true }} InputLabelProps={{ shrink: true }}>
                 <MenuItem value="">Front desk / building</MenuItem>
                 {d.contacts.map((c) => (
                   <MenuItem key={c._id} value={c._id}>{c.name || c.email}</MenuItem>
                 ))}
               </TextField>
+              <TextField {...field} select label="Play (for the scoreboard)" value={log.playId} onChange={(e) => setLog({ ...log, playId: e.target.value })} SelectProps={{ displayEmpty: true }} InputLabelProps={{ shrink: true }} sx={{ ...field.sx, gridColumn: "1 / -1" }}>
+                <MenuItem value="">None</MenuItem>
+                {plays.filter((p) => p.countsFrom === "activities").map((p) => (
+                  <MenuItem key={p._id} value={p._id}>{p.title}</MenuItem>
+                ))}
+              </TextField>
               <TextField {...field} label="Outcome" placeholder="Voicemail, spoke, booked demo…" value={log.outcome} onChange={(e) => setLog({ ...log, outcome: e.target.value })} sx={{ ...field.sx, gridColumn: "1 / -1" }} />
               <TextField {...field} multiline minRows={2} label="Notes" value={log.notes} onChange={(e) => setLog({ ...log, notes: e.target.value })} sx={{ ...field.sx, gridColumn: "1 / -1" }} />
-              <TextField {...field} select label="Stage" value={log.stage} onChange={(e) => setLog({ ...log, stage: e.target.value })} sx={{ ...field.sx, gridColumn: "1 / -1" }}>
+              <TextField {...field} select label="Stage" value={log.stage} onChange={(e) => setLog({ ...log, stage: e.target.value })} SelectProps={{ displayEmpty: true }} InputLabelProps={{ shrink: true }} sx={{ ...field.sx, gridColumn: "1 / -1" }}>
                 <MenuItem value="">(no change)</MenuItem>
                 {[...new Set([...STAGES, f.stage].filter(Boolean))].map((s) => (
                   <MenuItem key={s} value={s}>{s}</MenuItem>
@@ -270,23 +273,7 @@ export default function FacilityDrawer({ id, onClose, onChanged }) {
             <Label>History</Label>
             <Box sx={{ bgcolor: IOS.surface, borderRadius: IOS.radius.cell, px: 1.5 }}>
               {d.activities.length ? (
-                d.activities.map((a) => {
-                  const who = d.contacts.find((c) => c._id === a.contactId);
-                  return (
-                    <Box key={a._id} sx={{ py: 1, "& + &": { borderTop: `1px solid ${IOS.hairline}` } }}>
-                      <Typography sx={{ fontSize: 13.5 }}>
-                        <Box component="span" sx={{ fontWeight: 700, textTransform: "capitalize" }}>{a.kind}</Box>
-                        {who ? ` with ${who.name}` : ""}
-                        {a.outcome ? `: ${a.outcome}` : ""}
-                      </Typography>
-                      {a.notes && <Typography sx={{ fontSize: 13, color: IOS.secondary, whiteSpace: "pre-wrap" }}>{a.notes}</Typography>}
-                      <Typography sx={{ fontSize: 12, color: IOS.tertiary }}>
-                        {shortDate(a.at)}
-                        {a.by ? ` · ${a.by}` : ""}
-                      </Typography>
-                    </Box>
-                  );
-                })
+                d.activities.map((a) => <HistoryRow key={a._id} a={a} contacts={d.contacts} plays={plays} onChanged={changed} />)
               ) : (
                 <Empty>Nothing logged yet.</Empty>
               )}

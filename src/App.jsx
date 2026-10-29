@@ -42,7 +42,6 @@ import { IOS } from "./theme/ios";
 import StaffLinkPage from "./components/StaffLink/StaffLinkPage";
 import StaffingTemplatePage from "./components/StaffPortal/Coverage/StaffingTemplatePage";
 import LaborPage from "./components/StaffPortal/Labor/LaborPage";
-import HqPage from "./components/HQ/HqPage";
 import MessageList from "./components/StaffPortal/Messages/MessageList";
 import TimeOffDecision from "./components/StaffPortal/TimeOff/TimeOffDecision";
 import FacilityPreferencesPage from "./components/StaffPortal/FacilityPreferences/FacilityPreferencesPage";
@@ -247,14 +246,6 @@ export default function App() {
               element={
                 <PrivateRoute>
                   <LaborPage />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/hq/:tab?"
-              element={
-                <PrivateRoute>
-                  <HqPage />
                 </PrivateRoute>
               }
             />

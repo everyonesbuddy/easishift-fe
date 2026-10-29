@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Alert, Box, Button, ButtonBase, CircularProgress, MenuItem, TextField, Typography } from "@mui/material";
-import api from "../../config/api";
+import api from "./hqApi";
 import { IOS } from "../../theme/ios";
 import { ClickBadge, Empty, RolePill, Section } from "./HqBits";
 import { ROLE_LABELS, errorText, n } from "./hqFormat";

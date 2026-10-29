@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, Box, Button, CircularProgress, MenuItem, TextField, Typography } from "@mui/material";
 import { FiCheckCircle, FiCircle, FiUpload } from "react-icons/fi";
 import { toast } from "react-toastify";
-import api from "../../config/api";
+import api from "./hqApi";
 import { IOS } from "../../theme/ios";
 import { Section } from "./HqBits";
 import { ago, errorText, n } from "./hqFormat";

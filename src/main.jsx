@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.jsx";
+import HqApp from "./components/HQ/HqApp";
 import { AuthProvider } from "./context/AuthContext";
 import { GuideTourProvider } from "./context/GuideTourContext";
 import { initializeAnalytics, isAnalyticsHost } from "./utils/analytics";
@@ -16,12 +17,20 @@ initializeAnalytics({
   debug: analyticsDebug,
 });
 
+// /hq is WiserShifts' own command center: a separate app with its own
+// sign-in, outside the workspace product (no workspace session or menus).
+const isHq = window.location.pathname === "/hq" || window.location.pathname.startsWith("/hq/");
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <AuthProvider>
-      <GuideTourProvider>
-        <App />
-      </GuideTourProvider>
-    </AuthProvider>
+    {isHq ? (
+      <HqApp />
+    ) : (
+      <AuthProvider>
+        <GuideTourProvider>
+          <App />
+        </GuideTourProvider>
+      </AuthProvider>
+    )}
   </StrictMode>,
 );

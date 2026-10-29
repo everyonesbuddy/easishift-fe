@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Alert, Box, Button, CircularProgress, Typography } from "@mui/material";
 import { FiRefreshCw } from "react-icons/fi";
 import { toast } from "react-toastify";
-import api from "../../config/api";
+import api from "./hqApi";
 import { IOS } from "../../theme/ios";
 import { Empty, NotConnected, RolePill, Section, Stat } from "./HqBits";
 import { ago, errorText, n, num } from "./hqFormat";

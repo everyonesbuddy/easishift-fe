@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, Box, Button, CircularProgress, Drawer, IconButton, MenuItem, TextField, Typography } from "@mui/material";
 import { FiExternalLink, FiLinkedin, FiMail, FiPhone, FiX } from "react-icons/fi";
 import { toast } from "react-toastify";
-import api from "../../config/api";
+import api from "./hqApi";
 import { IOS } from "../../theme/ios";
 import { ClickBadge, Empty, RolePill, Tag } from "./HqBits";
 import { ROLE_LABELS, ago, dateInput, errorText, shortDate } from "./hqFormat";

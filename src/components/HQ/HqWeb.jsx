@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, Box, Button, CircularProgress, Typography } from "@mui/material";
 import { FiRefreshCw } from "react-icons/fi";
-import api from "../../config/api";
+import api from "./hqApi";
 import { IOS } from "../../theme/ios";
 import { Empty, NotConnected, Section, Stat } from "./HqBits";
 import { ago, errorText, n, pct } from "./hqFormat";

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Alert, Box, Button, CircularProgress, Link, Typography } from "@mui/material";
 import { FiRefreshCw } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
-import api from "../../config/api";
+import api from "./hqApi";
 import { IOS } from "../../theme/ios";
 import { Empty, NotConnected, Section, Stat, Tag } from "./HqBits";
 import { ago, errorText, n, num, shortDate } from "./hqFormat";

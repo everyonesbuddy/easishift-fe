@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Box, ButtonBase, Container, Typography } from "@mui/material";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
-import api from "../../config/api";
-import { useAuth } from "../../context/AuthContext";
+import { Alert, Box, ButtonBase, Container } from "@mui/material";
+import { useNavigate, useParams } from "react-router-dom";
+import api from "./hqApi";
 import { IOS } from "../../theme/ios";
 import { Stat } from "./HqBits";
 import { n } from "./hqFormat";
@@ -26,12 +25,8 @@ const TABS = [
   { id: "connections", label: "Connections", Comp: HqConnections },
 ];
 
-/**
- * HQ: WiserShifts' own command center. Only for our team (the server checks
- * PLATFORM_ADMIN_EMAILS on every request; this just hides the page).
- */
+/** HQ: WiserShifts' own command center (inside HqApp, behind the HQ sign-in). */
 export default function HqPage() {
-  const { user } = useAuth();
   const { tab = "plays" } = useParams();
   const navigate = useNavigate();
   const [overview, setOverview] = useState(null);
@@ -40,30 +35,24 @@ export default function HqPage() {
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
 
   useEffect(() => {
-    if (!user?.platformAdmin) return;
     api
       .get("/hq/overview")
       .then((res) => {
         setOverview(res.data);
         setError("");
       })
-      .catch((err) => setError(err?.response?.status === 404 ? "no_access" : "Couldn't load HQ."));
-  }, [user?.platformAdmin, reloadKey]);
+      .catch((err) => err?.response?.status !== 401 && setError("Couldn't load HQ."));
+  }, [reloadKey]);
 
-  if (!user?.platformAdmin || error === "no_access") return <Navigate to="/home" replace />;
   const current = TABS.find((t) => t.id === tab) || TABS[0];
   const o = overview;
   const leaders = o ? ["executive_director", "administrator", "don", "regional", "owner"].reduce((s, r) => s + (o.contactsByRole?.[r] || 0), 0) : null;
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 8 }}>
-      <Box sx={{ display: "flex", alignItems: "baseline", gap: 1.5, flexWrap: "wrap" }}>
-        <Typography sx={{ fontSize: 30, fontWeight: 700, letterSpacing: "-0.025em" }}>HQ</Typography>
-        <Typography sx={{ color: IOS.secondary, fontSize: 14 }}>WiserShifts team only</Typography>
-      </Box>
-      {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+    <Container maxWidth="xl" sx={{ mt: 3, mb: 8 }}>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)", lg: "repeat(6, 1fr)" }, gap: 1, mt: 2 }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)", lg: "repeat(6, 1fr)" }, gap: 1 }}>
         <Stat label="Plays for today" value={o ? n(o.plays.today) : "…"} detail={o ? `${n(o.plays.total)} open in all` : ""} tone={o?.plays.today ? IOS.blue : undefined} onClick={() => navigate("/hq/plays")} />
         <Stat label="Signups" value={o ? n(o.signups.total) : "…"} detail={o ? `${o.signups.last7} this week · ${o.signups.active} active` : ""} onClick={() => navigate("/hq/signups")} />
         <Stat label="Paying" value={o ? n(o.signups.paid) : "…"} detail={o ? `${o.signups.trialing} on trial` : ""} onClick={() => navigate("/hq/signups")} />

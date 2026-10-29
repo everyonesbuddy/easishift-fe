@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Alert, Box, ButtonBase, CircularProgress, Typography } from "@mui/material";
-import api from "../../config/api";
+import api from "./hqApi";
 import { IOS } from "../../theme/ios";
 import { Empty, RolePill, Section, Tag } from "./HqBits";
 import { ago, errorText, shortDate } from "./hqFormat";

@@ -14,6 +14,8 @@ import TimeClockAccuracyCalculator from "./components/Home/TimeClockAccuracyCalc
 import HoursPerResidentDayCalculator from "./components/Home/HoursPerResidentDayCalculator";
 import ScheduleCoverageCalculator from "./components/Home/ScheduleCoverageCalculator";
 import RolePage from "./components/Home/RolePage";
+import BlogIndex from "./components/Blog/BlogIndex";
+import BlogPost from "./components/Blog/BlogPost";
 import TermsAndConditions from "./components/Home/TermsAndConditions";
 import PrivacyPolicy from "./components/Home/PrivacyPolicy";
 import EndUserLicenseAgreement from "./components/Home/EndUserLicenseAgreement";
@@ -40,6 +42,7 @@ import { IOS } from "./theme/ios";
 import StaffLinkPage from "./components/StaffLink/StaffLinkPage";
 import StaffingTemplatePage from "./components/StaffPortal/Coverage/StaffingTemplatePage";
 import LaborPage from "./components/StaffPortal/Labor/LaborPage";
+import HqPage from "./components/HQ/HqPage";
 import MessageList from "./components/StaffPortal/Messages/MessageList";
 import TimeOffDecision from "./components/StaffPortal/TimeOff/TimeOffDecision";
 import FacilityPreferencesPage from "./components/StaffPortal/FacilityPreferences/FacilityPreferencesPage";
@@ -150,6 +153,8 @@ export default function App() {
             <Route path="/integrations" element={<IntegrationsPage />} />
             <Route path="/features/:feature" element={<FeatureLandingPage />} />
             <Route path="/for/:role" element={<RolePage />} />
+            <Route path="/blog" element={<BlogIndex />} />
+            <Route path="/blog/:slug" element={<BlogPost />} />
             <Route
               path="/calculators/hours-per-resident-day-calculator"
               element={<HoursPerResidentDayCalculator />}
@@ -242,6 +247,14 @@ export default function App() {
               element={
                 <PrivateRoute>
                   <LaborPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/hq/:tab?"
+              element={
+                <PrivateRoute>
+                  <HqPage />
                 </PrivateRoute>
               }
             />

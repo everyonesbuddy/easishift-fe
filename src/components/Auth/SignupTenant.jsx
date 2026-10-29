@@ -8,6 +8,7 @@ import {
   FormControlLabel,
   FormHelperText,
   Link,
+  MenuItem,
   Paper,
   TextField,
   Typography,
@@ -16,8 +17,31 @@ import { Link as RouterLink, useNavigate } from "react-router-dom";
 import api from "../../config/api";
 import { useAuth } from "../../context/AuthContext";
 import { trackEvent } from "../../utils/analytics";
+import { getFirstTouch, roleFromLanding } from "../../utils/firstTouch";
 
 const TERMS_VERSION = "1.0";
+
+// Optional; helps us know who we're talking to and which marketing works.
+const ROLES = [
+  ["scheduler", "I make the schedule"],
+  ["don", "Director of Nursing / clinical lead"],
+  ["executive_director", "Executive Director"],
+  ["administrator", "Administrator"],
+  ["regional", "Regional / corporate (several buildings)"],
+  ["owner", "Owner"],
+  ["other", "Something else"],
+];
+const HEARD = [
+  ["google", "Google search"],
+  ["linkedin", "LinkedIn"],
+  ["youtube", "YouTube"],
+  ["facebook", "Facebook group"],
+  ["email", "An email from us"],
+  ["colleague", "A colleague"],
+  ["calculator", "One of the calculators"],
+  ["conference", "A conference or event"],
+  ["other", "Somewhere else"],
+];
 
 const isEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -54,6 +78,8 @@ export default function SignupTenant() {
     facilityName: "",
     email: "",
     password: "",
+    signupRole: roleFromLanding(getFirstTouch()),
+    heardAbout: "",
   });
   const [termsAccepted, setTermsAccepted] = useState(false);
   // Bot checks (the server rejects these): when the form opened, and a
@@ -94,6 +120,9 @@ export default function SignupTenant() {
         termsVersion: TERMS_VERSION,
         formStartedAt: startedAt,
         website,
+        signupRole: form.signupRole || undefined,
+        heardAbout: form.heardAbout || undefined,
+        signupSource: getFirstTouch() || undefined,
       });
       const token = res.data?.token;
       if (token) {
@@ -182,6 +211,21 @@ export default function SignupTenant() {
             required
           />
           <TextField
+            select
+            label="Your role (optional)"
+            value={form.signupRole}
+            onChange={update("signupRole")}
+            helperText=" "
+            sx={fieldSx}
+          >
+            <MenuItem value="">Choose one</MenuItem>
+            {ROLES.map(([value, label]) => (
+              <MenuItem key={value} value={value}>
+                {label}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
             label="Work email"
             type="email"
             value={form.email}
@@ -203,6 +247,22 @@ export default function SignupTenant() {
             sx={fieldSx}
             required
           />
+
+          <TextField
+            select
+            label="How did you hear about us? (optional)"
+            value={form.heardAbout}
+            onChange={update("heardAbout")}
+            helperText=" "
+            sx={fieldSx}
+          >
+            <MenuItem value="">Choose one</MenuItem>
+            {HEARD.map(([value, label]) => (
+              <MenuItem key={value} value={value}>
+                {label}
+              </MenuItem>
+            ))}
+          </TextField>
 
           <Box>
             <FormControlLabel

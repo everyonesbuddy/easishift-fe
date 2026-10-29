@@ -51,6 +51,9 @@ export default function Footer() {
             <Link component={RouterLink} to="/integrations" underline="hover">
               Integrations
             </Link>
+            <Link component={RouterLink} to="/blog" underline="hover">
+              Blog
+            </Link>
           </Stack>
         </Box>
 

@@ -30,6 +30,7 @@ import {
   MdAccessTime,
   MdFileDownload,
   MdPalette,
+  MdRadar,
 } from "react-icons/md";
 import logo from "../../assets/logos/wiserShifts-logo-dark.svg";
 import { useAuth } from "../../context/AuthContext";
@@ -172,6 +173,8 @@ function Sidebar({ mobileOpen, onMobileClose }) {
     ...(hasFeature("messaging")
       ? [{ id: "messages", icon: MdMessage, label: "Messages", to: "/messages" }]
       : []),
+    // WiserShifts' own team only (the server checks too).
+    ...(user?.platformAdmin ? [{ id: "hq", icon: MdRadar, label: "HQ", to: "/hq" }] : []),
     ...(can("billing.manage")
       ? [
           {
@@ -244,7 +247,7 @@ function Sidebar({ mobileOpen, onMobileClose }) {
         <List sx={{ p: 0 }}>
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activePath === item.to;
+            const isActive = activePath === item.to || (item.id === "hq" && activePath.startsWith("/hq/"));
 
             return (
               <ListItem key={item.id} disablePadding sx={{ mb: 0.25 }}>

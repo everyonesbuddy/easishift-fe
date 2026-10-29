@@ -54,6 +54,10 @@ export default function HoursPerResidentDayCalculator() {
 
   return (
     <CalculatorLayout
+      capture={{
+        source: "hours-per-resident-day",
+        summary: `${f2(r.ppd)} hours per resident day, ${residents} residents${r.target !== null ? `, target ${r.target}` : ""}`,
+      }}
       eyebrow="Hours per resident day calculator"
       title="What are your hours per resident day?"
       intro="Put in your residents and who's on each shift. See your hours per resident day, how it compares to your budget, and what every 0.1 costs a year. Your numbers only, no industry averages."

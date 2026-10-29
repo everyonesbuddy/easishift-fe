@@ -163,3 +163,22 @@ test("initialization, navigation and CTA events are queued once and tolerate tra
     globalThis.document = originalDocument;
   }
 });
+
+test("role pages, new calculators and blog posts report their real path; HQ stays private", () => {
+  for (const path of [
+    "/for/schedulers",
+    "/for/directors",
+    "/calculators/hours-per-resident-day-calculator",
+    "/blog",
+    "/blog/how-to-cut-overtime",
+  ]) {
+    assert.equal(
+      getAnalyticsUrl(`https://wisershifts.com${path}?utm_source=linkedin`),
+      `https://wisershifts.com${path}?utm_source=linkedin`,
+    );
+  }
+  assert.equal(getAnalyticsUrl("https://wisershifts.com/hq/plays"), "https://wisershifts.com/portal");
+  assert.equal(getAnalyticsUrl("https://wisershifts.com/for/anything-else"), "https://wisershifts.com/portal");
+  assert.equal(getAnalyticsPageContext("https://wisershifts.com/blog/x").page_area, "blog");
+  assert.equal(getAnalyticsPageContext("https://wisershifts.com/for/operators").page_area, "role_page");
+});

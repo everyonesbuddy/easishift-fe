@@ -7,6 +7,7 @@ import { IOS } from "../../theme/ios";
 import { Section } from "./HqBits";
 import { ago, errorText, n } from "./hqFormat";
 import { guessSheet, readWorkbook, sheetToCsv } from "./xlsxToCsv";
+import SheetSync from "./SheetSync";
 
 const IMPORTS = {
   facilities: {
@@ -102,6 +103,7 @@ export default function HqConnections({ reloadKey, onChanged }) {
 
   return (
     <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, alignItems: "start" }}>
+      <SheetSync reloadKey={reloadKey} onChanged={onChanged} />
       <Section title="Connections" note="Keys live on the server (Heroku config vars), never in the browser. Add the ones listed and reload.">
         {error && <Alert severity="error">{error}</Alert>}
         {!list && !error && <CircularProgress size={22} />}
@@ -131,7 +133,7 @@ export default function HqConnections({ reloadKey, onChanged }) {
         ))}
       </Section>
 
-      <Section title="Import from your spreadsheets" note="Upload the Excel workbook and pick the tab, or a CSV of one tab. You'll see a preview before anything is saved.">
+      <Section title="Or upload a file" note="Upload an Excel workbook and pick the tab, or a CSV of one tab. You'll see a preview before anything is saved.">
         <Box sx={{ display: "grid", gap: 1.5 }}>
           <TextField
             select

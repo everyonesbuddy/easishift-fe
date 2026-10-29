@@ -12,6 +12,7 @@ const theme = createTheme({
   palette: { primary: { main: "#2563eb" }, background: { default: IOS.canvas } },
   typography: { fontFamily: IOS.font },
   shape: { borderRadius: 10 },
+  components: { MuiButton: { styleOverrides: { root: { textTransform: "none", fontWeight: 600 } } } },
 });
 
 function Wordmark() {

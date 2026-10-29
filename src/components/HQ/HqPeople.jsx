@@ -5,6 +5,7 @@ import { IOS } from "../../theme/ios";
 import { ClickBadge, Empty, RolePill, Section } from "./HqBits";
 import { ROLE_LABELS, errorText, n } from "./hqFormat";
 import FacilityDrawer from "./FacilityDrawer";
+import AddPerson from "./AddPerson";
 
 const ROLES = ["leadership", "executive_director", "administrator", "don", "regional", "owner", "scheduler", "other"];
 
@@ -18,6 +19,8 @@ export default function HqPeople({ reloadKey, onChanged }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState(0);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -41,10 +44,28 @@ export default function HqPeople({ reloadKey, onChanged }) {
     return () => {
       off = true;
     };
-  }, [role, engaged, query, page, reloadKey]);
+  }, [role, engaged, query, page, reloadKey, added]);
 
   return (
-    <Section title={data ? `${n(data.total)} people` : "People"} note="Executives at the facilities on our list. Schedulers we mostly reach with content, so they're here only when we have them.">
+    <Section
+      title={data ? `${n(data.total)} people` : "People"}
+      note="Executives at the facilities on our list. Schedulers we mostly reach with content, so they're here only when we have them."
+      right={
+        <Button size="small" variant="outlined" onClick={() => setAdding((a) => !a)} sx={{ borderRadius: IOS.radius.round, textTransform: "none", flexShrink: 0 }}>
+          {adding ? "Close" : "Add person"}
+        </Button>
+      }
+    >
+      {adding && (
+        <AddPerson
+          onAdded={() => {
+            setPage(1);
+            setAdded((k) => k + 1);
+            onChanged?.();
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      )}
       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
         <TextField size="small" placeholder="Search name, email, title, group…" value={q} onChange={(e) => setQ(e.target.value)} sx={{ flex: "1 1 260px", bgcolor: IOS.surface }} />
         <TextField

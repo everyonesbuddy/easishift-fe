@@ -56,6 +56,10 @@ export default function SignupTenant() {
     password: "",
   });
   const [termsAccepted, setTermsAccepted] = useState(false);
+  // Bot checks (the server rejects these): when the form opened, and a
+  // field people never see that bots fill in.
+  const [startedAt] = useState(() => Date.now());
+  const [website, setWebsite] = useState("");
   const [touched, setTouched] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -88,6 +92,8 @@ export default function SignupTenant() {
         timezone: browserTimezone(),
         termsAccepted: true,
         termsVersion: TERMS_VERSION,
+        formStartedAt: startedAt,
+        website,
       });
       const token = res.data?.token;
       if (token) {
@@ -128,6 +134,22 @@ export default function SignupTenant() {
           noValidate
           sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
         >
+          {/* Hidden from people (and screen readers); bots fill it in. */}
+          <Box
+            aria-hidden="true"
+            sx={{ position: "absolute", left: "-10000px", top: "auto", width: 1, height: 1, overflow: "hidden" }}
+          >
+            <label htmlFor="signup-website">Website</label>
+            <input
+              id="signup-website"
+              name="website"
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+            />
+          </Box>
           <Box sx={{ textAlign: "center" }}>
             <Typography variant="h4" sx={{ color: "black", fontWeight: 700 }}>
               Start free

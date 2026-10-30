@@ -85,7 +85,6 @@ function WeekPlan({ meta, onSaved }) {
       ))}
       {edit && (
         <Box sx={{ mt: 2, display: "grid", gap: 1 }}>
-          <TextField {...f} label="The number that matters most" value={m.northStar} onChange={(e) => setM({ ...m, northStar: e.target.value })} />
           <TextField {...f} label="Note" value={m.note} onChange={(e) => setM({ ...m, note: e.target.value })} />
           <Box sx={{ display: "flex", gap: 1 }}>
             <Button variant="contained" disableElevation onClick={save}>Save</Button>
@@ -134,13 +133,6 @@ export default function HqPlaybook({ reloadKey, audiences = null }) {
 
   return (
     <Box sx={{ display: "grid", gap: 2 }}>
-      {!audiences && data.meta.northStar && (
-        <Box sx={{ p: 2, borderRadius: IOS.radius.card, bgcolor: "#0F172A", color: "#fff" }}>
-          <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#94A3B8" }}>THE NUMBER THAT MATTERS MOST</Typography>
-          <Typography sx={{ fontSize: 17, fontWeight: 600, mt: 0.5 }}>{data.meta.northStar}</Typography>
-        </Box>
-      )}
-
       <Section title="Scoreboard" note="This week against each play's target, and the three weeks before. Counted from what's logged in HQ: pick the marketing play when you log a call or email, and link content to its play.">
         <Box sx={{ overflowX: "auto" }}>
           <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", minWidth: 640, "& td, & th": { borderBottom: `1px solid ${IOS.hairline}`, py: 0.9, px: 1, fontSize: 14, textAlign: "right", ...num }, "& th": { fontSize: 12, color: IOS.secondary, fontWeight: 700 }, "& td:first-of-type, & th:first-of-type": { textAlign: "left" } }}>

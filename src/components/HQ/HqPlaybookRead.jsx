@@ -61,7 +61,6 @@ function EditText({ meta, onSaved, onCancel }) {
   const setChannel = (i, v) => setM({ ...m, channels: m.channels.map((c, j) => (j === i ? { ...c, why: v } : c)) });
   return (
     <Box sx={{ display: "grid", gap: 2, maxWidth: 900 }}>
-      <TextField {...f} label="The number that matters most" value={m.northStar || ""} onChange={(e) => setM({ ...m, northStar: e.target.value })} />
       <TextField {...f} minRows={4} label="How we sell" value={m.overview || ""} onChange={(e) => setM({ ...m, overview: e.target.value })} />
       <TextField {...f} minRows={3} label="How the channels connect" value={m.connect || ""} onChange={(e) => setM({ ...m, connect: e.target.value })} />
       {(m.buyers || []).map((b, i) => (
@@ -140,12 +139,6 @@ export default function HqPlaybookRead({ reloadKey }) {
         </Button>
       </Box>
 
-      {meta.northStar && (
-        <Box sx={{ p: 2.25, borderRadius: IOS.radius.card, bgcolor: "#0F172A", color: "#fff" }}>
-          <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#94A3B8" }}>THE NUMBER THAT MATTERS MOST</Typography>
-          <Typography sx={{ fontSize: 18, fontWeight: 600, mt: 0.5 }}>{meta.northStar}</Typography>
-        </Box>
-      )}
 
       <H>How we sell</H>
       <P>{meta.overview}</P>

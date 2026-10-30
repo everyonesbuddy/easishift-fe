@@ -6,7 +6,7 @@ import { Empty, Section } from "./HqBits";
 import { errorText, n, num } from "./hqFormat";
 import { AUDIENCES } from "./usePlaybookPlays";
 
-const GROUP_COLORS = { In: IOS.blue, Moving: "#5856D6", Outreach: IOS.orange, Out: IOS.red };
+const GROUP_COLORS = { In: IOS.blue, Moving: "#5856D6", Outreach: IOS.orange, Content: "#30B0C7", Out: IOS.red };
 const ROLE_NAMES = { scheduler: "Scheduler", don: "DON", executive_director: "Executive Director", administrator: "Administrator", regional: "Regional", owner: "Owner", other: "Other" };
 const weekLabel = (key) => new Date(`${key}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
@@ -107,10 +107,10 @@ export default function HqNumbers({ reloadKey }) {
               </tr>
             </thead>
             <tbody>
-              {["In", "Moving", "Outreach", "Out"].map((g) => [
+              {["In", "Moving", "Outreach", "Content", "Out"].map((g) => [
                 <tr key={`g-${g}`}>
                   <td colSpan={d.weeks.length - showFrom + 2} style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.06em", color: GROUP_COLORS[g], paddingTop: 14 }}>
-                    {{ In: "COMING IN", Moving: "MOVING FORWARD", Outreach: "OUR OUTREACH", Out: "DROPPING OFF" }[g]}
+                    {{ In: "COMING IN", Moving: "MOVING FORWARD", Outreach: "COLD OUTREACH", Content: "CONTENT (KLAVIYO)", Out: "DROPPING OFF" }[g]}
                   </td>
                 </tr>,
                 ...d.rows

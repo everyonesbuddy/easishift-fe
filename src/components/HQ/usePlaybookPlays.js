@@ -7,9 +7,9 @@ let pending = null;
 
 export const CHANNEL_LABELS = {
   calls: "Calls",
-  email: "Email",
+  email: "Cold outreach email",
   linkedin: "LinkedIn",
-  newsletter: "Newsletter",
+  newsletter: "Klaviyo (newsletter & sequences)",
   youtube: "YouTube",
   blog: "Blog & search",
   facebook: "Facebook groups",

@@ -33,8 +33,8 @@ const GROUPS = [
   {
     label: "Marketing plays",
     items: [
-      { id: "leadership", label: "Reach leadership", Comp: LeadershipPage, title: "Reach leadership", sub: "DONs, executive directors, administrators and regional operators: what to do now, the marketing plays for them, and their content." },
-      { id: "schedulers", label: "Reach schedulers", Comp: SchedulersPage, title: "Reach schedulers", sub: "Schedulers and staffing coordinators: what to do now, the marketing plays for them, and their content." },
+      { id: "leadership", label: "Reach out to leadership", Comp: LeadershipPage, title: "Reach out to leadership", sub: "DONs, executive directors, administrators and regional operators: what to do now, the marketing plays for them, and their content." },
+      { id: "schedulers", label: "Reach out to schedulers", Comp: SchedulersPage, title: "Reach out to schedulers", sub: "Schedulers and staffing coordinators: what to do now, the marketing plays for them, and their content." },
       { id: "overall", label: "Full plan & scoreboard", Comp: HqOverall, title: "Full plan and scoreboard", sub: "The scoreboard, every marketing play, the week, and the full content calendar." },
     ],
   },
@@ -43,7 +43,7 @@ const GROUPS = [
     items: [
       { id: "numbers", label: "Funnel", Comp: HqNumbers, title: "Funnel", sub: "How people come in, how far they get, and who drops off." },
       { id: "signups", label: "Signups", Comp: HqSignups, title: "Signups", sub: "Who signed up, where they came from and how they're doing." },
-      { id: "email", label: "Email", Comp: HqEmail, title: "Email", sub: "Klaviyo: who really clicked." },
+      { id: "email", label: "Klaviyo email", Comp: HqEmail, title: "Klaviyo email", sub: "Our content email: who really clicks, how it lines up with the CRM, and who to stop emailing." },
       { id: "web", label: "Website & search", Comp: HqWeb, title: "Website and search", sub: "Google Analytics and Search Console." },
       { id: "channels", label: "Blog, video, LinkedIn", Comp: HqContent, title: "Blog, video and LinkedIn", sub: "How what we've published is doing." },
     ],

@@ -39,7 +39,7 @@ export const ROLE_COLORS = {
 
 export const PLAY_KINDS = {
   help: { label: "Help finish setup", color: IOS.orange },
-  expand: { label: "Reach leadership", color: "#5856D6" },
+  expand: { label: "Reach out to leadership", color: "#5856D6" },
   upgrade: { label: "Upgrade ask", color: IOS.green },
   rescue: { label: "Check in", color: IOS.orange },
   personal: { label: "Personal note", color: IOS.blue },
@@ -76,7 +76,7 @@ export const dateInput = (d) => (d ? new Date(d).toISOString().slice(0, 10) : ""
 
 export const KINDS = [
   ["call", "Call"],
-  ["email", "Email"],
+  ["email", "Cold email (own inbox)"],
   ["linkedin", "LinkedIn"],
   ["meeting", "Meeting"],
   ["note", "Note"],

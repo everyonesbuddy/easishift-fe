@@ -83,7 +83,7 @@ function TodoRow({ p, showAudience, onOpenFacility, onOpenContent, doneFor, setD
  * behind the weekly target, do more of what worked). `audiences` limits it
  * to one buyer's page.
  */
-export default function HqPlays({ reloadKey, onChanged, audiences = null, title = "To do now", note: sectionNote }) {
+export default function HqPlays({ reloadKey, onChanged, audiences = null, filter = null, hideChannels = false, title = "To do now", note: sectionNote, emptyText = "Nothing urgent. Nice." }) {
   const [plays, setPlays] = useState(null);
   const [error, setError] = useState("");
   const [channel, setChannel] = useState("");
@@ -123,8 +123,9 @@ export default function HqPlays({ reloadKey, onChanged, audiences = null, title 
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!plays) return <CircularProgress size={22} />;
 
-  const channels = [...new Set(plays.map((p) => p.channel || "other"))];
-  const shown = plays.filter((p) => !channel || (p.channel || "other") === channel);
+  const mine = filter ? plays.filter(filter) : plays;
+  const channels = [...new Set(mine.map((p) => p.channel || "other"))];
+  const shown = mine.filter((p) => !channel || (p.channel || "other") === channel);
   const today = shown.filter((p) => p.priority === 1);
   const later = shown.filter((p) => p.priority !== 1);
   const rowProps = {
@@ -140,7 +141,7 @@ export default function HqPlays({ reloadKey, onChanged, audiences = null, title 
 
   return (
     <>
-      {channels.length > 1 && (
+      {!hideChannels && channels.length > 1 && (
         <Box sx={{ display: "flex", gap: 0.75, mb: 1.5, flexWrap: "wrap" }}>
           {["", ...channels].map((c) => (
             <ButtonBase
@@ -149,14 +150,14 @@ export default function HqPlays({ reloadKey, onChanged, audiences = null, title 
               sx={{ px: 1.25, py: 0.5, borderRadius: IOS.radius.round, fontSize: 13, fontWeight: 600, bgcolor: channel === c ? IOS.ink : tint("#000000", 0.05), color: channel === c ? "#fff" : IOS.ink }}
             >
               {c ? CHANNEL_SHORT[c] || c : "Every channel"}
-              <Box component="span" sx={{ ml: 0.75, opacity: 0.6 }}>{c ? plays.filter((p) => (p.channel || "other") === c).length : plays.length}</Box>
+              <Box component="span" sx={{ ml: 0.75, opacity: 0.6 }}>{c ? mine.filter((p) => (p.channel || "other") === c).length : mine.length}</Box>
             </ButtonBase>
           ))}
         </Box>
       )}
       <Box sx={{ display: "grid", gap: 2 }}>
         <Section title={`${title} (${today.length})`} note={sectionNote || "People to contact and content to ship, across every channel. Most urgent first."}>
-          {today.length ? today.map((p) => <TodoRow key={p.key} p={p} {...rowProps} />) : <Empty>Nothing urgent. Nice.</Empty>}
+          {today.length ? today.map((p) => <TodoRow key={p.key} p={p} {...rowProps} />) : <Empty>{emptyText}</Empty>}
         </Section>
         {later.length > 0 && (
           <Section title={`This week (${later.length})`}>

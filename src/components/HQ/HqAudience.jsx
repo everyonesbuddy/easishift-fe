@@ -1,21 +1,14 @@
 import { useEffect, useState } from "react";
-import { Alert, Box, Button, ButtonBase, CircularProgress, Typography } from "@mui/material";
-import { FiArrowDown, FiPlus } from "react-icons/fi";
-import { useNavigate } from "react-router-dom";
+import { Alert, Box, ButtonBase, CircularProgress, Typography } from "@mui/material";
 import api from "./hqApi";
 import { IOS } from "../../theme/ios";
-import { Section, Tag } from "./HqBits";
-import { errorText, shortDate } from "./hqFormat";
-import usePlaybookPlays, { AUDIENCES, CHANNEL_LABELS } from "./usePlaybookPlays";
+import { errorText } from "./hqFormat";
+import { AUDIENCES } from "./usePlaybookPlays";
 import HqPlays from "./HqPlays";
 import HqPlaybook from "./HqPlaybook";
-import HqContentPlan, { ItemDialog } from "./HqContentPlan";
+import HqContentPlan from "./HqContentPlan";
 import { PlayCard } from "./PlayCards";
 
-// Content plan channel → playbook channel, so content sits with its channel.
-const CONTENT_CHANNEL = { youtube: "youtube", linkedin: "linkedin", blog: "blog", website: "blog", newsletter: "newsletter", email: "newsletter", facebook: "facebook", other: "other" };
-const STATUS = { idea: ["Idea", IOS.tertiary], drafting: ["Drafting", IOS.orange], ready: ["Ready", "#5856D6"], scheduled: ["Scheduled", IOS.blue], published: ["Published", IOS.green] };
-const FORMAT_FOR = { youtube: "video", linkedin: "linkedin_post", blog: "blog_post", newsletter: "newsletter", facebook: "facebook_post" };
 
 /** Small tab bar used inside a page. */
 export function SubTabs({ tabs, value, onChange }) {
@@ -34,39 +27,35 @@ export function SubTabs({ tabs, value, onChange }) {
   );
 }
 
-const Heading = ({ n, children, sub, id }) => (
-  <Box id={id} sx={{ mt: 4, mb: 1.5, scrollMarginTop: 80 }}>
-    <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: IOS.tertiary }}>STEP {n}</Typography>
-    <Typography component="h2" sx={{ fontSize: 21, fontWeight: 700, letterSpacing: "-0.02em" }}>{children}</Typography>
-    {sub && <Typography sx={{ color: IOS.secondary, fontSize: 14.5 }}>{sub}</Typography>}
-  </Box>
-);
+// Which tab a play belongs on.
+const tabForPlay = (p) => (p.channel === "calls" ? "calls" : p.channel === "email" ? "email" : p.channel === "linkedin" && p.countsFrom === "activities" ? "linkedin" : "content");
+
+const TABS = {
+  content: { label: "Content", note: "What we publish for them: LinkedIn posts, videos, Klaviyo emails, blog posts and templates, Facebook groups. Plan it on the board below." },
+  email: { label: "Cold email", note: "One-to-one emails from your own inbox, not Klaviyo. Log each one on the facility with its play so it counts." },
+  calls: { label: "Calls", note: "Phone calls to the building. Log each one on the facility with its play so it counts." },
+  linkedin: { label: "LinkedIn outreach", note: "Connection requests and messages, one person at a time. Log each message with its play so it counts." },
+};
 
 /**
- * One buyer's marketing plays, read top to bottom: what we're doing, how we
- * reach them on every channel (plays and the content for that channel
- * together), then everything to do now.
+ * One buyer's marketing plays: a short explanation, then tabs. "To do now"
+ * has everything for this buyer; each other tab is one way we reach them
+ * (content, cold email, calls…) with its plays and its own to-dos.
  */
 export default function HqAudience({ audiences, reloadKey, onChanged }) {
-  const navigate = useNavigate();
   const [data, setData] = useState(null);
-  const [items, setItems] = useState(null);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState("todo");
   const [open, setOpen] = useState(() => new Set());
   const [editing, setEditing] = useState(null);
-  const [openItem, setOpenItem] = useState(null);
   const [key, setKey] = useState(0);
-  const playbookPlays = usePlaybookPlays();
   const audKey = audiences.join(",");
 
   useEffect(() => {
     let off = false;
-    Promise.all([api.get("/hq/playbook"), api.get("/hq/content-plan")])
-      .then(([pb, cp]) => {
-        if (off) return;
-        setData(pb.data);
-        setItems(cp.data.items);
-      })
+    api
+      .get("/hq/playbook")
+      .then((res) => !off && setData(res.data))
       .catch((err) => !off && setError(errorText(err, "Couldn't load this page")));
     return () => {
       off = true;
@@ -74,48 +63,37 @@ export default function HqAudience({ audiences, reloadKey, onChanged }) {
   }, [reloadKey, key, audKey]);
 
   if (error) return <Alert severity="error">{error}</Alert>;
-  if (!data || !items) return <CircularProgress size={22} />;
+  if (!data) return <CircularProgress size={22} />;
 
   const mine = (list) => (list || []).some((a) => audiences.includes(a));
   const buyers = (data.meta.buyers || []).filter((b) => audiences.includes(b.key));
   const plays = data.plays.filter((p) => mine(p.audience));
-  const content = items.filter((i) => mine(i.audience));
-  const channelKeys = [...new Set([...(data.meta.channels || []).map((c) => c.key), ...plays.map((p) => p.channel)])];
-  const sections = channelKeys
-    .map((ck) => ({
-      key: ck,
-      meta: (data.meta.channels || []).find((c) => c.key === ck),
-      plays: plays.filter((p) => p.channel === ck || (ck === "blog" && p.channel === "search")),
-      content: content.filter((i) => CONTENT_CHANNEL[i.channel] === ck),
-    }))
-    .filter((s) => s.plays.length || s.content.length);
+  const playTab = new Map(data.plays.map((p) => [String(p._id), tabForPlay(p)]));
+  const tabs = ["content", "email", "calls", "linkedin"].filter((t) => plays.some((p) => tabForPlay(p) === t));
+  // Which tab a to-do belongs on.
+  const todoTab = (t) => (t.playId && playTab.get(t.playId)) || (t.channel === "calls" ? "calls" : t.channel === "email" ? "email" : "content");
   const toggle = (id) =>
-    setOpen((s) => {
-      const nx = new Set(s);
+    setOpen((st) => {
+      const nx = new Set(st);
       if (nx.has(id)) nx.delete(id);
       else nx.add(id);
       return nx;
     });
-  const refresh = () => setKey((k) => k + 1);
 
   return (
-    <Box sx={{ maxWidth: 1100 }}>
-      <Button size="small" startIcon={<FiArrowDown />} onClick={() => document.getElementById("todo")?.scrollIntoView({ behavior: "smooth" })} sx={{ px: 0, mb: 1 }}>
-        Jump to what to do now
-      </Button>
-
-      <Heading n={1} sub="Who they are, what they care about, and what we offer them.">What we're doing</Heading>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: `repeat(${Math.max(1, buyers.length)}, 1fr)` }, gap: 1.25 }}>
+    <Box>
+      {/* The explanation */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: `repeat(${Math.max(1, buyers.length)}, 1fr)` }, gap: 1.25, mb: 2.5 }}>
         {buyers.map((b) => {
           const color = AUDIENCES[b.key]?.color || IOS.blue;
           return (
-            <Box key={b.key} sx={{ p: 2, borderRadius: IOS.radius.card, bgcolor: IOS.surface, border: `1px solid ${IOS.hairline}`, borderTop: `4px solid ${color}` }}>
+            <Box key={b.key} sx={{ p: 2, borderRadius: IOS.radius.card, bgcolor: IOS.surface, border: `1px solid ${IOS.hairline}`, borderLeft: `4px solid ${color}` }}>
               <Typography sx={{ fontWeight: 700, fontSize: 16, color }}>{b.name}</Typography>
+              <Typography sx={{ fontSize: 14, mt: 0.5, lineHeight: 1.5 }}>{b.who}</Typography>
               {[
-                ["Who", b.who],
                 ["They care about", b.cares],
-                ["Where they are", b.where],
                 ["What we offer", b.offer],
+                ["How we reach them", b.how],
               ].map(([k, v]) => (
                 <Typography key={k} sx={{ fontSize: 14, mt: 0.75, lineHeight: 1.5 }}>
                   <b>{k}:</b> {v}
@@ -126,82 +104,66 @@ export default function HqAudience({ audiences, reloadKey, onChanged }) {
         })}
       </Box>
 
-      <Heading n={2} sub="Every channel we use for them: the plays we run there, and the content going out on it.">How we reach them</Heading>
-      <Box sx={{ display: "grid", gap: 1.5 }}>
-        {sections.map((s) => {
-          const upcoming = s.content.filter((i) => i.status !== "published").sort((a, b) => new Date(a.dueDate || 8.64e15) - new Date(b.dueDate || 8.64e15));
-          const publishedCount = s.content.length - upcoming.length;
-          const isContent = Boolean(FORMAT_FOR[s.key]);
-          return (
-            <Section key={s.key} title={s.meta?.name || CHANNEL_LABELS[s.key] || s.key} note={s.meta?.why}>
-              {s.plays.length > 0 && (
-                <Box sx={{ display: "grid", gap: 1, mb: upcoming.length || isContent ? 2 : 0 }}>
-                  {s.plays.map((p) => (
-                    <PlayCard
-                      key={p._id}
-                      play={{ ...p, done: p.done }}
-                      open={open.has(p._id)}
-                      onToggle={() => toggle(p._id)}
-                      editing={editing === p._id}
-                      onEdit={() => setEditing(p._id)}
-                      onDone={() => {
-                        setEditing(null);
-                        refresh();
-                      }}
-                    />
-                  ))}
-                </Box>
-              )}
-              {(upcoming.length > 0 || isContent) && (
-                <Box>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-                    <Typography sx={{ fontSize: 13, fontWeight: 700, color: IOS.secondary }}>
-                      CONTENT {upcoming.length ? `· ${upcoming.length} coming up` : ""}
-                      {publishedCount ? ` · ${publishedCount} published` : ""}
-                    </Typography>
-                    <Button size="small" startIcon={<FiPlus />} onClick={() => setOpenItem({ status: "idea", audience: [audiences[0]], format: FORMAT_FOR[s.key] || "other", channel: s.key === "blog" ? "blog" : s.key })} sx={{ ml: "auto" }}>
-                      Add
-                    </Button>
-                  </Box>
-                  {upcoming.slice(0, 5).map((i) => (
-                    <ButtonBase
-                      key={i._id}
-                      onClick={() => setOpenItem(i)}
-                      sx={{ display: "flex", width: "100%", textAlign: "left", gap: 1, py: 0.75, px: 1, borderRadius: "8px", alignItems: "center", "&:hover": { bgcolor: IOS.canvas } }}
-                    >
-                      <Tag color={STATUS[i.status][1]}>{STATUS[i.status][0]}</Tag>
-                      <Typography sx={{ fontSize: 14, flex: 1, minWidth: 0 }} noWrap>{i.title}</Typography>
-                      <Typography sx={{ fontSize: 12.5, color: IOS.secondary, flexShrink: 0 }}>{i.dueDate ? shortDate(i.dueDate) : ""}</Typography>
-                    </ButtonBase>
-                  ))}
-                  {upcoming.length > 5 && <Typography sx={{ fontSize: 12.5, color: IOS.secondary, px: 1 }}>+{upcoming.length - 5} more in the content calendar</Typography>}
-                  {!upcoming.length && <Typography sx={{ fontSize: 13, color: IOS.tertiary, px: 1 }}>Nothing planned yet.</Typography>}
-                </Box>
-              )}
-            </Section>
-          );
-        })}
-      </Box>
+      <SubTabs tabs={[["todo", "To do now"], ...tabs.map((t) => [t, TABS[t].label])]} value={tab} onChange={setTab} />
 
-      <Box id="todo" sx={{ scrollMarginTop: 80 }}>
-        <Heading n={3} sub="Across every channel above: people to contact and content to ship. Most urgent first.">To do now</Heading>
-        <HqPlays audiences={audiences} reloadKey={reloadKey + key} onChanged={onChanged} title="Today" note=" " />
-      </Box>
-
-      <Button onClick={() => navigate("/hq/overall")} sx={{ mt: 3, px: 0 }}>
-        See the full scoreboard and content calendar
-      </Button>
-
-      {openItem && (
-        <ItemDialog
-          item={openItem}
-          plays={playbookPlays}
-          onClose={() => setOpenItem(null)}
-          onSaved={() => {
-            setOpenItem(null);
-            refresh();
-          }}
+      {tab === "todo" && (
+        <HqPlays
+          audiences={audiences}
+          reloadKey={reloadKey + key}
+          onChanged={onChanged}
+          title="Today"
+          note="Everything for this buyer, across content, cold email, calls and LinkedIn. Most urgent first."
         />
+      )}
+
+      {tab !== "todo" && (
+        <Box sx={{ display: "grid", gap: 2 }}>
+          <Typography sx={{ color: IOS.secondary, fontSize: 14.5 }}>{TABS[tab].note}</Typography>
+
+          <HqPlays
+            audiences={audiences}
+            filter={(t) => todoTab(t) === tab}
+            hideChannels={tab !== "content"}
+            reloadKey={reloadKey + key}
+            onChanged={onChanged}
+            title={`To do now: ${TABS[tab].label.toLowerCase()}`}
+            note=" "
+            emptyText="Nothing to do here right now."
+          />
+
+          <Box>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: IOS.secondary, textTransform: "uppercase", mb: 0.75 }}>
+              The plays
+            </Typography>
+            <Box sx={{ display: "grid", gap: 1 }}>
+              {plays
+                .filter((p) => tabForPlay(p) === tab)
+                .map((p) => (
+                  <PlayCard
+                    key={p._id}
+                    play={p}
+                    open={open.has(p._id)}
+                    onToggle={() => toggle(p._id)}
+                    editing={editing === p._id}
+                    onEdit={() => setEditing(p._id)}
+                    onDone={() => {
+                      setEditing(null);
+                      setKey((k) => k + 1);
+                    }}
+                  />
+                ))}
+            </Box>
+          </Box>
+
+          {tab === "content" && (
+            <Box>
+              <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: IOS.secondary, textTransform: "uppercase", mb: 0.75 }}>
+                Content board
+              </Typography>
+              <HqContentPlan audiences={audiences} reloadKey={reloadKey + key} />
+            </Box>
+          )}
+        </Box>
       )}
     </Box>
   );

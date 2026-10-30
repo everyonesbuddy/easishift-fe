@@ -58,11 +58,64 @@ function PublishBox({ item, onDone, onCancel }) {
   );
 }
 
+const STATUS_LABEL = { idea: "Idea", drafting: "Drafting", ready: "Ready", scheduled: "Scheduled" };
+const shortDate = (d) => new Date(d).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+
+/**
+ * A content target, piece by piece: what went out this week (ticked), then the
+ * next ones to publish. Each gets its own "Mark published", one at a time.
+ */
+function ContentQueue({ p, onOpenContent, onLogged }) {
+  const [openId, setOpenId] = useState(null);
+  const row = { display: "flex", alignItems: "center", gap: 1, py: 0.75, px: 1, "& + &": { borderTop: `1px solid ${IOS.hairline}` } };
+  const title = (i) => (
+    <ButtonBase onClick={() => onOpenContent(i)} sx={{ flex: 1, minWidth: 0, justifyContent: "flex-start", textAlign: "left", fontSize: 14, fontWeight: 600, "&:hover": { color: IOS.blue } }}>
+      <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i.title}</Box>
+    </ButtonBase>
+  );
+  if (!p.queue?.length && !p.published?.length) return null;
+  return (
+    <Box sx={{ mt: 1, maxWidth: 760, border: `1px solid ${IOS.hairline}`, borderRadius: IOS.radius.cell, bgcolor: IOS.surface }}>
+      {(p.published || []).map((i) => (
+        <Box key={i._id} sx={row}>
+          <Box sx={{ width: 22, height: 22, borderRadius: "50%", bgcolor: IOS.green, color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}><FiCheck size={13} /></Box>
+          {title(i)}
+          <Typography sx={{ fontSize: 12.5, color: IOS.green, fontWeight: 600, whiteSpace: "nowrap" }}>Published {shortDate(i.publishedAt)}</Typography>
+        </Box>
+      ))}
+      {(p.queue || []).map((i, n) => (
+        <Box key={i._id}>
+          <Box sx={row}>
+            <Box sx={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${n === 0 ? IOS.blue : IOS.separator}`, flexShrink: 0 }} />
+            {title(i)}
+            <Tag color={i.status === "ready" || i.status === "scheduled" ? IOS.green : IOS.secondary}>{STATUS_LABEL[i.status] || i.status}</Tag>
+            <Button
+              size="small"
+              variant={n === 0 ? "contained" : "outlined"}
+              disableElevation
+              onClick={() => setOpenId(openId === i._id ? null : i._id)}
+              sx={{ borderRadius: IOS.radius.round, whiteSpace: "nowrap", flexShrink: 0 }}
+            >
+              Mark published
+            </Button>
+          </Box>
+          {openId === i._id && (
+            <Box sx={{ px: 1, pb: 1 }}>
+              <PublishBox item={i} onDone={onLogged} onCancel={() => setOpenId(null)} />
+            </Box>
+          )}
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 function TodoRow({ p, showAudience, onOpenFacility, onOpenContent, doneFor, setDoneFor, note, setNote, onDone, logFor, setLogFor, logPlays, onLogged, publishFor, setPublishFor }) {
   const k = PLAY_KINDS[p.kind] || { label: p.kind, color: IOS.secondary };
   const canLog = p.countsFrom === "activities" && p.playId;
   // Content: what counts is a piece marked published (no logging needed).
-  const canPublish = p.item && p.item.status !== "published" && (p.countsFrom === "content" || ["content", "overdue"].includes(p.kind));
+  const hasQueue = Array.isArray(p.queue);
+  const canPublish = !hasQueue && p.item && p.item.status !== "published" && (p.countsFrom === "content" || ["content", "overdue"].includes(p.kind));
   const isTarget = p.kind === "cadence";
   return (
     <Box sx={{ display: "flex", gap: 1.5, py: 1.5, "& + &": { borderTop: `1px solid ${IOS.hairline}` }, flexWrap: { xs: "wrap", md: "nowrap" } }}>
@@ -86,6 +139,7 @@ function TodoRow({ p, showAudience, onOpenFacility, onOpenContent, doneFor, setD
           {p.action}
         </Typography>
         {p.progress && <Progress {...p.progress} />}
+        {hasQueue && <ContentQueue p={p} onOpenContent={onOpenContent} onLogged={onLogged} />}
         {publishFor === p.key && <PublishBox item={p.item} onDone={onLogged} onCancel={() => setPublishFor(null)} />}
         {logFor === p.key && (
           <Box sx={{ mt: 1 }}>
@@ -111,7 +165,7 @@ function TodoRow({ p, showAudience, onOpenFacility, onOpenContent, doneFor, setD
             Open
           </Button>
         )}
-        {p.item && (
+        {p.item && !hasQueue && (
           <Button size="small" variant="outlined" startIcon={<FiEdit3 />} onClick={() => onOpenContent(p.item)} sx={{ borderRadius: IOS.radius.round }}>
             Open
           </Button>

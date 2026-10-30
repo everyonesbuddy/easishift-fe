@@ -1,5 +1,6 @@
 import { Box, Button, Link, Typography } from "@mui/material";
 import { FiDownload } from "react-icons/fi";
+import MarkdownBody from "./MarkdownBody";
 
 // Renders Contentful rich text (the JSON "document") without extra libraries.
 // Unknown node types render their children, so new Contentful features
@@ -128,5 +129,7 @@ export function Node({ node, assets = {} }) {
 
 export default function RichText({ document, assets }) {
   if (!document) return null;
+  // A Markdown (Long text) body comes through as a string.
+  if (typeof document === "string") return <MarkdownBody text={document} />;
   return <Node node={document} assets={assets} />;
 }

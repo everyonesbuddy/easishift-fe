@@ -14,6 +14,8 @@ import TimeClockAccuracyCalculator from "./components/Home/TimeClockAccuracyCalc
 import HoursPerResidentDayCalculator from "./components/Home/HoursPerResidentDayCalculator";
 import ScheduleCoverageCalculator from "./components/Home/ScheduleCoverageCalculator";
 import RolePage from "./components/Home/RolePage";
+import BlogIndex from "./components/Blog/BlogIndex";
+import BlogPost from "./components/Blog/BlogPost";
 import TermsAndConditions from "./components/Home/TermsAndConditions";
 import PrivacyPolicy from "./components/Home/PrivacyPolicy";
 import EndUserLicenseAgreement from "./components/Home/EndUserLicenseAgreement";
@@ -150,6 +152,8 @@ export default function App() {
             <Route path="/integrations" element={<IntegrationsPage />} />
             <Route path="/features/:feature" element={<FeatureLandingPage />} />
             <Route path="/for/:role" element={<RolePage />} />
+            <Route path="/blog" element={<BlogIndex />} />
+            <Route path="/blog/:slug" element={<BlogPost />} />
             <Route
               path="/calculators/hours-per-resident-day-calculator"
               element={<HoursPerResidentDayCalculator />}

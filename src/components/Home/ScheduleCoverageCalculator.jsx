@@ -46,6 +46,10 @@ export default function ScheduleCoverageCalculator() {
 
   return (
     <CalculatorLayout
+      capture={{
+        source: "schedule-coverage",
+        summary: `${f1(r.total)} full-time positions needed${r.haveAll ? `, ${f1(r.haveTotal)} on staff` : ""}`,
+      }}
       eyebrow="Schedule coverage calculator"
       title="How many full-time positions does your schedule need?"
       intro="Put in who you need on each shift. See the full-time positions it takes by role once time off and call-outs are allowed for, and how that compares with your team today."

@@ -14,6 +14,8 @@ import {
 import { FiArrowRight, FiCopy, FiDownload, FiMail } from "react-icons/fi";
 import { Link as RouterLink } from "react-router-dom";
 import { toast } from "react-toastify";
+import { NewsletterOptIn } from "./EmailCapture";
+import { getFirstTouch } from "../../utils/firstTouch";
 import api from "../../config/api";
 import { trackEvent } from "../../utils/analytics";
 import CalculatorInput from "./CalculatorInput";
@@ -22,7 +24,6 @@ import {
   copyCalculatorLink,
   formatMoney,
   formatNumber,
-  openBeehiivCaptureOnce,
   readNumberParam,
   usePageMetadata,
   WEEKS_PER_YEAR,
@@ -104,6 +105,7 @@ export default function CallOutCostCalculator() {
   );
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
+  const [newsletter, setNewsletter] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
 
   const balanceCoverage = (changedKey, nextValue) => {
@@ -256,9 +258,10 @@ export default function CallOutCostCalculator() {
 
     try {
       setSendingEmail(true);
-      openBeehiivCaptureOnce(trimmedEmail);
       await api.post("/marketing/call-out-cost/email-summary", {
         recipientEmail: trimmedEmail,
+        newsletter,
+        utm: getFirstTouch() || undefined,
         inputs: {
           companyName: companyName.trim(),
           employees,
@@ -833,6 +836,7 @@ export default function CallOutCostCalculator() {
                       {sendingEmail ? "Sending..." : "Email results"}
                     </Button>
                   </Box>
+                  <NewsletterOptIn checked={newsletter} onChange={setNewsletter} />
                 </Box>
               </Stack>
             </Box>

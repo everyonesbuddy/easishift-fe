@@ -21,7 +21,16 @@ const PUBLIC_PATHS = new Set([
   "/calculators/call-out-cost-calculator",
   "/calculators/overtime-cost-calculator",
   "/calculators/time-clock-accuracy-calculator",
+  "/calculators/hours-per-resident-day-calculator",
+  "/calculators/schedule-coverage-calculator",
+  "/for/schedulers",
+  "/for/directors",
+  "/for/operators",
+  "/blog",
 ]);
+// Public pages with a slug (marketing pages report their real path; app pages report "/portal").
+const PUBLIC_PATTERNS = [/^\/features\/[a-z0-9-]+$/, /^\/blog\/[a-z0-9-]+$/];
+const isPublicPath = (path) => PUBLIC_PATHS.has(path) || PUBLIC_PATTERNS.some((re) => re.test(path));
 const PAGE_AREAS = {
   "/": "home",
   "/login": "login",
@@ -57,10 +66,7 @@ export function isAnalyticsHost(hostname) {
 export function getAnalyticsUrl(value) {
   const url = new URL(value);
   const path = url.pathname.replace(/\/$/, "") || "/";
-  const safePath =
-    PUBLIC_PATHS.has(path) || /^\/features\/[a-z0-9-]+$/.test(path)
-      ? path
-      : "/portal";
+  const safePath = isPublicPath(path) ? path : "/portal";
   const safeUrl = new URL(safePath, url.origin);
   if (safePath !== "/portal") {
     CAMPAIGN_PARAMETERS.forEach((parameter) => {
@@ -89,7 +95,11 @@ export function getAnalyticsPageContext(value) {
         ? "features"
         : path.startsWith("/calculators/")
           ? "calculators"
-          : PUBLIC_PATHS.has(path)
+          : path.startsWith("/for/")
+            ? "role_page"
+            : path === "/blog" || path.startsWith("/blog/")
+              ? "blog"
+              : PUBLIC_PATHS.has(path)
             ? path.slice(1).replaceAll("-", "_")
             : "portal"),
     page_title:

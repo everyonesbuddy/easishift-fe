@@ -3,6 +3,7 @@ import { FiArrowRight, FiCalendar } from "react-icons/fi";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import Footer from "../Shared/Footer";
 import { DEMO_URL, NOT_AN_AGENCY } from "./roleContent";
+import EmailCapture from "./EmailCapture";
 
 const panel = { borderRadius: "20px", borderColor: "#E4E7EC" };
 
@@ -19,7 +20,7 @@ export function MathLine({ children, strong }) {
  * Shared layout for the planning calculators: dark header, inputs on the
  * left, live result and the math on the right, then a short pitch.
  */
-export default function CalculatorLayout({ eyebrow, title, intro, inputs, result, math, note, pitch }) {
+export default function CalculatorLayout({ eyebrow, title, intro, inputs, result, math, note, pitch, capture }) {
   const navigate = useNavigate();
   return (
     <>
@@ -68,6 +69,7 @@ export default function CalculatorLayout({ eyebrow, title, intro, inputs, result
                   {note && <Typography sx={{ fontSize: 12.5, color: "#667085", mt: 1.5, lineHeight: 1.55 }}>{note}</Typography>}
                 </CardContent>
               </Card>
+              {capture && <EmailCapture source={capture.source} summary={capture.summary} />}
             </Box>
           </Box>
 

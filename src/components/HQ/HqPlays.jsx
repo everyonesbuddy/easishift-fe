@@ -27,9 +27,42 @@ function Progress({ done, target, unit }) {
   );
 }
 
-function TodoRow({ p, showAudience, onOpenFacility, onOpenContent, doneFor, setDoneFor, note, setNote, onDone, logFor, setLogFor, logPlays, onLogged }) {
+/** Mark the next content piece published (that's what counts for content targets), with its link if you have it. */
+function PublishBox({ item, onDone, onCancel }) {
+  const [url, setUrl] = useState(item.url || "");
+  const [at, setAt] = useState(new Date().toISOString().slice(0, 10));
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/hq/content-plan/${item._id}`, { status: "published", publishedAt: at, url: url.trim() });
+      toast.success(`"${item.title}" marked published`);
+      onDone();
+    } catch (err) {
+      toast.error(errorText(err, "Couldn't save"));
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <Box sx={{ mt: 1, p: 1.5, bgcolor: IOS.canvas, borderRadius: IOS.radius.cell, display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 150px auto" }, gap: 1, alignItems: "center" }}>
+      <TextField size="small" label="Link to the post (optional)" placeholder="https://www.linkedin.com/feed/update/…" value={url} onChange={(e) => setUrl(e.target.value)} sx={{ bgcolor: IOS.surface }} helperText="With the link, its views and engagement show up automatically." />
+      <TextField size="small" type="date" label="Published" InputLabelProps={{ shrink: true }} value={at} onChange={(e) => setAt(e.target.value)} sx={{ bgcolor: IOS.surface, alignSelf: "start" }} />
+      <Box sx={{ display: "flex", gap: 1, alignSelf: "start" }}>
+        <Button variant="contained" disableElevation disabled={saving} onClick={save}>
+          Mark published
+        </Button>
+        <Button onClick={onCancel}>Cancel</Button>
+      </Box>
+    </Box>
+  );
+}
+
+function TodoRow({ p, showAudience, onOpenFacility, onOpenContent, doneFor, setDoneFor, note, setNote, onDone, logFor, setLogFor, logPlays, onLogged, publishFor, setPublishFor }) {
   const k = PLAY_KINDS[p.kind] || { label: p.kind, color: IOS.secondary };
   const canLog = p.countsFrom === "activities" && p.playId;
+  // Content: what counts is a piece marked published (no logging needed).
+  const canPublish = p.item && p.item.status !== "published" && (p.countsFrom === "content" || ["content", "overdue"].includes(p.kind));
   const isTarget = p.kind === "cadence";
   return (
     <Box sx={{ display: "flex", gap: 1.5, py: 1.5, "& + &": { borderTop: `1px solid ${IOS.hairline}` }, flexWrap: { xs: "wrap", md: "nowrap" } }}>
@@ -53,6 +86,7 @@ function TodoRow({ p, showAudience, onOpenFacility, onOpenContent, doneFor, setD
           {p.action}
         </Typography>
         {p.progress && <Progress {...p.progress} />}
+        {publishFor === p.key && <PublishBox item={p.item} onDone={onLogged} onCancel={() => setPublishFor(null)} />}
         {logFor === p.key && (
           <Box sx={{ mt: 1 }}>
             <LogTouch plays={logPlays} playId={p.playId} onLogged={onLogged} onCancel={() => setLogFor(null)} />
@@ -80,6 +114,11 @@ function TodoRow({ p, showAudience, onOpenFacility, onOpenContent, doneFor, setD
         {p.item && (
           <Button size="small" variant="outlined" startIcon={<FiEdit3 />} onClick={() => onOpenContent(p.item)} sx={{ borderRadius: IOS.radius.round }}>
             Open
+          </Button>
+        )}
+        {canPublish && (
+          <Button size="small" variant="contained" disableElevation startIcon={<FiCheck />} onClick={() => setPublishFor(publishFor === p.key ? null : p.key)} sx={{ borderRadius: IOS.radius.round }}>
+            Mark published
           </Button>
         )}
         {canLog && (
@@ -122,6 +161,7 @@ export default function HqPlays({ reloadKey, onChanged, audiences = null, filter
   const [note, setNote] = useState("");
   const [key, setKey] = useState(0);
   const [logFor, setLogFor] = useState(null);
+  const [publishFor, setPublishFor] = useState(null);
   const playbookPlays = usePlaybookPlays();
   const logPlays = playbookPlays.filter((x) => x.countsFrom === "activities");
   const audKey = (audiences || []).join(",");
@@ -171,8 +211,11 @@ export default function HqPlays({ reloadKey, onChanged, audiences = null, filter
     logFor,
     setLogFor,
     logPlays,
+    publishFor,
+    setPublishFor,
     onLogged: () => {
       setLogFor(null);
+      setPublishFor(null);
       setKey((x) => x + 1);
       onChanged?.();
     },

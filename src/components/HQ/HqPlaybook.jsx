@@ -141,12 +141,12 @@ export default function HqPlaybook({ reloadKey, audiences = null }) {
         </Box>
       )}
 
-      <Section title="Scoreboard" note="This week against each play's target, and the three weeks before. Counted from what's logged in HQ: pick the play when you log a call or email, and link content to its play.">
+      <Section title="Scoreboard" note="This week against each play's target, and the three weeks before. Counted from what's logged in HQ: pick the marketing play when you log a call or email, and link content to its play.">
         <Box sx={{ overflowX: "auto" }}>
           <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", minWidth: 640, "& td, & th": { borderBottom: `1px solid ${IOS.hairline}`, py: 0.9, px: 1, fontSize: 14, textAlign: "right", ...num }, "& th": { fontSize: 12, color: IOS.secondary, fontWeight: 700 }, "& td:first-of-type, & th:first-of-type": { textAlign: "left" } }}>
             <thead>
               <tr>
-                <th>Play</th>
+                <th>Marketing play</th>
                 <th>Target / week</th>
                 {data.weeks.map((w, i) => (
                   <th key={w}>{i === thisWeek ? "This week" : weekLabel(w)}</th>
@@ -194,12 +194,12 @@ export default function HqPlaybook({ reloadKey, audiences = null }) {
           </ButtonBase>
         ))}
         <Button size="small" variant="outlined" startIcon={<FiPlus />} onClick={() => setEditing("new")} sx={{ ml: "auto", borderRadius: IOS.radius.round }}>
-          Add play
+          Add marketing play
         </Button>
       </Box>
 
       {editing === "new" && (
-        <Section title="New play">
+        <Section title="New marketing play">
           <PlayForm
             onSaved={() => {
               setEditing(null);

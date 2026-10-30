@@ -122,7 +122,7 @@ function ItemDialog({ item, plays, onClose, onSaved }) {
         <TextField {...f} type="date" label="Due" InputLabelProps={{ shrink: true }} value={v.dueDate} onChange={set("dueDate")} />
         <TextField {...f} type="date" label="Published" InputLabelProps={{ shrink: true }} value={v.publishedAt} onChange={set("publishedAt")} />
         <TextField {...f} label="Link once it's live (YouTube, LinkedIn, wisershifts.com…)" value={v.url} onChange={set("url")} sx={{ gridColumn: "1 / -1" }} helperText="The link is how its views are matched." />
-        <TextField {...f} select label="Play it's for" value={v.playId} onChange={set("playId")} SelectProps={{ displayEmpty: true }} InputLabelProps={{ shrink: true }} sx={{ gridColumn: "1 / -1" }}>
+        <TextField {...f} select label="Marketing play it's for" value={v.playId} onChange={set("playId")} SelectProps={{ displayEmpty: true }} InputLabelProps={{ shrink: true }} sx={{ gridColumn: "1 / -1" }}>
           <MenuItem value="">None</MenuItem>
           {plays.filter((p) => p.countsFrom === "content").map((p) => (
             <MenuItem key={p._id} value={p._id}>{p.title}</MenuItem>

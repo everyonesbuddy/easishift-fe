@@ -241,7 +241,7 @@ export function HistoryRow({ a, contacts, plays, onChanged }) {
             <MenuItem key={c._id} value={c._id}>{c.name || c.email}</MenuItem>
           ))}
         </TextField>
-        <TextField {...field} select label="Play" value={v.playId} onChange={set("playId")} SelectProps={{ displayEmpty: true }} InputLabelProps={{ shrink: true }}>
+        <TextField {...field} select label="Marketing play" value={v.playId} onChange={set("playId")} SelectProps={{ displayEmpty: true }} InputLabelProps={{ shrink: true }}>
           <MenuItem value="">None</MenuItem>
           {plays.filter((p) => p.countsFrom === "activities").map((p) => (
             <MenuItem key={p._id} value={p._id}>{p.title}</MenuItem>

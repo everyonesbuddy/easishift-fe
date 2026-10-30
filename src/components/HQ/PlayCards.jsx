@@ -59,7 +59,7 @@ export function PlayForm({ play, onSaved, onCancel, onDeleted }) {
 
   return (
     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 1.25, mt: 1 }}>
-      <TextField {...f} label="Name of the play" value={p.title} onChange={set("title")} sx={{ ...f.sx, gridColumn: "1 / -1" }} />
+      <TextField {...f} label="Name of the marketing play" value={p.title} onChange={set("title")} sx={{ ...f.sx, gridColumn: "1 / -1" }} />
       <TextField {...f} select label="Channel" value={p.channel} onChange={set("channel")}>
         {Object.entries(CHANNEL_LABELS).map(([k, v]) => (
           <MenuItem key={k} value={k}>{v}</MenuItem>
@@ -120,7 +120,7 @@ export function PlayForm({ play, onSaved, onCancel, onDeleted }) {
         </Box>
         {play?._id && (
           <Box sx={{ ml: "auto" }}>
-            <DeleteButton onConfirm={remove} label="Remove play" />
+            <DeleteButton onConfirm={remove} label="Remove this marketing play" />
           </Box>
         )}
       </Box>
@@ -194,7 +194,7 @@ export function PlayCard({ play, open, onToggle, editing, onEdit, onDone }) {
           ))}
           <Typography sx={{ fontSize: 12.5, color: IOS.secondary, mt: 1 }}>Scoreboard counts: {COUNTS[play.countsFrom]}.</Typography>
           <Button size="small" startIcon={<FiEdit2 />} onClick={onEdit} sx={{ mt: 1 }}>
-            Edit this play
+            Edit this marketing play
           </Button>
         </Box>
       )}

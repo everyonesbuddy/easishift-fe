@@ -149,7 +149,7 @@ export default function HqPlaybookRead({ reloadKey }) {
       <Flow />
       <P>{meta.connect}</P>
 
-      <H sub="Three buyers. Each has its own page under Plays with what to do today, their plays and their content.">Who we sell to</H>
+      <H sub="Three buyers. Each has its own page under Marketing plays, with what to do today, the plays for them and their content.">Who we sell to</H>
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, gap: 1.5 }}>
         {(meta.buyers || []).map((b) => {
           const color = AUDIENCES[b.key]?.color || IOS.blue;
@@ -170,7 +170,7 @@ export default function HqPlaybookRead({ reloadKey }) {
               ))}
               {PAGE_FOR[b.key] && (
                 <Button data-hq-chrome size="small" endIcon={<FiArrowRight />} onClick={() => navigate(`/hq/${PAGE_FOR[b.key]}`)} sx={{ mt: 1.5, px: 0 }}>
-                  Their plays
+                  See their marketing plays
                 </Button>
               )}
             </Box>
@@ -178,7 +178,7 @@ export default function HqPlaybookRead({ reloadKey }) {
         })}
       </Box>
 
-      <H sub="What each channel is for, and the plays we run on it.">The channels</H>
+      <H sub="What each channel is for, and the marketing plays we run on it.">The channels</H>
       {(meta.channels || []).map((c) => {
         const list = plays.filter((p) => p.channel === c.key || (c.key === "blog" && p.channel === "search"));
         return (
@@ -227,7 +227,7 @@ export default function HqPlaybookRead({ reloadKey }) {
         </Box>
       ))}
 
-      <H sub="Each play's weekly target. The live scoreboard is under Plays → The overall plan.">How we keep score</H>
+      <H sub="Each play's weekly target. The live scoreboard is under Marketing plays → Full plan & scoreboard.">How we keep score</H>
       {plays
         .filter((p) => p.weeklyTarget)
         .map((p) => (

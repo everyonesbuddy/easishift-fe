@@ -249,7 +249,7 @@ export default function FacilityDrawer({ id, onClose, onChanged }) {
                   <MenuItem key={c._id} value={c._id}>{c.name || c.email}</MenuItem>
                 ))}
               </TextField>
-              <TextField {...field} select label="Play (for the scoreboard)" value={log.playId} onChange={(e) => setLog({ ...log, playId: e.target.value })} SelectProps={{ displayEmpty: true }} InputLabelProps={{ shrink: true }} sx={{ ...field.sx, gridColumn: "1 / -1" }}>
+              <TextField {...field} select label="Marketing play (for the scoreboard)" value={log.playId} onChange={(e) => setLog({ ...log, playId: e.target.value })} SelectProps={{ displayEmpty: true }} InputLabelProps={{ shrink: true }} sx={{ ...field.sx, gridColumn: "1 / -1" }}>
                 <MenuItem value="">None</MenuItem>
                 {plays.filter((p) => p.countsFrom === "activities").map((p) => (
                   <MenuItem key={p._id} value={p._id}>{p.title}</MenuItem>

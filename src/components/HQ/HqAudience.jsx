@@ -73,14 +73,14 @@ export default function HqAudience({ audiences, roles, reloadKey, onChanged }) {
       <BuyerCards keys={audiences} />
       <SubTabs
         tabs={[
-          ["now", "Do now"],
-          ["plays", "Their plays"],
-          ["content", "Their content"],
+          ["now", "To do now"],
+          ["plays", "Marketing plays"],
+          ["content", "Content"],
         ]}
         value={tab}
         onChange={setTab}
       />
-      {tab === "now" && <HqPlays roles={roles} title="Do now" reloadKey={reloadKey} onChanged={onChanged} />}
+      {tab === "now" && <HqPlays roles={roles} title="To do now" reloadKey={reloadKey} onChanged={onChanged} />}
       {tab === "plays" && <HqPlaybook audiences={audiences} reloadKey={reloadKey} />}
       {tab === "content" && <HqContentPlan audiences={audiences} reloadKey={reloadKey} />}
     </Box>
@@ -94,7 +94,7 @@ export function HqOverall({ reloadKey, onChanged }) {
     <Box>
       <SubTabs
         tabs={[
-          ["score", "Scoreboard, plays and the week"],
+          ["score", "Scoreboard, marketing plays and the week"],
           ["content", "Content calendar"],
           ["now", "Everything to do now"],
         ]}

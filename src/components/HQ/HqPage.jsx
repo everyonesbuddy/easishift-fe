@@ -22,7 +22,7 @@ const SchedulersPage = (props) => <HqAudience {...props} audiences={["scheduler"
 
 // The menu: the playbook to read first, then leads, then plays by buyer, then the numbers.
 const GROUPS = [
-  { label: "", items: [{ id: "playbook", label: "Playbook", Comp: HqPlaybookRead, title: "Marketing playbook", sub: "How we sell, who we sell to, the channels and the plays. Read this first." }] },
+  { label: "", items: [{ id: "playbook", label: "Playbook", Comp: HqPlaybookRead, title: "Marketing playbook", sub: "How we sell, who we sell to, the channels and the marketing plays. Read this first." }] },
   {
     label: "Facility leads",
     items: [
@@ -31,11 +31,11 @@ const GROUPS = [
     ],
   },
   {
-    label: "Plays",
+    label: "Marketing plays",
     items: [
-      { id: "leadership", label: "DONs, EDs & admins", Comp: LeadershipPage, title: "Plays for leadership", sub: "DONs, executive directors, administrators and regional operators: what to do now, their plays, their content." },
-      { id: "schedulers", label: "Schedulers", Comp: SchedulersPage, title: "Plays for schedulers", sub: "Schedulers and staffing coordinators: what to do now, their plays, their content." },
-      { id: "overall", label: "The overall plan", Comp: HqOverall, title: "The overall plan", sub: "The scoreboard, every play, the week, and the full content calendar." },
+      { id: "leadership", label: "Reach leadership", Comp: LeadershipPage, title: "Reach leadership", sub: "DONs, executive directors, administrators and regional operators: what to do now, the marketing plays for them, and their content." },
+      { id: "schedulers", label: "Reach schedulers", Comp: SchedulersPage, title: "Reach schedulers", sub: "Schedulers and staffing coordinators: what to do now, the marketing plays for them, and their content." },
+      { id: "overall", label: "Full plan & scoreboard", Comp: HqOverall, title: "Full plan and scoreboard", sub: "The scoreboard, every marketing play, the week, and the full content calendar." },
     ],
   },
   {
@@ -125,7 +125,7 @@ export default function HqPage() {
 
         {current.id === "overall" && (
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)", xl: "repeat(6, 1fr)" }, gap: 1, mb: 2.5 }}>
-            <Stat label="Plays for today" value={o ? n(o.plays.today) : "…"} detail={o ? `${n(o.plays.total)} open in all` : ""} tone={o?.plays.today ? IOS.blue : undefined} />
+            <Stat label="To do today" value={o ? n(o.plays.today) : "…"} detail={o ? `${n(o.plays.total)} open in all` : ""} tone={o?.plays.today ? IOS.blue : undefined} />
             <Stat label="Signups" value={o ? n(o.signups.total) : "…"} detail={o ? `${o.signups.last7} this week · ${o.signups.active} active` : ""} onClick={() => navigate("/hq/signups")} />
             <Stat label="Paying" value={o ? n(o.signups.paid) : "…"} detail={o ? `${o.signups.trialing} on trial` : ""} onClick={() => navigate("/hq/numbers")} />
             <Stat label="Facilities" value={o ? n(o.facilities) : "…"} detail="on our list" onClick={() => navigate("/hq/facilities")} />

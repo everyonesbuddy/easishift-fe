@@ -87,3 +87,11 @@ export const KINDS = [
   ["meeting", "Meeting"],
   ["note", "Note"],
 ];
+
+/** Monday of this week, local time, as an ISO string (for "this week's log"). */
+export function weekStartIso() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.toISOString();
+}

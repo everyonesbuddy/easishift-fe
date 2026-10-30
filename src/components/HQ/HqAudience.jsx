@@ -8,6 +8,7 @@ import HqPlays from "./HqPlays";
 import HqPlaybook from "./HqPlaybook";
 import HqContentPlan from "./HqContentPlan";
 import { PlayCard } from "./PlayCards";
+import { LogTouch, TouchLog } from "./LogTouch";
 
 
 /** Small tab bar used inside a page. */
@@ -32,9 +33,9 @@ const tabForPlay = (p) => (p.channel === "calls" ? "calls" : p.channel === "emai
 
 const TABS = {
   content: { label: "Content", note: "What we publish for them: LinkedIn posts, videos, Klaviyo emails, blog posts and templates, Facebook groups. Plan it on the board below." },
-  email: { label: "Cold email", note: "One-to-one emails from your own inbox, not Klaviyo. Log each one on the facility with its play so it counts." },
-  calls: { label: "Calls", note: "Phone calls to the building. Log each one on the facility with its play so it counts." },
-  linkedin: { label: "LinkedIn outreach", note: "Connection requests and messages, one person at a time. Log each message with its play so it counts." },
+  email: { label: "Cold email", note: "One-to-one emails from your own inbox, not Klaviyo. Log them below so they count toward the weekly target." },
+  calls: { label: "Calls", note: "Phone calls to the building. Log them below (one at a time or in a batch) so they count toward the weekly target." },
+  linkedin: { label: "LinkedIn outreach", note: "Connection requests and messages, one person at a time. Log them below so they count toward the weekly target." },
 };
 
 /**
@@ -119,6 +120,26 @@ export default function HqAudience({ audiences, reloadKey, onChanged }) {
       {tab !== "todo" && (
         <Box sx={{ display: "grid", gap: 2 }}>
           <Typography sx={{ color: IOS.secondary, fontSize: 14.5 }}>{TABS[tab].note}</Typography>
+
+          {tab !== "content" && (
+            <Box sx={{ p: 2, bgcolor: IOS.surface, borderRadius: IOS.radius.card, border: `1px solid ${IOS.hairline}` }}>
+              <Typography sx={{ fontWeight: 700, fontSize: 17, mb: 0.25 }}>Log what you did</Typography>
+              <Typography sx={{ color: IOS.secondary, fontSize: 13.5, mb: 1.5 }}>
+                One at a time, or a batch ("15 calls this morning"). It counts toward the play's weekly target. Picking a person or facility also adds it to their history.
+              </Typography>
+              <LogTouch
+                key={tab}
+                plays={plays.filter((p) => tabForPlay(p) === tab && p.countsFrom === "activities")}
+                onLogged={() => {
+                  setKey((k) => k + 1);
+                  onChanged?.();
+                }}
+              />
+              <Box sx={{ mt: 2 }}>
+                <TouchLog plays={plays.filter((p) => tabForPlay(p) === tab)} reloadKey={reloadKey + key} onChanged={() => setKey((k) => k + 1)} />
+              </Box>
+            </Box>
+          )}
 
           <HqPlays
             audiences={audiences}

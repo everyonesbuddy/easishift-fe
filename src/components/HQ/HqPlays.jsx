@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Alert, Box, Button, ButtonBase, CircularProgress, TextField, Typography } from "@mui/material";
-import { FiCheck, FiEdit3, FiMail, FiPhone } from "react-icons/fi";
+import { FiCheck, FiEdit3, FiMail, FiPhone, FiPlus } from "react-icons/fi";
 import { toast } from "react-toastify";
 import api from "./hqApi";
 import { IOS, tint } from "../../theme/ios";
@@ -9,11 +9,28 @@ import { PLAY_KINDS, errorText } from "./hqFormat";
 import FacilityDrawer from "./FacilityDrawer";
 import { ItemDialog } from "./HqContentPlan";
 import usePlaybookPlays, { AUDIENCES, CHANNEL_LABELS } from "./usePlaybookPlays";
+import { LogTouch } from "./LogTouch";
 
 const CHANNEL_SHORT = { calls: "Call", email: "Cold email", linkedin: "LinkedIn", newsletter: "Klaviyo", youtube: "YouTube", blog: "Blog & search", facebook: "Facebook", search: "Search", other: "Other" };
 
-function TodoRow({ p, showAudience, onOpenFacility, onOpenContent, doneFor, setDoneFor, note, setNote, onDone }) {
+function Progress({ done, target, unit }) {
+  const pct = Math.min(100, Math.round((done / Math.max(target, 1)) * 100));
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.75, maxWidth: 420 }}>
+      <Box sx={{ flex: 1, height: 8, borderRadius: 4, bgcolor: IOS.fill }}>
+        <Box sx={{ width: `${pct}%`, height: "100%", borderRadius: 4, bgcolor: pct >= 100 ? IOS.green : IOS.blue }} />
+      </Box>
+      <Typography sx={{ fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap" }}>
+        {done} of {target} {unit}
+      </Typography>
+    </Box>
+  );
+}
+
+function TodoRow({ p, showAudience, onOpenFacility, onOpenContent, doneFor, setDoneFor, note, setNote, onDone, logFor, setLogFor, logPlays, onLogged }) {
   const k = PLAY_KINDS[p.kind] || { label: p.kind, color: IOS.secondary };
+  const canLog = p.countsFrom === "activities" && p.playId;
+  const isTarget = p.kind === "cadence";
   return (
     <Box sx={{ display: "flex", gap: 1.5, py: 1.5, "& + &": { borderTop: `1px solid ${IOS.hairline}` }, flexWrap: { xs: "wrap", md: "nowrap" } }}>
       <Box sx={{ width: 4, borderRadius: 2, bgcolor: k.color, flexShrink: 0, display: { xs: "none", sm: "block" } }} />
@@ -35,6 +52,12 @@ function TodoRow({ p, showAudience, onOpenFacility, onOpenContent, doneFor, setD
           <Box component="span" sx={{ fontWeight: 600 }}>Do: </Box>
           {p.action}
         </Typography>
+        {p.progress && <Progress {...p.progress} />}
+        {logFor === p.key && (
+          <Box sx={{ mt: 1 }}>
+            <LogTouch plays={logPlays} playId={p.playId} onLogged={onLogged} onCancel={() => setLogFor(null)} />
+          </Box>
+        )}
         {doneFor === p.key && (
           <Box sx={{ display: "flex", gap: 1, mt: 1, alignItems: "center" }}>
             <TextField size="small" autoFocus placeholder="What happened? (optional)" value={note} onChange={(e) => setNote(e.target.value)} sx={{ flex: 1, maxWidth: 420 }} />
@@ -59,18 +82,24 @@ function TodoRow({ p, showAudience, onOpenFacility, onOpenContent, doneFor, setD
             Open
           </Button>
         )}
+        {canLog && (
+          <Button size="small" variant="contained" disableElevation startIcon={<FiPlus />} onClick={() => setLogFor(logFor === p.key ? null : p.key)} sx={{ borderRadius: IOS.radius.round }}>
+            Log
+          </Button>
+        )}
         <Button
           size="small"
-          variant="contained"
+          variant={isTarget ? "text" : "contained"}
           disableElevation
-          startIcon={<FiCheck />}
+          startIcon={isTarget ? null : <FiCheck />}
+          title={isTarget ? "Hide this reminder until next Monday (doesn't count as progress)" : "Mark this handled; it comes back only if something changes"}
           onClick={() => {
             setDoneFor(p.key);
             setNote("");
           }}
-          sx={{ borderRadius: IOS.radius.round, bgcolor: IOS.ink }}
+          sx={isTarget ? { borderRadius: IOS.radius.round, color: IOS.secondary } : { borderRadius: IOS.radius.round, bgcolor: IOS.ink }}
         >
-          Done
+          {isTarget ? "Skip this week" : "Done"}
         </Button>
       </Box>
     </Box>
@@ -92,7 +121,9 @@ export default function HqPlays({ reloadKey, onChanged, audiences = null, filter
   const [doneFor, setDoneFor] = useState(null);
   const [note, setNote] = useState("");
   const [key, setKey] = useState(0);
+  const [logFor, setLogFor] = useState(null);
   const playbookPlays = usePlaybookPlays();
+  const logPlays = playbookPlays.filter((x) => x.countsFrom === "activities");
   const audKey = (audiences || []).join(",");
 
   useEffect(() => {
@@ -113,7 +144,7 @@ export default function HqPlays({ reloadKey, onChanged, audiences = null, filter
       setPlays((list) => list.filter((x) => x.key !== p.key));
       setDoneFor(null);
       setNote("");
-      toast.success("Done. It comes back only if something changes.");
+      toast.success(p.kind === "cadence" ? "Skipped until next Monday." : "Done. It comes back only if something changes.");
       onChanged?.();
     } catch (err) {
       toast.error(errorText(err, "Couldn't save"));
@@ -137,6 +168,14 @@ export default function HqPlays({ reloadKey, onChanged, audiences = null, filter
     note,
     setNote,
     onDone: markDone,
+    logFor,
+    setLogFor,
+    logPlays,
+    onLogged: () => {
+      setLogFor(null);
+      setKey((x) => x + 1);
+      onChanged?.();
+    },
   };
 
   return (

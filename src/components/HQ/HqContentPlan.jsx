@@ -7,6 +7,7 @@ import { IOS, tint } from "../../theme/ios";
 import { Tag } from "./HqBits";
 import { dateInput, errorText, n, shortDate } from "./hqFormat";
 import { DeleteButton } from "./FacilityParts";
+import { copyText } from "./playFormat";
 import usePlaybookPlays, { AUDIENCES } from "./usePlaybookPlays";
 
 const STATUSES = [
@@ -135,6 +136,9 @@ function ItemDialog({ item, plays, onClose, onSaved }) {
             <DeleteButton onConfirm={remove} label="Remove" />
           </Box>
         )}
+        {v.notes && (
+          <Button onClick={() => copyText(v.notes.replace(/^When:.*\n+/, ""))}>Copy text</Button>
+        )}
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="contained" disableElevation onClick={save} disabled={!v.title.trim()}>Save</Button>
       </DialogActions>
@@ -143,7 +147,7 @@ function ItemDialog({ item, plays, onClose, onSaved }) {
 }
 
 /** Content plan: a board from idea to published, filterable by buyer and channel. */
-export default function HqContentPlan({ reloadKey }) {
+export default function HqContentPlan({ reloadKey, audiences = null }) {
   const [items, setItems] = useState(null);
   const [error, setError] = useState("");
   const [audience, setAudience] = useState("");
@@ -177,14 +181,16 @@ export default function HqContentPlan({ reloadKey }) {
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!items) return <CircularProgress size={22} />;
 
-  const shown = items.filter((i) => (!audience || i.audience.includes(audience)) && (!channel || i.channel === channel));
+  const shown = items.filter(
+    (i) => (audiences ? i.audience.some((a) => audiences.includes(a)) : !audience || i.audience.includes(audience)) && (!channel || i.channel === channel),
+  );
   const soon = shown.filter((i) => i.status !== "published" && i.dueDate && new Date(i.dueDate).getTime() < today + 8 * 86400000);
   const sel = { size: "small", select: true, SelectProps: { displayEmpty: true }, sx: { minWidth: 170, bgcolor: IOS.surface } };
 
   return (
     <Box>
       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2, alignItems: "center" }}>
-        <TextField {...sel} value={audience} onChange={(e) => setAudience(e.target.value)}>
+        <TextField {...sel} value={audience} onChange={(e) => setAudience(e.target.value)} sx={{ ...sel.sx, display: audiences ? "none" : undefined }}>
           <MenuItem value="">Every buyer</MenuItem>
           {Object.entries(AUDIENCES).map(([k, a]) => (
             <MenuItem key={k} value={k}>{a.label}</MenuItem>
@@ -201,7 +207,7 @@ export default function HqContentPlan({ reloadKey }) {
             {soon.length} due in the next 7 days
           </Typography>
         )}
-        <Button variant="contained" disableElevation startIcon={<FiPlus />} onClick={() => setOpen({ status: "idea", audience: audience ? [audience] : [] })} sx={{ ml: "auto", borderRadius: IOS.radius.round }}>
+        <Button variant="contained" disableElevation startIcon={<FiPlus />} onClick={() => setOpen({ status: "idea", audience: audiences ? [audiences[0]] : audience ? [audience] : [] })} sx={{ ml: "auto", borderRadius: IOS.radius.round }}>
           Add content
         </Button>
       </Box>

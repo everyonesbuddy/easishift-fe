@@ -5,7 +5,6 @@ import api from "./hqApi";
 import { IOS } from "../../theme/ios";
 import { Stat } from "./HqBits";
 import { n } from "./hqFormat";
-import HqPlays from "./HqPlays";
 import HqFacilities from "./HqFacilities";
 import HqPeople from "./HqPeople";
 import HqSignups from "./HqSignups";
@@ -13,40 +12,50 @@ import HqEmail from "./HqEmail";
 import HqContent from "./HqContent";
 import HqWeb from "./HqWeb";
 import HqConnections from "./HqConnections";
-import HqPlaybook from "./HqPlaybook";
-import HqContentPlan from "./HqContentPlan";
 import HqNumbers from "./HqNumbers";
+import HqPlaybookRead from "./HqPlaybookRead";
+import HqAudience, { HqOverall } from "./HqAudience";
 
-// The menu, grouped by what you're doing.
+const LEADERSHIP_ROLES = ["don", "executive_director", "administrator", "regional", "owner"];
+const LeadershipPage = (props) => <HqAudience {...props} audiences={["director", "operator"]} roles={LEADERSHIP_ROLES} />;
+const SchedulersPage = (props) => <HqAudience {...props} audiences={["scheduler"]} roles={["scheduler", "other"]} />;
+
+// The menu: the playbook to read first, then leads, then plays by buyer, then the numbers.
 const GROUPS = [
-  { label: "Today", items: [{ id: "plays", label: "Plays", Comp: HqPlays, title: "Today's plays", sub: "Who to reach next, and why." }] },
+  { label: "", items: [{ id: "playbook", label: "Playbook", Comp: HqPlaybookRead, title: "Marketing playbook", sub: "How we sell, who we sell to, the channels and the plays. Read this first." }] },
   {
-    label: "Sell",
+    label: "Facility leads",
     items: [
-      { id: "facilities", label: "Facilities", Comp: HqFacilities, title: "Facilities", sub: "Every building we market to. Open one to see its people, history, and to log a call." },
+      { id: "facilities", label: "Facilities", Comp: HqFacilities, title: "Facilities", sub: "Every building we market to. Open one to see its people and history, and to log a call." },
       { id: "people", label: "People", Comp: HqPeople, title: "People", sub: "The people at those buildings, executives first." },
-      { id: "signups", label: "Signups", Comp: HqSignups, title: "Signups", sub: "Who signed up, where they came from and how they're doing." },
     ],
   },
   {
-    label: "Market",
+    label: "Plays",
     items: [
-      { id: "playbook", label: "Playbook", Comp: HqPlaybook, title: "Playbook", sub: "The plays by buyer and channel, the week, and the scoreboard." },
-      { id: "content-plan", label: "Content plan", Comp: HqContentPlan, title: "Content plan", sub: "Every video, post, newsletter and template, from idea to published." },
-      { id: "email", label: "Email", Comp: HqEmail, title: "Email", sub: "Klaviyo: who really clicked." },
-      { id: "channels", label: "Blog, video, LinkedIn", Comp: HqContent, title: "Blog, video and LinkedIn", sub: "How what we've published is doing." },
-      { id: "web", label: "Website & search", Comp: HqWeb, title: "Website and search", sub: "Google Analytics and Search Console." },
+      { id: "leadership", label: "DONs, EDs & admins", Comp: LeadershipPage, title: "Plays for leadership", sub: "DONs, executive directors, administrators and regional operators: what to do now, their plays, their content." },
+      { id: "schedulers", label: "Schedulers", Comp: SchedulersPage, title: "Plays for schedulers", sub: "Schedulers and staffing coordinators: what to do now, their plays, their content." },
+      { id: "overall", label: "The overall plan", Comp: HqOverall, title: "The overall plan", sub: "The scoreboard, every play, the week, and the full content calendar." },
     ],
   },
-  { label: "Numbers", items: [{ id: "numbers", label: "Funnel", Comp: HqNumbers, title: "Numbers", sub: "How people come in, how far they get, and who drops off." }] },
+  {
+    label: "Data & metrics",
+    items: [
+      { id: "numbers", label: "Funnel", Comp: HqNumbers, title: "Funnel", sub: "How people come in, how far they get, and who drops off." },
+      { id: "signups", label: "Signups", Comp: HqSignups, title: "Signups", sub: "Who signed up, where they came from and how they're doing." },
+      { id: "email", label: "Email", Comp: HqEmail, title: "Email", sub: "Klaviyo: who really clicked." },
+      { id: "web", label: "Website & search", Comp: HqWeb, title: "Website and search", sub: "Google Analytics and Search Console." },
+      { id: "channels", label: "Blog, video, LinkedIn", Comp: HqContent, title: "Blog, video and LinkedIn", sub: "How what we've published is doing." },
+    ],
+  },
   { label: "Settings", items: [{ id: "connections", label: "Connections & data", Comp: HqConnections, title: "Connections and data", sub: "Keys, imports, Google Sheets and backups." }] },
 ];
 const ITEMS = GROUPS.flatMap((g) => g.items);
-const ALIASES = { content: "channels" };
+const ALIASES = { content: "channels", plays: "overall", "content-plan": "overall" };
 
 /** HQ: WiserShifts' own command center (inside HqApp, behind the HQ sign-in). */
 export default function HqPage() {
-  const { tab = "plays" } = useParams();
+  const { tab = "playbook" } = useParams();
   const navigate = useNavigate();
   const [overview, setOverview] = useState(null);
   const [error, setError] = useState("");
@@ -55,7 +64,7 @@ export default function HqPage() {
   const current = ITEMS.find((t) => t.id === (ALIASES[tab] || tab)) || ITEMS[0];
 
   useEffect(() => {
-    if (current.id !== "plays") return;
+    if (current.id !== "overall") return;
     api
       .get("/hq/overview")
       .then((res) => {
@@ -73,11 +82,12 @@ export default function HqPage() {
       {/* Side menu (desktop) */}
       <Box
         component="nav"
+        data-hq-chrome
         sx={{ display: { xs: "none", md: "block" }, width: 220, flexShrink: 0, borderRight: `1px solid ${IOS.separator}`, bgcolor: IOS.surface, py: 2, position: "sticky", top: 56, alignSelf: "flex-start", height: "calc(100vh - 56px)", overflowY: "auto" }}
       >
         {GROUPS.map((g) => (
           <Box key={g.label} sx={{ mb: 1.5 }}>
-            <Typography sx={{ px: 2.5, fontSize: 11.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: IOS.tertiary, mb: 0.5 }}>{g.label}</Typography>
+            {g.label && <Typography sx={{ px: 2.5, fontSize: 11.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: IOS.tertiary, mb: 0.5 }}>{g.label}</Typography>}
             {g.items.map((it) => {
               const active = it.id === current.id;
               return (
@@ -96,10 +106,10 @@ export default function HqPage() {
 
       <Box sx={{ flex: 1, minWidth: 0, px: { xs: 2, md: 3.5 }, pt: 3, pb: 8, maxWidth: 1400 }}>
         {/* Menu (phone) */}
-        <TextField select size="small" fullWidth value={current.id} onChange={(e) => navigate(`/hq/${e.target.value}`)} sx={{ display: { md: "none" }, mb: 2, bgcolor: IOS.surface }}>
+        <TextField data-hq-chrome select size="small" fullWidth value={current.id} onChange={(e) => navigate(`/hq/${e.target.value}`)} sx={{ display: { md: "none" }, mb: 2, bgcolor: IOS.surface }}>
           {GROUPS.flatMap((g) => [
-            <MenuItem key={`h-${g.label}`} disabled sx={{ fontSize: 12, fontWeight: 700, opacity: "1 !important", color: IOS.tertiary }}>
-              {g.label.toUpperCase()}
+            <MenuItem key={`h-${g.label || "top"}`} disabled sx={{ fontSize: 12, fontWeight: 700, opacity: "1 !important", color: IOS.tertiary }}>
+              {(g.label || "Start here").toUpperCase()}
             </MenuItem>,
             ...g.items.map((it) => (
               <MenuItem key={it.id} value={it.id}>
@@ -113,7 +123,7 @@ export default function HqPage() {
         <Typography sx={{ color: IOS.secondary, fontSize: 14.5, mb: 2.5 }}>{current.sub}</Typography>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        {current.id === "plays" && (
+        {current.id === "overall" && (
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)", xl: "repeat(6, 1fr)" }, gap: 1, mb: 2.5 }}>
             <Stat label="Plays for today" value={o ? n(o.plays.today) : "…"} detail={o ? `${n(o.plays.total)} open in all` : ""} tone={o?.plays.today ? IOS.blue : undefined} />
             <Stat label="Signups" value={o ? n(o.signups.total) : "…"} detail={o ? `${o.signups.last7} this week · ${o.signups.active} active` : ""} onClick={() => navigate("/hq/signups")} />

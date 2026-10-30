@@ -118,7 +118,7 @@ function Shell() {
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: IOS.canvas }}>
-      <Box sx={{ bgcolor: "#0F172A", px: { xs: 2, md: 3 }, height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
+      <Box data-hq-chrome sx={{ bgcolor: "#0F172A", px: { xs: 2, md: 3 }, height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
         <Wordmark />
         <Button onClick={(e) => setAnchor(e.currentTarget)} endIcon={<FiChevronDown />} sx={{ color: "#E2E8F0", textTransform: "none", fontWeight: 600 }}>
           {me?.name || me?.email || ""}

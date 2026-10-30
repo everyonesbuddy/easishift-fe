@@ -11,7 +11,7 @@ import FacilityDrawer from "./FacilityDrawer";
 const ROLE_FILTERS = ["", "scheduler", "don", "executive_director", "administrator", "regional"];
 
 /** What to do next, by person and role, from product use, email clicks and the call list. */
-export default function HqPlays({ reloadKey, onChanged }) {
+export default function HqPlays({ reloadKey, onChanged, roles = null, title = "Today" }) {
   const [plays, setPlays] = useState(null);
   const [error, setError] = useState("");
   const [role, setRole] = useState("");
@@ -23,11 +23,12 @@ export default function HqPlays({ reloadKey, onChanged }) {
     let off = false;
     api
       .get("/hq/plays", { params: role ? { role } : {} })
-      .then((res) => !off && setPlays(res.data.plays))
+      .then((res) => !off && setPlays(roles ? res.data.plays.filter((p) => roles.includes(p.role)) : res.data.plays))
       .catch((err) => !off && setError(errorText(err, "Couldn't load plays")));
     return () => {
       off = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- roles is a fixed list per page
   }, [role, reloadKey]);
 
   const markDone = async (p) => {
@@ -106,7 +107,7 @@ export default function HqPlays({ reloadKey, onChanged }) {
 
   return (
     <>
-      <Box sx={{ display: "flex", gap: 0.75, mb: 2, flexWrap: "wrap" }}>
+      <Box sx={{ display: roles ? "none" : "flex", gap: 0.75, mb: 2, flexWrap: "wrap" }}>
         {ROLE_FILTERS.map((r) => (
           <ButtonBase
             key={r || "all"}
@@ -129,7 +130,7 @@ export default function HqPlays({ reloadKey, onChanged }) {
       {!plays && !error && <CircularProgress size={22} />}
       {plays && (
         <Box sx={{ display: "grid", gap: 2 }}>
-          <Section title={`Today (${today.length})`} note="Signups that need a hand, people really clicking, groups heating up, and call-backs due.">
+          <Section title={`${title} (${today.length})`} note="Signups that need a hand, people really clicking, groups heating up, and call-backs due.">
             {today.length ? today.map((p) => <Row key={p.key} p={p} />) : <Empty>Nothing urgent. Nice.</Empty>}
           </Section>
           {later.length > 0 && (

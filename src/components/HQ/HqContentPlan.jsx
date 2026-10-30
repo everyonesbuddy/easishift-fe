@@ -49,7 +49,7 @@ function Metrics({ m }) {
   );
 }
 
-function ItemDialog({ item, plays, onClose, onSaved }) {
+export function ItemDialog({ item, plays, onClose, onSaved }) {
   const [v, setV] = useState({
     title: item.title || "",
     format: item.format || "other",

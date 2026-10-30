@@ -42,9 +42,15 @@ export const PLAY_KINDS = {
   expand: { label: "Reach out to leadership", color: "#5856D6" },
   upgrade: { label: "Upgrade ask", color: IOS.green },
   rescue: { label: "Check in", color: IOS.orange },
-  personal: { label: "Personal note", color: IOS.blue },
-  operator: { label: "Operator pitch", color: "#FF2D55" },
-  call: { label: "Call list", color: "#30B0C7" },
+  personal: { label: "Clicked our email", color: IOS.blue },
+  reply: { label: "Replied", color: IOS.red },
+  lead: { label: "Website lead", color: "#30B0C7" },
+  operator: { label: "Group pitch", color: "#FF2D55" },
+  call: { label: "Call-back due", color: "#30B0C7" },
+  overdue: { label: "Content overdue", color: IOS.red },
+  content: { label: "Content due", color: IOS.orange },
+  cadence: { label: "Weekly target", color: "#5856D6" },
+  didwell: { label: "Did well", color: IOS.green },
 };
 
 export const n = (v, digits = 0) =>

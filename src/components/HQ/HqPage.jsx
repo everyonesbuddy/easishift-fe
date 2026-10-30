@@ -16,9 +16,8 @@ import HqNumbers from "./HqNumbers";
 import HqPlaybookRead from "./HqPlaybookRead";
 import HqAudience, { HqOverall } from "./HqAudience";
 
-const LEADERSHIP_ROLES = ["don", "executive_director", "administrator", "regional", "owner"];
-const LeadershipPage = (props) => <HqAudience {...props} audiences={["director", "operator"]} roles={LEADERSHIP_ROLES} />;
-const SchedulersPage = (props) => <HqAudience {...props} audiences={["scheduler"]} roles={["scheduler", "other"]} />;
+const LeadershipPage = (props) => <HqAudience {...props} audiences={["director", "operator"]} />;
+const SchedulersPage = (props) => <HqAudience {...props} audiences={["scheduler"]} />;
 
 // The menu: the playbook to read first, then leads, then plays by buyer, then the numbers.
 const GROUPS = [
@@ -33,9 +32,9 @@ const GROUPS = [
   {
     label: "Marketing plays",
     items: [
-      { id: "leadership", label: "Reach out to leadership", Comp: LeadershipPage, title: "Reach out to leadership", sub: "DONs, executive directors, administrators and regional operators: what to do now, the marketing plays for them, and their content." },
-      { id: "schedulers", label: "Reach out to schedulers", Comp: SchedulersPage, title: "Reach out to schedulers", sub: "Schedulers and staffing coordinators: what to do now, the marketing plays for them, and their content." },
-      { id: "overall", label: "Full plan & scoreboard", Comp: HqOverall, title: "Full plan and scoreboard", sub: "The scoreboard, every marketing play, the week, and the full content calendar." },
+      { id: "schedulers", label: "For schedulers", Comp: SchedulersPage, title: "Marketing plays for schedulers", sub: "How we reach schedulers and staffing coordinators, on every channel, and what to do now." },
+      { id: "leadership", label: "For DONs, EDs & admins", Comp: LeadershipPage, title: "Marketing plays for DONs, EDs and admins", sub: "How we reach directors of nursing, executive directors, administrators and regional operators, on every channel, and what to do now." },
+      { id: "overall", label: "Full plan & scoreboard", Comp: HqOverall, title: "Full plan and scoreboard", sub: "Everything to do now for every buyer, the scoreboard, every marketing play, the week, and the full content calendar." },
     ],
   },
   {

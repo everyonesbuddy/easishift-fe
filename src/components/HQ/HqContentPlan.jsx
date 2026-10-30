@@ -22,13 +22,13 @@ const FORMATS = {
   short_video: "Short video",
   linkedin_post: "LinkedIn post",
   blog_post: "Blog post",
-  newsletter: "Newsletter",
+  newsletter: "Klaviyo email",
   email: "Email",
   template: "Template / checklist",
   facebook_post: "Facebook group post",
   other: "Other",
 };
-const CHANNELS = { youtube: "YouTube", linkedin: "LinkedIn", blog: "Blog", newsletter: "Newsletter", facebook: "Facebook groups", website: "Website", email: "Email", other: "Other" };
+const CHANNELS = { youtube: "YouTube", linkedin: "LinkedIn", blog: "Blog", newsletter: "Klaviyo", facebook: "Facebook groups", website: "Website", email: "Email", other: "Other" };
 // A sensible channel for each format, so adding is one step.
 const CHANNEL_FOR = { video: "youtube", short_video: "youtube", linkedin_post: "linkedin", blog_post: "blog", newsletter: "newsletter", email: "email", template: "website", facebook_post: "facebook", other: "other" };
 

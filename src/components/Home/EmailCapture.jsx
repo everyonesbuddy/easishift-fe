@@ -9,24 +9,24 @@ import { getFirstTouch } from "../../utils/firstTouch";
 const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
 /**
- * The newsletter consent line for calculators that email a summary. Unticked
- * by default: the summary is sent either way; the newsletter only with a tick.
+ * The weekly-email consent line for calculators that email a summary. Unticked
+ * by default: the summary is sent either way; the weekly email only with a tick.
  */
 export function NewsletterOptIn({ checked, onChange, dark = false }) {
   return (
     <FormControlLabel
       sx={{ mt: 0.5, alignItems: "flex-start", "& .MuiFormControlLabel-label": { fontSize: 13, color: dark ? "rgba(255,255,255,0.75)" : "#475467", pt: "9px" } }}
       control={<Checkbox size="small" checked={checked} onChange={(e) => onChange(e.target.checked)} />}
-      label="Also send me the WiserShifts newsletter on staffing and labor. Unsubscribe anytime."
+      label="Also send me one short email a week from WiserShifts on scheduling and staffing costs. Unsubscribe anytime."
     />
   );
 }
 
 /**
- * Newsletter sign-up box (calculators without a summary email, the blog).
+ * Weekly email sign-up box (calculators without a summary email, the blog).
  * Sending it is the opt-in, and it says so.
  */
-export default function EmailCapture({ source, summary = "", title = "Get the staffing math by email", text = "Short notes for people who run or schedule care buildings: overtime, call-outs, hours per resident day, and what's working. Unsubscribe anytime." }) {
+export default function EmailCapture({ source, summary = "", title = "One useful email a week", text = "For people who schedule or run care buildings. Schedulers get faster ways to build the week and cover call-outs. Leaders get what staffing is really costing them, worked out. Unsubscribe anytime." }) {
   const [email, setEmail] = useState("");
   const [website, setWebsite] = useState(""); // honeypot
   const [sending, setSending] = useState(false);

@@ -65,7 +65,7 @@ function Coverage({ c, onPick }) {
 }
 
 /**
- * Klaviyo (our content email: newsletter and sequences). Who really clicks,
+ * Klaviyo (our content email: the weekly email and sequences). Who really clicks,
  * how the list lines up with the CRM, and who to stop emailing.
  */
 export default function HqEmail({ reloadKey, onChanged }) {
@@ -162,7 +162,7 @@ export default function HqEmail({ reloadKey, onChanged }) {
     <Box sx={{ display: "grid", gap: 2 }}>
       <Section
         title="Klaviyo"
-        note={`Klaviyo is our content email (newsletter and sequences). Emails from your own inbox are cold outreach and are logged on each facility. ${data.sync?.lastOkAt ? `Synced ${ago(data.sync.lastOkAt)}, every hour.` : "Not synced yet."}`}
+        note={`Klaviyo is our content email (the weekly email and sequences). Emails from your own inbox are cold outreach and are logged on each facility. ${data.sync?.lastOkAt ? `Synced ${ago(data.sync.lastOkAt)}, every hour.` : "Not synced yet."}`}
         right={
           data.configured && (
             <Button size="small" variant="outlined" startIcon={<FiRefreshCw />} disabled={syncing} onClick={sync} sx={{ borderRadius: IOS.radius.round, flexShrink: 0 }}>

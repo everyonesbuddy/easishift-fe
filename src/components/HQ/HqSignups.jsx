@@ -88,7 +88,7 @@ export default function HqSignups({ reloadKey, onChanged }) {
         ))}
       </Section>
 
-      <Section title={`Calculator and newsletter emails (${data.leads.length})`} note="From the website. They're in Klaviyo too; only people who ticked the box are on the newsletter.">
+      <Section title={`Calculator and email sign-ups (${data.leads.length})`} note="From the website. They're in Klaviyo too; only people who ticked the box get the weekly email.">
         {!data.leads.length && <Empty>None yet.</Empty>}
         {data.leads.map((l) => (
           <Box key={l._id} sx={{ display: "flex", gap: 2, py: 1, px: 1, borderBottom: `1px solid ${IOS.hairline}`, flexWrap: "wrap" }}>
@@ -99,7 +99,7 @@ export default function HqSignups({ reloadKey, onChanged }) {
               {l.summary ? ` · ${l.summary}` : ""}
             </Typography>
             <Box sx={{ flex: "0 0 auto", display: "flex", gap: 0.75, alignItems: "center" }}>
-              {l.newsletter && <Tag color={IOS.green}>Newsletter</Tag>}
+              {l.newsletter && <Tag color={IOS.green}>Weekly email</Tag>}
               {!l.klaviyo?.synced && <Tag color={IOS.orange}>{l.klaviyo?.error === "not_configured" ? "Not in Klaviyo yet" : "Klaviyo error"}</Tag>}
               <Typography sx={{ fontSize: 12.5, color: IOS.secondary }}>{ago(l.createdAt)}</Typography>
             </Box>

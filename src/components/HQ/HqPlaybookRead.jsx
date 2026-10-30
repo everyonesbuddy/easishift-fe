@@ -8,7 +8,8 @@ import { IOS, tint } from "../../theme/ios";
 import { Tag } from "./HqBits";
 import { errorText } from "./hqFormat";
 import { AUDIENCES, CHANNEL_LABELS } from "./usePlaybookPlays";
-import { targetSentence, targetText } from "./playFormat";
+import { MESSAGE_FIELDS, targetSentence, targetText } from "./playFormat";
+import BuyerMessage from "./BuyerMessage";
 
 const PAGE_FOR = { scheduler: "schedulers", director: "leadership", operator: "leadership" };
 
@@ -30,13 +31,13 @@ function Flow() {
   const arrow = <Box sx={{ alignSelf: "center", color: IOS.tertiary, display: { xs: "none", md: "block" } }}><FiArrowRight /></Box>;
   return (
     <Box sx={{ display: "flex", gap: 1, flexWrap: { xs: "wrap", md: "nowrap" }, my: 2 }}>
-      {box("Channels", "Calls, email, LinkedIn, newsletter, YouTube, search, Facebook groups", IOS.blue)}
+      {box("Channels", "Calls, cold email, LinkedIn, Klaviyo email, YouTube, search, Facebook groups", IOS.blue)}
       {arrow}
       {box("A free offer", "Free setup · free labor snapshot · free calculators", "#5856D6")}
       {arrow}
       {box("Free account", "The scheduler builds and sends the week", IOS.orange)}
       {arrow}
-      {box("Monday labor email", "Leadership sees hours per resident day, overtime, call-outs", "#AF52DE")}
+      {box("Monday labor email (in the product)", "Leadership sees hours per resident day, overtime, call-outs", "#AF52DE")}
       {arrow}
       {box("Paid", "Flat price per facility", IOS.green)}
     </Box>
@@ -72,6 +73,8 @@ function EditText({ meta, onSaved, onCancel }) {
             ["where", "Where to find them"],
             ["offer", "The offer"],
             ["how", "How we reach them"],
+            ["promise", "What we say (one line)"],
+            ...MESSAGE_FIELDS,
           ].map(([k, l]) => (
             <TextField key={k} {...f} label={l} value={b[k] || ""} onChange={(e) => setBuyer(i, k, e.target.value)} />
           ))}
@@ -176,6 +179,16 @@ export default function HqPlaybookRead({ reloadKey }) {
             </Box>
           );
         })}
+      </Box>
+
+      <H sub="Each buyer wants something different, so each hears their own message. Every post, email, call and video starts from this.">What we say to each buyer</H>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, gap: 1.5 }}>
+        {(meta.buyers || []).map((b) => (
+          <Box key={b.key} sx={{ p: 2, borderRadius: IOS.radius.card, bgcolor: IOS.surface, border: `1px solid ${IOS.hairline}`, breakInside: "avoid" }}>
+            <Typography sx={{ fontWeight: 700, fontSize: 15, mb: 1, color: AUDIENCES[b.key]?.color || IOS.blue }}>{b.name}</Typography>
+            <BuyerMessage buyer={b} color={AUDIENCES[b.key]?.color || IOS.blue} />
+          </Box>
+        ))}
       </Box>
 
       <H sub="What each channel is for, and the marketing plays we run on it.">The channels</H>

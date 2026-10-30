@@ -25,3 +25,12 @@ export const copyText = async (text) => {
   }
 };
 
+
+/** What we say to each buyer (stored on each buyer in the playbook). */
+export const MESSAGE_FIELDS = [
+  ["pains", "Their pains, in their words"],
+  ["proof", "How we prove it"],
+  ["angles", "Content angles"],
+  ["cta", "The ask"],
+  ["avoid", "Don't lead with"],
+];

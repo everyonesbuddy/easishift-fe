@@ -9,7 +9,7 @@ export const CHANNEL_LABELS = {
   calls: "Calls",
   email: "Cold outreach email",
   linkedin: "LinkedIn",
-  newsletter: "Klaviyo (newsletter & sequences)",
+  newsletter: "Klaviyo (content emails & sequences)",
   youtube: "YouTube",
   blog: "Blog & search",
   facebook: "Facebook groups",

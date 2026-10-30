@@ -9,6 +9,7 @@ import HqPlaybook from "./HqPlaybook";
 import HqContentPlan from "./HqContentPlan";
 import { PlayCard } from "./PlayCards";
 import { LogTouch, TouchLog } from "./LogTouch";
+import BuyerMessage from "./BuyerMessage";
 
 
 /** Small tab bar used inside a page. */
@@ -32,7 +33,7 @@ export function SubTabs({ tabs, value, onChange }) {
 const tabForPlay = (p) => (p.channel === "calls" ? "calls" : p.channel === "email" ? "email" : p.channel === "linkedin" && p.countsFrom === "activities" ? "linkedin" : "content");
 
 const TABS = {
-  content: { label: "Content", note: "What we publish for them: LinkedIn posts, videos, Klaviyo emails, blog posts and templates, Facebook groups. Plan it on the board below." },
+  content: { label: "Content", note: "What we publish for them: LinkedIn posts, videos, the weekly Klaviyo email, blog posts and templates, Facebook groups. Every piece starts from what we say to this buyer (above). Plan it on the board below." },
   email: { label: "Cold email", note: "One-to-one emails from your own inbox, not Klaviyo. Log them below so they count toward the weekly target." },
   calls: { label: "Calls", note: "Phone calls to the building. Log them below (one at a time or in a batch) so they count toward the weekly target." },
   linkedin: { label: "LinkedIn outreach", note: "Connection requests and messages, one person at a time. Log them below so they count toward the weekly target." },
@@ -100,6 +101,7 @@ export default function HqAudience({ audiences, reloadKey, onChanged }) {
                   <b>{k}:</b> {v}
                 </Typography>
               ))}
+              <BuyerMessage buyer={b} color={color} compact />
             </Box>
           );
         })}

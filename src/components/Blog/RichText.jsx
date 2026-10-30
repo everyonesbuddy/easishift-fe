@@ -1,4 +1,6 @@
-import { Box, Link, Typography } from "@mui/material";
+import { Box, Button, Link, Typography } from "@mui/material";
+import { FiDownload } from "react-icons/fi";
+import MarkdownBody from "./MarkdownBody";
 
 // Renders Contentful rich text (the JSON "document") without extra libraries.
 // Unknown node types render their children, so new Contentful features
@@ -15,6 +17,26 @@ function Text({ node }) {
     else if (m.type === "code") out = <Box component="code" sx={{ fontSize: "0.92em", bgcolor: "#F2F4F7", px: 0.5, borderRadius: "4px" }}>{out}</Box>;
   }
   return out;
+}
+
+const isImage = (a) => !a.contentType || a.contentType.startsWith("image/");
+const KIND = { "application/pdf": "PDF", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "Excel", "application/vnd.ms-excel": "Excel", "text/csv": "CSV", "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "Word" };
+const sizeText = (b) => (!b ? "" : b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
+
+/** A file in the post (a PDF or Excel template): a download card. */
+function FileCard({ a }) {
+  const meta = [KIND[a.contentType] || (a.fileName.split(".").pop() || "File").toUpperCase(), sizeText(a.size)].filter(Boolean).join(" · ");
+  return (
+    <Box sx={{ my: 2.5, p: 2, borderRadius: "14px", border: "1px solid #E4E7EC", bgcolor: "#F9FAFB", display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+      <Box sx={{ flex: 1, minWidth: 200 }}>
+        <Typography sx={{ fontWeight: 800, fontSize: "1.02rem" }}>{a.title || a.fileName}</Typography>
+        {meta && <Typography sx={{ fontSize: 13.5, color: "#667085" }}>{meta}</Typography>}
+      </Box>
+      <Button variant="contained" startIcon={<FiDownload />} href={a.url} download={a.fileName || true} target="_blank" rel="noopener" sx={{ fontWeight: 800, textTransform: "none", borderRadius: "10px" }}>
+        Download
+      </Button>
+    </Box>
+  );
 }
 
 const Children = ({ node, assets }) => (node.content || []).map((c, i) => <Node key={i} node={c} assets={assets} />);
@@ -67,9 +89,20 @@ export function Node({ node, assets = {} }) {
       </Link>
     );
   }
+  if (t === "asset-hyperlink") {
+    // "Link to asset" on words: downloads the file (or opens the image).
+    const a = assets[node.data?.target?.sys?.id];
+    if (!a?.url) return <Children node={node} assets={assets} />;
+    return (
+      <Link href={a.url} download={a.fileName || true} target="_blank" rel="noopener" sx={{ color: "#2563EB", fontWeight: 600 }}>
+        <Children node={node} assets={assets} />
+      </Link>
+    );
+  }
   if (t === "embedded-asset-block") {
     const a = assets[node.data?.target?.sys?.id];
     if (!a?.url) return null;
+    if (!isImage(a)) return <FileCard a={a} />;
     return (
       <Box component="figure" sx={{ my: 3, mx: 0 }}>
         <Box component="img" src={`${a.url}?w=1400&fm=webp&q=80`} alt={a.title || ""} loading="lazy" width={a.width || undefined} height={a.height || undefined} sx={{ width: "100%", height: "auto", borderRadius: "14px", display: "block" }} />
@@ -96,5 +129,7 @@ export function Node({ node, assets = {} }) {
 
 export default function RichText({ document, assets }) {
   if (!document) return null;
+  // A Markdown (Long text) body comes through as a string.
+  if (typeof document === "string") return <MarkdownBody text={document} />;
   return <Node node={document} assets={assets} />;
 }

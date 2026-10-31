@@ -24,7 +24,7 @@ const IMPORTS = {
   },
   linkedin: {
     label: "LinkedIn post analytics",
-    help: "LinkedIn → your profile → Analytics → Post impressions → Export, then save the posts tab as CSV.",
+    help: "LinkedIn → Analytics → Content → Export. LinkedIn gives you an old .xls file: open it in Excel or Google Sheets, save it as .xlsx, then upload it and pick the \"All posts\" tab.",
   },
 };
 
@@ -73,6 +73,13 @@ export default function HqConnections({ reloadKey, onChanged }) {
     setPreview(null);
     setWorkbook(null);
     setSheet("");
+    if (f && /\.xls$/i.test(f.name)) {
+      // Old-style Excel (LinkedIn exports these): the browser can't read it.
+      toast.error("That's an old-style Excel file (.xls), which is what LinkedIn exports. Open it in Excel or Google Sheets, save it as .xlsx, and upload that.", { autoClose: 9000 });
+      setFile(null);
+      if (input.current) input.current.value = "";
+      return;
+    }
     if (!f || !/\.xlsx$/i.test(f.name)) return;
     try {
       const wb = await readWorkbook(f);
@@ -214,7 +221,7 @@ export default function HqConnections({ reloadKey, onChanged }) {
                 ref={input}
                 hidden
                 type="file"
-                accept=".csv,text/csv,.xlsx"
+                accept=".csv,text/csv,.xlsx,.xls"
                 onChange={(e) => pickFile(e.target.files?.[0] || null)}
               />
             </Button>

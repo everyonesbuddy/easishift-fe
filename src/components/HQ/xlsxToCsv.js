@@ -39,5 +39,6 @@ export function guessSheet(names, kind) {
   if (kind === "contacts") return find(/lead\s*bank/i) || names[0];
   if (kind === "activities") return find(/outreach/i) || names[0];
   if (kind === "facilities") return find(/^\s*[1-4]\s/) || names[0];
+  if (kind === "linkedin") return find(/all\s*posts/i) || find(/post/i) || names[0];
   return names[0];
 }

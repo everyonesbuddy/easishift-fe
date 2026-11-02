@@ -150,7 +150,7 @@ export function BudgetMock() {
 /** The Monday labor email, for people without a login. */
 export function MondayEmailMock() {
   const rows = [
-    ["Hours staffed", "1,267 h of 1,339 h needed"],
+    ["Hours scheduled", "1,267 h of 1,339 h needed"],
     ["Hours per resident day", "3.62 (target 3.85)"],
     ["Overtime", "16 h, 2 people"],
     ["Call-outs", "5, and 1 no-show"],

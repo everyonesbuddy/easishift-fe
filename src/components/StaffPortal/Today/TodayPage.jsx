@@ -137,6 +137,8 @@ export default function TodayPage() {
   const openSlot = d?.openSlots.find((s) => s._id === openSlotId) || null;
   const requests = d ? d.timeOff.length + d.swaps.length : 0;
   const openCallOuts = d ? d.callOuts.filter((c) => c.stillOpen) : [];
+  // People placed in a draft week: planned, but staff can't see it yet.
+  const draftedToday = d ? d.todayShifts.reduce((n, s) => n + (s.drafted || 0), 0) : 0;
 
   // Headline: the single most useful sentence for right now.
   const headline = !d
@@ -210,8 +212,26 @@ export default function TodayPage() {
                 borderTop: `1px solid ${IOS.hairline}`,
               }}
             >
-              <Figure label="On now" value={d.onNow.count} detail={d.onNow.byRole.map((r) => `${r.count} ${getRoleDisplayName(r.role)}`).join(", ") || "Nobody on shift"} />
-              <Figure label="Shifts today" value={d.totals.shiftsToday} detail={`${d.todayShifts.reduce((n, s) => n + s.assigned, 0)} of ${d.todayShifts.reduce((n, s) => n + s.required, 0)} spots filled`} />
+              <Figure
+                label="On now"
+                value={d.onNow.count}
+                detail={
+                  !d.onNow.count && d.onNow.drafted
+                    ? `${d.onNow.drafted} drafted, not published`
+                    : [d.onNow.byRole.map((r) => `${r.count} ${getRoleDisplayName(r.role)}`).join(", ") || "Nobody on shift", d.onNow.drafted ? `+${d.onNow.drafted} drafted` : ""]
+                        .filter(Boolean)
+                        .join(" · ")
+                }
+              />
+              <Figure
+                label="Shifts today"
+                value={d.totals.shiftsToday}
+                detail={
+                  !d.totals.shiftsToday && draftedToday
+                    ? `${draftedToday} drafted, not published`
+                    : `${d.todayShifts.reduce((n, s) => n + s.assigned, 0)} of ${d.todayShifts.reduce((n, s) => n + s.required, 0)} spots filled${draftedToday ? ` · +${draftedToday} drafted` : ""}`
+                }
+              />
               <Figure label="Open today" value={d.totals.openToday} tone={d.totals.openToday ? "bad" : "good"} detail={d.totals.openToday ? "Fill below" : "All filled"} />
               <Figure label="Next 2 days" value={d.totals.openNextTwoDays} tone={d.totals.openNextTwoDays ? "warn" : "good"} detail={d.totals.openNextTwoDays ? "spots open" : "All filled"} />
             </Box>
@@ -286,13 +306,30 @@ export default function TodayPage() {
 
             <Box sx={{ display: "grid", gap: 1.5 }}>
               {/* Today's shifts */}
-              <Section title="Today's shifts">
+              <Section
+                title="Today's shifts"
+                right={
+                  draftedToday || d.totals.todayPublished === false ? (
+                    <Box component="span" sx={{ fontSize: 12, fontWeight: 700, color: IOS.purple, bgcolor: tint(IOS.purple, 0.12), px: 1, py: 0.25, borderRadius: IOS.radius.pill }}>
+                      Draft
+                    </Box>
+                  ) : null
+                }
+              >
+                {(draftedToday > 0 || d.totals.todayPublished === false) && d.todayShifts.length > 0 && (
+                  <Typography sx={{ fontSize: 13, color: IOS.secondary, bgcolor: tint(IOS.purple, 0.07), borderRadius: IOS.radius.cell, px: 1.25, py: 0.9, mb: 0.75 }}>
+                    Draft week: these people are planned but not told. Staff can't see these shifts or get reminders until you publish the week.
+                  </Typography>
+                )}
                 {d.todayShifts.length === 0 ? (
                   <Quiet>No needs set for today.</Quiet>
                 ) : (
                   d.todayShifts.map((s) => {
+                    const drafted = s.drafted || 0;
+                    const covered = s.assigned + drafted;
                     const pct = s.required ? (s.assigned / s.required) * 100 : 100;
-                    const full = s.assigned >= s.required;
+                    const draftPct = s.required ? (drafted / s.required) * 100 : 0;
+                    const full = covered >= s.required;
                     const past = new Date(s.endTime) <= new Date();
                     return (
                       <Box key={s.key} sx={{ py: 0.9, "& + &": { borderTop: `1px solid ${IOS.hairline}` }, opacity: past ? 0.55 : 1 }}>
@@ -303,19 +340,36 @@ export default function TodayPage() {
                               {time(s.startTime)}–{time(s.endTime)}
                             </Box>
                           </Typography>
-                          <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: full ? IOS.greenText : IOS.orangeText, whiteSpace: "nowrap", ...num }}>
-                            {s.assigned}/{s.required}
+                          <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: drafted ? IOS.purple : full ? IOS.greenText : IOS.orangeText, whiteSpace: "nowrap", ...num }}>
+                            {covered}/{s.required}
+                            {drafted ? <Box component="span" sx={{ fontWeight: 500, fontSize: 12, ml: 0.5 }}>{s.assigned ? `(${drafted} drafted)` : "drafted"}</Box> : null}
                           </Typography>
                         </Box>
                         <Box sx={{ height: 6, borderRadius: 3, bgcolor: IOS.fill, mt: 0.6, overflow: "hidden" }}>
-                          <Box sx={{ height: "100%", width: `${pct}%`, bgcolor: full ? IOS.green : IOS.orange, borderRadius: 3 }} />
+                          <Box sx={{ display: "flex", height: "100%" }}>
+                            <Box sx={{ height: "100%", width: `${pct}%`, bgcolor: full && !drafted ? IOS.green : IOS.orange }} />
+                            {drafted > 0 && (
+                              <Box
+                                sx={{
+                                  height: "100%",
+                                  width: `${draftPct}%`,
+                                  background: `repeating-linear-gradient(45deg, ${tint(IOS.purple, 0.55)} 0 4px, ${tint(IOS.purple, 0.3)} 4px 8px)`,
+                                }}
+                              />
+                            )}
+                          </Box>
                         </Box>
+                        {drafted > 0 && s.assigned > 0 && (
+                          <Typography sx={{ fontSize: 12.5, color: IOS.purple, mt: 0.4 }}>
+                            {s.assigned} published, {drafted} drafted and not told yet.
+                          </Typography>
+                        )}
                         {!full && (
                           <Typography sx={{ fontSize: 12.5, color: IOS.secondary, mt: 0.4 }}>
                             Short:{" "}
                             {s.roles
-                              .filter((r) => r.assigned < r.required)
-                              .map((r) => `${r.required - r.assigned} ${getRoleDisplayName(r.role)}`)
+                              .filter((r) => r.assigned + (r.drafted || 0) < r.required)
+                              .map((r) => `${r.required - r.assigned - (r.drafted || 0)} ${getRoleDisplayName(r.role)}`)
                               .join(", ")}
                             {past ? " (ended)" : ""}
                           </Typography>

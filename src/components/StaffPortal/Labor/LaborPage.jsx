@@ -31,13 +31,13 @@ function attentionItems(d) {
   const items = [];
   const exp = d.credentials.expired.length;
   const soon = d.credentials.expiringSoon.length;
-  if (d.openShifts.unfilledPast) items.push({ tone: "bad", text: `${plural(d.openShifts.unfilledPast, "shift")} went unfilled`, target: "labor-shifts" });
+  if (d.openShifts.unfilledPast) items.push({ tone: "bad", text: `${plural(d.openShifts.unfilledPast, "spot")} went unfilled`, target: "labor-shifts" });
   if (exp) items.push({ tone: "bad", text: `${plural(exp, "certification")} expired`, target: "labor-credentials" });
   if (d.overtime.people.length) {
     const who = plural(d.overtime.people.length, "person", "people");
     items.push({ tone: "warn", text: d.period === "month" ? `${who} went into overtime` : `${who} going into overtime`, target: "labor-overtime" });
   }
-  if (d.openShifts.openUpcoming) items.push({ tone: "warn", text: `${plural(d.openShifts.openUpcoming, "shift")} still open`, target: "labor-shifts" });
+  if (d.openShifts.openUpcoming) items.push({ tone: "warn", text: `${plural(d.openShifts.openUpcoming, "spot")} still open`, target: "labor-shifts" });
   if (soon) items.push({ tone: "warn", text: `${plural(soon, "certification")} expiring soon`, target: "labor-credentials" });
   if (d.turnoverWatch.length) items.push({ tone: "warn", text: `${plural(d.turnoverWatch.length, "person", "people")} to check in with`, target: "labor-watch" });
   return items;
@@ -276,6 +276,8 @@ export default function LaborPage() {
   const isMonth = d?.period === "month";
   const periodWord = isMonth ? "month" : "week";
   const isCurrent = d && (isMonth ? d.month === d.thisMonth : d.weekStart === d.thisWeek);
+  // A finished week or month shows overtime as it happened; otherwise it's a projection.
+  const periodEnded = Boolean(d && !isCurrent && (isMonth ? d.month < d.thisMonth : d.weekStart < d.thisWeek));
   // Overtime can still be fixed in this week and later ones.
   const canFix = d && !isMonth && d.canFixOvertime && d.weekStart >= d.thisWeek;
   const go = (key) => setView((v) => ({ ...v, key }));
@@ -409,6 +411,13 @@ export default function LaborPage() {
             />
           </Box>
 
+          {d.draft?.any && (
+            <Typography sx={{ mt: 1.5, fontSize: 14, color: IOS.ink, bgcolor: tint(IOS.purple, 0.08), border: `1px solid ${tint(IOS.purple, 0.2)}`, borderRadius: IOS.radius.cell, px: 1.75, py: 1.1 }}>
+              <Box component="span" sx={{ fontWeight: 700, color: IOS.purple }}>Includes a draft. </Box>
+              {hours(d.draft.hours)} of these hours ({plural(d.draft.shifts, "shift")}) aren't published yet. They count here so you can catch overtime and budget before you publish, but staff haven't been told.
+            </Typography>
+          )}
+
           {/* Key figures */}
           <Box
             sx={{
@@ -425,19 +434,21 @@ export default function LaborPage() {
             }}
           >
             <Figure
-              label="Hours staffed"
+              label="Hours scheduled"
               value={hours(d.hours.scheduled)}
               detail={
-                d.hours.needed
-                  ? `of ${hours(d.hours.needed)} needed${d.hours.timeClockUsed ? `, ${hours(d.hours.worked)} worked` : ""}`
-                  : d.hours.timeClockUsed
-                    ? `${hours(d.hours.worked)} worked`
-                    : "Shifts with someone assigned"
+                d.draft?.hours
+                  ? `${hours(d.draft.hours)} of it still in a draft`
+                  : d.hours.needed
+                    ? `of ${hours(d.hours.needed)} needed${d.hours.timeClockUsed ? `, ${hours(d.hours.worked)} worked` : ""}`
+                    : d.hours.timeClockUsed
+                      ? `${hours(d.hours.worked)} worked`
+                      : "Shifts with someone assigned"
               }
             />
             {d.canSeeCosts && (
               <Figure
-                label="Labor cost"
+                label="Labor cost (scheduled)"
                 value={d.costs?.needsRates ? "Add rates" : money(d.costs?.scheduled)}
                 tone={!d.costs?.needsRates && d.costs?.overtimePremium ? "warn" : "none"}
                 detail={d.costs?.needsRates ? "Pay rates turn hours into dollars" : d.costs?.overtimePremium ? `${money(d.costs.overtimePremium)} of it is overtime` : "No overtime pay"}
@@ -445,7 +456,7 @@ export default function LaborPage() {
               />
             )}
             <Figure
-              label="Overtime"
+              label={periodEnded ? "Overtime" : "Overtime (projected)"}
               value={hours(d.overtime.totalOvertimeHours)}
               tone={d.overtime.people.length ? "warn" : "good"}
               detail={d.overtime.people.length ? `${plural(d.overtime.people.length, "person", "people")} over ${threshold} h` : `No one over ${threshold} h`}
@@ -459,13 +470,13 @@ export default function LaborPage() {
               onClick={d.attendance.callOuts + d.attendance.noShows ? () => scrollTo("labor-callouts") : undefined}
             />
             <Figure
-              label="Shifts covered"
+              label="Spots filled"
               value={`${d.openShifts.filled}/${d.openShifts.required}`}
               tone={d.openShifts.unfilledPast ? "bad" : d.openShifts.openUpcoming ? "warn" : "good"}
               detail={
-                d.openShifts.unfilledPast || d.openShifts.openUpcoming
+                (d.openShifts.unfilledPast || d.openShifts.openUpcoming
                   ? `${d.openShifts.openUpcoming} open, ${d.openShifts.unfilledPast} missed`
-                  : "All covered"
+                  : "All filled") + (d.openShifts.drafted ? ` · ${d.openShifts.drafted} drafted` : "")
               }
               onClick={() => scrollTo("labor-shifts")}
             />
@@ -510,6 +521,11 @@ export default function LaborPage() {
                       <Typography sx={{ fontSize: 14.5, fontWeight: 600 }} noWrap>
                         {o.name}
                         <Box component="span" sx={{ color: IOS.secondary, fontWeight: 400, fontSize: 13, ml: 1 }}>{roleLabel(o.role)}</Box>
+                        {o.includesDraft && (
+                          <Box component="span" title="Some of these hours are in a draft that isn't published yet" sx={{ ml: 1, fontSize: 11.5, fontWeight: 700, color: IOS.purple, bgcolor: tint(IOS.purple, 0.12), px: 0.75, py: 0.15, borderRadius: IOS.radius.pill }}>
+                            draft
+                          </Box>
+                        )}
                       </Typography>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
                         <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: IOS.redText, whiteSpace: "nowrap", ...num }}>
@@ -573,8 +589,8 @@ export default function LaborPage() {
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.2fr 1fr" }, gap: 1.5, mt: 1.5 }}>
             <Section
               id="labor-watch"
-              title="Check in with"
-              note="Signs of burnout or drifting away over the last 4 weeks. A short conversation now is cheaper than replacing them."
+              title="People to check in with"
+              note="Call-outs, no-shows, repeated overtime or hours falling off over the last 4 weeks: signs of burnout or drifting away. A short conversation now is cheaper than replacing them."
             >
               {d.turnoverWatch.length ? (
                 d.turnoverWatch.map((w) => (
@@ -602,7 +618,7 @@ export default function LaborPage() {
                   <Quiet>No call-outs or no-shows this {periodWord}.</Quiet>
                 )}
               </Section>
-              <Section id="labor-shifts" title="Shifts">
+              <Section id="labor-shifts" title="Spots" note={d.openShifts.drafted ? `${d.openShifts.drafted} of the filled spots are in a draft that isn't published yet.` : undefined}>
                 <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1 }}>
                   {[
                     ["Filled", d.openShifts.filled, "good"],
@@ -624,7 +640,7 @@ export default function LaborPage() {
             <Section title="Hours by role">
               {d.hours.byRole.length ? (
                 d.hours.byRole.map((r) => (
-                  <BarRow key={r.role} label={roleLabel(r.role)} value={r.scheduled} max={roleMax} color={roleColor(r.role, roles)} display={hours(r.scheduled)} />
+                  <BarRow key={r.role} label={roleLabel(r.role)} value={r.scheduled} max={roleMax} color={roleColor(r.role, roles)} display={r.drafted ? `${hours(r.scheduled)} (${hours(r.drafted)} drafted)` : hours(r.scheduled)} />
                 ))
               ) : (
                 <Quiet>No shifts this {periodWord}.</Quiet>
@@ -660,7 +676,7 @@ export default function LaborPage() {
 
           {!d.hours.timeClockUsed && (
             <Typography sx={{ color: IOS.secondary, fontSize: 13, mt: 2 }}>
-              Hours staffed are shifts with someone assigned (published or draft). Open shifts aren't counted until someone takes them. Turn on the time clock to compare with hours actually worked.
+              Hours scheduled are shifts with someone assigned, published or still in a draft. Open spots aren't counted until someone takes them. Turn on the time clock to compare with hours actually worked.
             </Typography>
           )}
         </>

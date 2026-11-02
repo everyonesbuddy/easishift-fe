@@ -42,14 +42,14 @@ export default function LaborPrint({ d, facilityName }) {
   const isMonth = d.period === "month";
   const b = d.budget;
   const figures = [
-    ["Hours staffed", hours(d.hours.scheduled), d.hours.needed ? `of ${hours(d.hours.needed)} needed` : ""],
+    ["Hours scheduled", hours(d.hours.scheduled), [d.hours.needed ? `of ${hours(d.hours.needed)} needed` : "", d.draft?.hours ? `${hours(d.draft.hours)} still in a draft` : ""].filter(Boolean).join(" · ")],
     ...(d.canSeeCosts && d.costs && !d.costs.needsRates
-      ? [["Labor cost", money(d.costs.scheduled), d.costs.overtimePremium ? `${money(d.costs.overtimePremium)} overtime pay` : "No overtime pay"]]
+      ? [["Labor cost (scheduled)", money(d.costs.scheduled), d.costs.overtimePremium ? `${money(d.costs.overtimePremium)} overtime pay` : "No overtime pay"]]
       : []),
     ["Hours per resident day", b ? String(b.scheduledPPD) : "–", b?.targetPPD !== null && b?.targetPPD !== undefined ? `target ${b.targetPPD}` : "no target set"],
     ["Overtime", hours(d.overtime.totalOvertimeHours), `${d.overtime.people.length} ${d.overtime.people.length === 1 ? "person" : "people"}`],
     ["Call-outs / no-shows", `${d.attendance.callOuts} / ${d.attendance.noShows}`, ""],
-    ["Shifts covered", `${d.openShifts.filled} of ${d.openShifts.required}`, `${d.openShifts.unfilledPast} went unfilled`],
+    ["Spots filled", `${d.openShifts.filled} of ${d.openShifts.required}`, `${d.openShifts.unfilledPast} went unfilled`],
   ];
   const certs = [...d.credentials.expired, ...d.credentials.expiringSoon];
 
@@ -119,7 +119,7 @@ export default function LaborPrint({ d, facilityName }) {
             />
             <H>Hours by role</H>
             <Table
-              head={["Role", "Hours staffed"]}
+              head={["Role", "Hours scheduled"]}
               numeric={[1]}
               rows={d.hours.byRole.slice(0, 8).map((r) => ({ key: r.role, cells: [roleLabel(r.role), fmt(r.scheduled)] }))}
               empty="No shifts."
@@ -136,7 +136,7 @@ export default function LaborPrint({ d, facilityName }) {
               }))}
               empty="Nothing expired or expiring."
             />
-            <H>Check in with</H>
+            <H>People to check in with</H>
             <Table
               head={["Person", "Why"]}
               rows={d.turnoverWatch.slice(0, 8).map((w) => ({ key: w.staffId, cells: [w.name, w.reasons.join(", ")] }))}
@@ -145,7 +145,7 @@ export default function LaborPrint({ d, facilityName }) {
           </div>
         </div>
         <p style={{ fontSize: 9, color: muted, marginTop: 14 }}>
-          Hours staffed are shifts with someone assigned (published or draft). Overtime is counted per payroll week over {d.overtime.thresholdHours} hours. From WiserShifts.
+          Hours scheduled are shifts with someone assigned, published or still in a draft. Overtime is counted per payroll week over {d.overtime.thresholdHours} hours. From WiserShifts.
         </p>
       </Box>
     </>,

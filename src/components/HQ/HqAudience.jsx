@@ -7,6 +7,7 @@ import { AUDIENCES } from "./usePlaybookPlays";
 import HqPlays from "./HqPlays";
 import HqPlaybook from "./HqPlaybook";
 import HqContentPlan from "./HqContentPlan";
+import HqWeek from "./HqWeek";
 import { PlayCard } from "./PlayCards";
 import { LogTouch, TouchLog } from "./LogTouch";
 import BuyerMessage from "./BuyerMessage";
@@ -47,7 +48,7 @@ const TABS = {
 export default function HqAudience({ audiences, reloadKey, onChanged }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState("todo");
+  const [tab, setTab] = useState("week");
   const [open, setOpen] = useState(() => new Set());
   const [editing, setEditing] = useState(null);
   const [key, setKey] = useState(0);
@@ -107,7 +108,9 @@ export default function HqAudience({ audiences, reloadKey, onChanged }) {
         })}
       </Box>
 
-      <SubTabs tabs={[["todo", "To do now"], ...tabs.map((t) => [t, TABS[t].label])]} value={tab} onChange={setTab} />
+      <SubTabs tabs={[["week", "This week"], ["todo", "To do now"], ...tabs.map((t) => [t, TABS[t].label])]} value={tab} onChange={setTab} />
+
+      {tab === "week" && <HqWeek audiences={audiences} reloadKey={reloadKey + key} onChanged={onChanged} />}
 
       {tab === "todo" && (
         <HqPlays
@@ -115,11 +118,11 @@ export default function HqAudience({ audiences, reloadKey, onChanged }) {
           reloadKey={reloadKey + key}
           onChanged={onChanged}
           title="Today"
-          note="Everything for this buyer, across content, cold email, calls and LinkedIn. Most urgent first."
+          note="People to get back to (replies, clicks, signups, call-backs) and content that's due. The weekly targets are on This week."
         />
       )}
 
-      {tab !== "todo" && (
+      {tab !== "todo" && tab !== "week" && (
         <Box sx={{ display: "grid", gap: 2 }}>
           <Typography sx={{ color: IOS.secondary, fontSize: 14.5 }}>{TABS[tab].note}</Typography>
 
@@ -194,21 +197,23 @@ export default function HqAudience({ audiences, reloadKey, onChanged }) {
 
 /** The whole program: scoreboard, every play, the week, and the full content calendar. */
 export function HqOverall({ reloadKey, onChanged }) {
-  const [tab, setTab] = useState("now");
+  const [tab, setTab] = useState("week");
   return (
     <Box>
       <SubTabs
         tabs={[
-          ["now", "Everything to do now"],
+          ["week", "This week"],
+          ["now", "To do now"],
           ["score", "Scoreboard, marketing plays and the week"],
           ["content", "Content calendar"],
         ]}
         value={tab}
         onChange={setTab}
       />
+      {tab === "week" && <HqWeek reloadKey={reloadKey} onChanged={onChanged} />}
       {tab === "score" && <HqPlaybook reloadKey={reloadKey} />}
       {tab === "content" && <HqContentPlan reloadKey={reloadKey} />}
-      {tab === "now" && <HqPlays reloadKey={reloadKey} onChanged={onChanged} title="Today" />}
+      {tab === "now" && <HqPlays reloadKey={reloadKey} onChanged={onChanged} title="Today" note="People to get back to (replies, clicks, signups, call-backs) and content that's due. The weekly targets are on This week." />}
     </Box>
   );
 }

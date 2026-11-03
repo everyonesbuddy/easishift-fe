@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import api from "./hqApi";
 import { IOS, tint } from "../../theme/ios";
 import { Empty, RolePill, Section, Tag } from "./HqBits";
-import { PLAY_KINDS, errorText } from "./hqFormat";
+import { PLAY_KINDS, errorText, localToday } from "./hqFormat";
 import FacilityDrawer from "./FacilityDrawer";
 import { ItemDialog } from "./HqContentPlan";
 import usePlaybookPlays, { AUDIENCES, CHANNEL_LABELS } from "./usePlaybookPlays";
@@ -30,7 +30,7 @@ function Progress({ done, target, unit }) {
 /** Mark the next content piece published (that's what counts for content targets), with its link if you have it. */
 function PublishBox({ item, onDone, onCancel }) {
   const [url, setUrl] = useState(item.url || "");
-  const [at, setAt] = useState(new Date().toISOString().slice(0, 10));
+  const [at, setAt] = useState(localToday());
   const [saving, setSaving] = useState(false);
   const save = async () => {
     setSaving(true);

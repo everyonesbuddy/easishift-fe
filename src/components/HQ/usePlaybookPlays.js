@@ -12,7 +12,7 @@ export const CHANNEL_LABELS = {
   newsletter: "Klaviyo (content emails & sequences)",
   youtube: "YouTube",
   blog: "Blog & search",
-  facebook: "Facebook groups",
+  facebook: "Facebook",
   search: "Search",
   other: "Other",
 };

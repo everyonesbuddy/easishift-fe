@@ -78,6 +78,11 @@ export const ago = (d) => {
 export const errorText = (err, fallback) => err?.response?.data?.message || fallback;
 
 /** "2026-11-03" for <input type="date"> from a Date/ISO string. */
+/** Today as "2026-11-03" on this computer (toISOString would be tomorrow after 7 p.m. in New York). */
+export const localToday = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 export const dateInput = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 
 export const KINDS = [

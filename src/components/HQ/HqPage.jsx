@@ -34,7 +34,7 @@ const GROUPS = [
     items: [
       { id: "schedulers", label: "For schedulers", Comp: SchedulersPage, title: "Marketing plays for schedulers", sub: "How we reach schedulers and staffing coordinators, on every channel, and what to do now." },
       { id: "leadership", label: "For DONs, EDs & admins", Comp: LeadershipPage, title: "Marketing plays for DONs, EDs and admins", sub: "How we reach directors of nursing, executive directors, administrators and regional operators, on every channel, and what to do now." },
-      { id: "overall", label: "Full plan & scoreboard", Comp: HqOverall, title: "Full plan and scoreboard", sub: "Everything to do now for every buyer, the scoreboard, every marketing play, the week, and the full content calendar." },
+      { id: "overall", label: "Full plan & scoreboard", Comp: HqOverall, title: "Full plan and scoreboard", sub: "This week's checklist for every buyer, what to do now, the scoreboard, every marketing play and the full content calendar." },
     ],
   },
   {

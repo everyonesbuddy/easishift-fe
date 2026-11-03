@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import api from "./hqApi";
 import { IOS, tint } from "../../theme/ios";
 import { Tag } from "./HqBits";
-import { dateInput, errorText, n, shortDate } from "./hqFormat";
+import { dateInput, errorText, n, shortDate, localToday } from "./hqFormat";
 import { DeleteButton } from "./FacilityParts";
 import { copyText } from "./playFormat";
 import usePlaybookPlays, { AUDIENCES } from "./usePlaybookPlays";
@@ -66,7 +66,7 @@ export function ItemDialog({ item, plays, onClose, onSaved }) {
   const set = (k) => (e) => setV({ ...v, [k]: e.target.value });
   const f = { size: "small", fullWidth: true };
   const save = async () => {
-    const body = { ...v, playId: v.playId || null, dueDate: v.dueDate || null, publishedAt: v.publishedAt || (v.status === "published" ? new Date().toISOString().slice(0, 10) : null) };
+    const body = { ...v, playId: v.playId || null, dueDate: v.dueDate || null, publishedAt: v.publishedAt || (v.status === "published" ? localToday() : null) };
     try {
       if (item._id) await api.patch(`/hq/content-plan/${item._id}`, body);
       else await api.post("/hq/content-plan", body);
@@ -171,7 +171,7 @@ export default function HqContentPlan({ reloadKey, audiences = null }) {
   const move = async (item, status) => {
     setItems((list) => list.map((x) => (x._id === item._id ? { ...x, status } : x)));
     try {
-      await api.patch(`/hq/content-plan/${item._id}`, { status, ...(status === "published" && !item.publishedAt ? { publishedAt: new Date().toISOString().slice(0, 10) } : {}) });
+      await api.patch(`/hq/content-plan/${item._id}`, { status, ...(status === "published" && !item.publishedAt ? { publishedAt: localToday() } : {}) });
       setKey((k) => k + 1);
     } catch (err) {
       toast.error(errorText(err, "Couldn't move it"));

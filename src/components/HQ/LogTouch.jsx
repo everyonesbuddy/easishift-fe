@@ -3,12 +3,12 @@ import { Autocomplete, Box, Button, MenuItem, TextField, Typography } from "@mui
 import { toast } from "react-toastify";
 import api from "./hqApi";
 import { IOS } from "../../theme/ios";
-import { errorText, weekStartIso } from "./hqFormat";
+import { errorText, weekStartIso, localToday } from "./hqFormat";
 import { DeleteButton } from "./FacilityParts";
 
 const KIND_FOR = { calls: "call", email: "email", linkedin: "linkedin" };
 const KIND_WORD = { call: "call", email: "email", linkedin: "LinkedIn message", meeting: "meeting", note: "note" };
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localToday();
 
 
 /**

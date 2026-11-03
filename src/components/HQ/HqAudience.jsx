@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
-import { Alert, Box, ButtonBase, CircularProgress, Typography } from "@mui/material";
+import { Alert, Box, Button, ButtonBase, CircularProgress, Typography } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import api from "./hqApi";
 import { IOS } from "../../theme/ios";
 import { errorText } from "./hqFormat";
 import { AUDIENCES } from "./usePlaybookPlays";
 import HqPlays from "./HqPlays";
-import HqPlaybook from "./HqPlaybook";
 import HqContentPlan from "./HqContentPlan";
-import HqWeek from "./HqWeek";
 import { PlayCard } from "./PlayCards";
 import { LogTouch, TouchLog } from "./LogTouch";
 import BuyerMessage from "./BuyerMessage";
@@ -31,12 +30,13 @@ export function SubTabs({ tabs, value, onChange }) {
 }
 
 // Which tab a play belongs on.
-const tabForPlay = (p) => (p.channel === "calls" ? "calls" : p.channel === "email" ? "email" : p.channel === "linkedin" && p.countsFrom === "activities" ? "linkedin" : "content");
+const tabForPlay = (p) => (p.channel === "calls" ? "calls" : p.channel === "email" ? "email" : p.channel === "linkedin" && p.countsFrom === "activities" ? "linkedin" : p.channel === "facebook" && p.countsFrom === "activities" ? "facebook" : "content");
 
 const TABS = {
   content: { label: "Content", note: "What we publish for them: LinkedIn posts, videos, the weekly Klaviyo email, blog posts and templates, Facebook groups. Every piece starts from what we say to this buyer (above). Plan it on the board below." },
   email: { label: "Cold email", note: "One-to-one emails from your own inbox, not Klaviyo. Log them below so they count toward the weekly target." },
   calls: { label: "Calls", note: "Phone calls to the building. Log them below (one at a time or in a batch) so they count toward the weekly target." },
+  facebook: { label: "Facebook groups", note: "Groups we're in and the people we message from them. Track and log them on the Facebook page; each group's next step is in This week." },
   linkedin: { label: "LinkedIn outreach", note: "Connection requests and messages, one person at a time. Log them below so they count toward the weekly target." },
 };
 
@@ -48,10 +48,11 @@ const TABS = {
 export default function HqAudience({ audiences, reloadKey, onChanged }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState("week");
+  const [tab, setTab] = useState("");
   const [open, setOpen] = useState(() => new Set());
   const [editing, setEditing] = useState(null);
   const [key, setKey] = useState(0);
+  const navigate = useNavigate();
   const audKey = audiences.join(",");
 
   useEffect(() => {
@@ -72,7 +73,8 @@ export default function HqAudience({ audiences, reloadKey, onChanged }) {
   const buyers = (data.meta.buyers || []).filter((b) => audiences.includes(b.key));
   const plays = data.plays.filter((p) => mine(p.audience));
   const playTab = new Map(data.plays.map((p) => [String(p._id), tabForPlay(p)]));
-  const tabs = ["content", "email", "calls", "linkedin"].filter((t) => plays.some((p) => tabForPlay(p) === t));
+  const tabs = ["calls", "email", "facebook", "linkedin", "content"].filter((t) => plays.some((p) => tabForPlay(p) === t));
+  const current = tabs.includes(tab) ? tab : tabs[0] || "";
   // Which tab a to-do belongs on.
   const todoTab = (t) => (t.playId && playTab.get(t.playId)) || (t.channel === "calls" ? "calls" : t.channel === "email" ? "email" : "content");
   const toggle = (id) =>
@@ -108,51 +110,50 @@ export default function HqAudience({ audiences, reloadKey, onChanged }) {
         })}
       </Box>
 
-      <SubTabs tabs={[["week", "This week"], ["todo", "To do now"], ...tabs.map((t) => [t, TABS[t].label])]} value={tab} onChange={setTab} />
+      <SubTabs tabs={tabs.map((t) => [t, TABS[t].label])} value={current} onChange={setTab} />
+      <Typography sx={{ color: IOS.secondary, fontSize: 13.5, mb: 1.5 }}>
+        This week's to-dos for every channel are on <ButtonBase onClick={() => navigate("/hq/week")} sx={{ color: IOS.blue, fontSize: 13.5, fontWeight: 600, verticalAlign: "baseline" }}>This week</ButtonBase>.
+      </Typography>
 
-      {tab === "week" && <HqWeek audiences={audiences} reloadKey={reloadKey + key} onChanged={onChanged} />}
-
-      {tab === "todo" && (
-        <HqPlays
-          audiences={audiences}
-          reloadKey={reloadKey + key}
-          onChanged={onChanged}
-          title="Today"
-          note="People to get back to (replies, clicks, signups, call-backs) and content that's due. The weekly targets are on This week."
-        />
-      )}
-
-      {tab !== "todo" && tab !== "week" && (
+      {current && (
         <Box sx={{ display: "grid", gap: 2 }}>
-          <Typography sx={{ color: IOS.secondary, fontSize: 14.5 }}>{TABS[tab].note}</Typography>
+          <Typography sx={{ color: IOS.secondary, fontSize: 14.5 }}>{TABS[current].note}</Typography>
 
-          {tab !== "content" && (
+          {current === "facebook" && (
+            <Box>
+              <Button variant="contained" disableElevation onClick={() => navigate("/hq/facebook")} sx={{ borderRadius: IOS.radius.round }}>
+                Open Facebook groups & people
+              </Button>
+            </Box>
+          )}
+
+          {current !== "content" && current !== "facebook" && (
             <Box sx={{ p: 2, bgcolor: IOS.surface, borderRadius: IOS.radius.card, border: `1px solid ${IOS.hairline}` }}>
               <Typography sx={{ fontWeight: 700, fontSize: 17, mb: 0.25 }}>Log what you did</Typography>
               <Typography sx={{ color: IOS.secondary, fontSize: 13.5, mb: 1.5 }}>
                 One at a time, or a batch ("15 calls this morning"). It counts toward the play's weekly target. Picking a person or facility also adds it to their history.
               </Typography>
               <LogTouch
-                key={tab}
-                plays={plays.filter((p) => tabForPlay(p) === tab && p.countsFrom === "activities")}
+                key={current}
+                plays={plays.filter((p) => tabForPlay(p) === current && p.countsFrom === "activities")}
                 onLogged={() => {
                   setKey((k) => k + 1);
                   onChanged?.();
                 }}
               />
               <Box sx={{ mt: 2 }}>
-                <TouchLog plays={plays.filter((p) => tabForPlay(p) === tab)} reloadKey={reloadKey + key} onChanged={() => setKey((k) => k + 1)} />
+                <TouchLog plays={plays.filter((p) => tabForPlay(p) === current)} reloadKey={reloadKey + key} onChanged={() => setKey((k) => k + 1)} />
               </Box>
             </Box>
           )}
 
           <HqPlays
             audiences={audiences}
-            filter={(t) => todoTab(t) === tab}
-            hideChannels={tab !== "content"}
+            filter={(t) => todoTab(t) === current}
+            hideChannels={current !== "content"}
             reloadKey={reloadKey + key}
             onChanged={onChanged}
-            title={`To do now: ${TABS[tab].label.toLowerCase()}`}
+            title={`To do now: ${TABS[current].label.toLowerCase()}`}
             note=" "
             emptyText="Nothing to do here right now."
           />
@@ -163,7 +164,7 @@ export default function HqAudience({ audiences, reloadKey, onChanged }) {
             </Typography>
             <Box sx={{ display: "grid", gap: 1 }}>
               {plays
-                .filter((p) => tabForPlay(p) === tab)
+                .filter((p) => tabForPlay(p) === current)
                 .map((p) => (
                   <PlayCard
                     key={p._id}
@@ -181,7 +182,7 @@ export default function HqAudience({ audiences, reloadKey, onChanged }) {
             </Box>
           </Box>
 
-          {tab === "content" && (
+          {current === "content" && (
             <Box>
               <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: IOS.secondary, textTransform: "uppercase", mb: 0.75 }}>
                 Content board
@@ -191,29 +192,6 @@ export default function HqAudience({ audiences, reloadKey, onChanged }) {
           )}
         </Box>
       )}
-    </Box>
-  );
-}
-
-/** The whole program: scoreboard, every play, the week, and the full content calendar. */
-export function HqOverall({ reloadKey, onChanged }) {
-  const [tab, setTab] = useState("week");
-  return (
-    <Box>
-      <SubTabs
-        tabs={[
-          ["week", "This week"],
-          ["now", "To do now"],
-          ["score", "Scoreboard, marketing plays and the week"],
-          ["content", "Content calendar"],
-        ]}
-        value={tab}
-        onChange={setTab}
-      />
-      {tab === "week" && <HqWeek reloadKey={reloadKey} onChanged={onChanged} />}
-      {tab === "score" && <HqPlaybook reloadKey={reloadKey} />}
-      {tab === "content" && <HqContentPlan reloadKey={reloadKey} />}
-      {tab === "now" && <HqPlays reloadKey={reloadKey} onChanged={onChanged} title="Today" note="People to get back to (replies, clicks, signups, call-backs) and content that's due. The weekly targets are on This week." />}
     </Box>
   );
 }

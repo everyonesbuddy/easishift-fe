@@ -15,6 +15,7 @@ import HqConnections from "./HqConnections";
 import HqNumbers from "./HqNumbers";
 import HqPlaybookRead from "./HqPlaybookRead";
 import HqAudience, { HqOverall } from "./HqAudience";
+import HqFacebook from "./HqFacebook";
 
 const LeadershipPage = (props) => <HqAudience {...props} audiences={["director", "operator"]} />;
 const SchedulersPage = (props) => <HqAudience {...props} audiences={["scheduler"]} />;
@@ -34,6 +35,7 @@ const GROUPS = [
     items: [
       { id: "schedulers", label: "For schedulers", Comp: SchedulersPage, title: "Marketing plays for schedulers", sub: "How we reach schedulers and staffing coordinators, on every channel, and what to do now." },
       { id: "leadership", label: "For DONs, EDs & admins", Comp: LeadershipPage, title: "Marketing plays for DONs, EDs and admins", sub: "How we reach directors of nursing, executive directors, administrators and regional operators, on every channel, and what to do now." },
+      { id: "facebook", label: "Facebook groups & people", Comp: HqFacebook, title: "Facebook", sub: "The groups where our buyers talk, where we stand in each, and everyone to message from them. Everything here also shows up in This week." },
       { id: "overall", label: "Full plan & scoreboard", Comp: HqOverall, title: "Full plan and scoreboard", sub: "This week's checklist for every buyer, what to do now, the scoreboard, every marketing play and the full content calendar." },
     ],
   },

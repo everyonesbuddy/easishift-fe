@@ -22,7 +22,7 @@ export function Stat({ label, value, detail, tone, onClick }) {
   return (
     <Wrap
       onClick={onClick}
-      sx={{ display: "block", textAlign: "left", p: 1.75, borderRadius: IOS.radius.cell, bgcolor: IOS.canvas, minWidth: 0, width: "100%" }}
+      sx={{ display: "block", boxSizing: "border-box", textAlign: "left", p: 1.75, borderRadius: IOS.radius.cell, bgcolor: IOS.canvas, minWidth: 0, width: "100%" }}
     >
       <Typography sx={{ color: IOS.secondary, fontSize: 12.5, fontWeight: 600 }}>{label}</Typography>
       <Typography sx={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", color: tone || IOS.ink, ...num }}>{value}</Typography>

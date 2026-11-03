@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, Box, Button, ButtonBase, CircularProgress, IconButton, MenuItem, TextField, Tooltip, Typography } from "@mui/material";
-import { FiCheck, FiChevronDown, FiChevronRight, FiCopy, FiMail, FiPhone, FiPlus, FiRefreshCw, FiX } from "react-icons/fi";
+import { FiCheck, FiChevronDown, FiChevronRight, FiCopy, FiExternalLink, FiMail, FiPhone, FiPlus, FiRefreshCw, FiX } from "react-icons/fi";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "./hqApi";
 import { IOS, tint } from "../../theme/ios";
@@ -16,6 +17,7 @@ const GROUPS = [
   { key: "calls", label: "Calls", test: (p) => p.channel === "calls" },
   { key: "email", label: "Cold email", test: (p) => p.channel === "email" },
   { key: "linkedin-out", label: "LinkedIn outreach", test: (p) => p.channel === "linkedin" && p.list === "people" },
+  { key: "facebook", label: "Facebook groups & people", test: (p) => p.list === "facebook" },
   { key: "content", label: "Content to publish", test: (p) => p.list === "content" },
 ];
 const VERB = { calls: "Call", email: "Email", linkedin: "Message" };
@@ -86,6 +88,11 @@ function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, more = fa
           <FiPhone size={15} />
         </IconButton>
       )}
+      {t.url && (
+        <IconButton size="small" href={t.url} target="_blank" rel="noreferrer" aria-label="Open on Facebook" sx={{ color: IOS.blue }}>
+          <FiExternalLink size={15} />
+        </IconButton>
+      )}
       {t.email && !t.done && (
         <IconButton size="small" href={`mailto:${t.email}`} aria-label={`Email ${t.email}`} title={t.email}>
           <FiMail size={15} />
@@ -122,6 +129,7 @@ function PlayWeek({ p, data, view, busyId, onTick, onRemove, onOpenFacility }) {
   const [openDays, setOpenDays] = useState(() => new Set([data.today]));
   const [showMore, setShowMore] = useState(false);
   const [showScripts, setShowScripts] = useState(false);
+  const navigate = useNavigate();
   const toggleDay = (d) =>
     setOpenDays((s) => {
       const n = new Set(s);
@@ -155,7 +163,11 @@ function PlayWeek({ p, data, view, busyId, onTick, onRemove, onOpenFacility }) {
       {p.count > ticked && <Typography sx={{ fontSize: 12, color: IOS.secondary, mt: 0.5 }}>{p.count - ticked} logged another way (a batch or the history) count too.</Typography>}
 
       <Box sx={{ mt: 1 }}>
-        {!p.todos.length && <Typography sx={{ fontSize: 13.5, color: IOS.secondary, py: 1 }}>{p.list === "content" ? "Nothing planned for this play. Add pieces on the content board." : "Nobody left to reach for this play. Add facilities or people, then top up the list."}</Typography>}
+        {!p.todos.length && (
+          <Typography sx={{ fontSize: 13.5, color: IOS.secondary, py: 1 }}>
+            {p.list === "content" ? "Nothing planned for this play. Add pieces on the content board." : p.list === "facebook" ? "No groups yet. Add the groups you find on the Facebook page." : "Nobody left to reach for this play. Add facilities or people, then top up the list."}
+          </Typography>
+        )}
         {!byDay && rows(p.todos)}
         {byDay && view === "today" && (
           <>
@@ -189,7 +201,12 @@ function PlayWeek({ p, data, view, busyId, onTick, onRemove, onOpenFacility }) {
       <Box sx={{ display: "flex", gap: 0.5, mt: 1, flexWrap: "wrap" }}>
         {p.more.length > 0 && (
           <Button size="small" startIcon={showMore ? <FiChevronDown /> : <FiChevronRight />} onClick={() => setShowMore(!showMore)} sx={{ color: IOS.secondary }}>
-            {p.list === "content" ? `Coming up later (${p.more.length})` : `More to ${(VERB[p.channel] || "reach").toLowerCase()} (${p.more.length})`}
+            {p.list === "content" ? `Coming up later (${p.more.length})` : p.list === "facebook" ? `Other groups (${p.more.length})` : `More to ${(VERB[p.channel] || "reach").toLowerCase()} (${p.more.length})`}
+          </Button>
+        )}
+        {p.list === "facebook" && (
+          <Button size="small" startIcon={<FiExternalLink />} onClick={() => navigate("/hq/facebook")} sx={{ color: IOS.secondary }}>
+            Groups and people
           </Button>
         )}
         {p.scripts.length > 0 && (
@@ -201,10 +218,10 @@ function PlayWeek({ p, data, view, busyId, onTick, onRemove, onOpenFacility }) {
       {showMore && (
         <Box sx={{ mt: 0.5, p: 1, bgcolor: IOS.canvas, borderRadius: "10px" }}>
           <Typography sx={{ fontSize: 12.5, color: IOS.secondary, px: 1, mb: 0.5 }}>
-            {p.list === "content" ? "Published one early? Tick it and it counts the day you do it." : "Did one that isn't on the list, or getting ahead? Tick it and it joins this week."}
+            {p.list === "content" ? "Published one early? Tick it and it counts the day you do it." : p.list === "facebook" ? "Did something in another group? Tick it and it counts." : "Did one that isn't on the list, or getting ahead? Tick it and it joins this week."}
           </Typography>
           {p.more.map((m) => (
-            <TodoRow key={m.refId} t={{ ...m, _id: `more-${m.refId}`, done: false }} channel={p.channel} more busy={busyId === `more-${m.refId}`} onTick={() => onTick({ ...m, _id: `more-${m.refId}`, isMore: true }, true)} onOpenFacility={onOpenFacility} />
+            <TodoRow key={`${m.refId}:${m.action || ""}`} t={{ ...m, _id: `more-${m.refId}`, done: false }} channel={p.channel} more busy={busyId === `more-${m.refId}`} onTick={() => onTick({ ...m, _id: `more-${m.refId}`, isMore: true }, true)} onOpenFacility={onOpenFacility} />
           ))}
         </Box>
       )}
@@ -293,7 +310,7 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
     setBusyId(t._id);
     try {
       const res = t.isMore
-        ? await api.post(`/hq/week/items/new/check`, { done: true, playId: t.playId, kind: t.kind, refId: t.refId })
+        ? await api.post(`/hq/week/items/new/check`, { done: true, playId: t.playId, kind: t.kind, refId: t.refId, action: t.action })
         : await api.post(`/hq/week/items/${t._id}/check`, { done });
       setData(res.data);
       onChanged?.();

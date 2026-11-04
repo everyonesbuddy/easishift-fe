@@ -32,6 +32,7 @@ export function PlayForm({ play, onSaved, onCancel, onDeleted }) {
     countsFrom: play?.countsFrom || "activities",
     measure: play?.measure || "",
     active: play?.active !== false,
+    followUps: (play?.followUps || []).join(", "),
   });
   const set = (k) => (e) => setP({ ...p, [k]: e.target.value });
   const f = { size: "small", fullWidth: true, sx: { bgcolor: IOS.surface } };
@@ -106,6 +107,17 @@ export function PlayForm({ play, onSaved, onCancel, onDeleted }) {
         <TextField {...f} type="number" label="Weekly target" value={p.weeklyTarget} onChange={set("weeklyTarget")} inputProps={{ step: 0.5, min: 0 }} />
         <TextField {...f} label="of what" placeholder="calls" value={p.targetUnit} onChange={set("targetUnit")} />
       </Box>
+      {p.channel === "email" && (
+        <TextField
+          {...f}
+          id="play-followups"
+          label="Follow-up days after email 1"
+          placeholder="4, 9"
+          value={p.followUps}
+          onChange={set("followUps")}
+          helperText="Email 2 on the first day, email 3 on the second. It stops when you mark that they replied."
+        />
+      )}
       <TextField {...f} select label="Scoreboard counts" value={p.countsFrom} onChange={set("countsFrom")}>
         {Object.entries(COUNTS).map(([k, v]) => (
           <MenuItem key={k} value={k}>{v}</MenuItem>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Alert, Box, Button, ButtonBase, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Link, MenuItem, TextField, Typography } from "@mui/material";
-import { FiPlus } from "react-icons/fi";
+import { FiCopy, FiPlus } from "react-icons/fi";
 import { toast } from "react-toastify";
 import api from "./hqApi";
 import { IOS, tint } from "../../theme/ios";
@@ -128,7 +128,14 @@ export function ItemDialog({ item, plays, onClose, onSaved }) {
             <MenuItem key={p._id} value={p._id}>{p.title}</MenuItem>
           ))}
         </TextField>
-        <TextField {...f} multiline minRows={3} label="Notes, outline or script" value={v.notes} onChange={set("notes")} sx={{ gridColumn: "1 / -1" }} />
+        <Box sx={{ gridColumn: "1 / -1", position: "relative" }}>
+          <TextField {...f} multiline minRows={8} maxRows={24} label="Draft, outline or script" value={v.notes} onChange={set("notes")} helperText="A reference draft to start from: change it to sound like you." />
+          {v.notes && (
+            <Button size="small" startIcon={<FiCopy size={13} />} onClick={() => copyText(v.notes)} sx={{ position: "absolute", top: 6, right: 8, bgcolor: IOS.surface, "&:hover": { bgcolor: IOS.canvas } }}>
+              Copy
+            </Button>
+          )}
+        </Box>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         {item._id && (

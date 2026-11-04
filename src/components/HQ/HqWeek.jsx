@@ -154,7 +154,7 @@ function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenIte
         </IconButton>
       )}
       {t.url && (
-        <IconButton size="small" href={t.url} target="_blank" rel="noreferrer" aria-label={t.kind === "content" ? "Open it" : "Open on Facebook"} sx={{ color: IOS.blue }}>
+        <IconButton size="small" href={/^https?:\/\//i.test(t.url) ? t.url : `https://${t.url}`} target="_blank" rel="noreferrer" aria-label={t.kind === "content" ? "Open it" : "Open on Facebook"} title={t.kind === "content" ? "Open it" : "Open on Facebook"} sx={{ color: IOS.blue }}>
           <FiExternalLink size={15} />
         </IconButton>
       )}

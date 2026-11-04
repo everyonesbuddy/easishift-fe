@@ -474,7 +474,7 @@ export default function HqFacebook({ reloadKey, onChanged }) {
       )}
 
       {tab === "scripts" && (
-        <Section title="Scripts" note="Copy, change the [name], send. Edit them on the Facebook plays (Full plan & scoreboard).">
+        <Section title="Scripts" note="Copy, change the [name], send. To change them, edit the Facebook campaigns under Strategy.">
           {scripts.length ? (
             scripts.map((s, i) => (
               <Box key={i} sx={{ bgcolor: IOS.canvas, borderRadius: "10px", p: 1.5, mb: 1 }}>
@@ -491,7 +491,7 @@ export default function HqFacebook({ reloadKey, onChanged }) {
               </Box>
             ))
           ) : (
-            <Empty>No scripts on the Facebook plays yet.</Empty>
+            <Empty>No scripts on the Facebook campaigns yet.</Empty>
           )}
         </Section>
       )}

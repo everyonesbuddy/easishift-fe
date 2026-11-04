@@ -466,7 +466,7 @@ function PlayWeek({ p, data, view, busyId, onTick, onRemove, onOpenFacility, onO
         )}
         {!p.todos.length && !p.short && (
           <Typography sx={{ fontSize: 13.5, color: IOS.secondary, py: 1 }}>
-            {p.list === "content" ? "Nothing planned for this play this week. Add a piece below." : p.list === "facebook" ? "No groups yet. Add the groups you find on the Facebook page." : "Nobody left to reach for this play. Add facilities or people, then top up the list."}
+            {p.list === "content" ? "Nothing planned for this campaign this week. Add a piece below." : p.list === "facebook" ? "No groups yet. Add the groups you find on the Facebook page." : "Nobody left to reach for this play. Add facilities or people, then top up the list."}
           </Typography>
         )}
         {!byDay && rows(p.todos)}
@@ -791,7 +791,7 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
           </Box>
         ))}
 
-      {!plays.length && <Empty>No running plays with a weekly target for this buyer.</Empty>}
+      {!plays.length && <Empty>No running campaigns with a weekly target for this buyer.</Empty>}
 
       {!audiences && <Tasks tasks={data.tasks} today={data.today} busyId={busyId} onTick={tick} onRemove={remove} onAdd={addTask} />}
 

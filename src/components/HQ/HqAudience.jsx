@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, Box, Button, ButtonBase, CircularProgress, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import { FiChevronDown, FiChevronRight } from "react-icons/fi";
 import api from "./hqApi";
 import { IOS } from "../../theme/ios";
 import { errorText } from "./hqFormat";
@@ -33,11 +34,11 @@ export function SubTabs({ tabs, value, onChange }) {
 const tabForPlay = (p) => (p.channel === "calls" ? "calls" : p.channel === "email" ? "email" : p.channel === "linkedin" && p.countsFrom === "activities" ? "linkedin" : p.channel === "facebook" && p.countsFrom === "activities" ? "facebook" : "content");
 
 const TABS = {
-  content: { label: "Content", note: "What we publish for them: LinkedIn posts, videos, the weekly Klaviyo email, blog posts and templates, Facebook groups. Every piece starts from what we say to this buyer (above). Plan it on the board below." },
-  email: { label: "Cold email", note: "One-to-one emails from your own inbox, not Klaviyo. Log them below so they count toward the weekly target." },
-  calls: { label: "Calls", note: "Phone calls to the building. Log them below (one at a time or in a batch) so they count toward the weekly target." },
+  content: { label: "Content", note: "What we publish for them: LinkedIn posts, videos, the weekly Klaviyo email, blog posts and templates. Each campaign below has templates to start a piece from; the pieces themselves are planned on the Content calendar." },
+  email: { label: "Cold email", note: "One-to-one emails from your own inbox, not Klaviyo. The people to email, and their follow-ups, are on This week; the emails are in each campaign's scripts below." },
+  calls: { label: "Calls", note: "Phone calls to the building. Who to call, and call-backs, are on This week; what to say is in each campaign's scripts below." },
   facebook: { label: "Facebook groups", note: "Groups we're in and the people we message from them. Track and log them on the Facebook page; each group's next step is in This week." },
-  linkedin: { label: "LinkedIn outreach", note: "Connection requests and messages, one person at a time. Log them below so they count toward the weekly target." },
+  linkedin: { label: "LinkedIn outreach", note: "Messages, one person at a time. Who to message is on This week; what to say is in each campaign's scripts below." },
 };
 
 /**
@@ -51,6 +52,7 @@ export default function HqAudience({ audiences, reloadKey, onChanged }) {
   const [tab, setTab] = useState("");
   const [open, setOpen] = useState(() => new Set());
   const [editing, setEditing] = useState(null);
+  const [showLog, setShowLog] = useState(false);
   const [key, setKey] = useState(0);
   const navigate = useNavigate();
   const audKey = audiences.join(",");
@@ -127,40 +129,21 @@ export default function HqAudience({ audiences, reloadKey, onChanged }) {
             </Box>
           )}
 
-          {current !== "content" && current !== "facebook" && (
-            <Box sx={{ p: 2, bgcolor: IOS.surface, borderRadius: IOS.radius.card, border: `1px solid ${IOS.hairline}` }}>
-              <Typography sx={{ fontWeight: 700, fontSize: 17, mb: 0.25 }}>Log what you did</Typography>
-              <Typography sx={{ color: IOS.secondary, fontSize: 13.5, mb: 1.5 }}>
-                One at a time, or a batch ("15 calls this morning"). It counts toward the play's weekly target. Picking a person or facility also adds it to their history.
-              </Typography>
-              <LogTouch
-                key={current}
-                plays={plays.filter((p) => tabForPlay(p) === current && p.countsFrom === "activities")}
-                onLogged={() => {
-                  setKey((k) => k + 1);
-                  onChanged?.();
-                }}
-              />
-              <Box sx={{ mt: 2 }}>
-                <TouchLog plays={plays.filter((p) => tabForPlay(p) === current)} reloadKey={reloadKey + key} onChanged={() => setKey((k) => k + 1)} />
-              </Box>
-            </Box>
-          )}
-
           <HqPlays
             audiences={audiences}
             filter={(t) => todoTab(t) === current}
             hideChannels={current !== "content"}
             reloadKey={reloadKey + key}
             onChanged={onChanged}
-            title={`To do now: ${TABS[current].label.toLowerCase()}`}
+            title={`Get back to them: ${TABS[current].label.toLowerCase()}`}
             note=" "
             emptyText="Nothing to do here right now."
+            hideEmpty
           />
 
           <Box>
             <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: IOS.secondary, textTransform: "uppercase", mb: 0.75 }}>
-              The plays
+              Campaigns
             </Typography>
             <Box sx={{ display: "grid", gap: 1 }}>
               {plays
@@ -182,12 +165,40 @@ export default function HqAudience({ audiences, reloadKey, onChanged }) {
             </Box>
           </Box>
 
-          {current === "content" && (
+          {current !== "content" && current !== "facebook" && (
             <Box>
-              <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: IOS.secondary, textTransform: "uppercase", mb: 0.75 }}>
-                Content board
+              <Button size="small" startIcon={showLog ? <FiChevronDown /> : <FiChevronRight />} onClick={() => setShowLog(!showLog)} sx={{ color: IOS.secondary }}>
+                Log a batch or something not on This week
+              </Button>
+              {showLog && (
+                <Box sx={{ p: 2, mt: 1, bgcolor: IOS.surface, borderRadius: IOS.radius.card, border: `1px solid ${IOS.hairline}` }}>
+                  <Typography sx={{ color: IOS.secondary, fontSize: 13.5, mb: 1.5 }}>
+                    For a batch ("15 calls this morning") or anything you didn't tick on This week. It counts toward the campaign's weekly target.
+                  </Typography>
+                  <LogTouch
+                    key={current}
+                    plays={plays.filter((p) => tabForPlay(p) === current && p.countsFrom === "activities")}
+                    onLogged={() => {
+                      setKey((k) => k + 1);
+                      onChanged?.();
+                    }}
+                  />
+                  <Box sx={{ mt: 2 }}>
+                    <TouchLog plays={plays.filter((p) => tabForPlay(p) === current)} reloadKey={reloadKey + key} onChanged={() => setKey((k) => k + 1)} />
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          )}
+
+          {current === "content" && (
+            <Box sx={{ p: 2, bgcolor: IOS.surface, borderRadius: IOS.radius.card, border: `1px solid ${IOS.hairline}`, display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
+              <Typography sx={{ flex: "1 1 320px", fontSize: 14.5 }}>
+                Every piece (its status, due date and draft) lives on the <b>Content calendar</b>. This week's pieces are also on <b>This week</b>.
               </Typography>
-              <HqContentPlan audiences={audiences} reloadKey={reloadKey + key} />
+              <Button variant="outlined" onClick={() => navigate("/hq/calendar")} sx={{ borderRadius: IOS.radius.round }}>
+                Open the Content calendar
+              </Button>
             </Box>
           )}
         </Box>

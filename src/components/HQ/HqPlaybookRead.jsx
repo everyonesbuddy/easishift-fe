@@ -145,7 +145,7 @@ export default function HqPlaybookRead({ reloadKey }) {
       <Flow />
       <P>{meta.connect}</P>
 
-      <H sub="Three buyers. Each has its own page under Marketing plays, with what to do today, the plays for them and their content.">Who we sell to</H>
+      <H sub="Three buyers. Each has its own page under Strategy, with the campaigns that reach them.">Who we sell to</H>
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, gap: 1.5 }}>
         {(meta.buyers || []).map((b) => {
           const color = AUDIENCES[b.key]?.color || IOS.blue;
@@ -166,7 +166,7 @@ export default function HqPlaybookRead({ reloadKey }) {
               ))}
               {PAGE_FOR[b.key] && (
                 <Button data-hq-chrome size="small" endIcon={<FiArrowRight />} onClick={() => navigate(`/hq/${PAGE_FOR[b.key]}`)} sx={{ mt: 1.5, px: 0 }}>
-                  See their marketing plays
+                  See their campaigns
                 </Button>
               )}
             </Box>
@@ -184,7 +184,7 @@ export default function HqPlaybookRead({ reloadKey }) {
         ))}
       </Box>
 
-      <H sub="What each channel is for, and the marketing plays we run on it.">The channels</H>
+      <H sub="What each channel is for, and the campaigns we run on it.">The channels</H>
       {(meta.channels || []).map((c) => {
         const list = plays.filter((p) => p.channel === c.key || (c.key === "blog" && p.channel === "search"));
         return (
@@ -225,7 +225,7 @@ export default function HqPlaybookRead({ reloadKey }) {
         </tbody>
       </Box>
 
-      <H>Which buildings get which plays</H>
+      <H>Which buildings get which campaigns</H>
       {(meta.tierRules || []).map((r) => (
         <Box key={r.tier} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "200px 1fr" }, gap: 1, py: 1, borderBottom: `1px solid ${IOS.hairline}` }}>
           <Typography sx={{ fontWeight: 700, fontSize: 14.5 }}>{r.tier}</Typography>
@@ -233,7 +233,7 @@ export default function HqPlaybookRead({ reloadKey }) {
         </Box>
       ))}
 
-      <H sub="Each play's weekly target. The live scoreboard is under Marketing plays → Full plan & scoreboard.">How we keep score</H>
+      <H sub="Each campaign's weekly target. The live scoreboard is under Strategy → Scoreboard & all campaigns.">How we keep score</H>
       {plays
         .filter((p) => p.weeklyTarget)
         .map((p) => (

@@ -73,7 +73,7 @@ export function LogTouch({ plays, playId = "", onLogged, onCancel }) {
   const f = { size: "small", sx: { bgcolor: IOS.surface } };
   return (
     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "2fr 90px 2fr 140px" }, gap: 1, alignItems: "start", p: 1.5, bgcolor: IOS.canvas, borderRadius: IOS.radius.cell }}>
-      <TextField {...f} select label="Play" value={v.playId} onChange={(e) => setV({ ...v, playId: e.target.value })}>
+      <TextField {...f} select label="Campaign" value={v.playId} onChange={(e) => setV({ ...v, playId: e.target.value })}>
         {plays.map((p) => (
           <MenuItem key={p._id} value={p._id}>{p.title}</MenuItem>
         ))}

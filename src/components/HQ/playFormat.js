@@ -2,8 +2,8 @@
 import { toast } from "react-toastify";
 
 export const COUNTS = {
-  activities: "Touches logged with this play",
-  content: "Content published for this play",
+  activities: "Calls, emails and touches logged with this campaign",
+  content: "Content published for this campaign",
   leads: "Calculator emails",
   signups: "Workspace signups",
   none: "Not counted",

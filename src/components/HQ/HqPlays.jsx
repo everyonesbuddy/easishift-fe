@@ -205,7 +205,7 @@ function TodoRow({ p, showAudience, onOpenFacility, onOpenContent, doneFor, setD
  * behind the weekly target, do more of what worked). `audiences` limits it
  * to one buyer's page.
  */
-export default function HqPlays({ reloadKey, onChanged, audiences = null, filter = null, hideChannels = false, title = "To do now", note: sectionNote, emptyText = "Nothing urgent. Nice." }) {
+export default function HqPlays({ reloadKey, onChanged, audiences = null, filter = null, hideChannels = false, title = "To do now", note: sectionNote, emptyText = "Nothing urgent. Nice.", hideEmpty = false }) {
   const [plays, setPlays] = useState(null);
   const [error, setError] = useState("");
   const [channel, setChannel] = useState("");
@@ -246,9 +246,10 @@ export default function HqPlays({ reloadKey, onChanged, audiences = null, filter
   };
 
   if (error) return <Alert severity="error">{error}</Alert>;
-  if (!plays) return <CircularProgress size={22} />;
+  if (!plays) return hideEmpty ? null : <CircularProgress size={22} />;
 
   const mine = filter ? plays.filter(filter) : plays;
+  if (hideEmpty && !mine.length) return null;
   const channels = [...new Set(mine.map((p) => p.channel || "other"))];
   const shown = mine.filter((p) => !channel || (p.channel || "other") === channel);
   const today = shown.filter((p) => p.priority === 1);

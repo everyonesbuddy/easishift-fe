@@ -67,7 +67,7 @@ function WeekPlan({ meta, onSaved }) {
           </tbody>
         </Box>
       </Box>
-      <Typography sx={{ fontWeight: 700, fontSize: 15, mt: 2.5, mb: 0.75 }}>Which buildings get which plays</Typography>
+      <Typography sx={{ fontWeight: 700, fontSize: 15, mt: 2.5, mb: 0.75 }}>Which buildings get which campaigns</Typography>
       {(edit ? m.tierRules : meta.tierRules).map((r, i) => (
         <Box key={i} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "200px 1fr" }, gap: 1, py: 0.75, borderBottom: `1px solid ${IOS.hairline}` }}>
           {edit ? (
@@ -133,12 +133,12 @@ export default function HqPlaybook({ reloadKey, audiences = null }) {
 
   return (
     <Box sx={{ display: "grid", gap: 2 }}>
-      <Section title="Scoreboard" note="This week against each play's target, and the three weeks before. Counted from what's logged in HQ: pick the marketing play when you log a call or email, and link content to its play.">
+      <Section title="Scoreboard" note="This week against each campaign's target, and the three weeks before. Counted from what's logged in HQ: ticks on This week, calls and emails logged with a campaign, and content linked to its campaign.">
         <Box sx={{ overflowX: "auto" }}>
           <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", minWidth: 640, "& td, & th": { borderBottom: `1px solid ${IOS.hairline}`, py: 0.9, px: 1, fontSize: 14, textAlign: "right", ...num }, "& th": { fontSize: 12, color: IOS.secondary, fontWeight: 700 }, "& td:first-of-type, & th:first-of-type": { textAlign: "left" } }}>
             <thead>
               <tr>
-                <th>Marketing play</th>
+                <th>Campaign</th>
                 <th>Target / week</th>
                 {data.weeks.map((w, i) => (
                   <th key={w}>{i === thisWeek ? "This week" : weekLabel(w)}</th>
@@ -186,12 +186,12 @@ export default function HqPlaybook({ reloadKey, audiences = null }) {
           </ButtonBase>
         ))}
         <Button size="small" variant="outlined" startIcon={<FiPlus />} onClick={() => setEditing("new")} sx={{ ml: "auto", borderRadius: IOS.radius.round }}>
-          Add marketing play
+          Add a campaign
         </Button>
       </Box>
 
       {editing === "new" && (
-        <Section title="New marketing play">
+        <Section title="New campaign">
           <PlayForm
             onSaved={() => {
               setEditing(null);

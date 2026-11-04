@@ -71,10 +71,10 @@ const GROUPS = [
   {
     label: "Strategy",
     items: [
-      { id: "playbook", label: "Playbook", Comp: HqPlaybookRead, title: "Marketing playbook", sub: "How we sell, who we sell to, the channels and the marketing plays." },
-      { id: "schedulers", label: "Plays for schedulers", Comp: SchedulersPage, title: "Plays for schedulers", sub: "Who schedulers are, what we say to them, and how we reach them on each channel. Log calls and emails here." },
-      { id: "leadership", label: "Plays for DONs, EDs & admins", Comp: LeadershipPage, title: "Plays for DONs, EDs and admins", sub: "Who the leaders are, what we say to them, and how we reach them on each channel. Log calls and emails here." },
-      { id: "scoreboard", label: "Scoreboard & all plays", Comp: ScoreboardPage, title: "Scoreboard and all plays", sub: "Each play's weekly target against the last four weeks, every play, and the week's schedule." },
+      { id: "playbook", label: "Playbook", Comp: HqPlaybookRead, title: "Marketing playbook", sub: "How we sell, who we sell to, the channels and the campaigns we run." },
+      { id: "schedulers", label: "Schedulers", Comp: SchedulersPage, title: "Campaigns for schedulers", sub: "Who schedulers are, what we say to them, and each campaign that reaches them: how it runs, its scripts, and this week's count." },
+      { id: "leadership", label: "DONs, EDs & admins", Comp: LeadershipPage, title: "Campaigns for DONs, EDs and admins", sub: "Who the leaders are, what we say to them, and each campaign that reaches them: how it runs, its scripts, and this week's count." },
+      { id: "scoreboard", label: "Scoreboard & all campaigns", Comp: ScoreboardPage, title: "Scoreboard and all campaigns", sub: "Each campaign's weekly target against the last four weeks, every campaign, and the week's schedule." },
     ],
   },
   {

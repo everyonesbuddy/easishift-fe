@@ -122,14 +122,14 @@ export function ItemDialog({ item, plays, onClose, onSaved }) {
         <TextField {...f} type="date" label="Due" InputLabelProps={{ shrink: true }} value={v.dueDate} onChange={set("dueDate")} />
         <TextField {...f} type="date" label="Published" InputLabelProps={{ shrink: true }} value={v.publishedAt} onChange={set("publishedAt")} />
         <TextField {...f} label="Link once it's live (YouTube, LinkedIn, wisershifts.com…)" value={v.url} onChange={set("url")} sx={{ gridColumn: "1 / -1" }} helperText="The link is how its views are matched." />
-        <TextField {...f} select label="Marketing play it's for" value={v.playId} onChange={set("playId")} SelectProps={{ displayEmpty: true }} InputLabelProps={{ shrink: true }} sx={{ gridColumn: "1 / -1" }}>
+        <TextField {...f} select label="Campaign it's for" value={v.playId} onChange={set("playId")} SelectProps={{ displayEmpty: true }} InputLabelProps={{ shrink: true }} sx={{ gridColumn: "1 / -1" }}>
           <MenuItem value="">None</MenuItem>
           {plays.filter((p) => p.countsFrom === "content").map((p) => (
             <MenuItem key={p._id} value={p._id}>{p.title}</MenuItem>
           ))}
         </TextField>
         <Box sx={{ gridColumn: "1 / -1", position: "relative" }}>
-          <TextField {...f} multiline minRows={8} maxRows={24} label="Draft, outline or script" value={v.notes} onChange={set("notes")} helperText="A reference draft to start from: change it to sound like you." />
+          <TextField {...f} multiline minRows={8} maxRows={24} label="This piece's draft" value={v.notes} onChange={set("notes")} helperText="The draft, outline or script for this piece only. For a fresh start, copy a template from its campaign." />
           {v.notes && (
             <Button size="small" startIcon={<FiCopy size={13} />} onClick={() => copyText(v.notes)} sx={{ position: "absolute", top: 6, right: 8, bgcolor: IOS.surface, "&:hover": { bgcolor: IOS.canvas } }}>
               Copy

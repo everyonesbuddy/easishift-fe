@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Alert, Box, Button, ButtonBase, CircularProgress, IconButton, MenuItem, TextField, Tooltip, Typography } from "@mui/material";
-import { FiCheck, FiChevronDown, FiChevronRight, FiCopy, FiExternalLink, FiMail, FiPhone, FiPlus, FiRefreshCw, FiX } from "react-icons/fi";
+import { Alert, Box, Button, ButtonBase, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, MenuItem, TextField, Tooltip, Typography } from "@mui/material";
+import { FiCheck, FiChevronDown, FiChevronRight, FiCopy, FiEye, FiExternalLink, FiMail, FiPhone, FiPlus, FiRefreshCw, FiX } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "./hqApi";
@@ -92,6 +92,68 @@ function mailto(t, script, sender) {
   return `mailto:${t.email}?subject=${encodeURIComponent(fill(script.subject))}&body=${encodeURIComponent(fill(script.body))}`;
 }
 
+/**
+ * The email for one person, filled in: pick a version of the play's script,
+ * copy the subject and body, or open it in your email.
+ */
+function EmailPreview({ t, scripts, sender, onClose }) {
+  const versions = scripts.filter((x) => x.body);
+  const [i, setI] = useState(0);
+  const facility = (t.detail || "").split(" · ")[0];
+  const v = versions[i] || { label: "", subject: "", body: "" };
+  const subject = fillScript(v.subject, { firstName: t.firstName, facility, sender });
+  const body = fillScript(v.body, { firstName: t.firstName, facility, sender });
+  const box = { bgcolor: IOS.canvas, borderRadius: "10px", p: 1.5, position: "relative" };
+  const copyBtn = (text, label) => (
+    <Button size="small" startIcon={<FiCopy size={13} />} onClick={() => copyText(text)} sx={{ position: { sm: "absolute" }, top: 6, right: 6 }}>
+      {label}
+    </Button>
+  );
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="md">
+      <DialogTitle sx={{ pb: 0.5 }}>
+        Email to {t.title}
+        <Typography sx={{ fontSize: 13.5, color: IOS.secondary }}>{t.detail}</Typography>
+      </DialogTitle>
+      <DialogContent sx={{ display: "grid", gap: 1.5, pt: "12px !important" }}>
+        {versions.length > 1 && (
+          <TextField select size="small" label="Version" value={i} onChange={(e) => setI(Number(e.target.value))}>
+            {versions.map((x, k) => (
+              <MenuItem key={k} value={k}>
+                {x.label || `Version ${k + 1}`}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
+        <Box sx={box}>
+          <Typography sx={{ fontSize: 12, fontWeight: 700, color: IOS.secondary, textTransform: "uppercase", letterSpacing: "0.06em" }}>To</Typography>
+          <Typography sx={{ fontSize: 14.5, pr: { sm: 14 } }}>{t.email}</Typography>
+          {copyBtn(t.email, "Copy address")}
+        </Box>
+        {subject && (
+          <Box sx={box}>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: IOS.secondary, textTransform: "uppercase", letterSpacing: "0.06em" }}>Subject</Typography>
+            <Typography sx={{ fontSize: 14.5, fontWeight: 600, pr: { sm: 14 } }}>{subject}</Typography>
+            {copyBtn(subject, "Copy subject")}
+          </Box>
+        )}
+        <Box sx={box}>
+          <Typography sx={{ fontSize: 12, fontWeight: 700, color: IOS.secondary, textTransform: "uppercase", letterSpacing: "0.06em" }}>Email</Typography>
+          <Typography sx={{ fontSize: 14.5, whiteSpace: "pre-wrap", lineHeight: 1.55, mt: 0.5, pr: { sm: 14 } }}>{body}</Typography>
+          {copyBtn(body, "Copy email")}
+        </Box>
+        {!t.firstName && <Typography sx={{ fontSize: 12.5, color: IOS.orangeText }}>No first name on file, so it says "Hi there". Change it if you know their name.</Typography>}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose}>Close</Button>
+        <Button variant="contained" disableElevation startIcon={<FiMail />} href={mailto(t, v, sender)} sx={{ borderRadius: IOS.radius.round }}>
+          Open in email
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 const dayDate = (weekKey, i) => {
   const d = new Date(`${weekKey}T12:00:00`);
   d.setDate(d.getDate() + i);
@@ -125,8 +187,9 @@ function Tick({ done, busy, onClick, label }) {
 }
 
 /** One to-do: tick, what it is, how to reach them, take it off the list. */
-function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenItem, script, sender = "", more = false }) {
+function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenItem, script, scripts = [], sender = "", more = false }) {
   const verb = VERB[channel];
+  const [preview, setPreview] = useState(false);
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, py: 0.9, px: 1, minWidth: 0, borderRadius: "10px", "&:hover": { bgcolor: IOS.canvas }, "&:hover .rm": { opacity: 1 } }}>
       <Tick done={t.done} busy={busy} onClick={() => onTick(t, !t.done)} label={t.done ? "Untick" : "Tick"} />
@@ -174,9 +237,15 @@ function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenIte
           <FiExternalLink size={15} />
         </IconButton>
       )}
+      {t.email && !t.done && scripts.some((x) => x.body) && (
+        <Button size="small" startIcon={<FiEye size={13} />} onClick={() => setPreview(true)} sx={{ borderRadius: IOS.radius.round, whiteSpace: "nowrap", flexShrink: 0 }}>
+          See the email
+        </Button>
+      )}
+      {preview && <EmailPreview t={t} scripts={scripts} sender={sender} onClose={() => setPreview(false)} />}
       {t.email && !t.done && (
         <Button size="small" href={mailto(t, script, sender)} startIcon={<FiMail size={13} />} title={script ? `Opens your email with "${script.label}" filled in` : t.email} sx={{ borderRadius: IOS.radius.round, whiteSpace: "nowrap", flexShrink: 0 }}>
-          {script ? "Write it" : "Email"}
+          {script ? "Open in email" : "Email"}
         </Button>
       )}
       {!more && onRemove && (
@@ -221,7 +290,7 @@ function PlayWeek({ p, data, view, busyId, onTick, onRemove, onOpenFacility, onO
       return n;
     });
   const unit = p.weeklyTarget < 1 ? (p.targetUnit || "").replace(/s$/, "") : p.targetUnit;
-  const rows = (list) => list.map((t) => <TodoRow key={t._id} t={t} channel={p.channel} busy={busyId === t._id} onTick={onTick} onRemove={onRemove} onOpenFacility={onOpenFacility} onOpenItem={onOpenItem} script={script} sender={sender} />);
+  const rows = (list) => list.map((t) => <TodoRow key={t._id} t={t} channel={p.channel} busy={busyId === t._id} onTick={onTick} onRemove={onRemove} onOpenFacility={onOpenFacility} onOpenItem={onOpenItem} script={script} scripts={p.channel === "email" ? p.scripts : []} sender={sender} />);
 
   // Today view: today's, plus anything left from earlier days; whole week: every day.
   const days = byDay ? [0, 1, 2, 3, 4, 5, 6].map((d) => [d, p.todos.filter((t) => (t.day ?? data.today) === d)]).filter(([, l]) => l.length) : [];

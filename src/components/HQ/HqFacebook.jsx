@@ -20,6 +20,34 @@ const FILTERS = [
   ["offer", "Offer posted", (g) => Boolean(g.offerAt)],
   ["none", "No promotion", (g) => g.status === "declined" || g.promo === "none"],
 ];
+// What the main button says: what you're confirming you did.
+const DONE_LABEL = {
+  join: "I asked to join",
+  joined: "We're in",
+  admin: "I messaged the admin",
+  admin_followup: "I followed up",
+  offer: "I posted the offer",
+  answer: "I answered a question",
+  message: "I messaged them",
+  followup: "I followed up",
+  call_booked: "Call booked",
+};
+/** A link as typed ("facebook.com/…") made into one that opens Facebook. */
+const fullUrl = (u) => {
+  const s = String(u || "").trim();
+  if (!s) return "";
+  return /^https?:\/\//i.test(s) ? s : `https://${s.replace(/^\/+/, "")}`;
+};
+/** A name that opens its Facebook page when there's a link. */
+function FbName({ url, children, size = 15.5, label }) {
+  if (!url) return <Typography sx={{ fontWeight: 700, fontSize: size }}>{children}</Typography>;
+  return (
+    <Box component="a" href={fullUrl(url)} target="_blank" rel="noreferrer" title={label} sx={{ fontWeight: 700, fontSize: size, color: IOS.ink, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 0.5, "&:hover": { color: IOS.blue, textDecoration: "underline" } }}>
+      {children}
+      <FiExternalLink size={13} style={{ color: IOS.blue, flexShrink: 0 }} />
+    </Box>
+  );
+}
 const PEOPLE_ORDER = ["to_message", "messaged", "replied", "call_booked", "signed_up", "not_interested"];
 const ago = (d) => {
   if (!d) return "";
@@ -147,14 +175,14 @@ function PersonDialog({ person, groups, labels, onClose, onSaved }) {
   );
 }
 
-/** "Done" for the next step, plus a menu for anything else that happened. */
+/** The next step's button (it says what you did), plus a menu for anything else that happened. */
 function Actions({ next, actions, onLog, busy }) {
   const [anchor, setAnchor] = useState(null);
   return (
     <Box sx={{ display: "flex", gap: 0.5, alignItems: "center", flexShrink: 0 }}>
       {next && (
         <Button size="small" variant="contained" disableElevation startIcon={busy ? <CircularProgress size={12} color="inherit" /> : <FiCheck />} disabled={busy} onClick={() => onLog(next.action)} sx={{ borderRadius: IOS.radius.round, whiteSpace: "nowrap" }}>
-          Done
+          {DONE_LABEL[next.action] || "Done"}
         </Button>
       )}
       <IconButton size="small" aria-label="Log something else" onClick={(e) => setAnchor(e.currentTarget)}>
@@ -221,12 +249,7 @@ function GroupRow({ g, labels, busy, onLog, onEdit, onDelete, reloadKey, onUndon
         </IconButton>
         <Box sx={{ flex: { xs: "1 1 calc(100% - 48px)", md: 1 }, minWidth: 0 }}>
           <Box sx={{ display: "flex", gap: 0.75, alignItems: "center", flexWrap: "wrap" }}>
-            <Typography sx={{ fontWeight: 700, fontSize: 15.5 }}>{g.name}</Typography>
-            {g.url && (
-              <IconButton size="small" href={g.url} target="_blank" rel="noreferrer" aria-label="Open the group" sx={{ color: IOS.blue }}>
-                <FiExternalLink size={14} />
-              </IconButton>
-            )}
+            <FbName url={g.url} label="Open the group on Facebook">{g.name}</FbName>
             <Pill status={g.status} labels={labels.groupStatuses} />
             {g.priority === 1 && <Tag color={IOS.orange}>Best fit</Tag>}
           </Box>
@@ -237,8 +260,10 @@ function GroupRow({ g, labels, busy, onLog, onEdit, onDelete, reloadKey, onUndon
             <Typography sx={{ fontSize: 14, mt: 0.5 }}>
               <Box component="span" sx={{ fontWeight: 700 }}>Next: </Box>
               {g.next.title}
-              {g.next.why && <Box component="span" sx={{ color: IOS.secondary }}> {g.next.why}</Box>}
             </Typography>
+          )}
+          {g.next?.why && (
+            <Typography sx={{ fontSize: 13, color: IOS.secondary }}>{g.next.why}</Typography>
           )}
         </Box>
         <Box sx={{ ml: { xs: 5, md: 0 } }}>
@@ -269,12 +294,7 @@ function PersonRow({ p, labels, busy, onLog, onEdit, onDelete }) {
     <Box sx={{ display: "flex", gap: 1.5, py: 1.25, alignItems: "flex-start", "& + &": { borderTop: `1px solid ${IOS.hairline}` }, flexWrap: { xs: "wrap", md: "nowrap" } }}>
       <Box sx={{ flex: { xs: "1 1 100%", md: 1 }, minWidth: 0 }}>
         <Box sx={{ display: "flex", gap: 0.75, alignItems: "center", flexWrap: "wrap" }}>
-          <Typography sx={{ fontWeight: 700, fontSize: 15 }}>{p.name}</Typography>
-          {p.profileUrl && (
-            <IconButton size="small" href={p.profileUrl} target="_blank" rel="noreferrer" aria-label="Open their profile" sx={{ color: IOS.blue }}>
-              <FiExternalLink size={14} />
-            </IconButton>
-          )}
+          <FbName url={p.profileUrl} size={15} label="Open their Facebook profile">{p.name}</FbName>
           <Pill status={p.status} labels={labels.personStatuses} />
         </Box>
         <Typography sx={{ fontSize: 13, color: IOS.secondary }}>
@@ -286,6 +306,11 @@ function PersonRow({ p, labels, busy, onLog, onEdit, onDelete }) {
             <Box component="span" sx={{ fontWeight: 700 }}>Next: </Box>
             {p.next.title}
           </Typography>
+        )}
+        {p.postUrl && (
+          <Box component="a" href={fullUrl(p.postUrl)} target="_blank" rel="noreferrer" sx={{ fontSize: 13, color: IOS.blue, display: "inline-flex", gap: 0.5, alignItems: "center", mt: 0.25 }}>
+            See their comment <FiExternalLink size={12} />
+          </Box>
         )}
       </Box>
       <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -345,7 +370,7 @@ export default function HqFacebook({ reloadKey, onChanged }) {
     setBusy(item._id);
     try {
       await api.post(`/hq/facebook/${type}/${item._id}/log`, { action });
-      toast.success(`${type === "groups" ? labels.groupActions[action] : labels.personActions[action]}. Logged.`);
+      toast.success(`Logged: ${(type === "groups" ? labels.groupActions[action] : labels.personActions[action]).toLowerCase()}. ${item.name} moved to its next step.`);
       refresh();
     } catch (err) {
       toast.error(errorText(err, "Couldn't log"));

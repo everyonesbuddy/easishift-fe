@@ -66,13 +66,29 @@ const NEW_PIECE = {
   facebook: ["facebook_post", "facebook"],
 };
 /** A mailto: link with the play's email script filled in. */
-function mailto(t, script) {
+// Links the email scripts can drop in with {calculator link}, {template link}, {directors page}.
+const LINKS = {
+  "calculator link": "https://wisershifts.com/calculators/hours-per-resident-day-calculator",
+  "hprd calculator": "https://wisershifts.com/calculators/hours-per-resident-day-calculator",
+  "call-out calculator": "https://wisershifts.com/calculators/call-out-cost-calculator",
+  "template link": "https://wisershifts.com/templates/weekly-cna-schedule-template.pdf",
+  "directors page": "https://wisershifts.com/for/directors",
+  "signup link": "https://wisershifts.com/signup",
+};
+/** Fill a script's placeholders, written as {First name} or [first name]. */
+function fillScript(text, { firstName, facility, sender }) {
+  const tag = (words) => new RegExp(`[\\[{]\\s*(?:${words})\\s*[\\]}]`, "gi");
+  let out = String(text || "")
+    .replace(tag("first ?name|firstname|name"), firstName || "there")
+    .replace(tag("building|facility|community|building name|facility name|community name"), facility || "your building")
+    .replace(tag("your name|my name|sender"), sender || "");
+  for (const [k, url] of Object.entries(LINKS)) out = out.replace(tag(k.replace(/[-]/g, "\\-")), url);
+  return out;
+}
+function mailto(t, script, sender) {
   if (!script) return `mailto:${t.email}`;
   const facility = (t.detail || "").split(" · ")[0];
-  const fill = (x) =>
-    String(x || "")
-      .replace(/\[(first name|firstname|name)\]/gi, t.firstName || "there")
-      .replace(/\[(facility|building|community)( name)?\]/gi, facility || "your building");
+  const fill = (x) => fillScript(x, { firstName: t.firstName, facility, sender });
   return `mailto:${t.email}?subject=${encodeURIComponent(fill(script.subject))}&body=${encodeURIComponent(fill(script.body))}`;
 }
 
@@ -109,7 +125,7 @@ function Tick({ done, busy, onClick, label }) {
 }
 
 /** One to-do: tick, what it is, how to reach them, take it off the list. */
-function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenItem, script, more = false }) {
+function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenItem, script, sender = "", more = false }) {
   const verb = VERB[channel];
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, py: 0.9, px: 1, minWidth: 0, borderRadius: "10px", "&:hover": { bgcolor: IOS.canvas }, "&:hover .rm": { opacity: 1 } }}>
@@ -159,7 +175,7 @@ function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenIte
         </IconButton>
       )}
       {t.email && !t.done && (
-        <Button size="small" href={mailto(t, script)} startIcon={<FiMail size={13} />} title={script ? `Opens your email with "${script.label}" filled in` : t.email} sx={{ borderRadius: IOS.radius.round, whiteSpace: "nowrap", flexShrink: 0 }}>
+        <Button size="small" href={mailto(t, script, sender)} startIcon={<FiMail size={13} />} title={script ? `Opens your email with "${script.label}" filled in` : t.email} sx={{ borderRadius: IOS.radius.round, whiteSpace: "nowrap", flexShrink: 0 }}>
           {script ? "Write it" : "Email"}
         </Button>
       )}
@@ -187,7 +203,7 @@ function DayHead({ label, done, total, open, onClick, today }) {
 }
 
 /** One play's week: progress, the list (by day for calls and emails), scripts, and more you can tick. */
-function PlayWeek({ p, data, view, busyId, onTick, onRemove, onOpenFacility, onOpenItem, onAddPiece }) {
+function PlayWeek({ p, data, view, busyId, onTick, onRemove, onOpenFacility, onOpenItem, onAddPiece, sender }) {
   const target = goal(p);
   const ticked = p.todos.filter((t) => t.done).length;
   const byDay = p.list === "people" || p.list === "content";
@@ -205,7 +221,7 @@ function PlayWeek({ p, data, view, busyId, onTick, onRemove, onOpenFacility, onO
       return n;
     });
   const unit = p.weeklyTarget < 1 ? (p.targetUnit || "").replace(/s$/, "") : p.targetUnit;
-  const rows = (list) => list.map((t) => <TodoRow key={t._id} t={t} channel={p.channel} busy={busyId === t._id} onTick={onTick} onRemove={onRemove} onOpenFacility={onOpenFacility} onOpenItem={onOpenItem} script={script} />);
+  const rows = (list) => list.map((t) => <TodoRow key={t._id} t={t} channel={p.channel} busy={busyId === t._id} onTick={onTick} onRemove={onRemove} onOpenFacility={onOpenFacility} onOpenItem={onOpenItem} script={script} sender={sender} />);
 
   // Today view: today's, plus anything left from earlier days; whole week: every day.
   const days = byDay ? [0, 1, 2, 3, 4, 5, 6].map((d) => [d, p.todos.filter((t) => (t.day ?? data.today) === d)]).filter(([, l]) => l.length) : [];
@@ -381,6 +397,14 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
   const [refilling, setRefilling] = useState(false);
   const [editItem, setEditItem] = useState(null); // a content piece to open, or a new one
   const [key, setKey] = useState(0);
+  const [sender, setSender] = useState("");
+  // Your name, to sign the cold emails.
+  useEffect(() => {
+    api
+      .get("/hq/auth/me")
+      .then((res) => setSender(res.data?.user?.name || ""))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let off = false;
@@ -475,7 +499,7 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
     } else setKey((k) => k + 1);
     onChanged?.();
   };
-  const rowProps = { data, view, busyId, onTick: tick, onRemove: remove, onOpenFacility: setOpenFacility, onOpenItem: openItem, onAddPiece: addPiece };
+  const rowProps = { sender, data, view, busyId, onTick: tick, onRemove: remove, onOpenFacility: setOpenFacility, onOpenItem: openItem, onAddPiece: addPiece };
 
   return (
     <Box sx={{ display: "grid", gap: 2 }}>

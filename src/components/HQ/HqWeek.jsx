@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { Alert, Box, Button, ButtonBase, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, MenuItem, TextField, Tooltip, Typography } from "@mui/material";
-import { FiCheck, FiChevronDown, FiChevronRight, FiCopy, FiEye, FiExternalLink, FiMail, FiPhone, FiPlus, FiRefreshCw, FiX } from "react-icons/fi";
+import { Alert, Box, Button, ButtonBase, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, TextField, Tooltip, Typography } from "@mui/material";
+import { FiCheck, FiChevronDown, FiChevronRight, FiCopy, FiEye, FiExternalLink, FiFileText, FiMail, FiPhone, FiPlus, FiRefreshCw, FiX } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "./hqApi";
 import { IOS, tint } from "../../theme/ios";
 import { Empty, Section, Tag } from "./HqBits";
-import { errorText, n, num } from "./hqFormat";
+import { errorText, localToday, n, num } from "./hqFormat";
 import { AUDIENCES } from "./usePlaybookPlays";
 import { copyText } from "./playFormat";
 import FacilityDrawer from "./FacilityDrawer";
@@ -98,7 +98,13 @@ function mailto(t, script, sender) {
  */
 function EmailPreview({ t, scripts, sender, onClose }) {
   const versions = scripts.filter((x) => x.body);
-  const [i, setI] = useState(0);
+  const isCall = !t.email;
+  // Start on the version that fits: the right email in a sequence, the voicemail for another try.
+  const [i, setI] = useState(() => {
+    const find = (re) => versions.findIndex((x) => re.test(x.label || ""));
+    const k = t.step ? find(new RegExp(`Email ${t.step}\\b`)) : /^Try again/.test(t.reason || "") ? find(/voicemail/i) : -1;
+    return k >= 0 ? k : 0;
+  });
   const facility = (t.detail || "").split(" · ")[0];
   const v = versions[i] || { label: "", subject: "", body: "" };
   const subject = fillScript(v.subject, { firstName: t.firstName, facility, sender });
@@ -112,8 +118,11 @@ function EmailPreview({ t, scripts, sender, onClose }) {
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle sx={{ pb: 0.5 }}>
-        Email to {t.title}
-        <Typography sx={{ fontSize: 13.5, color: IOS.secondary }}>{t.detail}</Typography>
+        {isCall ? "Call" : "Email to"} {t.title}
+        <Typography sx={{ fontSize: 13.5, color: IOS.secondary }}>
+          {t.detail}
+          {t.reason ? ` · ${t.reason}` : ""}
+        </Typography>
       </DialogTitle>
       <DialogContent sx={{ display: "grid", gap: 1.5, pt: "12px !important" }}>
         {versions.length > 1 && (
@@ -125,11 +134,21 @@ function EmailPreview({ t, scripts, sender, onClose }) {
             ))}
           </TextField>
         )}
-        <Box sx={box}>
-          <Typography sx={{ fontSize: 12, fontWeight: 700, color: IOS.secondary, textTransform: "uppercase", letterSpacing: "0.06em" }}>To</Typography>
-          <Typography sx={{ fontSize: 14.5, pr: { sm: 14 } }}>{t.email}</Typography>
-          {copyBtn(t.email, "Copy address")}
-        </Box>
+        {isCall ? (
+          t.phone && (
+            <Box sx={box}>
+              <Typography sx={{ fontSize: 12, fontWeight: 700, color: IOS.secondary, textTransform: "uppercase", letterSpacing: "0.06em" }}>Phone</Typography>
+              <Typography sx={{ fontSize: 14.5, pr: { sm: 14 } }}>{t.phone}</Typography>
+              {copyBtn(t.phone, "Copy number")}
+            </Box>
+          )
+        ) : (
+          <Box sx={box}>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: IOS.secondary, textTransform: "uppercase", letterSpacing: "0.06em" }}>To</Typography>
+            <Typography sx={{ fontSize: 14.5, pr: { sm: 14 } }}>{t.email}</Typography>
+            {copyBtn(t.email, "Copy address")}
+          </Box>
+        )}
         {subject && (
           <Box sx={box}>
             <Typography sx={{ fontSize: 12, fontWeight: 700, color: IOS.secondary, textTransform: "uppercase", letterSpacing: "0.06em" }}>Subject</Typography>
@@ -138,21 +157,74 @@ function EmailPreview({ t, scripts, sender, onClose }) {
           </Box>
         )}
         <Box sx={box}>
-          <Typography sx={{ fontSize: 12, fontWeight: 700, color: IOS.secondary, textTransform: "uppercase", letterSpacing: "0.06em" }}>Email</Typography>
+          <Typography sx={{ fontSize: 12, fontWeight: 700, color: IOS.secondary, textTransform: "uppercase", letterSpacing: "0.06em" }}>{isCall && !v.subject ? "What to say" : "Email"}</Typography>
           <Typography sx={{ fontSize: 14.5, whiteSpace: "pre-wrap", lineHeight: 1.55, mt: 0.5, pr: { sm: 14 } }}>{body}</Typography>
-          {copyBtn(body, "Copy email")}
+          {copyBtn(body, isCall && !v.subject ? "Copy" : "Copy email")}
         </Box>
-        {!t.firstName && <Typography sx={{ fontSize: 12.5, color: IOS.orangeText }}>No first name on file, so it says "Hi there". Change it if you know their name.</Typography>}
+        {!isCall && !t.firstName && <Typography sx={{ fontSize: 12.5, color: IOS.orangeText }}>No first name on file, so it says "Hi there". Change it if you know their name.</Typography>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose}>Close</Button>
-        <Button variant="contained" disableElevation startIcon={<FiMail />} href={mailto(t, v, sender)} sx={{ borderRadius: IOS.radius.round }}>
-          Open in email
+        {isCall ? (
+          t.phone && (
+            <Button variant="contained" disableElevation startIcon={<FiPhone />} href={`tel:${t.phone}`} sx={{ borderRadius: IOS.radius.round }}>
+              Call {t.phone}
+            </Button>
+          )
+        ) : (
+          <Button variant="contained" disableElevation startIcon={<FiMail />} href={mailto(t, v, sender)} sx={{ borderRadius: IOS.radius.round }}>
+            Open in email
+          </Button>
+        )}
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// What happened on a call. "Call back" asks for the day; the rest are one tap.
+const CALL_OUTCOMES = [
+  ["booked", "Booked the setup", "Off the cold list; it's a setup now."],
+  ["callback", "Reached: call back…", "Pick the day; it shows up then."],
+  ["reached", "Talked, no next step", ""],
+  ["voicemail", "Left a voicemail", "Tried again in 2 days, up to 3 times."],
+  ["no_answer", "No answer", "Tried again in 2 days, up to 3 times."],
+  ["not_interested", "Not interested", "Off the list."],
+  ["wrong_number", "Wrong number", "Off the list. Fix the number on Facilities."],
+];
+/** Two working days from today, as "2026-11-06". */
+function inTwoWorkdays() {
+  const d = new Date();
+  let left = 2;
+  while (left > 0) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6) left -= 1;
+  }
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** "Call back": the day, and what they said. */
+function CallbackDialog({ t, onClose, onSave }) {
+  const [date, setDate] = useState(inTwoWorkdays);
+  const [notes, setNotes] = useState("");
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle>Call {t.title} back</DialogTitle>
+      <DialogContent sx={{ display: "grid", gap: 1.5, pt: "8px !important" }}>
+        <TextField id={`cb-date-${t._id}`} type="date" size="small" label="When" value={date} onChange={(e) => setDate(e.target.value)} InputLabelProps={{ shrink: true }} inputProps={{ min: localToday() }} />
+        <TextField id={`cb-notes-${t._id}`} size="small" label="What they said (optional)" placeholder="Ask for Kim after 2 p.m." value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" disableElevation disabled={!date} onClick={() => onSave({ outcome: "callback", nextDate: date, notes })} sx={{ borderRadius: IOS.radius.round }}>
+          Save call-back
         </Button>
       </DialogActions>
     </Dialog>
   );
 }
+
+const REASON_COLOR = (r) => (/^Call back/.test(r) ? IOS.blue : /^Try again/.test(r) ? IOS.orange : "#5856D6");
+const shortDay = (d) => (d ? new Date(d).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : "");
 
 const dayDate = (weekKey, i) => {
   const d = new Date(`${weekKey}T12:00:00`);
@@ -187,12 +259,47 @@ function Tick({ done, busy, onClick, label }) {
 }
 
 /** One to-do: tick, what it is, how to reach them, take it off the list. */
-function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenItem, script, scripts = [], sender = "", more = false }) {
+function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenItem, onOutcome, script, scripts = [], sender = "", more = false }) {
   const verb = VERB[channel];
   const [preview, setPreview] = useState(false);
+  const [menuAt, setMenuAt] = useState(null);
+  const [callback, setCallback] = useState(false);
+  const isCall = channel === "calls" && (t.kind === "facility" || t.kind === "contact");
+  // A call asks what happened; everything else ticks straight away.
+  const clickTick = (e) => (isCall && !t.done && !more ? setMenuAt(e.currentTarget) : onTick(t, !t.done));
+  const doneText = t.kind === "content" ? "Published" : channel === "email" ? "Sent" : t.outcome === "callback" && t.nextDate ? `Call back ${shortDay(t.nextDate)}` : t.outcomeLabel || "Done";
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, py: 0.9, px: 1, minWidth: 0, borderRadius: "10px", "&:hover": { bgcolor: IOS.canvas }, "&:hover .rm": { opacity: 1 } }}>
-      <Tick done={t.done} busy={busy} onClick={() => onTick(t, !t.done)} label={t.done ? "Untick" : "Tick"} />
+      <Tick done={t.done} busy={busy} onClick={clickTick} label={t.done ? "Untick" : isCall ? "What happened?" : "Tick"} />
+      {menuAt && (
+        <Menu anchorEl={menuAt} open onClose={() => setMenuAt(null)}>
+          <MenuItem disabled sx={{ fontSize: 12, opacity: "1 !important", color: IOS.secondary }}>What happened?</MenuItem>
+          {CALL_OUTCOMES.map(([k, label, hint]) => (
+            <MenuItem
+              key={k}
+              onClick={() => {
+                setMenuAt(null);
+                if (k === "callback") setCallback(true);
+                else onTick(t, true, { outcome: k });
+              }}
+              sx={{ display: "block", py: 0.75 }}
+            >
+              <Typography sx={{ fontSize: 14.5, fontWeight: 600 }}>{label}</Typography>
+              {hint && <Typography sx={{ fontSize: 12, color: IOS.secondary }}>{hint}</Typography>}
+            </MenuItem>
+          ))}
+        </Menu>
+      )}
+      {callback && (
+        <CallbackDialog
+          t={t}
+          onClose={() => setCallback(false)}
+          onSave={(extra) => {
+            setCallback(false);
+            onTick(t, true, extra);
+          }}
+        />
+      )}
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.75, flexWrap: "wrap" }}>
           {t.facilityId ? (
@@ -212,7 +319,32 @@ function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenIte
           )}
           {t.kind === "content" && <Tag color={IOS.blue}>{KIND(t)}</Tag>}
           {t.kind === "content" && !t.done && t.status && <Tag color={t.status === "ready" || t.status === "scheduled" ? IOS.green : IOS.secondary}>{cap(t.status)}</Tag>}
-          {t.done && t.doneAt && <Typography sx={{ fontSize: 12.5, color: IOS.greenText, fontWeight: 600 }}>{t.kind === "content" ? "Published" : "Done"} {when(t.doneAt)}</Typography>}
+          {t.reason && !t.done && <Tag color={REASON_COLOR(t.reason)}>{t.reason.split(":")[0]}</Tag>}
+          {t.done && t.doneAt && (
+            <Typography sx={{ fontSize: 12.5, color: ["not_interested", "wrong_number"].includes(t.outcome) ? IOS.secondary : IOS.greenText, fontWeight: 600 }}>
+              {doneText}
+              {t.outcome === "callback" ? "" : ` ${when(t.doneAt)}`}
+            </Typography>
+          )}
+          {channel === "email" && t.done && t.canUndo && onOutcome && (
+            t.outcome ? (
+              <Typography component="span" sx={{ fontSize: 12.5, color: IOS.secondary }}>
+                · {t.outcomeLabel}{" "}
+                <ButtonBase onClick={() => onOutcome(t, "")} sx={{ fontSize: 12.5, color: IOS.blue, verticalAlign: "baseline" }}>
+                  undo
+                </ButtonBase>
+              </Typography>
+            ) : (
+              <Box component="span" sx={{ display: "inline-flex", gap: 1 }}>
+                <ButtonBase onClick={() => onOutcome(t, "replied")} sx={{ fontSize: 12.5, color: IOS.blue, fontWeight: 600 }}>
+                  They replied
+                </ButtonBase>
+                <ButtonBase onClick={() => onOutcome(t, "not_interested")} sx={{ fontSize: 12.5, color: IOS.secondary }}>
+                  Not interested
+                </ButtonBase>
+              </Box>
+            )
+          )}
         </Box>
         {t.kind === "content" && !t.done && (
           <Typography sx={{ fontSize: 12.5, color: IOS.secondary }}>
@@ -221,6 +353,8 @@ function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenIte
           </Typography>
         )}
         {t.detail && <Typography sx={{ fontSize: 12.5, color: IOS.secondary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.detail}</Typography>}
+        {t.reason && t.reason.includes(":") && !t.done && <Typography sx={{ fontSize: 12.5, color: IOS.blue }}>They said: {t.reason.split(": ").slice(1).join(": ")}</Typography>}
+        {channel === "email" && t.outcome === "replied" && <Typography sx={{ fontSize: 12.5, color: IOS.greenText }}>Answer from your inbox today. Their follow-ups are stopped.</Typography>}
       </Box>
       {t.phone && !t.done && (
         <Button size="small" href={`tel:${t.phone}`} startIcon={<FiPhone size={13} />} sx={{ borderRadius: IOS.radius.round, whiteSpace: "nowrap", flexShrink: 0, display: { xs: "none", sm: "inline-flex" } }}>
@@ -237,9 +371,9 @@ function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenIte
           <FiExternalLink size={15} />
         </IconButton>
       )}
-      {t.email && !t.done && scripts.some((x) => x.body) && (
-        <Button size="small" startIcon={<FiEye size={13} />} onClick={() => setPreview(true)} sx={{ borderRadius: IOS.radius.round, whiteSpace: "nowrap", flexShrink: 0 }}>
-          See the email
+      {(t.email || isCall) && !t.done && scripts.some((x) => x.body) && (
+        <Button size="small" startIcon={t.email ? <FiEye size={13} /> : <FiFileText size={13} />} onClick={() => setPreview(true)} sx={{ borderRadius: IOS.radius.round, whiteSpace: "nowrap", flexShrink: 0 }}>
+          {t.email ? "See the email" : "See the script"}
         </Button>
       )}
       {preview && <EmailPreview t={t} scripts={scripts} sender={sender} onClose={() => setPreview(false)} />}
@@ -272,7 +406,7 @@ function DayHead({ label, done, total, open, onClick, today }) {
 }
 
 /** One play's week: progress, the list (by day for calls and emails), scripts, and more you can tick. */
-function PlayWeek({ p, data, view, busyId, onTick, onRemove, onOpenFacility, onOpenItem, onAddPiece, sender }) {
+function PlayWeek({ p, data, view, busyId, onTick, onRemove, onOpenFacility, onOpenItem, onAddPiece, onOutcome, sender }) {
   const target = goal(p);
   const ticked = p.todos.filter((t) => t.done).length;
   const byDay = p.list === "people" || p.list === "content";
@@ -290,7 +424,7 @@ function PlayWeek({ p, data, view, busyId, onTick, onRemove, onOpenFacility, onO
       return n;
     });
   const unit = p.weeklyTarget < 1 ? (p.targetUnit || "").replace(/s$/, "") : p.targetUnit;
-  const rows = (list) => list.map((t) => <TodoRow key={t._id} t={t} channel={p.channel} busy={busyId === t._id} onTick={onTick} onRemove={onRemove} onOpenFacility={onOpenFacility} onOpenItem={onOpenItem} script={script} scripts={p.channel === "email" ? p.scripts : []} sender={sender} />);
+  const rows = (list) => list.map((t) => <TodoRow key={t._id} t={t} channel={p.channel} busy={busyId === t._id} onTick={onTick} onRemove={onRemove} onOpenFacility={onOpenFacility} onOpenItem={onOpenItem} script={script} scripts={p.channel === "email" || p.channel === "calls" ? p.scripts : []} sender={sender} onOutcome={onOutcome} />);
 
   // Today view: today's, plus anything left from earlier days; whole week: every day.
   const days = byDay ? [0, 1, 2, 3, 4, 5, 6].map((d) => [d, p.todos.filter((t) => (t.day ?? data.today) === d)]).filter(([, l]) => l.length) : [];
@@ -499,14 +633,27 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
   const anyDay = all.filter((t) => t.day === null || t.day === undefined).filter((t) => !t.done).length;
   const shortPlays = plays.filter((p) => p.short);
 
-  const tick = async (t, done) => {
+  const tick = async (t, done, extra = {}) => {
     setBusyId(t._id);
     try {
       const res = t.isMore
-        ? await api.post(`/hq/week/items/new/check`, { done: true, playId: t.playId, kind: t.kind, refId: t.refId, action: t.action })
-        : await api.post(`/hq/week/items/${t._id}/check`, { done });
+        ? await api.post(`/hq/week/items/new/check`, { done: true, playId: t.playId, kind: t.kind, refId: t.refId, action: t.action, ...extra })
+        : await api.post(`/hq/week/items/${t._id}/check`, { done, ...extra });
       setData(res.data);
       onChanged?.();
+    } catch (err) {
+      toast.error(errorText(err, "Couldn't save"));
+    } finally {
+      setBusyId(null);
+    }
+  };
+  // After an email: they replied or said no (ends their follow-ups); "" undoes it.
+  const outcome = async (t, value) => {
+    setBusyId(t._id);
+    try {
+      const res = await api.post(`/hq/week/items/${t._id}/outcome`, { outcome: value });
+      setData(res.data);
+      if (value === "replied") toast.success("Marked as replied. Their follow-ups are stopped.");
     } catch (err) {
       toast.error(errorText(err, "Couldn't save"));
     } finally {
@@ -568,7 +715,7 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
     } else setKey((k) => k + 1);
     onChanged?.();
   };
-  const rowProps = { sender, data, view, busyId, onTick: tick, onRemove: remove, onOpenFacility: setOpenFacility, onOpenItem: openItem, onAddPiece: addPiece };
+  const rowProps = { sender, data, view, busyId, onTick: tick, onRemove: remove, onOpenFacility: setOpenFacility, onOpenItem: openItem, onAddPiece: addPiece, onOutcome: outcome };
 
   return (
     <Box sx={{ display: "grid", gap: 2 }}>
@@ -625,7 +772,7 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
           ))}
         </Box>
         <Typography sx={{ fontSize: 12.5, color: IOS.secondary, mt: 1.5 }}>
-          Tick a call or email and it's logged with its play; tick a piece and it's marked published. Untick to undo. Click a piece to open it (notes, script, due date). The list stays the same all week.
+          Tick a call and say what happened (call-backs and retries come back on the right day); tick an email and its follow-ups come up on day 4 and 9 unless you mark that they replied. Tick a piece and it's marked published. Untick to undo. Click a piece to open it (notes, script, due date). The list stays the same all week.
         </Typography>
       </Box>
 

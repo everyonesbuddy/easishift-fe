@@ -20,6 +20,7 @@ import HqContentPlan from "./HqContentPlan";
 import HqWeek from "./HqWeek";
 import HqPlays from "./HqPlays";
 import HqFacebook from "./HqFacebook";
+import HqMoney from "./HqMoney";
 
 const LeadershipPage = (props) => <HqAudience {...props} audiences={["director", "operator"]} />;
 const SchedulersPage = (props) => <HqAudience {...props} audiences={["scheduler"]} />;
@@ -87,6 +88,7 @@ const GROUPS = [
       { id: "channels", label: "Blog, video & LinkedIn", Comp: HqContent, title: "Blog, video and LinkedIn", sub: "How what we've published is doing." },
     ],
   },
+  { label: "Business", items: [{ id: "money", label: "Money", Comp: HqMoney, title: "Money", sub: "Profit and loss by month: Stripe income, what we pay for, and who's subscribed." }] },
   { label: "Settings", items: [{ id: "connections", label: "Connections & data", Comp: HqConnections, title: "Connections and data", sub: "Keys, imports, Google Sheets and backups." }] },
 ];
 const ITEMS = GROUPS.flatMap((g) => g.items);

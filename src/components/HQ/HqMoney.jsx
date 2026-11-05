@@ -239,7 +239,13 @@ export default function HqMoney() {
             />
           </Box>
 
-          <Section title={`Profit and loss · ${year}`} note="Income is what Stripe actually paid out per month, after refunds and Stripe's fees. Months still to come show expected costs only." sx={{ mb: 2.5 }}>
+          <Section
+            title={`Profit and loss · ${year}`}
+            note={`Income is WiserShifts customers' payments in Stripe each month, after refunds and Stripe's fees. Months still to come show expected costs only.${
+              st.left?.count || st.left?.subscriptions
+                ? ` Left out as not WiserShifts: ${st.left.count ? `${st.left.count} payment${st.left.count === 1 ? "" : "s"}, refund${st.left.count === 1 ? "" : "s"} or fee${st.left.count === 1 ? "" : "s"} (${usd(st.left.amount)})` : ""}${st.left.count && st.left.subscriptions ? " and " : ""}${st.left.subscriptions ? `${st.left.subscriptions} older subscription${st.left.subscriptions === 1 ? "" : "s"}` : ""}.`
+                : ""
+            }`} sx={{ mb: 2.5 }}>
             <Box sx={{ overflowX: "auto", mx: { xs: -2, md: -2.5 }, px: { xs: 2, md: 2.5 } }}>
               <Box component="table" sx={{ borderCollapse: "collapse", width: "100%", minWidth: 980 }}>
                 <thead>
@@ -357,7 +363,7 @@ export default function HqMoney() {
             )}
           </Section>
 
-          <Section title="Subscriptions" note="Everyone with a WiserShifts subscription in Stripe. MRR counts paying customers; yearly plans count a twelfth a month.">
+          <Section title="Subscriptions" note="Every WiserShifts workspace subscription in Stripe (other Stripe subscriptions are left out). MRR counts paying customers; yearly plans count a twelfth a month.">
             {data.subscriptions.length === 0 ? (
               <Empty>{st.configured ? "No subscriptions in Stripe yet." : "Connect Stripe to see subscriptions."}</Empty>
             ) : (

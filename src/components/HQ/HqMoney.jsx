@@ -184,6 +184,14 @@ export default function HqMoney() {
       setErr(x?.response?.data?.message || "Couldn't save that.");
     }
   };
+  const hide = async (s, hidden) => {
+    try {
+      await api.post("/hq/money/hide", { customerId: s.customerId, hidden, label: s.customer || s.label || s.email || "" });
+      load();
+    } catch (x) {
+      setErr(x?.response?.data?.message || "Couldn't change that.");
+    }
+  };
   const remove = async (e) => {
     if (!window.confirm(`Remove ${e.name}? Its costs come off the P&L.`)) return;
     await api.delete(`/hq/money/expenses/${e._id}`);
@@ -225,17 +233,27 @@ export default function HqMoney() {
 
       {data && (
         <>
+          {data.failing > 0 && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {data.subscriptions.filter((s) => s.status === "past_due" || s.status === "unpaid").map((s) => s.customer).join(", ")}
+              {data.failing === 1 ? "'s payment" : "'s payments"} failed ({usd(data.atRisk)} a month). It isn't counted in MRR or income until it goes through. Stripe keeps retrying; a nudge to update their card usually fixes it.
+            </Alert>
+          )}
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(3, minmax(0, 1fr))", xl: "repeat(6, minmax(0, 1fr))" }, gap: 1, mb: 2.5 }}>
-            <Stat label="MRR" value={usd(data.mrr)} detail={`${data.paying} paying · ${data.trialing} on trial`} />
+            <Stat
+              label="MRR"
+              value={usd(data.mrr)}
+              detail={[`${data.paying} paying`, data.failing ? `${data.failing} payment failed` : "", data.trialing ? `${data.trialing} on trial` : ""].filter(Boolean).join(" · ")}
+            />
             <Stat label={`Income · ${current?.label || "this month"}`} value={usd(current?.net ?? 0)} detail={last ? `${usd(last.net)} in ${last.label}` : "after refunds and fees"} />
             <Stat label="Spending a month" value={usd(data.burn)} detail="usual costs now" />
             <Stat label={`Profit · ${current?.label || "this month"}`} value={usd(current?.profit ?? 0)} tone={profitTone(current?.profit)} detail={last ? `${usd(last.profit)} in ${last.label}` : ""} />
             <Stat label={`Profit · ${year} so far`} value={usd(data.totals.profit)} tone={profitTone(data.totals.profit)} detail={`${usd(data.totals.net)} in · ${usd(data.totals.expenses)} out`} />
             <Stat
               label="To break even"
-              value={data.mrr >= data.burn ? "Covered" : data.breakEven === null ? "–" : `${data.breakEven} more`}
-              tone={data.mrr >= data.burn ? IOS.greenText : IOS.ink}
-              detail={data.mrr >= data.burn ? "MRR covers monthly costs" : data.breakEven === null ? "no paying customers yet" : "paying customers at today's average"}
+              value={data.covered ? "Covered" : data.breakEven === null ? "–" : `${data.breakEven} more`}
+              tone={data.covered ? IOS.greenText : IOS.ink}
+              detail={data.covered ? "MRR covers monthly costs" : data.breakEven === null ? `${usd(data.burn - data.mrr)} a month to cover` : `paying customer${data.breakEven === 1 ? "" : "s"} to cover ${usd(data.burn - data.mrr)} a month`}
             />
           </Box>
 
@@ -363,7 +381,7 @@ export default function HqMoney() {
             )}
           </Section>
 
-          <Section title="Subscriptions" note="Every WiserShifts workspace subscription in Stripe (other Stripe subscriptions are left out). MRR counts paying customers; yearly plans count a twelfth a month.">
+          <Section title="Subscriptions" note="Every WiserShifts workspace subscription in Stripe. MRR counts only paid-up subscriptions; yearly plans count a twelfth a month. Hide your own test checkouts so they don't count.">
             {data.subscriptions.length === 0 ? (
               <Empty>{st.configured ? "No subscriptions in Stripe yet." : "Connect Stripe to see subscriptions."}</Empty>
             ) : (
@@ -371,7 +389,7 @@ export default function HqMoney() {
                 <Box component="table" sx={{ borderCollapse: "collapse", width: "100%", minWidth: 640 }}>
                   <thead>
                     <tr>
-                      {["Customer", "Plan", "A month", "Status", "Started", ""].map((h, i) => <Box component="th" key={h + i} sx={{ ...head, textAlign: i < 2 || i === 3 ? "left" : "right" }}>{h}</Box>)}
+                      {["Customer", "Plan", "A month", "Status", "Started", "", ""].map((h, i) => <Box component="th" key={h + i} sx={{ ...head, textAlign: i < 2 || i === 3 ? "left" : "right" }}>{h}</Box>)}
                     </tr>
                   </thead>
                   <tbody>
@@ -386,15 +404,34 @@ export default function HqMoney() {
                         <Box component="td" sx={{ ...cell, textAlign: "left" }}>
                           <Tag color={STATUS_COLOR[s.status] || IOS.secondary}>{s.statusLabel}</Tag>
                           {s.cancelAtPeriodEnd && s.status !== "canceled" && <Box component="span" sx={{ ml: 0.75 }}><Tag color={IOS.orangeText}>Ends at renewal</Tag></Box>}
+                          {s.test && <Box component="span" sx={{ ml: 0.75 }}><Tag color={IOS.purple}>Looks like a test</Tag></Box>}
                         </Box>
                         <Box component="td" sx={{ ...cell, color: IOS.secondary }}>{s.started ? new Date(s.started).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "–"}</Box>
                         <Box component="td" sx={{ ...cell, color: IOS.secondary, fontSize: 12 }}>
                           {s.status === "trialing" && s.trialEnd ? `Trial ends ${new Date(s.trialEnd).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : s.status === "canceled" && s.ended ? `Ended ${new Date(s.ended).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}
                         </Box>
+                        <Box component="td" sx={{ ...cell, py: 0.25 }}>
+                          {s.customerId && (
+                            <Button size="small" onClick={() => hide(s, true)} sx={{ fontSize: 12, minWidth: 0, color: s.test ? IOS.blue : IOS.secondary }}>
+                              Hide as test
+                            </Button>
+                          )}
+                        </Box>
                       </tr>
                     ))}
                   </tbody>
                 </Box>
+              </Box>
+            )}
+            {data.hidden?.length > 0 && (
+              <Box sx={{ mt: 1.5, display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center" }}>
+                <Typography sx={{ fontSize: 12.5, color: IOS.secondary }}>Hidden as tests (not in MRR or income):</Typography>
+                {data.hidden.map((h) => (
+                  <Box key={h.customerId} sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, px: 1, py: 0.25, borderRadius: IOS.radius.pill, bgcolor: IOS.canvas }}>
+                    <Typography sx={{ fontSize: 12.5 }}>{h.label || h.customerId}{h.subscriptions ? ` · ${h.subscriptions} subscription${h.subscriptions === 1 ? "" : "s"}` : ""}</Typography>
+                    <Button size="small" onClick={() => hide(h, false)} sx={{ fontSize: 12, minWidth: 0, py: 0 }}>Show again</Button>
+                  </Box>
+                ))}
               </Box>
             )}
           </Section>

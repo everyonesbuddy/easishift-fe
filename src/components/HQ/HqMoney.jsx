@@ -105,6 +105,103 @@ function ExpenseDialog({ onClose, onSave, initial }) {
   );
 }
 
+/** Email a customer whose payment failed the invoice's pay link. Test it on yourself first. */
+function NudgeDialog({ sub, onClose, onSent }) {
+  const [info, setInfo] = useState(null);
+  const [err, setErr] = useState("");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState("");
+  const [confirm, setConfirm] = useState(false);
+  const [tested, setTested] = useState(false);
+  useEffect(() => {
+    let live = true;
+    api.get(`/hq/money/nudge/${sub.id}`).then(
+      ({ data }) => {
+        if (!live) return;
+        setInfo(data);
+        setSubject(data.draft.subject);
+        setMessage(data.draft.message);
+      },
+      (e) => live && setErr(e?.response?.data?.message || "Couldn't load the invoice."),
+    );
+    return () => { live = false; };
+  }, [sub.id]);
+  const send = async (test) => {
+    setBusy(true);
+    setErr("");
+    setSent("");
+    try {
+      const { data } = await api.post(`/hq/money/nudge/${sub.id}`, { subject, message, test });
+      if (test) {
+        setTested(true);
+        setSent(`Test sent to ${data.to}. Check your inbox, then send it for real.`);
+      } else onSent(`Sent to ${data.to}.`);
+    } catch (e) {
+      setErr(e?.response?.data?.message || "Couldn't send it.");
+    } finally {
+      setBusy(false);
+      setConfirm(false);
+    }
+  };
+  const day = (d) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return (
+    <Dialog open onClose={busy ? undefined : onClose} fullWidth maxWidth="sm">
+      <DialogTitle sx={{ fontWeight: 700 }}>Nudge {sub.customer || "them"} to pay</DialogTitle>
+      <DialogContent>
+        {!info && !err && <Box sx={{ py: 4, textAlign: "center" }}><CircularProgress size={24} /></Box>}
+        {info && (
+          <>
+            <Box sx={{ p: 1.5, mb: 2, borderRadius: IOS.radius.cell, bgcolor: IOS.canvas, fontSize: 13.5 }}>
+              <Typography sx={{ fontSize: 13.5 }}>
+                <b>{usd(info.amountDue)}</b> unpaid{info.invoiceNumber ? ` on invoice ${info.invoiceNumber}` : ""} · goes to <b>{info.to || "no email in Stripe"}</b>
+              </Typography>
+              <Typography sx={{ fontSize: 12.5, color: IOS.secondary, mt: 0.25 }}>
+                Stripe has tried {info.attempts} time{info.attempts === 1 ? "" : "s"}{info.nextTry ? `, next try ${day(info.nextTry)}` : ", and won't retry on its own"}. The button in the email opens Stripe's page for this invoice, where they can pay or change their card.{" "}
+                <a href={info.payUrl} target="_blank" rel="noreferrer">Open it</a>
+              </Typography>
+              {info.history.length > 0 && (
+                <Typography sx={{ fontSize: 12.5, color: IOS.secondary, mt: 0.5 }}>
+                  Sent before: {info.history.map((h) => `${day(h.at)}${h.test ? " (test)" : ` to ${h.to}`}`).join(" · ")}
+                </Typography>
+              )}
+            </Box>
+            <TextField label="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} fullWidth size="small" sx={{ mb: 1.5 }} />
+            <TextField label="Message" value={message} onChange={(e) => setMessage(e.target.value)} fullWidth multiline minRows={9} helperText="The pay button goes in after the second paragraph. Change the greeting to their name." />
+          </>
+        )}
+        {sent && <Alert severity="success" sx={{ mt: 2 }}>{sent}</Alert>}
+        {err && <Alert severity="error" sx={{ mt: 2 }}>{err}</Alert>}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2, flexWrap: "wrap", gap: 1 }}>
+        <Button onClick={onClose} disabled={busy}>Close</Button>
+        <Box sx={{ flex: 1 }} />
+        {info && (
+          <>
+            <Button variant="outlined" disabled={busy || !subject.trim() || !message.trim()} onClick={() => send(true)}>
+              Send test to me{info.testTo ? ` (${info.testTo})` : ""}
+            </Button>
+            {confirm ? (
+              <Button variant="contained" color="warning" disableElevation disabled={busy} onClick={() => send(false)}>
+                Yes, email {info.to}
+              </Button>
+            ) : (
+              <Tooltip title={tested ? "" : "Send yourself a test first to see how it looks"}>
+                <span>
+                  <Button variant="contained" disableElevation disabled={busy || !info.to || !subject.trim() || !message.trim()} onClick={() => setConfirm(true)}>
+                    Send to {sub.customer || "them"}
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+          </>
+        )}
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function ImportDialog({ onClose, year, onDone }) {
   const [url, setUrl] = useState(memo.get);
   const [busy, setBusy] = useState(false);
@@ -184,6 +281,7 @@ export default function HqMoney() {
       setErr(x?.response?.data?.message || "Couldn't save that.");
     }
   };
+  const [nudging, setNudging] = useState(null);
   const hide = async (s, hidden) => {
     try {
       await api.post("/hq/money/hide", { customerId: s.customerId, hidden, label: s.customer || s.label || s.email || "" });
@@ -236,7 +334,7 @@ export default function HqMoney() {
           {data.failing > 0 && (
             <Alert severity="warning" sx={{ mb: 2 }}>
               {data.subscriptions.filter((s) => s.status === "past_due" || s.status === "unpaid").map((s) => s.customer).join(", ")}
-              {data.failing === 1 ? "'s payment" : "'s payments"} failed ({usd(data.atRisk)} a month). It isn't counted in MRR or income until it goes through. Stripe keeps retrying; a nudge to update their card usually fixes it.
+              {data.failing === 1 ? "'s payment" : "'s payments"} failed ({usd(data.atRisk)} a month). It isn't counted in MRR or income until it goes through. Use Nudge in Subscriptions to email them the pay link.
             </Alert>
           )}
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(3, minmax(0, 1fr))", xl: "repeat(6, minmax(0, 1fr))" }, gap: 1, mb: 2.5 }}>
@@ -408,10 +506,15 @@ export default function HqMoney() {
                         </Box>
                         <Box component="td" sx={{ ...cell, color: IOS.secondary }}>{s.started ? new Date(s.started).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "–"}</Box>
                         <Box component="td" sx={{ ...cell, color: IOS.secondary, fontSize: 12 }}>
-                          {s.status === "trialing" && s.trialEnd ? `Trial ends ${new Date(s.trialEnd).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : s.status === "canceled" && s.ended ? `Ended ${new Date(s.ended).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}
+                          {s.lastNudge ? `Nudged ${new Date(s.lastNudge.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : s.status === "trialing" && s.trialEnd ? `Trial ends ${new Date(s.trialEnd).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : s.status === "canceled" && s.ended ? `Ended ${new Date(s.ended).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}
                         </Box>
                         <Box component="td" sx={{ ...cell, py: 0.25 }}>
-                          {s.customerId && (
+                          {(s.status === "past_due" || s.status === "unpaid") && (
+                            <Button size="small" variant="outlined" color="warning" onClick={() => setNudging(s)} sx={{ fontSize: 12, minWidth: 0, mr: 0.5 }}>
+                              Nudge
+                            </Button>
+                          )}
+                          {s.customerId && s.status !== "past_due" && s.status !== "unpaid" && (
                             <Button size="small" onClick={() => hide(s, true)} sx={{ fontSize: 12, minWidth: 0, color: s.test ? IOS.blue : IOS.secondary }}>
                               Hide as test
                             </Button>
@@ -441,6 +544,7 @@ export default function HqMoney() {
         </>
       )}
 
+      {nudging && <NudgeDialog sub={nudging} onClose={() => setNudging(null)} onSent={(msg) => { setNudging(null); setNote(msg); load(); }} />}
       {importing && <ImportDialog onClose={() => setImporting(false)} year={year} onDone={(msg) => { setImporting(false); setNote(msg); load(); }} />}
       {editing && <ExpenseDialog initial={editing._id ? editing : null} onClose={() => setEditing(null)} onSave={saveExpense} />}
     </Box>

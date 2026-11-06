@@ -3,6 +3,7 @@ import { Alert, Box, Button, ButtonBase, Checkbox, CircularProgress, Dialog, Dia
 import { FiCheck, FiChevronDown, FiChevronRight, FiCopy, FiEye, FiExternalLink, FiFileText, FiMail, FiPhone, FiPlus, FiRefreshCw, FiX } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import HqHistory from "./HqHistory";
 import api from "./hqApi";
 import { IOS, tint } from "../../theme/ios";
 import { Empty, Section, Tag } from "./HqBits";
@@ -855,6 +856,29 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
   };
   const rowProps = { sender, data, view, busyId, onTick: tick, onRemove: remove, onOpenFacility: setOpenFacility, onOpenItem: openItem, onAddPiece: addPiece, onOutcome: outcome };
 
+  // Today, the whole week, or a look back at any period.
+  const toggle = (
+    <Box sx={{ display: "flex", bgcolor: IOS.fill, borderRadius: IOS.radius.round, p: 0.4 }}>
+      {[
+        ["today", "Today"],
+        ["week", "Whole week"],
+        ["history", "History"],
+      ].map(([k, label]) => (
+        <ButtonBase key={k} onClick={() => setView(k)} sx={{ px: 1.75, py: 0.6, borderRadius: IOS.radius.round, fontSize: 13.5, fontWeight: 600, bgcolor: view === k ? IOS.surface : "transparent", boxShadow: view === k ? IOS.shadow : "none" }}>
+          {label}
+        </ButtonBase>
+      ))}
+    </Box>
+  );
+  if (view === "history") {
+    return (
+      <Box sx={{ display: "grid", gap: 2 }}>
+        <Box sx={{ display: "flex", justifyContent: "flex-end" }}>{toggle}</Box>
+        <HqHistory />
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ display: "grid", gap: 2 }}>
       {/* The week at a glance */}
@@ -877,16 +901,7 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
             </Typography>
           </Box>
           <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-            <Box sx={{ display: "flex", bgcolor: IOS.fill, borderRadius: IOS.radius.round, p: 0.4 }}>
-              {[
-                ["today", "Today"],
-                ["week", "Whole week"],
-              ].map(([k, label]) => (
-                <ButtonBase key={k} onClick={() => setView(k)} sx={{ px: 1.75, py: 0.6, borderRadius: IOS.radius.round, fontSize: 13.5, fontWeight: 600, bgcolor: view === k ? IOS.surface : "transparent", boxShadow: view === k ? IOS.shadow : "none" }}>
-                  {label}
-                </ButtonBase>
-              ))}
-            </Box>
+            {toggle}
             <Tooltip title="Adds new facilities, people or content until every list reaches its target. Nothing is taken away.">
               <span>
                 <Button size="small" startIcon={refilling ? <CircularProgress size={13} /> : <FiRefreshCw />} disabled={refilling} onClick={refill} sx={{ borderRadius: IOS.radius.round }}>

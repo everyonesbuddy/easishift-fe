@@ -241,6 +241,7 @@ const CALL_OUTCOMES = [
   ["no_answer", "No answer", "Tried again in 2 days, up to 3 times."],
   ["not_interested", "Not interested", "Off the list."],
   ["wrong_number", "Wrong number", "Off the list. Fix the number on Facilities."],
+  ["left", "No longer works there", "Off your lists for good. Add who replaced them, if you know."],
 ];
 /** Two working days from today, as "2026-11-06". */
 function inTwoWorkdays() {
@@ -268,6 +269,44 @@ function CallbackDialog({ t, onClose, onSave }) {
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="contained" disableElevation disabled={!date} onClick={() => onSave({ outcome: "callback", nextDate: date, notes })} sx={{ borderRadius: IOS.radius.round }}>
           Save call-back
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/**
+ * "No longer works there": who replaced them, if they told you. For a person,
+ * that's a new contact at the same building; for the front desk call, the
+ * building's new scheduler. Everything is optional.
+ */
+function LeftDialog({ t, onClose, onSave }) {
+  const building = (t.detail || "").split(" · ")[0];
+  const isBuilding = t.kind === "facility";
+  const [r, setR] = useState({ name: "", title: "", phone: "", email: "" });
+  const [notes, setNotes] = useState("");
+  const set = (k) => (e) => setR((x) => ({ ...x, [k]: e.target.value }));
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs">
+      <DialogTitle sx={{ pb: 0.5 }}>{isBuilding ? `The scheduler at ${t.title} left` : `${t.title.split(",")[0]} no longer works there`}</DialogTitle>
+      <DialogContent sx={{ display: "grid", gap: 1.5, pt: "8px !important" }}>
+        <Typography sx={{ fontSize: 13.5, color: IOS.secondary }}>
+          {isBuilding
+            ? "The scheduler you had saved is cleared, and the building stays on your list. If they told you who does the schedule now, add them:"
+            : `They come off every list, and their follow-up emails stop. ${building || "The building"} stays on your lists. If they told you who replaced them, add them and they'll show up as a new contact:`}
+        </Typography>
+        <TextField size="small" label={isBuilding ? "New scheduler's name" : "Who replaced them"} placeholder="Dana Lee" value={r.name} onChange={set("name")} autoFocus />
+        <TextField size="small" label="Their title" placeholder={isBuilding ? "Staffing coordinator" : "Director of Nursing"} value={r.title} onChange={set("title")} disabled={!r.name.trim()} />
+        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
+          <TextField size="small" label="Phone" value={r.phone} onChange={set("phone")} disabled={!r.name.trim()} />
+          <TextField size="small" label="Email" value={r.email} onChange={set("email")} disabled={!r.name.trim()} />
+        </Box>
+        <TextField size="small" label="What they said (optional)" placeholder="She left in September; ask for Dana" value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" disableElevation onClick={() => onSave({ outcome: "left", notes, ...(r.name.trim() ? { replacement: r } : {}) })} sx={{ borderRadius: IOS.radius.round }}>
+          {r.name.trim() ? `Save and add ${r.name.trim().split(" ")[0]}` : "Save"}
         </Button>
       </DialogActions>
     </Dialog>
@@ -318,6 +357,7 @@ function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenIte
   const [preview, setPreview] = useState(false);
   const [menuAt, setMenuAt] = useState(null);
   const [callback, setCallback] = useState(false);
+  const [left, setLeft] = useState(false);
   const isCall = channel === "calls" && (t.kind === "facility" || t.kind === "contact");
   // A call asks what happened; everything else ticks straight away.
   const clickTick = (e) => (isCall && !t.done && !more ? setMenuAt(e.currentTarget) : onTick(t, !t.done));
@@ -334,6 +374,7 @@ function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenIte
               onClick={() => {
                 setMenuAt(null);
                 if (k === "callback") setCallback(true);
+                else if (k === "left") setLeft(true);
                 else onTick(t, true, { outcome: k });
               }}
               sx={{ display: "block", py: 0.75 }}
@@ -343,6 +384,18 @@ function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenIte
             </MenuItem>
           ))}
         </Menu>
+      )}
+      {left && (
+        <LeftDialog
+          t={t}
+          onClose={() => setLeft(false)}
+          onSave={(extra) => {
+            setLeft(false);
+            // A call logs it with the tick; after an email, it's the email's outcome.
+            if (channel === "email") onOutcome(t, "left", extra);
+            else onTick(t, true, extra);
+          }}
+        />
       )}
       {callback && (
         <CallbackDialog
@@ -375,7 +428,7 @@ function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenIte
           {t.kind === "content" && !t.done && t.status && <Tag color={t.status === "ready" || t.status === "scheduled" ? IOS.green : IOS.secondary}>{cap(t.status)}</Tag>}
           {t.reason && !t.done && <Tag color={REASON_COLOR(t.reason)}>{t.reason.split(":")[0]}</Tag>}
           {t.done && t.doneAt && (
-            <Typography sx={{ fontSize: 12.5, color: ["not_interested", "wrong_number"].includes(t.outcome) ? IOS.secondary : IOS.greenText, fontWeight: 600 }}>
+            <Typography sx={{ fontSize: 12.5, color: ["not_interested", "wrong_number", "left"].includes(t.outcome) ? IOS.secondary : IOS.greenText, fontWeight: 600 }}>
               {doneText}
               {t.outcome === "callback" ? "" : ` ${when(t.doneAt)}`}
             </Typography>
@@ -395,6 +448,9 @@ function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenIte
                 </ButtonBase>
                 <ButtonBase onClick={() => onOutcome(t, "not_interested")} sx={{ fontSize: 12.5, color: IOS.secondary }}>
                   Not interested
+                </ButtonBase>
+                <ButtonBase onClick={() => setLeft(true)} sx={{ fontSize: 12.5, color: IOS.secondary }}>
+                  No longer there
                 </ButtonBase>
               </Box>
             )
@@ -694,6 +750,7 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
         ? await api.post(`/hq/week/items/new/check`, { done: true, playId: t.playId, kind: t.kind, refId: t.refId, action: t.action, ...extra })
         : await api.post(`/hq/week/items/${t._id}/check`, { done, ...extra });
       setData(res.data);
+      if (extra.outcome === "left") toast.success(extra.replacement ? `Saved. ${extra.replacement.name} is added ${t.kind === "facility" ? "as the building's scheduler" : "as a contact at the same building"}.` : "Saved. They're off your lists.");
       onChanged?.();
     } catch (err) {
       toast.error(errorText(err, "Couldn't save"));
@@ -702,12 +759,13 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
     }
   };
   // After an email: they replied or said no (ends their follow-ups); "" undoes it.
-  const outcome = async (t, value) => {
+  const outcome = async (t, value, extra = {}) => {
     setBusyId(t._id);
     try {
-      const res = await api.post(`/hq/week/items/${t._id}/outcome`, { outcome: value });
+      const res = await api.post(`/hq/week/items/${t._id}/outcome`, { outcome: value, ...extra });
       setData(res.data);
       if (value === "replied") toast.success("Marked as replied. Their follow-ups are stopped.");
+      if (value === "left") toast.success(extra.replacement ? `Saved. ${extra.replacement.name} is added as a contact at the same building.` : "Saved. They're off your lists and their follow-ups are stopped.");
     } catch (err) {
       toast.error(errorText(err, "Couldn't save"));
     } finally {

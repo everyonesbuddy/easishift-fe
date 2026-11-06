@@ -580,10 +580,11 @@ function PlayWeek({ p, data, view, busyId, onTick, onRemove, onOpenFacility, onO
         <Typography sx={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", color: allDone ? IOS.greenText : IOS.ink, ...num }}>
           {allDone && <FiCheck size={13} style={{ marginRight: 4, verticalAlign: -1 }} />}
           {p.count} of {target} {unit}
-          {p.weeklyTarget < 1 ? " (due this week)" : ""}
+          {p.span > 1 ? ` every ${p.span} weeks` : ""}
         </Typography>
       </Box>
-      {p.count > ticked && <Typography sx={{ fontSize: 12, color: IOS.secondary, mt: 0.5 }}>{p.count - ticked} logged another way (a batch or the history) count too.</Typography>}
+      {p.span > 1 && <Typography sx={{ fontSize: 12, color: IOS.secondary, mt: 0.5 }}>Counts the last {p.span} weeks, so one done last week covers this week too.</Typography>}
+      {p.count - ticked - (p.published || []).length > 0 && <Typography sx={{ fontSize: 12, color: IOS.secondary, mt: 0.5 }}>{p.count - ticked - (p.published || []).length} logged another way (a batch or the history) count too.</Typography>}
 
       <Box sx={{ mt: 1 }}>
         {p.short && (
@@ -600,9 +601,27 @@ function PlayWeek({ p, data, view, busyId, onTick, onRemove, onOpenFacility, onO
             </Button>
           </Box>
         )}
-        {!p.todos.length && !p.short && (
+        {(p.published || []).map((x) => (
+          <Box key={x.url || x.title} sx={{ display: "flex", alignItems: "center", gap: 1.25, py: 0.9, px: 1 }}>
+            <Box sx={{ width: 26, height: 26, borderRadius: "50%", bgcolor: IOS.green, color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}>
+              <FiCheck size={15} />
+            </Box>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography sx={{ fontSize: 14.5, fontWeight: 600, color: IOS.secondary }}>{x.title}</Typography>
+              <Typography sx={{ fontSize: 12.5, color: IOS.greenText, fontWeight: 600 }}>
+                On the blog {md(new Date(x.date))}
+                {x.url && (
+                  <Box component="a" href={x.url} target="_blank" rel="noreferrer" sx={{ ml: 1, color: IOS.blue, fontWeight: 500, textDecoration: "none" }}>
+                    Open <FiExternalLink size={11} />
+                  </Box>
+                )}
+              </Typography>
+            </Box>
+          </Box>
+        ))}
+        {!p.todos.length && !p.short && !(p.published || []).length && (
           <Typography sx={{ fontSize: 13.5, color: IOS.secondary, py: 1 }}>
-            {p.list === "content" ? "Nothing planned for this campaign this week. Add a piece below." : p.list === "facebook" ? "No groups yet. Add the groups you find on the Facebook page." : "Nobody left to reach for this play. Add facilities or people, then top up the list."}
+            {p.list === "content" ? (p.span > 1 ? `Nothing scheduled yet, and one is due every ${p.span} weeks. Pick one below, or pause the campaign in Strategy.` : "Nothing planned for this campaign this week. Add a piece below.") : p.list === "facebook" ? "No groups yet. Add the groups you find on the Facebook page." : "Nobody left to reach for this play. Add facilities or people, then top up the list."}
           </Typography>
         )}
         {!byDay && rows(p.todos)}

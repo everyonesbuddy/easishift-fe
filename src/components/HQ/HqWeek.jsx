@@ -74,6 +74,7 @@ const LINKS = {
   "template link": "https://wisershifts.com/templates/weekly-cna-schedule-template.pdf",
   "directors page": "https://wisershifts.com/for/directors",
   "signup link": "https://wisershifts.com/signup",
+  "operators link": "https://wisershifts.com/for/operators",
 };
 /** Fill a script's placeholders, written as {First name} or [first name]. */
 function fillScript(text, { firstName, facility, sender }) {
@@ -98,6 +99,30 @@ function fillKnown(text, k) {
   return out;
 }
 
+/**
+ * Which script fits this person, from what HQ knows: the right email in a
+ * sequence, the assisted living version for an assisted living building,
+ * the voicemail for another try, and "you spoke with their scheduler" only
+ * when that call is on file.
+ */
+function pickVersion(versions, t) {
+  const al = (x) => /assisted living/i.test(x.label || "");
+  const spoke = (x) => /spoken with their scheduler/i.test(x.label || "");
+  const fits = (x) => (t.known?.assisted ? true : !al(x)) && (t.known?.spokeWithScheduler || !spoke(x));
+  const first = (test) => {
+    const pref = versions.findIndex((x) => test(x) && (t.known?.assisted ? al(x) : true) && fits(x));
+    return pref >= 0 ? pref : versions.findIndex((x) => test(x) && fits(x));
+  };
+  if (t.step) return first((x) => new RegExp(`Email ${t.step}\\b`).test(x.label || ""));
+  if (/^Try again/.test(t.reason || "")) return first((x) => /voicemail/i.test(x.label || ""));
+  if (t.known?.spokeWithScheduler) {
+    const k = versions.findIndex(spoke);
+    if (k >= 0) return k;
+  }
+  if (!t.email) return Math.max(0, versions.findIndex(fits));
+  return first((x) => /^Email 1\b/.test(x.label || "") || /· Email 1 ·/.test(x.label || ""));
+}
+
 function mailto(t, script, sender) {
   if (!script) return `mailto:${t.email}`;
   const facility = (t.detail || "").split(" · ")[0];
@@ -113,18 +138,7 @@ function EmailPreview({ t, scripts, sender, onClose }) {
   const versions = scripts.filter((x) => x.body);
   const isCall = !t.email;
   // Start on the version that fits: the right email in a sequence, the voicemail for another try.
-  const [i, setI] = useState(() => {
-    const find = (re) => versions.findIndex((x) => re.test(x.label || ""));
-    // Only open the "you spoke with their scheduler" version when HQ has that call on file.
-    const k = t.step
-      ? find(new RegExp(`Email ${t.step}\\b`))
-      : /^Try again/.test(t.reason || "")
-        ? find(/voicemail/i)
-        : t.known?.spokeWithScheduler
-          ? find(/spoken with their scheduler/i)
-          : versions.findIndex((x) => !/spoken with their scheduler/i.test(x.label || ""));
-    return k >= 0 ? k : 0;
-  });
+  const [i, setI] = useState(() => Math.max(0, pickVersion(versions, t)));
   const facility = (t.detail || "").split(" · ")[0];
   const v = versions[i] || { label: "", subject: "", body: "" };
   const subject = fillScript(v.subject, { firstName: t.firstName, facility, sender });
@@ -297,6 +311,9 @@ function Tick({ done, busy, onClick, label }) {
 
 /** One to-do: tick, what it is, how to reach them, take it off the list. */
 function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenItem, onOutcome, script, scripts = [], sender = "", more = false }) {
+  // The email that fits this person (their step, their building's type), else the campaign's first.
+  const withSubject = scripts.filter((x) => x.body && x.subject);
+  const rowScript = t.email && withSubject.length ? withSubject[Math.max(0, pickVersion(withSubject, t))] : script;
   const verb = VERB[channel];
   const [preview, setPreview] = useState(false);
   const [menuAt, setMenuAt] = useState(null);
@@ -415,8 +432,8 @@ function TodoRow({ t, channel, busy, onTick, onRemove, onOpenFacility, onOpenIte
       )}
       {preview && <EmailPreview t={t} scripts={scripts} sender={sender} onClose={() => setPreview(false)} />}
       {t.email && !t.done && (
-        <Button size="small" href={mailto(t, script, sender)} startIcon={<FiMail size={13} />} title={script ? `Opens your email with "${script.label}" filled in` : t.email} sx={{ borderRadius: IOS.radius.round, whiteSpace: "nowrap", flexShrink: 0 }}>
-          {script ? "Open in email" : "Email"}
+        <Button size="small" href={mailto(t, rowScript, sender)} startIcon={<FiMail size={13} />} title={rowScript ? `Opens your email with "${rowScript.label}" filled in` : t.email} sx={{ borderRadius: IOS.radius.round, whiteSpace: "nowrap", flexShrink: 0 }}>
+          {rowScript ? "Open in email" : "Email"}
         </Button>
       )}
       {!more && onRemove && (

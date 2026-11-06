@@ -85,6 +85,19 @@ function fillScript(text, { firstName, facility, sender }) {
   for (const [k, url] of Object.entries(LINKS)) out = out.replace(tag(k.replace(/[-]/g, "\\-")), url);
   return out;
 }
+/**
+ * Fill what HQ knows into the "you spoke with their scheduler" script: the
+ * scheduler's name, when, and the booked setup. Only when that call is on file.
+ */
+function fillKnown(text, k) {
+  if (!text || !k?.spokeWithScheduler) return text;
+  let out = text.replace(/^\[Only use this if HQ shows[^\]]*\]\s*/m, "");
+  if (k.schedulerName) out = out.replace(/\[scheduler's name\]/g, k.schedulerName);
+  if (k.spokeOn) out = out.replace(/\[when\]/g, `on ${k.spokeOn}`);
+  out = out.replace(/\[, and we're setting up next week together\]/g, k.setupBooked ? ", and we're setting up next week together" : "");
+  return out;
+}
+
 function mailto(t, script, sender) {
   if (!script) return `mailto:${t.email}`;
   const facility = (t.detail || "").split(" · ")[0];
@@ -102,13 +115,20 @@ function EmailPreview({ t, scripts, sender, onClose }) {
   // Start on the version that fits: the right email in a sequence, the voicemail for another try.
   const [i, setI] = useState(() => {
     const find = (re) => versions.findIndex((x) => re.test(x.label || ""));
-    const k = t.step ? find(new RegExp(`Email ${t.step}\\b`)) : /^Try again/.test(t.reason || "") ? find(/voicemail/i) : -1;
+    // Only open the "you spoke with their scheduler" version when HQ has that call on file.
+    const k = t.step
+      ? find(new RegExp(`Email ${t.step}\\b`))
+      : /^Try again/.test(t.reason || "")
+        ? find(/voicemail/i)
+        : t.known?.spokeWithScheduler
+          ? find(/spoken with their scheduler/i)
+          : versions.findIndex((x) => !/spoken with their scheduler/i.test(x.label || ""));
     return k >= 0 ? k : 0;
   });
   const facility = (t.detail || "").split(" · ")[0];
   const v = versions[i] || { label: "", subject: "", body: "" };
   const subject = fillScript(v.subject, { firstName: t.firstName, facility, sender });
-  const body = fillScript(v.body, { firstName: t.firstName, facility, sender });
+  const body = fillKnown(fillScript(v.body, { firstName: t.firstName, facility, sender }), t.known);
   const box = { bgcolor: IOS.canvas, borderRadius: "10px", p: 1.5, position: "relative" };
   const copyBtn = (text, label) => (
     <Button size="small" startIcon={<FiCopy size={13} />} onClick={() => copyText(text)} sx={{ position: { sm: "absolute" }, top: 6, right: 6 }}>
@@ -147,6 +167,23 @@ function EmailPreview({ t, scripts, sender, onClose }) {
             <Typography sx={{ fontSize: 12, fontWeight: 700, color: IOS.secondary, textTransform: "uppercase", letterSpacing: "0.06em" }}>To</Typography>
             <Typography sx={{ fontSize: 14.5, pr: { sm: 14 } }}>{t.email}</Typography>
             {copyBtn(t.email, "Copy address")}
+          </Box>
+        )}
+        {t.known && (t.known.facts.length > 0 || t.known.history.length > 0) && (
+          <Box sx={{ ...box, bgcolor: "rgba(0,122,255,0.06)" }}>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: IOS.secondary, textTransform: "uppercase", letterSpacing: "0.06em" }}>What HQ knows</Typography>
+            {t.known.facts.map((f) => (
+              <Typography key={f} sx={{ fontSize: 13.5, mt: 0.25 }}>{f}</Typography>
+            ))}
+            {t.known.history.length > 0 && (
+              <>
+                <Typography sx={{ fontSize: 12.5, color: IOS.secondary, mt: 0.75 }}>Last touches</Typography>
+                {t.known.history.map((h) => (
+                  <Typography key={h} sx={{ fontSize: 13.5 }}>{h}</Typography>
+                ))}
+              </>
+            )}
+            {t.known.spokeWithScheduler && <Typography sx={{ fontSize: 12.5, color: IOS.greenText, mt: 0.5, fontWeight: 600 }}>You've talked with the scheduler at this building, so the script below says so.</Typography>}
           </Box>
         )}
         {subject && (

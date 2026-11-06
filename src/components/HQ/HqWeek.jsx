@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Box, Button, ButtonBase, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Menu, MenuItem, TextField, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, ButtonBase, Checkbox, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, IconButton, Menu, MenuItem, TextField, Tooltip, Typography } from "@mui/material";
 import { FiCheck, FiChevronDown, FiChevronRight, FiCopy, FiEye, FiExternalLink, FiFileText, FiMail, FiPhone, FiPlus, FiRefreshCw, FiX } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -77,15 +77,21 @@ const LINKS = {
   "operators link": "https://wisershifts.com/for/operators",
 };
 /** Fill a script's placeholders, written as {First name} or [first name]. */
-function fillScript(text, { firstName, facility, sender }) {
+function fillScript(text, { firstName, facility, sender, role }) {
   const tag = (words) => new RegExp(`[\\[{]\\s*(?:${words})\\s*[\\]}]`, "gi");
-  let out = String(text || "")
+  let out = String(text || "");
+  // No name yet (they left and you're calling for whoever has the job): ask for the role instead.
+  if (!firstName && role) out = out.replace(new RegExp(`(reach|speak (?:to|with)|for|calling) ${tag("first ?name|firstname|name").source}`, "gi"), `$1 your ${role}`);
+  out = out
     .replace(tag("first ?name|firstname|name"), firstName || "there")
     .replace(tag("building|facility|community|building name|facility name|community name"), facility || "your building")
     .replace(tag("your name|my name|sender"), sender || "");
   for (const [k, url] of Object.entries(LINKS)) out = out.replace(tag(k.replace(/[-]/g, "\\-")), url);
   return out;
 }
+/** For someone with no name on file, their job title, so the script asks for the role. */
+const roleOf = (t) => (t.kind === "contact" && !t.firstName ? t.title || "" : "");
+
 /**
  * Fill what HQ knows into the "you spoke with their scheduler" script: the
  * scheduler's name, when, and the booked setup. Only when that call is on file.
@@ -126,7 +132,7 @@ function pickVersion(versions, t) {
 function mailto(t, script, sender) {
   if (!script) return `mailto:${t.email}`;
   const facility = (t.detail || "").split(" · ")[0];
-  const fill = (x) => fillScript(x, { firstName: t.firstName, facility, sender });
+  const fill = (x) => fillScript(x, { firstName: t.firstName, facility, sender, role: roleOf(t) });
   return `mailto:${t.email}?subject=${encodeURIComponent(fill(script.subject))}&body=${encodeURIComponent(fill(script.body))}`;
 }
 
@@ -141,8 +147,8 @@ function EmailPreview({ t, scripts, sender, onClose }) {
   const [i, setI] = useState(() => Math.max(0, pickVersion(versions, t)));
   const facility = (t.detail || "").split(" · ")[0];
   const v = versions[i] || { label: "", subject: "", body: "" };
-  const subject = fillScript(v.subject, { firstName: t.firstName, facility, sender });
-  const body = fillKnown(fillScript(v.body, { firstName: t.firstName, facility, sender }), t.known);
+  const subject = fillScript(v.subject, { firstName: t.firstName, facility, sender, role: roleOf(t) });
+  const body = fillKnown(fillScript(v.body, { firstName: t.firstName, facility, sender, role: roleOf(t) }), t.known);
   const box = { bgcolor: IOS.canvas, borderRadius: "10px", p: 1.5, position: "relative" };
   const copyBtn = (text, label) => (
     <Button size="small" startIcon={<FiCopy size={13} />} onClick={() => copyText(text)} sx={{ position: { sm: "absolute" }, top: 6, right: 6 }}>
@@ -283,7 +289,10 @@ function CallbackDialog({ t, onClose, onSave }) {
 function LeftDialog({ t, onClose, onSave }) {
   const building = (t.detail || "").split(" · ")[0];
   const isBuilding = t.kind === "facility";
-  const [r, setR] = useState({ name: "", title: "", phone: "", email: "" });
+  // The number you called usually still works (front desk), so it carries over.
+  const [r, setR] = useState({ name: "", title: "", phone: t.phone || "", email: "" });
+  const [keepCalling, setKeepCalling] = useState(true);
+  const role = (t.title || "").split(",").slice(1).join(",").trim() || (t.firstName ? "" : t.title) || "";
   const [notes, setNotes] = useState("");
   const set = (k) => (e) => setR((x) => ({ ...x, [k]: e.target.value }));
   return (
@@ -296,17 +305,34 @@ function LeftDialog({ t, onClose, onSave }) {
             : `They come off every list, and their follow-up emails stop. ${building || "The building"} stays on your lists. If they told you who replaced them, add them and they'll show up as a new contact:`}
         </Typography>
         <TextField size="small" label={isBuilding ? "New scheduler's name" : "Who replaced them"} placeholder="Dana Lee" value={r.name} onChange={set("name")} autoFocus />
-        <TextField size="small" label="Their title" placeholder={isBuilding ? "Staffing coordinator" : "Director of Nursing"} value={r.title} onChange={set("title")} disabled={!r.name.trim()} />
-        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
-          <TextField size="small" label="Phone" value={r.phone} onChange={set("phone")} disabled={!r.name.trim()} />
-          <TextField size="small" label="Email" value={r.email} onChange={set("email")} disabled={!r.name.trim()} />
-        </Box>
+        {r.name.trim() ? (
+          <>
+            <TextField size="small" label="Their title" placeholder={role || (isBuilding ? "Staffing coordinator" : "Director of Nursing")} value={r.title} onChange={set("title")} helperText={!isBuilding && role && !r.title ? `Left empty, it stays ${role}.` : " "} />
+            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
+              <TextField size="small" label="Phone" value={r.phone} onChange={set("phone")} helperText={t.phone && r.phone === t.phone ? "The number you called" : " "} />
+              <TextField size="small" label="Email" value={r.email} onChange={set("email")} />
+            </Box>
+          </>
+        ) : (
+          !isBuilding && (
+            <FormControlLabel
+              sx={{ alignItems: "flex-start", ml: -0.5 }}
+              control={<Checkbox size="small" checked={keepCalling} onChange={(e) => setKeepCalling(e.target.checked)} sx={{ pt: 0.25 }} />}
+              label={
+                <Typography sx={{ fontSize: 13.5 }}>
+                  Don't know their name? Keep calling {t.phone || "this number"} for whoever is {role ? `the ${role}` : "in this job"} now.
+                  <Box component="span" sx={{ display: "block", color: IOS.secondary, fontSize: 12.5 }}>They're added without a name; the script asks the front desk for {role ? `your ${role}` : "them by role"}.</Box>
+                </Typography>
+              }
+            />
+          )
+        )}
         <TextField size="small" label="What they said (optional)" placeholder="She left in September; ask for Dana" value={notes} onChange={(e) => setNotes(e.target.value)} />
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" disableElevation onClick={() => onSave({ outcome: "left", notes, ...(r.name.trim() ? { replacement: r } : {}) })} sx={{ borderRadius: IOS.radius.round }}>
-          {r.name.trim() ? `Save and add ${r.name.trim().split(" ")[0]}` : "Save"}
+        <Button variant="contained" disableElevation onClick={() => onSave({ outcome: "left", notes, ...(r.name.trim() ? { replacement: r } : isBuilding ? { keepCalling: false } : { keepCalling, replacement: { title: role, phone: r.phone } }) })} sx={{ borderRadius: IOS.radius.round }}>
+          {r.name.trim() ? `Save and add ${r.name.trim().split(" ")[0]}` : !isBuilding && keepCalling ? "Save and keep calling" : "Save"}
         </Button>
       </DialogActions>
     </Dialog>
@@ -750,7 +776,7 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
         ? await api.post(`/hq/week/items/new/check`, { done: true, playId: t.playId, kind: t.kind, refId: t.refId, action: t.action, ...extra })
         : await api.post(`/hq/week/items/${t._id}/check`, { done, ...extra });
       setData(res.data);
-      if (extra.outcome === "left") toast.success(extra.replacement ? `Saved. ${extra.replacement.name} is added ${t.kind === "facility" ? "as the building's scheduler" : "as a contact at the same building"}.` : "Saved. They're off your lists.");
+      if (extra.outcome === "left") toast.success(extra.replacement && !extra.replacement.name ? `Saved. You'll call the same number for the ${extra.replacement.title || "person in that job"} next.` : extra.replacement ? `Saved. ${extra.replacement.name} is added ${t.kind === "facility" ? "as the building's scheduler" : "as a contact at the same building"}.` : "Saved. They're off your lists.");
       onChanged?.();
     } catch (err) {
       toast.error(errorText(err, "Couldn't save"));
@@ -765,7 +791,7 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
       const res = await api.post(`/hq/week/items/${t._id}/outcome`, { outcome: value, ...extra });
       setData(res.data);
       if (value === "replied") toast.success("Marked as replied. Their follow-ups are stopped.");
-      if (value === "left") toast.success(extra.replacement ? `Saved. ${extra.replacement.name} is added as a contact at the same building.` : "Saved. They're off your lists and their follow-ups are stopped.");
+      if (value === "left") toast.success(extra.replacement && !extra.replacement.name ? `Saved. They're off your lists; whoever is the ${extra.replacement.title || "person in that job"} now is added to call.` : extra.replacement ? `Saved. ${extra.replacement.name} is added as a contact at the same building.` : "Saved. They're off your lists and their follow-ups are stopped.");
     } catch (err) {
       toast.error(errorText(err, "Couldn't save"));
     } finally {

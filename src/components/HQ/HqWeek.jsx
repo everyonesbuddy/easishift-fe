@@ -610,7 +610,7 @@ function PlayWeek({ p, data, view, busyId, onTick, onRemove, onOpenFacility, onO
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography sx={{ fontSize: 14.5, fontWeight: 600, color: IOS.secondary }}>{x.title}</Typography>
               <Typography sx={{ fontSize: 12.5, color: IOS.greenText, fontWeight: 600 }}>
-                On the blog {md(new Date(x.date))}
+                {x.where || "On the blog"} {md(new Date(x.date))}
                 {x.url && (
                   <Box component="a" href={x.url} target="_blank" rel="noreferrer" sx={{ ml: 1, color: IOS.blue, fontWeight: 500, textDecoration: "none" }}>
                     Open <FiExternalLink size={11} />

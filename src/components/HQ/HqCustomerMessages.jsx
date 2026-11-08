@@ -1,7 +1,7 @@
 // HQ: try the customer messages on a real workspace. Find it by anyone's
 // email, see its managers and whether they can get texts, and send the
 // morning summary, the next-step nudge or a sample call-out alert, now.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Box, Button, CircularProgress, TextField, Typography } from "@mui/material";
 import api from "./hqApi";
 import { IOS } from "../../theme/ios";
@@ -20,8 +20,31 @@ const SENDS = [
   ["callout", "Send a sample call-out alert", "What managers get the moment someone calls out (with made-up names)."],
 ];
 
+const usd = (n) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/** Texts and what they cost, by kind. */
+function TextingBreakdown({ t }) {
+  if (!t?.byKind?.length) return <Typography sx={{ fontSize: 13.5, color: IOS.secondary }}>No texts sent.</Typography>;
+  return (
+    <Box sx={{ display: "grid", gap: 0.4 }}>
+      {t.byKind.map((k) => (
+        <Box key={k.kind} sx={{ display: "flex", gap: 1, fontSize: 13.5 }}>
+          <Typography sx={{ fontSize: 13.5, flex: 1 }}>{k.kind}</Typography>
+          <Typography sx={{ fontSize: 13.5, color: IOS.secondary, fontVariantNumeric: "tabular-nums" }}>
+            {k.texts.toLocaleString()} texts · {k.segments.toLocaleString()} segments
+          </Typography>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 export default function HqCustomerMessages() {
   const [email, setEmail] = useState("");
+  const [usage, setUsage] = useState(null);
+  useEffect(() => {
+    api.get("/hq/customers/texting").then(({ data }) => setUsage(data), () => setUsage(null));
+  }, []);
   const [w, setW] = useState(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState("");
@@ -72,6 +95,34 @@ export default function HqCustomerMessages() {
 
   return (
     <Box sx={{ display: "grid", gap: 2 }}>
+      {usage && (
+        <Section
+          title={`Texting this month: about ${usd(usage.cost)}`}
+          note={`${usage.texts.toLocaleString()} texts, ${usage.segments.toLocaleString()} segments, at about ${(usage.costPerSegment * 100).toFixed(2)}¢ a segment (Twilio plus carrier fees).${usage.cap ? ` Each workspace switches to email after ${usage.cap.toLocaleString()} segments in a month.` : ""}`}
+        >
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
+            <Box>
+              <Typography sx={{ fontSize: 13, fontWeight: 700, color: IOS.secondary, mb: 0.5 }}>By kind</Typography>
+              <TextingBreakdown t={usage} />
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: 13, fontWeight: 700, color: IOS.secondary, mb: 0.5 }}>Top workspaces</Typography>
+              {usage.top.length ? (
+                usage.top.map((w) => (
+                  <Box key={w.name} sx={{ display: "flex", gap: 1 }}>
+                    <Typography sx={{ fontSize: 13.5, flex: 1 }}>{w.name}</Typography>
+                    <Typography sx={{ fontSize: 13.5, color: IOS.secondary, fontVariantNumeric: "tabular-nums" }}>
+                      {w.segments.toLocaleString()} segments · {usd(w.cost)}
+                    </Typography>
+                  </Box>
+                ))
+              ) : (
+                <Typography sx={{ fontSize: 13.5, color: IOS.secondary }}>No texts yet this month.</Typography>
+              )}
+            </Box>
+          </Box>
+        </Section>
+      )}
       <Section title="Try the customer messages" note="Find a workspace by anyone's email, or its name. Sends are real: they go to that workspace's managers by text (if they've said yes) or email.">
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <TextField size="small" label="Email or workspace name" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && email.trim() && find()} sx={{ minWidth: 300, flex: 1 }} />
@@ -116,6 +167,10 @@ export default function HqCustomerMessages() {
                 </Typography>
               </Box>
             </Box>
+          </Section>
+
+          <Section title={`Texting, last 30 days: about ${usd(w.texting?.cost)}`} note={`${(w.texting?.texts || 0).toLocaleString()} texts, ${(w.texting?.segments || 0).toLocaleString()} segments.`}>
+            <TextingBreakdown t={w.texting} />
           </Section>
 
           <Section title="Send for real, now">

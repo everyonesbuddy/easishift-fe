@@ -68,7 +68,7 @@ export default function MembersPage() {
   const [removeTarget, setRemoveTarget] = useState(null);
   // Phone for call-out alerts and the morning summary by text.
   const [phoneTarget, setPhoneTarget] = useState(null);
-  const [phoneForm, setPhoneForm] = useState({ userPhoneCountryCode: "+1", userPhone: "" });
+  const [phoneForm, setPhoneForm] = useState({ name: "", email: "", userPhoneCountryCode: "+1", userPhone: "" });
   const [ownerTarget, setOwnerTarget] = useState(null);
 
   const fetchMembers = async () => {
@@ -122,7 +122,7 @@ export default function MembersPage() {
   };
 
   const openPhone = (member) => {
-    setPhoneForm({ userPhoneCountryCode: member.userPhoneCountryCode || "+1", userPhone: member.userPhone || "" });
+    setPhoneForm({ name: member.name || "", email: member.email || "", userPhoneCountryCode: member.userPhoneCountryCode || "+1", userPhone: member.userPhone || "" });
     setPhoneTarget(member);
   };
   const savePhone = async () => {
@@ -133,15 +133,19 @@ export default function MembersPage() {
       const res = await api.patch(isMe ? "/members/me" : `/members/${member._id}`, phoneForm);
       setMembers((list) => list.map((m) => (String(m._id) === String(member._id) ? { ...m, ...res.data } : m)));
       setPhoneTarget(null);
+      const askedToText = res.data?.textStatus === "pending" && member.textStatus !== "pending";
+      const newEmail = res.data?.email && res.data.email !== member.email;
       toast.success(
-        res.data?.textStatus === "pending"
-          ? `Saved. ${isMe ? "You'll" : `${member.name.split(" ")[0]} will`} get a text asking to reply START.`
-          : res.data?.phoneE164
-            ? "Phone saved."
-            : "Phone removed.",
+        askedToText
+          ? `Saved. ${isMe ? "You'll" : `${res.data.name.split(" ")[0]} will`} get a text asking to reply START.`
+          : newEmail && member.invitePending
+            ? `Saved. The invite went to ${res.data.email}.`
+            : newEmail && isMe
+              ? `Saved. Sign in with ${res.data.email} from now on.`
+              : "Saved.",
       );
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Couldn't save the phone");
+      toast.error(err?.response?.data?.message || "Couldn't save the changes");
     } finally {
       setSaving(false);
     }
@@ -283,6 +287,11 @@ export default function MembersPage() {
                         (you)
                       </Typography>
                     )}
+                    {(isMe || canManage) && (
+                      <Button size="small" onClick={() => openPhone(member)} sx={{ ml: 0.5, textTransform: "none", minWidth: 0, p: 0.25 }}>
+                        Edit
+                      </Button>
+                    )}
                     {member.invitePending && (
                       <Chip size="small" label="Invite pending" sx={{ ml: 1 }} />
                     )}
@@ -333,9 +342,9 @@ export default function MembersPage() {
                         <Box>
                           {member.phoneE164 && <Typography sx={{ fontSize: 13 }}>{member.phoneE164}</Typography>}
                           <Chip size="small" label={label} sx={{ bgcolor: "#F1F5F9", color, fontWeight: 600, mt: member.phoneE164 ? 0.25 : 0 }} />
-                          {(isMe || canManage) && (
+                          {(isMe || canManage) && !member.phoneE164 && (
                             <Button size="small" onClick={() => openPhone(member)} sx={{ ml: 0.5, textTransform: "none", minWidth: 0 }}>
-                              {member.phoneE164 ? "Edit" : "Add phone"}
+                              Add phone
                             </Button>
                           )}
                         </Box>
@@ -372,11 +381,26 @@ export default function MembersPage() {
 
       <Dialog open={Boolean(phoneTarget)} onClose={() => setPhoneTarget(null)} fullWidth maxWidth="xs">
         <DialogTitle sx={{ fontWeight: 800 }}>
-          {phoneTarget && String(phoneTarget._id) === String(user?._id) ? "Your phone" : `${phoneTarget?.name || ""}'s phone`}
+          {phoneTarget && String(phoneTarget._id) === String(user?._id) ? "Your details" : `Edit ${phoneTarget?.name || ""}`}
         </DialogTitle>
         <DialogContent>
-          <Typography color="text.secondary" sx={{ fontSize: 14, mb: 2 }}>
-            For texts when someone calls out or asks for time off, and a short morning summary. A new number gets one text asking them to reply START.
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField label="Name" value={phoneForm.name} onChange={(e) => setPhoneForm({ ...phoneForm, name: e.target.value })} fullWidth />
+            <TextField
+              label="Email"
+              type="email"
+              value={phoneForm.email}
+              onChange={(e) => setPhoneForm({ ...phoneForm, email: e.target.value })}
+              helperText={
+                phoneTarget?.invitePending
+                  ? "Changing it sends the invite to the new address."
+                  : "This is how they sign in, so they'll use the new one from now on."
+              }
+              fullWidth
+            />
+          </Stack>
+          <Typography color="text.secondary" sx={{ fontSize: 13, mt: 2, mb: 1 }}>
+            Mobile, for texts when someone calls out or asks for time off, and a short morning summary. A new number gets one text asking them to reply START.
           </Typography>
           <Stack direction="row" spacing={1}>
             <TextField
@@ -391,7 +415,6 @@ export default function MembersPage() {
               onChange={(e) => setPhoneForm({ ...phoneForm, userPhone: e.target.value })}
               placeholder="(470) 555-0100"
               fullWidth
-              autoFocus
             />
           </Stack>
         </DialogContent>

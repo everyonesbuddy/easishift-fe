@@ -843,6 +843,27 @@ export default function ScheduleList() {
     }
   }, [location.pathname, location.state, navigate]);
 
+  // "Fill it" in a call-out text or email: /schedule?callout=<shift id> opens that shift's call-out dialog.
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get("callout");
+    if (!id || !canManageSchedules) return;
+    let live = true;
+    api
+      .get(`/schedules/${id}`)
+      .then(({ data }) => {
+        if (!live) return;
+        const shift = data?.schedule || data;
+        if (!shift?._id) return;
+        if (new Date(shift.endTime).getTime() <= Date.now()) toast.info("That shift has already ended.");
+        else setCallOutSchedule(shift);
+      })
+      .catch(() => live && toast.error("Couldn't find that shift. It may have been removed."))
+      .finally(() => live && navigate(location.pathname, { replace: true }));
+    return () => {
+      live = false;
+    };
+  }, [location.search, location.pathname, canManageSchedules, navigate]);
+
   // ---------------------------
   // Modals
   // ---------------------------

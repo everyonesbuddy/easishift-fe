@@ -371,6 +371,7 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
     rotationAnchorDate: "",
     emailNotificationsEnabled: true,
     smsNotificationsEnabled: true,
+    morningSummaryEnabled: true,
     roles: [],
   });
   const [emailError, setEmailError] = useState("");
@@ -517,6 +518,7 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
           : "",
         emailNotificationsEnabled: data.emailNotificationsEnabled ?? true,
         smsNotificationsEnabled: data.smsNotificationsEnabled ?? true,
+        morningSummaryEnabled: data.morningSummaryEnabled ?? true,
       }));
     } catch (err) {
       console.error("Failed to fetch staff preferences", err);
@@ -566,6 +568,7 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
         rotationAnchorDate: "",
         emailNotificationsEnabled: true,
         smsNotificationsEnabled: true,
+        morningSummaryEnabled: true,
         roles: getUserRoles(staff).filter((role) => !isSystemRole(role)),
       });
 
@@ -683,6 +686,7 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
             : null,
         emailNotificationsEnabled: !!form.emailNotificationsEnabled,
         smsNotificationsEnabled: !!form.smsNotificationsEnabled,
+        morningSummaryEnabled: form.morningSummaryEnabled !== false,
       };
 
       const payload = {
@@ -1321,6 +1325,22 @@ export default function StaffCreateAndEditForm({ staff, onSuccess, onClose }) {
                   }
                   label="SMS Notifications"
                 />
+                {(form.roles || []).some((r) => ["owner", "administrator", "scheduler", "admin"].includes(r)) && (
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={form.morningSummaryEnabled !== false}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            morningSummaryEnabled: e.target.checked,
+                          })
+                        }
+                      />
+                    }
+                    label="Morning summary at 6 a.m. (today's shifts, open slots, overnight call-outs)"
+                  />
+                )}
               </Stack>
             </Box>
           </SectionCard>

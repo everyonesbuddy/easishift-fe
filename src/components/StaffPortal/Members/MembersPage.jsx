@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import {
+  Checkbox,
+  FormControlLabel,
   Box,
   Button,
   Chip,
@@ -63,12 +65,12 @@ export default function MembersPage() {
   const canTransfer = can("ownership.transfer") || user?.roles?.includes("owner");
   const [members, setMembers] = useState([]);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [invite, setInvite] = useState({ name: "", email: "", role: "scheduler" });
+  const [invite, setInvite] = useState({ name: "", email: "", role: "scheduler", userPhoneCountryCode: "+1", userPhone: "" });
   const [saving, setSaving] = useState(false);
   const [removeTarget, setRemoveTarget] = useState(null);
   // Phone for call-out alerts and the morning summary by text.
   const [phoneTarget, setPhoneTarget] = useState(null);
-  const [phoneForm, setPhoneForm] = useState({ name: "", email: "", userPhoneCountryCode: "+1", userPhone: "" });
+  const [phoneForm, setPhoneForm] = useState({ name: "", email: "", userPhoneCountryCode: "+1", userPhone: "", role: "", textConsent: false });
   const [ownerTarget, setOwnerTarget] = useState(null);
 
   const fetchMembers = async () => {
@@ -100,6 +102,7 @@ export default function MembersPage() {
         name: invite.name.trim(),
         email: invite.email.trim(),
         role: invite.role,
+        ...(invite.userPhone.trim() ? { userPhone: invite.userPhone.trim(), userPhoneCountryCode: invite.userPhoneCountryCode } : {}),
       });
       toast.success(
         res.data?.inviteSent
@@ -108,7 +111,7 @@ export default function MembersPage() {
         { position: "top-right", autoClose: 3000 },
       );
       setInviteOpen(false);
-      setInvite({ name: "", email: "", role: "scheduler" });
+      setInvite({ name: "", email: "", role: "scheduler", userPhoneCountryCode: "+1", userPhone: "" });
       afterChange();
     } catch (err) {
       if (err?.response?.status !== 402) {
@@ -122,7 +125,14 @@ export default function MembersPage() {
   };
 
   const openPhone = (member) => {
-    setPhoneForm({ name: member.name || "", email: member.email || "", userPhoneCountryCode: member.userPhoneCountryCode || "+1", userPhone: member.userPhone || "" });
+    setPhoneForm({
+      name: member.name || "",
+      email: member.email || "",
+      userPhoneCountryCode: member.userPhoneCountryCode || "+1",
+      userPhone: member.userPhone || "",
+      role: member.role,
+      textConsent: member.textStatus === "opted_in",
+    });
     setPhoneTarget(member);
   };
   const savePhone = async () => {
@@ -130,13 +140,25 @@ export default function MembersPage() {
     setSaving(true);
     try {
       const isMe = String(member._id) === String(user?._id);
-      const res = await api.patch(isMe ? "/members/me" : `/members/${member._id}`, phoneForm);
+      const { role, textConsent, ...details } = phoneForm;
+      const body = { ...details };
+      // Role changes (not the owner's own, and handing over ownership is its own step below).
+      if (!isMe && canManage && member.role !== "owner" && role !== member.role && role !== "owner") body.role = role;
+      if (isMe && textConsent && member.textStatus !== "opted_in") body.textConsent = true;
+      const res = await api.patch(isMe ? "/members/me" : `/members/${member._id}`, body);
       setMembers((list) => list.map((m) => (String(m._id) === String(member._id) ? { ...m, ...res.data } : m)));
       setPhoneTarget(null);
+      if (role === "owner" && member.role !== "owner") {
+        setOwnerTarget({ ...member, ...res.data });
+        return;
+      }
       const askedToText = res.data?.textStatus === "pending" && member.textStatus !== "pending";
+      const textsOn = res.data?.textStatus === "opted_in" && member.textStatus !== "opted_in";
       const newEmail = res.data?.email && res.data.email !== member.email;
       toast.success(
-        askedToText
+        textsOn
+          ? "Saved. Texts are on; a confirmation text is on its way."
+          : askedToText
           ? `Saved. ${isMe ? "You'll" : `${res.data.name.split(" ")[0]} will`} get a text asking to reply START.`
           : newEmail && member.invitePending
             ? `Saved. The invite went to ${res.data.email}.`
@@ -148,18 +170,6 @@ export default function MembersPage() {
       toast.error(err?.response?.data?.message || "Couldn't save the changes");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleRoleChange = async (member, role) => {
-    try {
-      await api.patch(`/members/${member._id}`, { role });
-      toast.success(`${member.name} is now a ${role}`, { position: "top-right", autoClose: 2000 });
-      afterChange();
-    } catch (err) {
-      if (err?.response?.status !== 402) {
-        toast.error(errorMessage(err, "Couldn't change the role"), { position: "top-right" });
-      }
     }
   };
 
@@ -287,7 +297,7 @@ export default function MembersPage() {
                         (you)
                       </Typography>
                     )}
-                    {(isMe || canManage) && (
+                    {isMe && !canManage && (
                       <Button size="small" onClick={() => openPhone(member)} sx={{ ml: 0.5, textTransform: "none", minWidth: 0, p: 0.25 }}>
                         Edit
                       </Button>
@@ -312,28 +322,14 @@ export default function MembersPage() {
                   </TableCell>
                   <TableCell>{member.email}</TableCell>
                   <TableCell>
-                    {canManage && !isOwner ? (
-                      <TextField
-                        select
-                        size="small"
-                        value={member.role}
-                        onChange={(e) => handleRoleChange(member, e.target.value)}
-                        sx={{ minWidth: 140 }}
-                      >
-                        <MenuItem value="administrator">Admin</MenuItem>
-                        <MenuItem value="scheduler">Scheduler</MenuItem>
-                        <MenuItem value="viewer">Viewer</MenuItem>
-                      </TextField>
-                    ) : (
-                      <Box>
-                        <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
-                          {ROLE_NAME[member.role] || member.role}
-                        </Typography>
-                        <Typography color="text.secondary" sx={{ fontSize: 12 }}>
-                          {ROLE_INFO[member.role]}
-                        </Typography>
-                      </Box>
-                    )}
+                    <Box>
+                      <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
+                        {ROLE_NAME[member.role] || member.role}
+                      </Typography>
+                      <Typography color="text.secondary" sx={{ fontSize: 12 }}>
+                        {ROLE_INFO[member.role]}
+                      </Typography>
+                    </Box>
                   </TableCell>
                   <TableCell>
                     {(() => {
@@ -353,21 +349,21 @@ export default function MembersPage() {
                   </TableCell>
                   {canManage && (
                     <TableCell>
-                      {!isOwner && (
+                      {(
                         <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                          <Button size="small" variant="outlined" onClick={() => openPhone(member)} sx={{ textTransform: "none" }}>
+                            Edit
+                          </Button>
                           {member.invitePending && (
                             <Button size="small" variant="outlined" onClick={() => handleResend(member)} sx={{ textTransform: "none" }}>
                               Resend invite
                             </Button>
                           )}
-                          {canTransfer && !member.invitePending && ["scheduler", "administrator"].includes(member.role) && (
-                            <Button size="small" variant="outlined" onClick={() => setOwnerTarget(member)} sx={{ textTransform: "none" }}>
-                              Make owner
+                          {!isOwner && (
+                            <Button size="small" variant="contained" color="error" onClick={() => setRemoveTarget(member)} sx={{ textTransform: "none" }}>
+                              Remove
                             </Button>
                           )}
-                          <Button size="small" variant="contained" color="error" onClick={() => setRemoveTarget(member)} sx={{ textTransform: "none" }}>
-                            Remove
-                          </Button>
                         </Stack>
                       )}
                     </TableCell>
@@ -394,13 +390,33 @@ export default function MembersPage() {
               helperText={
                 phoneTarget?.invitePending
                   ? "Changing it sends the invite to the new address."
-                  : "This is how they sign in, so they'll use the new one from now on."
+                  : phoneTarget && String(phoneTarget._id) === String(user?._id)
+                    ? "This is how you sign in, so you'll use the new one from now on."
+                    : "This is how they sign in, so they'll use the new one from now on."
               }
               fullWidth
             />
+            {canManage && phoneTarget && String(phoneTarget._id) !== String(user?._id) && phoneTarget.role !== "owner" && (
+              <TextField
+                select
+                label="Role"
+                value={phoneForm.role}
+                onChange={(e) => setPhoneForm({ ...phoneForm, role: e.target.value })}
+                helperText={phoneForm.role === "owner" ? "You'll confirm handing over ownership next. You become a scheduler." : ROLE_INFO[phoneForm.role]}
+              >
+                <MenuItem value="administrator">Admin</MenuItem>
+                <MenuItem value="scheduler">Scheduler</MenuItem>
+                <MenuItem value="viewer">Viewer</MenuItem>
+                {canTransfer && !phoneTarget.invitePending && ["scheduler", "administrator"].includes(phoneTarget.role) && (
+                  <MenuItem value="owner">Owner (hand over ownership)</MenuItem>
+                )}
+              </TextField>
+            )}
           </Stack>
           <Typography color="text.secondary" sx={{ fontSize: 13, mt: 2, mb: 1 }}>
-            Mobile, for texts when someone calls out or asks for time off, and a short morning summary. A new number gets one text asking them to reply START.
+            {phoneTarget && String(phoneTarget._id) === String(user?._id)
+              ? "Your mobile, for texts when someone calls out or asks for time off, and a short morning summary."
+              : "Mobile, for texts when someone calls out or asks for time off, and a short morning summary. A new number gets one text asking them to reply START."}
           </Typography>
           <Stack direction="row" spacing={1}>
             <TextField
@@ -417,6 +433,24 @@ export default function MembersPage() {
               fullWidth
             />
           </Stack>
+          {phoneTarget && String(phoneTarget._id) === String(user?._id) && phoneForm.userPhone.trim() && (
+            <FormControlLabel
+              sx={{ mt: 1, alignItems: "flex-start" }}
+              control={
+                <Checkbox
+                  checked={phoneForm.textConsent}
+                  disabled={phoneTarget.textStatus === "opted_in" && phoneForm.userPhone === (phoneTarget.userPhone || "")}
+                  onChange={(e) => setPhoneForm({ ...phoneForm, textConsent: e.target.checked })}
+                  sx={{ pt: 0.25 }}
+                />
+              }
+              label={
+                <Typography sx={{ fontSize: 13.5 }}>
+                  Text me when someone calls out or asks for time off, plus a short morning summary. Msg &amp; data rates may apply; reply STOP any time.
+                </Typography>
+              }
+            />
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPhoneTarget(null)} sx={{ textTransform: "none" }}>
@@ -454,6 +488,17 @@ export default function MembersPage() {
               <MenuItem value="scheduler">Scheduler</MenuItem>
               <MenuItem value="viewer">Viewer</MenuItem>
             </TextField>
+            <Stack direction="row" spacing={1}>
+              <TextField label="Code" value={invite.userPhoneCountryCode} onChange={(e) => setInvite({ ...invite, userPhoneCountryCode: e.target.value })} sx={{ width: 90 }} />
+              <TextField
+                label="Mobile (optional)"
+                value={invite.userPhone}
+                onChange={(e) => setInvite({ ...invite, userPhone: e.target.value })}
+                placeholder="(470) 555-0100"
+                helperText="For texts about call-outs and time off. They'll get one text asking them to reply START."
+                fullWidth
+              />
+            </Stack>
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>

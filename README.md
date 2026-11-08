@@ -28,6 +28,11 @@ WiserShifts is a **white-label, multi-tenant workforce management SaaS** built f
 - [Messages](#messages)
 - [Staff Preferences](#staff-preferences)
 - [Billing / Subscription](#billing--subscription)
+- [Team Members & Texting](#team-members--texting)
+- [Call-Outs & Open-Shift Texts](#call-outs--open-shift-texts)
+- [Manager Alerts & Morning Summary](#manager-alerts--morning-summary)
+- [When We Text and When We Email](#when-we-text-and-when-we-email)
+- [HQ (WiserShifts' Back Office)](#hq-wisershifts-back-office)
 
 12. [Interactive Guide Tours](#interactive-guide-tours)
 13. [Shared Components](#shared-components)
@@ -232,12 +237,16 @@ Workspace routing in the frontend is for discovery and presentation, not access 
 
 ## Role System
 
-Two role categories control what a user sees and can do:
+A person is either a **team member** (has a login) or **staff** (on the schedule, usually reached by text or email and their personal link `/s/:token`, no password).
 
-| Role value                 | `isAdmin` | Sidebar & access                                                                          |
-| -------------------------- | --------- | ----------------------------------------------------------------------------------------- |
-| `"admin"` / `"superadmin"` | `true`    | Admin menu: staff mgmt, coverage, schedule builder, time-off decisions, billing, messages |
-| `"staff"` (or any other)   | `false`   | Staff menu: my schedule, preferences, my time-off requests, shift swaps, messages         |
+| Team member role | Can do                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------ |
+| `owner`          | Everything, including billing and handing over ownership. One per workspace                |
+| `administrator`  | Runs the workspace alongside the owner (members, settings, schedules). Only the owner hands over ownership |
+| `scheduler`      | Build and publish schedules, coverage, call-outs, time-off decisions (`admin` is a legacy alias) |
+| `viewer`         | Read-only (free seat)                                                                      |
+
+Owners, administrators and schedulers are the **managers**: they get the call-out alerts, the morning summary and the next-step nudges. Staff without a login use the staff link page.
 
 Role is stored in the `role` field on the user object returned by the backend. It is mirrored in `localStorage` for persistence. Components consume it via `const { role, isAdmin, can } = useAuth()`.
 
@@ -310,6 +319,18 @@ The full `<BrowserRouter>` renders with a persistent `<Sidebar>` + `<Navbar>` sh
 | `/timeoff-requests`        | `TimeOffRequestList`    | Private                     |
 | `/messages`                | `MessageList`           | Private                     |
 | `/preferences`             | `PreferencesPage`       | Private — staff             |
+| `/setup`                   | Setup wizard            | Private — managers          |
+| `/members`                 | `MembersPage`           | Private — owner / admin     |
+| `/labor`                   | Labor (overtime, hours per resident day) | Private — managers |
+| `/staffing-template`       | Staffing template       | Private — managers          |
+| `/facility-preferences`    | `FacilityPreferencesPage` | Private — managers        |
+| `/time-tracking`, `/payroll-exports` | Time clock and payroll exports | Private — managers |
+| `/s/:token`                | `StaffLinkPage` (a staff member's own schedule, no login) | Public, by link |
+| `/hq/*`                    | HQ, a separate app (see below) | HQ login              |
+
+Plus public marketing pages: `/pricing`, `/blog`, `/calculators/*`, `/features/:feature`, `/for/:role`, `/integrations`, legal pages.
+
+`/schedule?callout=<id>` opens the call-out dialog for that call-out straight away. The call-out alert's **Fill it** link uses it.
 
 > Note: `PrivateRoute` only checks authentication. Role-level restrictions (e.g. admin-only pages) are enforced by the backend API responses or by conditional rendering inside the components.
 
@@ -338,6 +359,7 @@ While paywalled, the entire app collapses to a single `/billing` route served by
 - **Taxonomy Model:** `roleFamilies`, `unitAreas`, `shiftTypes`, `shiftTypeDefinitions` (with time slots e.g. `day_am 07:00-15:00`), and `certificationTags`.
 - **Scheduling Policy & Workload:** Configures rotation patterns (`balance`, `4_on_4_off`, `2_2_3`, `panama`, `fixed_5_2`, `rotating_3`, `custom`), weekly overtime thresholds, and fairness lookback windows.
 - **Time Tracking:** Supports open or QR-code based attendance with clock in/out grace minutes and rounding intervals.
+- **Who gets a reminder** (Notifications): **Smart** (default) reminds staff only before their first shift back after a day off, so people working several days in a row don't get a text every day. **Every shift**, or **Off**. Saves texts.
 
 Values are normalized to `snake_case` for database persistence and rendered as human-friendly labels in the UI.
 
@@ -436,6 +458,7 @@ Admins see all requests org-wide. A new swap is initiated via `ShiftSwapRequestM
 - **Days to Avoid** — Weekdays the staff member prefers to have off.
 - **Open to Overtime** — Switch indicating willingness to take overtime hours without penalty in AI ranking.
 - **Notification Preferences** — Email and SMS alert toggles.
+- **Morning summary** (managers, in `StaffCreateAndEditForm`): turn off the 6 a.m. summary for one person.
 
 Internal administrative controls (target hours, max shifts, consecutive days, rotation) are strictly hidden from the staff view and managed exclusively by administrators in `StaffCreateAndEditForm`.
 
@@ -444,6 +467,93 @@ Internal administrative controls (target hours, max shifts, consecutive days, ro
 ### Billing / Subscription
 
 **`ManageSubscription`** handles Stripe plan upgrades, seat limits, and portal management with paywall protection.
+
+---
+
+### Team Members & Texting
+
+**`MembersPage`** (`/members`) lists everyone with a login.
+
+- **Invite** takes name, email, role and an optional **phone**.
+- **Edit** (one dialog for the whole member) changes name, email, phone and role. Picking **Owner (hand over ownership)** asks to confirm first. This replaced the old inline role picker and "Make owner" button.
+  - A changed email re-sends the invite if they haven't joined yet.
+  - An email that's already in use is refused.
+- **Texts column** shows each person's texting status: Gets texts, Asked (no reply yet), Not asked, Said STOP, or No phone.
+- **Your own row:** add your number and tick **"Text me alerts…"** to get texts right away (consent given in the app, a confirmation text follows). Uses `PATCH /members/me`.
+- **Someone else's number:** they get one opt-in text and must reply START or YES themselves. Nobody can opt in for someone else.
+
+---
+
+### Call-Outs & Open-Shift Texts
+
+**`CallOutDialog`** (from a shift, or `/schedule?callout=<id>`) marks someone out and shows who can cover without going into overtime.
+
+- **Text who can cover** sends offers **in waves**: the 5 most likely to say yes first, then 5 more every 10 minutes while the shift is still open. The dialog says so.
+- **Urgent? Text all N now** (or **Text everyone now** after the first wave) skips the waves. Shifts starting within 3 hours always go to everyone at once.
+- Picking specific people texts just them.
+- The first person to reply YES gets the shift. Everyone else who was texted hears it's filled.
+
+---
+
+### Manager Alerts & Morning Summary
+
+These come from the backend; the frontend just links into them.
+
+- **Call-out alert:** when a staff member calls out themselves. A text if the shift starts within 24 hours, otherwise email. It links to `/schedule?callout=<id>`.
+- **Time-off request:** email. It also shows up in the morning summary.
+- **Morning summary, 6 a.m.:**
+  - **What's in it:** today's shifts, open slots, call-outs and who's covering, requests waiting, overtime, and the next step.
+  - **How it's sent:** a text only when something needs them, otherwise email. Nothing on a quiet day.
+- **Next-step nudges, 10 a.m. Mon/Wed/Fri on quiet days:**
+  - **The steps:** finish setup → add staff → add phones → publish → publish next week → get staff to say yes to texts.
+  - **How they're sent:** email, except "publish next week", which is a text.
+
+---
+
+### When We Text and When We Email
+
+The backend picks the channel. A **text** needs all of these:
+- a plan with texting
+- a phone number
+- the person said yes to texts
+- texts not turned off in their preferences
+- the workspace under its monthly text cap
+
+Otherwise it's an **email**.
+
+| Message | Who | Text when |
+|---|---|---|
+| Schedule published | staff on it | always (otherwise email) |
+| Changes to a published week ("Send changes") | people affected | always |
+| Shift reminder | staff | paid plans, per the reminder setting (smart by default) |
+| Open-shift offer | eligible staff | always, in waves |
+| "It's filled" | people who were texted the offer | always (text only) |
+| Time-off answer, staff link re-sent | the staff member | always |
+| Call-out alert | managers | shift starts within 24 hours |
+| Time-off request | managers | never (email) |
+| Morning summary | managers | something needs them (else email; nothing on quiet days) |
+| Next-step nudge | managers | only "publish next week" (else email) |
+| Invites, password resets, trial and billing, Monday labor email, "someone took the shift" | — | never (email) |
+
+The backend README has the full rules and costs.
+
+---
+
+### HQ (WiserShifts' Back Office)
+
+`wisershifts.com/hq` is a **separate app** for the WiserShifts team (`src/components/HQ`, mounted from `src/main.jsx` when the path starts with `/hq`).
+- **Login:** its own sign-in (`/hq/login`, HQ users created on the backend with `scripts/create-hq-user.js`).
+- **API:** it calls the backend through `hqApi.js`, which carries the HQ token, not the workspace one.
+
+| Menu | Pages |
+|---|---|
+| (Home) | **This week**: the week's checklist from the campaigns, "People to get back to", and **History** (last week, last 4 weeks, months or any dates: each campaign against its target, outcomes and the full log) |
+| Reach out | Facilities, Leaders & contacts (including "No longer works there" with a replacement contact), Facebook groups & people |
+| Publish | Content calendar |
+| Strategy | Playbook, Schedulers, DONs/EDs & admins, Scoreboard & all campaigns |
+| Results | Funnel, Signups, Klaviyo email, Website & search, Blog/video/LinkedIn |
+| Business | **Money**: profit and loss by month from Stripe (WiserShifts income only, MRR from paid-up subscriptions only, test customers hidden) plus expenses, and failed-payment nudges (with a test send) |
+| Settings | Connections & data; **Customer messages**: texting this month and its cost, find a workspace, see its managers' texting status, ask them to opt in, and send the morning summary, a nudge or a sample call-out alert for real |
 
 ---
 
@@ -576,6 +686,22 @@ Forms (create staff, create shift, request time off, compose message, etc.) are 
 
 7. **White-Label Workspace Foundation:**
    - Added root-domain workspace discovery, remembered-workspace continuation, tenant-subdomain login branding, and owner-managed tenant display names, logos, colors, and subdomains.
+
+8. **Managers Kept in the Loop:**
+   - Call-out alerts with a **Fill it** deep link (`/schedule?callout=<id>`), the 6 a.m. morning summary, and next-step nudges.
+   - A morning summary on/off switch per manager.
+
+9. **Team Members Page:**
+   - Phones on invite and Edit; one Edit dialog for name, email, phone and role (including handing over ownership).
+   - A Texts column, and in-app "Text me alerts" consent for your own number.
+
+10. **Smarter Texting:**
+    - Call-out offers in waves, with "Text everyone now".
+    - Smart shift reminders (Smart / Every shift / Off).
+    - The backend also cleans texts to plain characters and caps texts per workspace per month.
+
+11. **HQ:**
+    - The separate back office at `/hq`: This week with History, campaigns and scripts, Money from Stripe, and Customer messages for test sends and texting costs.
 
 ---
 

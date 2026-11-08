@@ -41,6 +41,21 @@ export default function HqCustomerMessages() {
       setBusy("");
     }
   };
+  const optIn = async () => {
+    setBusy("optin");
+    setErr("");
+    setResult(null);
+    try {
+      const { data } = await api.post(`/hq/customers/${w.tenant._id}/opt-in`, {});
+      setResult({ ...data, which: "optin", skipped: data.results.length ? null : "No managers to ask." });
+      const { data: fresh } = await api.get("/hq/customers/lookup", { params: email.includes("@") ? { email } : { q: email } });
+      setW(fresh);
+    } catch (e) {
+      setErr(e?.response?.data?.message || "Couldn't send it.");
+    } finally {
+      setBusy("");
+    }
+  };
   const send = async (which) => {
     setBusy(which);
     setErr("");
@@ -105,6 +120,18 @@ export default function HqCustomerMessages() {
 
           <Section title="Send for real, now">
             <Box sx={{ display: "grid", gap: 1.25 }}>
+              <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap" }}>
+                <Button variant="outlined" onClick={optIn} disabled={Boolean(busy) || !w.tenant.texting || !w.managers.some((m) => m.phone && !["opted_in", "opted_out"].includes(m.texts))} sx={{ minWidth: 250 }}>
+                  {busy === "optin" ? <CircularProgress size={18} /> : "Ask managers to opt in to texts"}
+                </Button>
+                <Typography sx={{ fontSize: 13, color: IOS.secondary, flex: 1, minWidth: 220 }}>
+                  {!w.tenant.texting
+                    ? "This plan doesn't include texting."
+                    : w.managers.every((m) => !m.phone)
+                      ? "No manager has a phone yet. Add it on their Members page (Texts → Add phone)."
+                      : "Texts each manager with a phone who hasn't said yes. Once they reply START or YES, alerts come by text."}
+                </Typography>
+              </Box>
               {SENDS.map(([k, label, note]) => (
                 <Box key={k} sx={{ display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap" }}>
                   <Button variant="outlined" onClick={() => send(k)} disabled={Boolean(busy) || (k === "nudge" && !w.nextStep)} sx={{ minWidth: 250 }}>

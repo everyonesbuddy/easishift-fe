@@ -26,6 +26,14 @@ import { useAuth } from "../../../context/AuthContext";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import { getRoleDisplayName } from "../../../constants/industryRoles";
 
+const TEXT_STATUS = {
+  opted_in: ["Gets texts", "#15803D"],
+  pending: ["Asked, waiting for START", "#B45309"],
+  none: ["Not asked yet", "#64748B"],
+  opted_out: ["Said STOP", "#B91C1C"],
+  no_phone: ["No phone", "#64748B"],
+};
+
 const ROLE_NAME = { owner: "Owner", administrator: "Admin", scheduler: "Scheduler", viewer: "Viewer" };
 
 const ROLE_INFO = {
@@ -58,6 +66,9 @@ export default function MembersPage() {
   const [invite, setInvite] = useState({ name: "", email: "", role: "scheduler" });
   const [saving, setSaving] = useState(false);
   const [removeTarget, setRemoveTarget] = useState(null);
+  // Phone for call-out alerts and the morning summary by text.
+  const [phoneTarget, setPhoneTarget] = useState(null);
+  const [phoneForm, setPhoneForm] = useState({ userPhoneCountryCode: "+1", userPhone: "" });
   const [ownerTarget, setOwnerTarget] = useState(null);
 
   const fetchMembers = async () => {
@@ -105,6 +116,32 @@ export default function MembersPage() {
           position: "top-right",
         });
       }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openPhone = (member) => {
+    setPhoneForm({ userPhoneCountryCode: member.userPhoneCountryCode || "+1", userPhone: member.userPhone || "" });
+    setPhoneTarget(member);
+  };
+  const savePhone = async () => {
+    const member = phoneTarget;
+    setSaving(true);
+    try {
+      const isMe = String(member._id) === String(user?._id);
+      const res = await api.patch(isMe ? "/members/me" : `/members/${member._id}`, phoneForm);
+      setMembers((list) => list.map((m) => (String(m._id) === String(member._id) ? { ...m, ...res.data } : m)));
+      setPhoneTarget(null);
+      toast.success(
+        res.data?.textStatus === "pending"
+          ? `Saved. ${isMe ? "You'll" : `${member.name.split(" ")[0]} will`} get a text asking to reply START.`
+          : res.data?.phoneE164
+            ? "Phone saved."
+            : "Phone removed.",
+      );
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Couldn't save the phone");
     } finally {
       setSaving(false);
     }
@@ -229,6 +266,7 @@ export default function MembersPage() {
               <TableCell sx={headCellSx}>Name</TableCell>
               <TableCell sx={headCellSx}>Email</TableCell>
               <TableCell sx={headCellSx}>Role</TableCell>
+              <TableCell sx={headCellSx}>Texts</TableCell>
               {canManage && <TableCell sx={headCellSx}>Actions</TableCell>}
             </TableRow>
           </TableHead>
@@ -288,6 +326,22 @@ export default function MembersPage() {
                       </Box>
                     )}
                   </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const [label, color] = TEXT_STATUS[member.textStatus] || TEXT_STATUS.none;
+                      return (
+                        <Box>
+                          {member.phoneE164 && <Typography sx={{ fontSize: 13 }}>{member.phoneE164}</Typography>}
+                          <Chip size="small" label={label} sx={{ bgcolor: "#F1F5F9", color, fontWeight: 600, mt: member.phoneE164 ? 0.25 : 0 }} />
+                          {(isMe || canManage) && (
+                            <Button size="small" onClick={() => openPhone(member)} sx={{ ml: 0.5, textTransform: "none", minWidth: 0 }}>
+                              {member.phoneE164 ? "Edit" : "Add phone"}
+                            </Button>
+                          )}
+                        </Box>
+                      );
+                    })()}
+                  </TableCell>
                   {canManage && (
                     <TableCell>
                       {!isOwner && (
@@ -315,6 +369,41 @@ export default function MembersPage() {
           </TableBody>
         </Table>
       </Paper>
+
+      <Dialog open={Boolean(phoneTarget)} onClose={() => setPhoneTarget(null)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontWeight: 800 }}>
+          {phoneTarget && String(phoneTarget._id) === String(user?._id) ? "Your phone" : `${phoneTarget?.name || ""}'s phone`}
+        </DialogTitle>
+        <DialogContent>
+          <Typography color="text.secondary" sx={{ fontSize: 14, mb: 2 }}>
+            For texts when someone calls out or asks for time off, and a short morning summary. A new number gets one text asking them to reply START.
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <TextField
+              label="Code"
+              value={phoneForm.userPhoneCountryCode}
+              onChange={(e) => setPhoneForm({ ...phoneForm, userPhoneCountryCode: e.target.value })}
+              sx={{ width: 90 }}
+            />
+            <TextField
+              label="Mobile number"
+              value={phoneForm.userPhone}
+              onChange={(e) => setPhoneForm({ ...phoneForm, userPhone: e.target.value })}
+              placeholder="(470) 555-0100"
+              fullWidth
+              autoFocus
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPhoneTarget(null)} sx={{ textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button variant="contained" disabled={saving} onClick={savePhone} sx={{ textTransform: "none" }}>
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={inviteOpen} onClose={() => setInviteOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle sx={{ fontWeight: 800 }}>Invite a member</DialogTitle>

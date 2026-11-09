@@ -10,6 +10,8 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
+  Menu,
   MenuItem,
   Paper,
   Stack,
@@ -21,19 +23,25 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { FiUserPlus } from "react-icons/fi";
+import { FiMoreHorizontal, FiUserPlus } from "react-icons/fi";
 import { toast } from "react-toastify";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import { getRoleDisplayName } from "../../../constants/industryRoles";
 
+// Only the states a customer can act on get a label. "Not asked yet" is our
+// plumbing, so a phone with no answer yet just shows the number.
 const TEXT_STATUS = {
-  opted_in: ["Gets texts", "#15803D"],
-  pending: ["Asked, waiting for START", "#B45309"],
-  none: ["Not asked yet", "#64748B"],
-  opted_out: ["Said STOP", "#B91C1C"],
-  no_phone: ["No phone", "#64748B"],
+  opted_in: ["Gets texts", "#15803D", "#F0FDF4"],
+  pending: ["Waiting for their reply", "#B45309", "#FFFBEB"],
+  opted_out: ["Texts off", "#64748B", "#F1F5F9"],
+};
+
+/** +16783139368 → (678) 313-9368; other countries stay as they are. */
+const formatPhone = (e164) => {
+  const m = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(e164 || "");
+  return m ? `(${m[1]}) ${m[2]}-${m[3]}` : e164;
 };
 
 const ROLE_NAME = { owner: "Owner", administrator: "Admin", scheduler: "Scheduler", viewer: "Viewer" };
@@ -68,6 +76,7 @@ export default function MembersPage() {
   const [invite, setInvite] = useState({ name: "", email: "", role: "scheduler", userPhoneCountryCode: "+1", userPhone: "" });
   const [saving, setSaving] = useState(false);
   const [removeTarget, setRemoveTarget] = useState(null);
+  const [menu, setMenu] = useState(null); // { anchor, member }
   // Phone for call-out alerts and the morning summary by text.
   const [phoneTarget, setPhoneTarget] = useState(null);
   const [phoneForm, setPhoneForm] = useState({ name: "", email: "", userPhoneCountryCode: "+1", userPhone: "", role: "", textConsent: false });
@@ -280,7 +289,7 @@ export default function MembersPage() {
               <TableCell sx={headCellSx}>Name</TableCell>
               <TableCell sx={headCellSx}>Email</TableCell>
               <TableCell sx={headCellSx}>Role</TableCell>
-              <TableCell sx={headCellSx}>Texts</TableCell>
+              <TableCell sx={headCellSx}>Phone</TableCell>
               {canManage && <TableCell sx={headCellSx}>Actions</TableCell>}
             </TableRow>
           </TableHead>
@@ -290,7 +299,7 @@ export default function MembersPage() {
               const isOwner = member.role === "owner";
               return (
                 <TableRow key={member._id} hover>
-                  <TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>
                     {member.name}
                     {isMe && (
                       <Typography component="span" color="text.secondary" sx={{ ml: 1, fontSize: 12 }}>
@@ -303,21 +312,17 @@ export default function MembersPage() {
                       </Button>
                     )}
                     {member.invitePending && (
-                      <Chip size="small" label="Invite pending" sx={{ ml: 1 }} />
+                      <Typography sx={{ fontSize: 12, color: "#B45309" }}>Invite not accepted yet</Typography>
                     )}
-                    {member.staffProfileId ? (
-                      <Chip size="small" label="Also on the schedule" sx={{ ml: 1, bgcolor: "#F0FDFA", color: "#0F766E" }} />
-                    ) : (
-                      canAddStaff &&
-                      (isMe || canManage) && (
-                        <Button
-                          size="small"
-                          onClick={() => openSchedule(member)}
-                          sx={{ ml: 1, textTransform: "none", minWidth: 0, p: 0.25 }}
-                        >
-                          {isMe ? "Put me on the schedule" : "Put on the schedule"}
-                        </Button>
-                      )
+                    {member.staffProfileId && (
+                      <Typography color="text.secondary" sx={{ fontSize: 12 }}>
+                        Also on the schedule
+                      </Typography>
+                    )}
+                    {!member.staffProfileId && canAddStaff && isMe && !canManage && (
+                      <Button size="small" onClick={() => openSchedule(member)} sx={{ display: "block", textTransform: "none", minWidth: 0, p: 0, fontSize: 12 }}>
+                        Add me to the schedule
+                      </Button>
                     )}
                   </TableCell>
                   <TableCell>{member.email}</TableCell>
@@ -333,14 +338,25 @@ export default function MembersPage() {
                   </TableCell>
                   <TableCell>
                     {(() => {
-                      const [label, color] = TEXT_STATUS[member.textStatus] || TEXT_STATUS.none;
+                      const status = member.phoneE164 ? TEXT_STATUS[member.textStatus] : null;
+                      if (!member.phoneE164) {
+                        return isMe || canManage ? (
+                          <Button size="small" onClick={() => openPhone(member)} sx={{ textTransform: "none", minWidth: 0, p: 0 }}>
+                            Add phone
+                          </Button>
+                        ) : (
+                          <Typography color="text.secondary" sx={{ fontSize: 13 }}>-</Typography>
+                        );
+                      }
                       return (
                         <Box>
-                          {member.phoneE164 && <Typography sx={{ fontSize: 13 }}>{member.phoneE164}</Typography>}
-                          <Chip size="small" label={label} sx={{ bgcolor: "#F1F5F9", color, fontWeight: 600, mt: member.phoneE164 ? 0.25 : 0 }} />
-                          {(isMe || canManage) && !member.phoneE164 && (
-                            <Button size="small" onClick={() => openPhone(member)} sx={{ ml: 0.5, textTransform: "none", minWidth: 0 }}>
-                              Add phone
+                          <Typography sx={{ fontSize: 13 }}>{formatPhone(member.phoneE164)}</Typography>
+                          {status && (
+                            <Chip size="small" label={status[0]} sx={{ bgcolor: status[2], color: status[1], fontWeight: 600, mt: 0.25 }} />
+                          )}
+                          {isMe && !status && (
+                            <Button size="small" onClick={() => openPhone(member)} sx={{ display: "block", textTransform: "none", minWidth: 0, p: 0, fontSize: 12 }}>
+                              Turn on text alerts
                             </Button>
                           )}
                         </Box>
@@ -350,19 +366,14 @@ export default function MembersPage() {
                   {canManage && (
                     <TableCell>
                       {(
-                        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ whiteSpace: "nowrap" }}>
                           <Button size="small" variant="outlined" onClick={() => openPhone(member)} sx={{ textTransform: "none" }}>
                             Edit
                           </Button>
-                          {member.invitePending && (
-                            <Button size="small" variant="outlined" onClick={() => handleResend(member)} sx={{ textTransform: "none" }}>
-                              Resend invite
-                            </Button>
-                          )}
-                          {!isOwner && (
-                            <Button size="small" variant="contained" color="error" onClick={() => setRemoveTarget(member)} sx={{ textTransform: "none" }}>
-                              Remove
-                            </Button>
+                          {(member.invitePending || (!member.staffProfileId && canAddStaff) || !isOwner) && (
+                            <IconButton size="small" aria-label={`More for ${member.name}`} onClick={(e) => setMenu({ anchor: e.currentTarget, member })}>
+                              <FiMoreHorizontal size={16} />
+                            </IconButton>
                           )}
                         </Stack>
                       )}
@@ -374,6 +385,43 @@ export default function MembersPage() {
           </TableBody>
         </Table>
       </Paper>
+
+      <Menu anchorEl={menu?.anchor} open={Boolean(menu)} onClose={() => setMenu(null)}>
+        {menu?.member.invitePending && (
+          <MenuItem
+            onClick={() => {
+              const m = menu.member;
+              setMenu(null);
+              handleResend(m);
+            }}
+          >
+            Resend invite
+          </MenuItem>
+        )}
+        {menu && !menu.member.staffProfileId && canAddStaff && (
+          <MenuItem
+            onClick={() => {
+              const m = menu.member;
+              setMenu(null);
+              openSchedule(m);
+            }}
+          >
+            Add to the schedule
+          </MenuItem>
+        )}
+        {menu && menu.member.role !== "owner" && (
+          <MenuItem
+            onClick={() => {
+              const m = menu.member;
+              setMenu(null);
+              setRemoveTarget(m);
+            }}
+            sx={{ color: "error.main" }}
+          >
+            Remove from team
+          </MenuItem>
+        )}
+      </Menu>
 
       <Dialog open={Boolean(phoneTarget)} onClose={() => setPhoneTarget(null)} fullWidth maxWidth="xs">
         <DialogTitle sx={{ fontWeight: 800 }}>
@@ -512,8 +560,8 @@ export default function MembersPage() {
       <Dialog open={Boolean(scheduleTarget)} onClose={() => setScheduleTarget(null)} fullWidth maxWidth="xs">
         <DialogTitle sx={{ fontWeight: 800 }}>
           {scheduleTarget && String(scheduleTarget._id) === String(user?._id)
-            ? "Put yourself on the schedule"
-            : `Put ${scheduleTarget?.name || "them"} on the schedule`}
+            ? "Add yourself to the schedule"
+            : `Add ${scheduleTarget?.name || "them"} to the schedule`}
         </DialogTitle>
         <DialogContent>
           <Typography color="text.secondary" sx={{ mb: 2 }}>

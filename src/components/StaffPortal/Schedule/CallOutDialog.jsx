@@ -86,11 +86,13 @@ export default function CallOutDialog({ open, schedule, onClose, onChanged }) {
     }
   };
 
-  const textEligible = async () => {
+  // Default: the people most likely to say yes first, the rest in waves while it's open.
+  // everyone: text all of them now (urgent).
+  const textEligible = async (everyone = false) => {
     if (!coverage?._id) return;
     setBusy(true);
     try {
-      const res = await api.post(`/coverage/${coverage._id}/fill-by-text`, {});
+      const res = await api.post(`/coverage/${coverage._id}/fill-by-text`, everyone ? { everyone: true } : {});
       setTextResult(res.data);
     } catch (err) {
       const data = err?.response?.data;
@@ -147,9 +149,19 @@ export default function CallOutDialog({ open, schedule, onClose, onChanged }) {
             {textResult ? (
               <Alert severity="success">
                 Offered to {textResult.sentTo}{" "}
-                {textResult.sentTo === 1 ? "person" : "people"}: {textResult.bySms || 0} by
+                {textResult.sentTo === 1 ? "person" : "people"}
+                {textResult.queued > 0 ? " most likely to say yes" : ""}: {textResult.bySms || 0} by
                 text, {textResult.byEmail || 0} by email. The first to say yes gets the
                 shift, and you'll get an email.
+                {textResult.queued > 0 && (
+                  <Box sx={{ mt: 1 }}>
+                    If nobody takes it, {textResult.queued} more get it, {textResult.waveSize} at a time every{" "}
+                    {textResult.waveMinutes} minutes, until it's filled.{" "}
+                    <Button size="small" disabled={busy} onClick={() => textEligible(true)} sx={{ textTransform: "none", p: 0, minWidth: 0, verticalAlign: "baseline" }}>
+                      Text everyone now
+                    </Button>
+                  </Box>
+                )}
                 {textResult.notReached?.length > 0 && (
                   <Box sx={{ mt: 1 }}>
                     Not reached:{" "}
@@ -166,18 +178,23 @@ export default function CallOutDialog({ open, schedule, onClose, onChanged }) {
                     variant="contained"
                     fullWidth
                     disabled={busy || coverage?.remaining <= 0}
-                    onClick={textEligible}
+                    onClick={() => textEligible(false)}
                     sx={{ textTransform: "none", py: 1.2, borderRadius: 2 }}
                   >
-                    Text {eligible.length} eligible{" "}
-                    {eligible.length === 1 ? "person" : "people"}. First YES gets it
+                    {eligible.length > 5 ? "Text who can cover" : `Text ${eligible.length} eligible ${eligible.length === 1 ? "person" : "people"}`}. First YES gets it
                     {!canText && (
                       <Chip size="small" label="Starter" sx={{ ml: 1, bgcolor: "#fff" }} />
                     )}
                   </Button>
                   <Typography variant="caption" color="text.secondary">
                     People this would put into overtime are skipped.
+                    {eligible.length > 5 ? " The 5 most likely to say yes get it first; the rest follow every 10 minutes if it's still open." : ""}
                   </Typography>
+                  {eligible.length > 5 && (
+                    <Button size="small" disabled={busy || coverage?.remaining <= 0} onClick={() => textEligible(true)} sx={{ textTransform: "none", display: "block", mt: 0.5, p: 0 }}>
+                      Urgent? Text all {eligible.length} now
+                    </Button>
+                  )}
                 </Box>
               )
             )}

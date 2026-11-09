@@ -21,6 +21,7 @@ import HqWeek from "./HqWeek";
 import HqPlays from "./HqPlays";
 import HqFacebook from "./HqFacebook";
 import HqMoney from "./HqMoney";
+import HqCustomerMessages from "./HqCustomerMessages";
 
 const LeadershipPage = (props) => <HqAudience {...props} audiences={["director", "operator"]} />;
 const SchedulersPage = (props) => <HqAudience {...props} audiences={["scheduler"]} />;
@@ -89,7 +90,13 @@ const GROUPS = [
     ],
   },
   { label: "Business", items: [{ id: "money", label: "Money", Comp: HqMoney, title: "Money", sub: "Profit and loss by month: Stripe income, what we pay for, and who's subscribed." }] },
-  { label: "Settings", items: [{ id: "connections", label: "Connections & data", Comp: HqConnections, title: "Connections and data", sub: "Keys, imports, Google Sheets and backups." }] },
+  {
+    label: "Settings",
+    items: [
+      { id: "connections", label: "Connections & data", Comp: HqConnections, title: "Connections and data", sub: "Keys, imports, Google Sheets and backups." },
+      { id: "customer-messages", label: "Customer messages", Comp: HqCustomerMessages, title: "Customer messages", sub: "Send a workspace's managers the morning summary, a next-step nudge or a call-out alert, to test them." },
+    ],
+  },
 ];
 const ITEMS = GROUPS.flatMap((g) => g.items);
 // Old links keep working.

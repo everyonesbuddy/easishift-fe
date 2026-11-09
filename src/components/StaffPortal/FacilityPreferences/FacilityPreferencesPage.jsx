@@ -1167,6 +1167,20 @@ export default function FacilityPreferencesPage() {
                   label="Tell staff about open shifts"
                 />
               </Row>
+              <Row label="Who gets a reminder" help="Smart texts only the first shift back after a day off; people working days in a row already know. Saves a lot of texts.">
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  value={prefs.shiftReminderMode || "smart"}
+                  onChange={(_, v) => v && handleChange("shiftReminderMode", v)}
+                  disabled={readOnly}
+                  sx={segmentedSx}
+                >
+                  <ToggleButton value="smart">Smart</ToggleButton>
+                  <ToggleButton value="all">Every shift</ToggleButton>
+                  <ToggleButton value="off">Off</ToggleButton>
+                </ToggleButtonGroup>
+              </Row>
               <Row label="Shift reminder" help="How long before a shift staff get a reminder.">
                 <Box sx={{ display: "flex", alignItems: "center" }}>
                   <Field

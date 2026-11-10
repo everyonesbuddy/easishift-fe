@@ -749,6 +749,8 @@ function Tasks({ tasks, today, busyId, onTick, onRemove, onAdd }) {
  */
 export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
   const [data, setData] = useState(null);
+  const [gov, setGov] = useState([]); // government deadlines (only the week load sends them)
+  const navigate = useNavigate();
   const [error, setError] = useState("");
   const [view, setView] = useState("today");
   const [busyId, setBusyId] = useState(null);
@@ -769,7 +771,11 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
     let off = false;
     api
       .get("/hq/week")
-      .then((res) => !off && setData(res.data))
+      .then((res) => {
+        if (off) return;
+        setData(res.data);
+        setGov(res.data.gov || []);
+      })
       .catch((err) => !off && setError(errorText(err, "Couldn't load this week")));
     return () => {
       off = true;
@@ -900,6 +906,23 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
 
   return (
     <Box sx={{ display: "grid", gap: 2 }}>
+      {/* Government contract deadlines: questions and responses due soon */}
+      {!audiences && gov.length > 0 && (
+        <Box sx={{ bgcolor: IOS.surface, border: `1px solid ${IOS.hairline}`, borderRadius: IOS.radius.card, p: { xs: 2, md: 2.5 } }}>
+          <Typography sx={{ fontWeight: 700, fontSize: 15.5, mb: 0.75 }}>Government contract deadlines</Typography>
+          {gov.map((t) => (
+            <ButtonBase
+              key={`${t.refId}:${t.kind}`}
+              onClick={() => navigate(`/hq/government?listing=${t.refId}`)}
+              sx={{ display: "flex", gap: 1, alignItems: "baseline", flexWrap: "wrap", justifyContent: "flex-start", textAlign: "left", py: 0.5, width: "100%" }}
+            >
+              <Box component="span" sx={{ fontSize: 12.5, fontWeight: 700, color: t.kind === "overdue" ? IOS.secondary : t.kind === "due" ? IOS.redText : IOS.orangeText, whiteSpace: "nowrap" }}>{t.title}</Box>
+              <Box component="span" sx={{ fontSize: 14, fontWeight: 600 }}>{t.listing}</Box>
+              <Box component="span" sx={{ fontSize: 13, color: IOS.secondary }}>{t.detail}</Box>
+            </ButtonBase>
+          ))}
+        </Box>
+      )}
       {/* The week at a glance */}
       <Box sx={{ bgcolor: IOS.surface, border: `1px solid ${IOS.hairline}`, borderRadius: IOS.radius.card, p: { xs: 2, md: 2.5 } }}>
         <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, flexWrap: "wrap" }}>

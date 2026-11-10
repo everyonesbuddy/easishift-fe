@@ -22,6 +22,7 @@ import HqPlays from "./HqPlays";
 import HqFacebook from "./HqFacebook";
 import HqMoney from "./HqMoney";
 import HqCustomerMessages from "./HqCustomerMessages";
+import HqGovernment from "./HqGovernment";
 
 const LeadershipPage = (props) => <HqAudience {...props} audiences={["director", "operator"]} />;
 const SchedulersPage = (props) => <HqAudience {...props} audiences={["scheduler"]} />;
@@ -63,6 +64,7 @@ const GROUPS = [
     items: [
       { id: "facilities", label: "Facilities", Comp: HqFacilities, title: "Facilities", sub: "Every building we market to. Open one to call it, log it and see its history." },
       { id: "people", label: "Leaders & contacts", Comp: HqPeople, title: "Leaders & contacts", sub: "The people at those buildings, executives first." },
+      { id: "government", label: "Government contracts", Comp: HqGovernment, title: "Government contracts", sub: "Federal listings from SAM.gov every morning, state and county ones you add, and where we stand on each. Deadlines also show in This week." },
       { id: "facebook", label: "Facebook groups & people", Comp: HqFacebook, title: "Facebook", sub: "The groups where our buyers talk, where we stand in each, and everyone to message from them. Everything here also shows up in This week." },
     ],
   },

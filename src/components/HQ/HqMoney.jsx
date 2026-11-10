@@ -238,6 +238,39 @@ function ImportDialog({ onClose, year, onDone }) {
   );
 }
 
+const shortDate = (d, year) => (d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", ...(year ? { year: "numeric" } : {}) }) : "–");
+const days = (n) => `${n} day${n === 1 ? "" : "s"}`;
+
+/** Where a subscription stands on paying: an open invoice first (overdue or not), then its last payment. */
+function PaymentCell({ p }) {
+  if (!p) return <Typography sx={{ fontSize: 12, color: IOS.tertiary }}>–</Typography>;
+  return (
+    <Box>
+      {p.open && (
+        <Box sx={{ mb: p.lastPaid ? 0.25 : 0 }}>
+          <Tag color={p.open.daysOverdue ? IOS.redText : IOS.orangeText}>
+            {p.open.daysOverdue ? `Overdue ${days(p.open.daysOverdue)} · ${usd(p.open.amount)}` : `Invoice open · ${usd(p.open.amount)} due ${shortDate(p.open.due)}`}
+          </Tag>
+          {p.open.url && (
+            <Box component="a" href={p.open.url} target="_blank" rel="noreferrer" sx={{ ml: 0.75, fontSize: 12, color: IOS.blue }}>
+              Invoice
+            </Box>
+          )}
+        </Box>
+      )}
+      {p.lastPaid ? (
+        <Typography sx={{ fontSize: 12, color: p.lastPaid.daysLate > 7 ? IOS.orangeText : IOS.secondary }}>
+          Paid {shortDate(p.lastPaid.paidAt)}
+          {p.lastPaid.daysAfter > 1 ? ` · ${days(p.lastPaid.daysAfter)} after the invoice` : " · on time"}
+          {p.latePaid > 1 ? ` · late ${p.latePaid} of ${p.paidCount} times` : ""}
+        </Typography>
+      ) : (
+        !p.open && <Typography sx={{ fontSize: 12, color: IOS.tertiary }}>No payments yet</Typography>
+      )}
+    </Box>
+  );
+}
+
 export default function HqMoney() {
   const nowYear = new Date().getFullYear();
   const [year, setYear] = useState(nowYear);
@@ -337,6 +370,15 @@ export default function HqMoney() {
               {data.failing === 1 ? "'s payment" : "'s payments"} failed ({usd(data.atRisk)} a month). It isn't counted in MRR or income until it goes through. Use Nudge in Subscriptions to email them the pay link.
             </Alert>
           )}
+          {data.overdue > 0 && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {data.subscriptions
+                .filter((s) => s.payments?.open?.daysOverdue > 0)
+                .map((s) => `${s.customer} (${usd(s.payments.open.amount)}, ${days(s.payments.open.daysOverdue)} overdue)`)
+                .join(", ")}{" "}
+              {data.overdue === 1 ? "has an unpaid invoice" : "have unpaid invoices"}. See Subscriptions below.
+            </Alert>
+          )}
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(3, minmax(0, 1fr))", xl: "repeat(6, minmax(0, 1fr))" }, gap: 1, mb: 2.5 }}>
             <Stat
               label="MRR"
@@ -354,6 +396,41 @@ export default function HqMoney() {
               detail={data.covered ? "MRR covers monthly costs" : data.breakEven === null ? `${usd(data.burn - data.mrr)} a month to cover` : `paying customer${data.breakEven === 1 ? "" : "s"} to cover ${usd(data.burn - data.mrr)} a month`}
             />
           </Box>
+
+          {data.cash && (
+            <Section
+              title="Where the money is"
+              note="Earned and settling are WiserShifts payments only, after Stripe's fees. Settling is paid but not in your Stripe balance yet. The balance and payouts are for the whole Stripe account, since Stripe can't split them by business."
+              sx={{ mb: 2.5 }}
+            >
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", md: "repeat(4, minmax(0, 1fr))" }, gap: 1 }}>
+                <Stat label={`Earned · ${year}`} value={usd(data.cash.earned)} detail="WiserShifts, after fees" />
+                <Stat
+                  label="Settling"
+                  value={usd(data.cash.settling)}
+                  tone={data.cash.settling ? IOS.blue : undefined}
+                  detail={data.cash.settling ? (data.cash.landsOn ? `paid; available by ${shortDate(data.cash.landsOn)}` : "paid; available soon") : "nothing waiting"}
+                />
+                <Stat
+                  label="Stripe balance"
+                  value={data.cash.account ? usd(data.cash.account.available) : "–"}
+                  tone={data.cash.account?.available < 0 ? IOS.orangeText : undefined}
+                  detail={data.cash.account ? `${usd(data.cash.account.pending)} on the way in · whole account` : "key can't read the balance"}
+                />
+                <Stat
+                  label={`Paid out to the bank · ${year}`}
+                  value={data.cash.payouts ? usd(data.cash.payouts.total) : "–"}
+                  detail={
+                    data.cash.payouts?.last
+                      ? `last ${usd(data.cash.payouts.last.amount)}, ${data.cash.payouts.last.status === "paid" ? "arrived" : data.cash.payouts.last.status === "in_transit" ? "arrives" : data.cash.payouts.last.status} ${shortDate(data.cash.payouts.last.arrives)}`
+                      : data.cash.payouts
+                        ? "no payouts yet"
+                        : "key can't read payouts"
+                  }
+                />
+              </Box>
+            </Section>
+          )}
 
           <Section
             title={`Profit and loss · ${year}`}
@@ -484,10 +561,10 @@ export default function HqMoney() {
               <Empty>{st.configured ? "No subscriptions in Stripe yet." : "Connect Stripe to see subscriptions."}</Empty>
             ) : (
               <Box sx={{ overflowX: "auto" }}>
-                <Box component="table" sx={{ borderCollapse: "collapse", width: "100%", minWidth: 640 }}>
+                <Box component="table" sx={{ borderCollapse: "collapse", width: "100%", minWidth: 980 }}>
                   <thead>
                     <tr>
-                      {["Customer", "Plan", "A month", "Status", "Started", "", ""].map((h, i) => <Box component="th" key={h + i} sx={{ ...head, textAlign: i < 2 || i === 3 ? "left" : "right" }}>{h}</Box>)}
+                      {["Customer", "Plan", "A month", "Status", "This period", "Next charge", "Payments", "Started", "", ""].map((h, i) => <Box component="th" key={h + i} sx={{ ...head, textAlign: [0, 1, 3, 4, 5, 6].includes(i) ? "left" : "right" }}>{h}</Box>)}
                     </tr>
                   </thead>
                   <tbody>
@@ -503,6 +580,25 @@ export default function HqMoney() {
                           <Tag color={STATUS_COLOR[s.status] || IOS.secondary}>{s.statusLabel}</Tag>
                           {s.cancelAtPeriodEnd && s.status !== "canceled" && <Box component="span" sx={{ ml: 0.75 }}><Tag color={IOS.orangeText}>Ends at renewal</Tag></Box>}
                           {s.test && <Box component="span" sx={{ ml: 0.75 }}><Tag color={IOS.purple}>Looks like a test</Tag></Box>}
+                        </Box>
+                        <Box component="td" sx={{ ...cell, textAlign: "left", color: IOS.secondary, fontSize: 12.5 }}>
+                          {s.periodStart && s.periodEnd && s.status !== "canceled" ? `${shortDate(s.periodStart)} – ${shortDate(s.periodEnd)}` : "–"}
+                        </Box>
+                        <Box component="td" sx={{ ...cell, textAlign: "left", fontSize: 12.5 }}>
+                          {s.nextCharge ? (
+                            <>
+                              <Typography sx={{ fontSize: 12.5, fontWeight: 600 }}>{shortDate(s.nextCharge)} · {usd(s.amount)}</Typography>
+                              <Typography sx={{ fontSize: 11.5, color: IOS.secondary }}>
+                                every {s.every}
+                                {s.collection === "invoice" ? " · sends an invoice" : " · card on file"}
+                              </Typography>
+                            </>
+                          ) : (
+                            <Typography sx={{ fontSize: 12.5, color: IOS.tertiary }}>{s.cancelAtPeriodEnd ? "Won't renew" : "–"}</Typography>
+                          )}
+                        </Box>
+                        <Box component="td" sx={{ ...cell, textAlign: "left", whiteSpace: "normal", minWidth: 170 }}>
+                          <PaymentCell p={s.payments} />
                         </Box>
                         <Box component="td" sx={{ ...cell, color: IOS.secondary }}>{s.started ? new Date(s.started).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "–"}</Box>
                         <Box component="td" sx={{ ...cell, color: IOS.secondary, fontSize: 12 }}>

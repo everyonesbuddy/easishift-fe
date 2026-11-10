@@ -276,19 +276,47 @@ export default function HqGovernment({ reloadKey, onChanged }) {
       setBusy("");
     }
   };
+  // The check runs in the background on the server (SAM.gov can take minutes); look back every 8 seconds until it's done.
+  const [checking, setChecking] = useState(false);
+  const waitForCheck = useCallback(
+    async (before) => {
+      setChecking(true);
+      try {
+        for (let i = 0; i < 60; i += 1) {
+          await new Promise((r) => setTimeout(r, 8000));
+          const d = await load();
+          const f = d?.feed;
+          if (f && !f.running && f.lastTriedAt && f.lastTriedAt !== before) {
+            if (f.lastError) toast.warn(f.lastError);
+            else toast.success(f.lastAdded ? `${f.lastAdded} new listing${f.lastAdded === 1 ? "" : "s"}` : "Checked. Nothing new.");
+            return;
+          }
+        }
+      } finally {
+        setChecking(false);
+      }
+    },
+    [load],
+  );
   const refresh = async () => {
     setBusy("refresh");
+    const before = data?.feed?.lastTriedAt || null;
     try {
-      const { data: r } = await api.post("/hq/gov/refresh");
-      toast.success(r.added ? `${r.added} new listing${r.added === 1 ? "" : "s"}` : "Nothing new since the last check.");
-      await load();
+      await api.post("/hq/gov/refresh");
+      setBusy("");
+      await waitForCheck(before);
     } catch (e) {
-      toast.error(errorText(e, "Couldn't check SAM.gov."));
-      await load();
+      toast.error(errorText(e, "Couldn't start the check."));
     } finally {
       setBusy("");
     }
   };
+  // Opened while a check is running (the morning job, or Check now from before): follow it.
+  const runningOnLoad = data?.feed?.running;
+  useEffect(() => {
+    if (runningOnLoad && !checking) waitForCheck(data?.feed?.lastTriedAt || null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runningOnLoad]);
 
   if (error) return <Alert severity="error">{error}</Alert>;
   if (!data) return <CircularProgress size={22} />;
@@ -314,14 +342,14 @@ export default function HqGovernment({ reloadKey, onChanged }) {
         title="Federal listings from SAM.gov"
         note={
           feed.on
-            ? `Checked every morning for listings about scheduling staff, workforce management and timekeeping, plus software listings that mention them.${feed.lastFetchAt ? ` Last checked ${new Date(feed.lastFetchAt).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}${feed.lastAdded != null ? `, ${feed.lastAdded} new` : ""}.` : " Not checked yet."}`
+            ? `Checked every morning for listings about scheduling, staffing, workforce management and timekeeping, plus software publishers' listings that mention them.${checking ? " Checking SAM.gov now. It can take a few minutes; you can leave this page." : feed.lastTriedAt ? ` Last checked ${new Date(feed.lastTriedAt).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}${feed.lastAdded != null && !feed.lastError ? `, ${feed.lastAdded} new` : ""}.` : " Not checked yet."}`
             : "Turn this on with your SAM.gov Public API Key (SAM.gov → Account Details), saved on the server as SAM_GOV_API_KEY. State, county and city listings you add by hand either way."
         }
         right={
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", justifyContent: "flex-end" }}>
             {feed.on && (
-              <Button size="small" startIcon={busy === "refresh" ? <CircularProgress size={13} /> : <FiRefreshCw />} disabled={busy === "refresh"} onClick={refresh} sx={{ textTransform: "none", borderRadius: IOS.radius.round }}>
-                Check now
+              <Button size="small" startIcon={busy === "refresh" || checking ? <CircularProgress size={13} /> : <FiRefreshCw />} disabled={busy === "refresh" || checking} onClick={refresh} sx={{ textTransform: "none", borderRadius: IOS.radius.round }}>
+                {checking ? "Checking…" : "Check now"}
               </Button>
             )}
             <Button size="small" variant="contained" disableElevation startIcon={<FiPlus />} onClick={() => setDialog({ listing: null })} sx={{ textTransform: "none", borderRadius: IOS.radius.round }}>
@@ -330,7 +358,7 @@ export default function HqGovernment({ reloadKey, onChanged }) {
           </Box>
         }
       >
-        {feed.lastError && <Alert severity="warning" sx={{ mb: 1.5 }}>{feed.lastError}</Alert>}
+        {feed.lastError && !checking && <Alert severity="warning" sx={{ mb: 1.5 }}>{feed.lastError}</Alert>}
         <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap", mb: 1 }}>
           {TABS.map(([k, label]) => (
             <ButtonBase

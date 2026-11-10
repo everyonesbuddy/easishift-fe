@@ -750,6 +750,7 @@ function Tasks({ tasks, today, busyId, onTick, onRemove, onAdd }) {
 export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
   const [data, setData] = useState(null);
   const [gov, setGov] = useState([]); // government deadlines (only the week load sends them)
+  const [success, setSuccess] = useState([]); // customer check-ins and red customers (same)
   const navigate = useNavigate();
   const [error, setError] = useState("");
   const [view, setView] = useState("today");
@@ -775,6 +776,7 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
         if (off) return;
         setData(res.data);
         setGov(res.data.gov || []);
+        setSuccess(res.data.success || []);
       })
       .catch((err) => !off && setError(errorText(err, "Couldn't load this week")));
     return () => {
@@ -906,6 +908,23 @@ export default function HqWeek({ reloadKey, onChanged, audiences = null }) {
 
   return (
     <Box sx={{ display: "grid", gap: 2 }}>
+      {/* Customer success: red customers and check-ins due */}
+      {!audiences && success.length > 0 && (
+        <Box sx={{ bgcolor: IOS.surface, border: `1px solid ${IOS.hairline}`, borderRadius: IOS.radius.card, p: { xs: 2, md: 2.5 } }}>
+          <Typography sx={{ fontWeight: 700, fontSize: 15.5, mb: 0.75 }}>Customers</Typography>
+          {success.map((t) => (
+            <ButtonBase
+              key={`${t.refId}:${t.kind}`}
+              onClick={() => navigate(`/hq/success?customer=${t.refId}`)}
+              sx={{ display: "flex", gap: 1, alignItems: "baseline", flexWrap: "wrap", justifyContent: "flex-start", textAlign: "left", py: 0.5, width: "100%" }}
+            >
+              <Box component="span" sx={{ fontSize: 14, fontWeight: 650, color: t.kind === "checkin" ? IOS.ink : IOS.redText }}>{t.title}</Box>
+              {t.detail && <Box component="span" sx={{ fontSize: 13, color: IOS.secondary }}>{t.detail}</Box>}
+              {t.owner && <Box component="span" sx={{ fontSize: 12.5, color: IOS.tertiary }}>· {t.owner}</Box>}
+            </ButtonBase>
+          ))}
+        </Box>
+      )}
       {/* Government contract deadlines: questions and responses due soon */}
       {!audiences && gov.length > 0 && (
         <Box sx={{ bgcolor: IOS.surface, border: `1px solid ${IOS.hairline}`, borderRadius: IOS.radius.card, p: { xs: 2, md: 2.5 } }}>

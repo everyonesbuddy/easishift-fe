@@ -23,6 +23,7 @@ import HqFacebook from "./HqFacebook";
 import HqMoney from "./HqMoney";
 import HqCustomerMessages from "./HqCustomerMessages";
 import HqGovernment from "./HqGovernment";
+import HqSuccess from "./HqSuccess";
 
 const LeadershipPage = (props) => <HqAudience {...props} audiences={["director", "operator"]} />;
 const SchedulersPage = (props) => <HqAudience {...props} audiences={["scheduler"]} />;
@@ -59,6 +60,10 @@ function HomePage({ reloadKey, onChanged, overview: o }) {
 // The menu, in the order the work happens: this week, reaching out, publishing, the strategy behind it, then results.
 const GROUPS = [
   { label: "", items: [{ id: "week", label: "This week", Comp: HomePage, title: "This week", sub: "Everything to do this week, ticked off as you go, and the people to get back to." }] },
+  {
+    label: "Customers",
+    items: [{ id: "success", label: "Customer success", Comp: HqSuccess, title: "Customer success", sub: "Every customer we look after: how healthy they are and why, who owns them, the checklist for their stage, and the next check-in." }],
+  },
   {
     label: "Reach out",
     items: [

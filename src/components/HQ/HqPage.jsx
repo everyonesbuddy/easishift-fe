@@ -57,52 +57,60 @@ function HomePage({ reloadKey, onChanged, overview: o }) {
   );
 }
 
-// The menu, in the order the work happens: this week, reaching out, publishing, the strategy behind it, then results.
+// The menu, grouped by what the work is for: this week; getting customers
+// (who we reach, then the campaigns and content that reach them); keeping
+// them (customer success); how marketing is doing (website and metrics);
+// money; and settings.
 const GROUPS = [
   { label: "", items: [{ id: "week", label: "This week", Comp: HomePage, title: "This week", sub: "Everything to do this week, ticked off as you go, and the people to get back to." }] },
   {
-    label: "Customers",
-    items: [{ id: "success", label: "Customer success", Comp: HqSuccess, title: "Customer success", sub: "Every customer we look after: how healthy they are and why, who owns them, the checklist for their stage, and the next check-in." }],
-  },
-  {
-    label: "Reach out",
+    label: "Marketing & sales",
+    note: "Getting customers: who we reach out to",
     items: [
       { id: "facilities", label: "Facilities", Comp: HqFacilities, title: "Facilities", sub: "Every building we market to. Open one to call it, log it and see its history." },
       { id: "people", label: "Leaders & contacts", Comp: HqPeople, title: "Leaders & contacts", sub: "The people at those buildings, executives first." },
-      { id: "government", label: "Government contracts", Comp: HqGovernment, title: "Government contracts", sub: "Federal listings from SAM.gov every morning, state and county ones you add, and where we stand on each. Deadlines also show in This week." },
       { id: "facebook", label: "Facebook groups & people", Comp: HqFacebook, title: "Facebook", sub: "The groups where our buyers talk, where we stand in each, and everyone to message from them. Everything here also shows up in This week." },
+      { id: "government", label: "Government contracts", Comp: HqGovernment, title: "Government contracts", sub: "Federal listings from SAM.gov every morning, state and county ones you add, and where we stand on each. Deadlines also show in This week." },
     ],
   },
   {
-    label: "Publish",
-    items: [{ id: "calendar", label: "Content calendar", Comp: CalendarPage, title: "Content calendar", sub: "Every post, video, email and template: ideas, drafts, what's scheduled and what's out." }],
-  },
-  {
-    label: "Strategy",
+    label: "Campaigns & content",
+    note: "What we say and publish to get customers",
     items: [
       { id: "playbook", label: "Playbook", Comp: HqPlaybookRead, title: "Marketing playbook", sub: "How we sell, who we sell to, the channels and the campaigns we run." },
-      { id: "schedulers", label: "Schedulers", Comp: SchedulersPage, title: "Campaigns for schedulers", sub: "Who schedulers are, what we say to them, and each campaign that reaches them: how it runs, its scripts, and this week's count." },
-      { id: "leadership", label: "DONs, EDs & admins", Comp: LeadershipPage, title: "Campaigns for DONs, EDs and admins", sub: "Who the leaders are, what we say to them, and each campaign that reaches them: how it runs, its scripts, and this week's count." },
-      { id: "scoreboard", label: "Scoreboard & all campaigns", Comp: ScoreboardPage, title: "Scoreboard and all campaigns", sub: "Each campaign's weekly target against the last four weeks, every campaign, and the week's schedule." },
+      { id: "schedulers", label: "For schedulers", Comp: SchedulersPage, title: "Campaigns for schedulers", sub: "Who schedulers are, what we say to them, and each campaign that reaches them: how it runs, its scripts, and this week's count." },
+      { id: "leadership", label: "For DONs, EDs & admins", Comp: LeadershipPage, title: "Campaigns for DONs, EDs and admins", sub: "Who the leaders are, what we say to them, and each campaign that reaches them: how it runs, its scripts, and this week's count." },
+      { id: "scoreboard", label: "Scoreboard", Comp: ScoreboardPage, title: "Scoreboard and all campaigns", sub: "Each campaign's weekly target against the last four weeks, every campaign, and the week's schedule." },
+      { id: "calendar", label: "Content calendar", Comp: CalendarPage, title: "Content calendar", sub: "Every post, video, email and template: ideas, drafts, what's scheduled and what's out." },
     ],
   },
   {
-    label: "Results",
+    label: "Customer success",
+    note: "Keeping the customers we have",
+    items: [
+      { id: "success", label: "Customers & health", Comp: HqSuccess, title: "Customer success", sub: "Every customer we look after: how healthy they are and why, who owns them, the checklist for their stage, and the next check-in." },
+      { id: "customer-messages", label: "Messages & texting", Comp: HqCustomerMessages, title: "Customer messages", sub: "Texting this month and what it costs, each workspace's managers, and test sends of the morning summary, a nudge or a call-out alert." },
+    ],
+  },
+  {
+    label: "Website & metrics",
+    note: "Traffic, signups and how marketing is doing",
     items: [
       { id: "numbers", label: "Funnel", Comp: HqNumbers, title: "Funnel", sub: "How people come in, how far they get, and who drops off." },
       { id: "signups", label: "Signups", Comp: HqSignups, title: "Signups", sub: "Who signed up, where they came from and how they're doing." },
-      { id: "email", label: "Klaviyo email", Comp: HqEmail, title: "Klaviyo email", sub: "Our content email: who really clicks, how it lines up with the CRM, and who to stop emailing." },
-      { id: "web", label: "Website & search", Comp: HqWeb, title: "Website and search", sub: "Google Analytics and Search Console." },
+      { id: "web", label: "Website traffic & search", Comp: HqWeb, title: "Website traffic and search", sub: "Visitors, pages and sources from Google Analytics, and searches from Search Console." },
+      { id: "email", label: "Email results (Klaviyo)", Comp: HqEmail, title: "Email results (Klaviyo)", sub: "Our content email: who really clicks, how it lines up with the CRM, and who to stop emailing." },
       { id: "channels", label: "Blog, video & LinkedIn", Comp: HqContent, title: "Blog, video and LinkedIn", sub: "How what we've published is doing." },
     ],
   },
-  { label: "Business", items: [{ id: "money", label: "Money", Comp: HqMoney, title: "Money", sub: "Profit and loss by month: Stripe income, what we pay for, and who's subscribed." }] },
+  {
+    label: "Money",
+    note: "Profit and loss",
+    items: [{ id: "money", label: "Profit & loss", Comp: HqMoney, title: "Money: profit and loss", sub: "Profit and loss by month: Stripe income, what we pay for, who's subscribed, when they're billed and who pays late." }],
+  },
   {
     label: "Settings",
-    items: [
-      { id: "connections", label: "Connections & data", Comp: HqConnections, title: "Connections and data", sub: "Keys, imports, Google Sheets and backups." },
-      { id: "customer-messages", label: "Customer messages", Comp: HqCustomerMessages, title: "Customer messages", sub: "Send a workspace's managers the morning summary, a next-step nudge or a call-out alert, to test them." },
-    ],
+    items: [{ id: "connections", label: "Connections & data", Comp: HqConnections, title: "Connections and data", sub: "Keys, imports, Google Sheets and backups." }],
   },
 ];
 const ITEMS = GROUPS.flatMap((g) => g.items);
@@ -118,6 +126,7 @@ export default function HqPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
   const current = ITEMS.find((t) => t.id === (ALIASES[tab] || tab)) || ITEMS[0];
+  const currentGroup = GROUPS.find((g) => g.items.includes(current));
 
   useEffect(() => {
     if (current.id !== "week") return;
@@ -141,7 +150,8 @@ export default function HqPage() {
       >
         {GROUPS.map((g) => (
           <Box key={g.label} sx={{ mb: 1.5 }}>
-            {g.label && <Typography sx={{ px: 2.5, fontSize: 11.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: IOS.tertiary, mb: 0.5 }}>{g.label}</Typography>}
+            {g.label && <Typography sx={{ px: 2.5, fontSize: 11.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: IOS.tertiary, mb: g.note ? 0 : 0.5 }}>{g.label}</Typography>}
+            {g.note && <Typography sx={{ px: 2.5, fontSize: 11.5, color: IOS.tertiary, lineHeight: 1.3, mb: 0.5 }}>{g.note}</Typography>}
             {g.items.map((it) => {
               const active = it.id === current.id;
               return (
@@ -173,6 +183,12 @@ export default function HqPage() {
           ])}
         </TextField>
 
+        {currentGroup?.label && (
+          <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: IOS.tertiary }}>
+            {currentGroup.label}
+            {currentGroup.note ? ` · ${currentGroup.note}` : ""}
+          </Typography>
+        )}
         <Typography sx={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.025em" }}>{current.title}</Typography>
         <Typography sx={{ color: IOS.secondary, fontSize: 14.5, mb: 2.5 }}>{current.sub}</Typography>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}

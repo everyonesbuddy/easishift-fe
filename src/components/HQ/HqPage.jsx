@@ -79,7 +79,7 @@ const GROUPS = [
     ],
   },
   {
-    label: "2 · Campaigns",
+    label: "2 · Marketing & campaigns",
     note: "How we reach leads: calls, emails, posts",
     color: "#AF52DE",
     ink: "#8E3FC2", // the same color, dark enough for text
@@ -167,7 +167,7 @@ export default function HqPage() {
             {g.label && (
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, px: 2.5 }}>
                 <Box sx={{ width: 8, height: 8, borderRadius: "2px", bgcolor: g.color || IOS.tertiary, flexShrink: 0 }} />
-                <Typography sx={{ fontSize: 11.5, fontWeight: 750, letterSpacing: "0.06em", textTransform: "uppercase", color: g.ink || IOS.tertiary }}>{g.label}</Typography>
+                <Typography sx={{ fontSize: 10.5, fontWeight: 750, letterSpacing: "0.04em", textTransform: "uppercase", whiteSpace: "nowrap", color: g.ink || IOS.tertiary }}>{g.label}</Typography>
               </Box>
             )}
             {g.note && <Typography sx={{ px: 2.5, pl: 4, fontSize: 11.5, color: IOS.tertiary, lineHeight: 1.3, mb: 0.5 }}>{g.note}</Typography>}

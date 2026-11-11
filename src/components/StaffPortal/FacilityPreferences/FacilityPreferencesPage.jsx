@@ -43,6 +43,56 @@ const SCHEDULING_PATTERNS = [
   { value: "custom", label: "Custom (coverage-driven)" },
 ];
 
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/**
+ * Roles whose overtime week starts on another day, e.g. dining (cooks,
+ * servers) Thursday to Wednesday. Each row: the roles, and the day.
+ */
+function RoleWorkweeks({ groups, roles, buildingDay, onChange, disabled }) {
+  const used = new Set(groups.flatMap((g) => g.roles));
+  const set = (i, patch) => onChange(groups.map((g, j) => (j === i ? { ...g, ...patch } : g)));
+  return (
+    <Box sx={{ display: "grid", gap: 1.25, width: "100%" }}>
+      {groups.map((g, i) => (
+        <Box key={i} sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+          <Autocomplete
+            multiple
+            size="small"
+            options={roles.filter((r) => !used.has(r) || g.roles.includes(r))}
+            value={g.roles}
+            getOptionLabel={toLabel}
+            onChange={(_, v) => set(i, { roles: v })}
+            disabled={disabled}
+            renderInput={(params) => <TextField {...params} placeholder={g.roles.length ? "" : "Pick roles, e.g. Cook, Server"} />}
+            sx={{ flex: "1 1 260px", minWidth: 220 }}
+          />
+          <Typography sx={{ fontSize: 14, color: IOS.secondary }}>week starts on</Typography>
+          <Select size="small" value={g.weekStartsOn} onChange={(e) => set(i, { weekStartsOn: Number(e.target.value) })} disabled={disabled} sx={{ minWidth: 140, borderRadius: "10px" }}>
+            {WEEKDAYS.map((d, n) => (
+              <MenuItem key={d} value={n}>{d}</MenuItem>
+            ))}
+          </Select>
+          <IconButton size="small" aria-label="Remove this group" onClick={() => onChange(groups.filter((_, j) => j !== i))} disabled={disabled}>
+            <FiX />
+          </IconButton>
+        </Box>
+      ))}
+      <Box>
+        <Button
+          size="small"
+          startIcon={<FiPlus />}
+          disabled={disabled || !roles.some((r) => !used.has(r))}
+          onClick={() => onChange([...groups, { roles: [], weekStartsOn: (buildingDay + 4) % 7 }])}
+          sx={{ textTransform: "none" }}
+        >
+          {groups.length ? "Add another group" : "Give some roles their own workweek"}
+        </Button>
+      </Box>
+    </Box>
+  );
+}
+
 const TAXONOMY_FIELDS = [
   "roleFamilies",
   "unitAreas",
@@ -608,6 +658,8 @@ export default function FacilityPreferencesPage() {
     setError("");
     try {
       const payload = normalizeTaxonomyPrefs(prefs);
+      // Groups with no roles picked yet aren't saved.
+      if (Array.isArray(payload.roleWeekStarts)) payload.roleWeekStarts = payload.roleWeekStarts.filter((g) => g.roles?.length);
 
       const res = await api.post("/facility-preferences", payload);
       trackEvent("facility_settings_saved");
@@ -696,6 +748,7 @@ export default function FacilityPreferencesPage() {
     { id: "areas", label: "Unit areas" },
     { id: "certifications", label: "Certifications" },
     { id: "facility", label: "Facility" },
+    { id: "workweeks", label: "Workweeks" },
     { id: "time-tracking", label: "Time tracking" },
     { id: "staff-links", label: "Staff links" },
     { id: "notifications", label: "Notifications" },
@@ -1028,6 +1081,35 @@ export default function FacilityPreferencesPage() {
                   </Select>
                 </Row>
               </Box>
+            </Section>
+
+            {/* ── Workweeks ── */}
+            <Section
+              id="workweeks"
+              title="Workweeks"
+              description="The 7 days overtime is counted over. Most roles use the building's week; some (like dining) can count over their own."
+            >
+              <Row first label="Building's week" help="Lays out and publishes the schedule, and counts overtime for every role not listed below.">
+                <Typography sx={{ fontSize: 15, fontWeight: 600 }}>
+                  {WEEKDAYS[prefs.weekStartsOn ?? 0]} to {WEEKDAYS[((prefs.weekStartsOn ?? 0) + 6) % 7]}
+                </Typography>
+              </Row>
+              <Row
+                stack
+                label="Roles with their own workweek"
+                help="Overtime for these roles counts over their own 7 days, and the call-out and auto-fill overtime checks, labor report and Monday email follow it. The schedule still shows the building's week."
+              >
+                <RoleWorkweeks
+                  groups={prefs.roleWeekStarts || []}
+                  roles={prefs.roleFamilies || []}
+                  buildingDay={prefs.weekStartsOn ?? 0}
+                  onChange={(v) => handleChange("roleWeekStarts", v)}
+                  disabled={readOnly || !can("tenant.settings")}
+                />
+                {!readOnly && !can("tenant.settings") && (
+                  <Typography sx={{ fontSize: 12.5, color: IOS.secondary }}>Only the owner or an administrator can change workweeks.</Typography>
+                )}
+              </Row>
             </Section>
 
             {/* ── Time tracking ── */}

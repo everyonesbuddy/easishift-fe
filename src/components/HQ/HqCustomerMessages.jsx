@@ -123,7 +123,7 @@ export default function HqCustomerMessages() {
           </Box>
         </Section>
       )}
-      <Section title="Try the customer messages" note="Find a workspace by anyone's email, or its name. Sends are real: they go to that workspace's managers by text (if they've said yes) or email.">
+      <Section title="Send an alert or nudge to test it" note="Find a workspace by anyone's email, or its name. Sends are real: they go to that workspace's managers by text (if they've said yes) or email.">
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <TextField size="small" label="Email or workspace name" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && email.trim() && find()} sx={{ minWidth: 300, flex: 1 }} />
           <Button variant="contained" disableElevation onClick={find} disabled={!email.trim() || busy === "find"}>

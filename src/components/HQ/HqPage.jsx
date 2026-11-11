@@ -104,13 +104,13 @@ const GROUPS = [
     ],
   },
   {
-    label: "4 · Customers",
-    note: "Paying customers: keep them healthy",
+    label: "4 · Customer success",
+    note: "Keep paying customers healthy and using it",
     color: "#34C759",
     ink: "#1E7F3A", // the same color, dark enough for text
     items: [
       { id: "success", label: "Customer health", Comp: HqSuccess, title: "Customer health", sub: "Every customer we look after: how healthy they are and why, who owns them, the checklist for their stage, and the next check-in." },
-      { id: "customer-messages", label: "Messages & texting", Comp: HqCustomerMessages, title: "Customer messages and texting", sub: "Texting this month and what it costs, each workspace's managers, and test sends of the morning summary, a nudge or a call-out alert." },
+      { id: "customer-messages", label: "App alerts & nudges", Comp: HqCustomerMessages, title: "App alerts and nudges", sub: "What WiserShifts sends customers on its own (the 6 a.m. morning summary, next-step nudges, call-out alerts and opt-in texts): send any of them to a workspace's managers to test, see who gets texts, and what texting costs this month." },
     ],
   },
   {

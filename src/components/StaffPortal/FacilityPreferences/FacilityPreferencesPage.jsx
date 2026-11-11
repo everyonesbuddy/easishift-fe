@@ -93,6 +93,42 @@ function RoleWorkweeks({ groups, roles, buildingDay, onChange, disabled }) {
   );
 }
 
+/** "Cook, Server: Thursday to Wednesday" for a set of role workweeks. */
+const describeWorkweeks = (groups) =>
+  (groups || []).length
+    ? groups.map((g) => `${(g.roles || []).map(toLabel).join(", ")}: ${WEEKDAYS[g.weekStartsOn]} to ${WEEKDAYS[(g.weekStartsOn + 6) % 7]}`).join("; ")
+    : "None";
+const whenChanged = (d) => new Date(d).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+
+/** Who changed role workweeks and when, newest first; the latest shows, the rest on request. */
+function WorkweekHistory({ history }) {
+  const [open, setOpen] = useState(false);
+  const list = [...(history || [])].reverse();
+  if (!list.length) return null;
+  const [last, ...older] = list;
+  return (
+    <Box sx={{ mt: 0.5 }}>
+      <Typography sx={{ fontSize: 12.5, color: IOS.secondary }}>
+        Last changed by <strong>{last.byName || "someone"}</strong> on {whenChanged(last.at)}. Was: {describeWorkweeks(last.from)}.
+        {older.length > 0 && (
+          <Button size="small" onClick={() => setOpen((v) => !v)} sx={{ textTransform: "none", ml: 0.5, p: 0, minWidth: 0, fontSize: 12.5, verticalAlign: "baseline" }}>
+            {open ? "Hide history" : `See all ${list.length} changes`}
+          </Button>
+        )}
+      </Typography>
+      {open && (
+        <Box sx={{ mt: 0.75, display: "grid", gap: 0.5 }}>
+          {older.map((h, i) => (
+            <Typography key={i} sx={{ fontSize: 12.5, color: IOS.secondary }}>
+              {whenChanged(h.at)} · <strong>{h.byName || "someone"}</strong>: {describeWorkweeks(h.from)} → {describeWorkweeks(h.to)}
+            </Typography>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 const TAXONOMY_FIELDS = [
   "roleFamilies",
   "unitAreas",
@@ -660,6 +696,7 @@ export default function FacilityPreferencesPage() {
       const payload = normalizeTaxonomyPrefs(prefs);
       // Groups with no roles picked yet aren't saved.
       if (Array.isArray(payload.roleWeekStarts)) payload.roleWeekStarts = payload.roleWeekStarts.filter((g) => g.roles?.length);
+      delete payload.roleWeekStartsHistory; // the server keeps the history
 
       const res = await api.post("/facility-preferences", payload);
       trackEvent("facility_settings_saved");
@@ -1097,18 +1134,16 @@ export default function FacilityPreferencesPage() {
               <Row
                 stack
                 label="Roles with their own workweek"
-                help="Overtime for these roles counts over their own 7 days, and the call-out and auto-fill overtime checks, labor report and Monday email follow it. The schedule still shows the building's week."
+                help="Overtime for these roles counts over their own 7 days, and the call-out and auto-fill overtime checks, labor report and Monday email follow it. The schedule still shows the building's week. Every change is recorded and emailed to the owner and administrators."
               >
                 <RoleWorkweeks
                   groups={prefs.roleWeekStarts || []}
                   roles={prefs.roleFamilies || []}
                   buildingDay={prefs.weekStartsOn ?? 0}
                   onChange={(v) => handleChange("roleWeekStarts", v)}
-                  disabled={readOnly || !can("tenant.settings")}
+                  disabled={readOnly}
                 />
-                {!readOnly && !can("tenant.settings") && (
-                  <Typography sx={{ fontSize: 12.5, color: IOS.secondary }}>Only the owner or an administrator can change workweeks.</Typography>
-                )}
+                <WorkweekHistory history={prefs.roleWeekStartsHistory} />
               </Row>
             </Section>
 

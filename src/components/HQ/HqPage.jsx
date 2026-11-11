@@ -57,59 +57,73 @@ function HomePage({ reloadKey, onChanged, overview: o }) {
   );
 }
 
-// The menu, grouped by what the work is for: this week; getting customers
-// (who we reach, then the campaigns and content that reach them); keeping
-// them (customer success); how marketing is doing (website and metrics);
-// money; and settings.
+// The menu follows the funnel, numbered in order and colored by step:
+//   1 Leads: who we want (our ideal customer) and the buildings and people we've found
+//   2 Campaigns: how we reach those leads
+//   3 Marketing results: whether it's working (traffic, signups, conversion)
+//   4 Customers: keeping paying customers healthy
+//   5 Money: revenue, costs and profit
 const GROUPS = [
-  { label: "", items: [{ id: "week", label: "This week", Comp: HomePage, title: "This week", sub: "Everything to do this week, ticked off as you go, and the people to get back to." }] },
+  { label: "", items: [{ id: "week", label: "This week", Comp: HomePage, title: "This week", sub: "Everything to do this week, from every step below, ticked off as you go." }] },
   {
-    label: "Marketing & sales",
-    note: "Getting customers: who we reach out to",
+    label: "1 · Leads",
+    note: "Who we want as customers, and the ones we've found",
+    color: "#007AFF",
+    ink: "#0062CC", // the same color, dark enough for text
     items: [
-      { id: "facilities", label: "Facilities", Comp: HqFacilities, title: "Facilities", sub: "Every building we market to. Open one to call it, log it and see its history." },
-      { id: "people", label: "Leaders & contacts", Comp: HqPeople, title: "Leaders & contacts", sub: "The people at those buildings, executives first." },
-      { id: "facebook", label: "Facebook groups & people", Comp: HqFacebook, title: "Facebook", sub: "The groups where our buyers talk, where we stand in each, and everyone to message from them. Everything here also shows up in This week." },
-      { id: "government", label: "Government contracts", Comp: HqGovernment, title: "Government contracts", sub: "Federal listings from SAM.gov every morning, state and county ones you add, and where we stand on each. Deadlines also show in This week." },
+      { id: "playbook", label: "Ideal customer (ICP)", Comp: HqPlaybookRead, title: "Ideal customer and playbook", sub: "Who we sell to (the buildings and the people in them), why they buy, and how we sell to them." },
+      { id: "facilities", label: "Facilities (accounts)", Comp: HqFacilities, title: "Facilities: our accounts", sub: "Every building that fits our ideal customer. Open one to call it, log it and see its history." },
+      { id: "people", label: "Contacts (leads)", Comp: HqPeople, title: "Contacts: our leads", sub: "The people at those buildings who decide or schedule, executives first." },
+      { id: "facebook", label: "Facebook groups & people", Comp: HqFacebook, title: "Facebook groups and people", sub: "The groups where our buyers talk, and the people we've met there. Everything here also shows up in This week." },
+      { id: "government", label: "Government bids", Comp: HqGovernment, title: "Government bids", sub: "Federal listings from SAM.gov every morning, state and county ones you add, and where we stand on each. Deadlines also show in This week." },
     ],
   },
   {
-    label: "Campaigns & content",
-    note: "What we say and publish to get customers",
+    label: "2 · Campaigns",
+    note: "How we reach leads: calls, emails, posts",
+    color: "#AF52DE",
+    ink: "#8E3FC2", // the same color, dark enough for text
     items: [
-      { id: "playbook", label: "Playbook", Comp: HqPlaybookRead, title: "Marketing playbook", sub: "How we sell, who we sell to, the channels and the campaigns we run." },
-      { id: "schedulers", label: "For schedulers", Comp: SchedulersPage, title: "Campaigns for schedulers", sub: "Who schedulers are, what we say to them, and each campaign that reaches them: how it runs, its scripts, and this week's count." },
-      { id: "leadership", label: "For DONs, EDs & admins", Comp: LeadershipPage, title: "Campaigns for DONs, EDs and admins", sub: "Who the leaders are, what we say to them, and each campaign that reaches them: how it runs, its scripts, and this week's count." },
-      { id: "scoreboard", label: "Scoreboard", Comp: ScoreboardPage, title: "Scoreboard and all campaigns", sub: "Each campaign's weekly target against the last four weeks, every campaign, and the week's schedule." },
-      { id: "calendar", label: "Content calendar", Comp: CalendarPage, title: "Content calendar", sub: "Every post, video, email and template: ideas, drafts, what's scheduled and what's out." },
+      { id: "schedulers", label: "To schedulers", Comp: SchedulersPage, title: "Campaigns to schedulers", sub: "Who schedulers are, what we say to them, and each campaign that reaches them: how it runs, its scripts, and this week's count." },
+      { id: "leadership", label: "To DONs, EDs & admins", Comp: LeadershipPage, title: "Campaigns to DONs, EDs and admins", sub: "Who the leaders are, what we say to them, and each campaign that reaches them: how it runs, its scripts, and this week's count." },
+      { id: "calendar", label: "Content calendar", Comp: CalendarPage, title: "Content calendar", sub: "Every post, video, email and template that campaigns use: ideas, drafts, what's scheduled and what's out." },
+      { id: "scoreboard", label: "Campaign scoreboard", Comp: ScoreboardPage, title: "Campaign scoreboard", sub: "Each campaign's weekly target against the last four weeks, every campaign, and the week's schedule." },
     ],
   },
   {
-    label: "Customer success",
-    note: "Keeping the customers we have",
+    label: "3 · Marketing results",
+    note: "Is it working: traffic, signups, conversion",
+    color: "#FF9500",
+    ink: "#B35900", // the same color, dark enough for text
     items: [
-      { id: "success", label: "Customers & health", Comp: HqSuccess, title: "Customer success", sub: "Every customer we look after: how healthy they are and why, who owns them, the checklist for their stage, and the next check-in." },
-      { id: "customer-messages", label: "Messages & texting", Comp: HqCustomerMessages, title: "Customer messages", sub: "Texting this month and what it costs, each workspace's managers, and test sends of the morning summary, a nudge or a call-out alert." },
-    ],
-  },
-  {
-    label: "Website & metrics",
-    note: "Traffic, signups and how marketing is doing",
-    items: [
-      { id: "numbers", label: "Funnel", Comp: HqNumbers, title: "Funnel", sub: "How people come in, how far they get, and who drops off." },
-      { id: "signups", label: "Signups", Comp: HqSignups, title: "Signups", sub: "Who signed up, where they came from and how they're doing." },
+      { id: "numbers", label: "Funnel: visit to paying", Comp: HqNumbers, title: "Funnel", sub: "How people come in, how far they get from first visit to paying, and where they drop off." },
+      { id: "signups", label: "Signups & trials", Comp: HqSignups, title: "Signups and trials", sub: "Who signed up, where they came from and how far they've got." },
       { id: "web", label: "Website traffic & search", Comp: HqWeb, title: "Website traffic and search", sub: "Visitors, pages and sources from Google Analytics, and searches from Search Console." },
-      { id: "email", label: "Email results (Klaviyo)", Comp: HqEmail, title: "Email results (Klaviyo)", sub: "Our content email: who really clicks, how it lines up with the CRM, and who to stop emailing." },
-      { id: "channels", label: "Blog, video & LinkedIn", Comp: HqContent, title: "Blog, video and LinkedIn", sub: "How what we've published is doing." },
+      { id: "email", label: "Email results", Comp: HqEmail, title: "Email results (Klaviyo)", sub: "Our content email: who really clicks, how it lines up with our leads, and who to stop emailing." },
+      { id: "channels", label: "Blog, video & LinkedIn", Comp: HqContent, title: "Blog, video and LinkedIn results", sub: "How what we've published is doing." },
     ],
   },
   {
-    label: "Money",
-    note: "Profit and loss",
-    items: [{ id: "money", label: "Profit & loss", Comp: HqMoney, title: "Money: profit and loss", sub: "Profit and loss by month: Stripe income, what we pay for, who's subscribed, when they're billed and who pays late." }],
+    label: "4 · Customers",
+    note: "Paying customers: keep them healthy",
+    color: "#34C759",
+    ink: "#1E7F3A", // the same color, dark enough for text
+    items: [
+      { id: "success", label: "Customer health", Comp: HqSuccess, title: "Customer health", sub: "Every customer we look after: how healthy they are and why, who owns them, the checklist for their stage, and the next check-in." },
+      { id: "customer-messages", label: "Messages & texting", Comp: HqCustomerMessages, title: "Customer messages and texting", sub: "Texting this month and what it costs, each workspace's managers, and test sends of the morning summary, a nudge or a call-out alert." },
+    ],
+  },
+  {
+    label: "5 · Money",
+    note: "Revenue, costs and profit",
+    color: "#30B0C7",
+    ink: "#0E7385", // the same color, dark enough for text
+    items: [{ id: "money", label: "Profit & loss", Comp: HqMoney, title: "Profit and loss", sub: "Profit and loss by month: Stripe income, what we pay for, who's subscribed, when they're billed and who pays late." }],
   },
   {
     label: "Settings",
+    color: "#8E8E93",
+    ink: "#6E6E73", // the same color, dark enough for text
     items: [{ id: "connections", label: "Connections & data", Comp: HqConnections, title: "Connections and data", sub: "Keys, imports, Google Sheets and backups." }],
   },
 ];
@@ -150,15 +164,34 @@ export default function HqPage() {
       >
         {GROUPS.map((g) => (
           <Box key={g.label} sx={{ mb: 1.5 }}>
-            {g.label && <Typography sx={{ px: 2.5, fontSize: 11.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: IOS.tertiary, mb: g.note ? 0 : 0.5 }}>{g.label}</Typography>}
-            {g.note && <Typography sx={{ px: 2.5, fontSize: 11.5, color: IOS.tertiary, lineHeight: 1.3, mb: 0.5 }}>{g.note}</Typography>}
+            {g.label && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, px: 2.5 }}>
+                <Box sx={{ width: 8, height: 8, borderRadius: "2px", bgcolor: g.color || IOS.tertiary, flexShrink: 0 }} />
+                <Typography sx={{ fontSize: 11.5, fontWeight: 750, letterSpacing: "0.06em", textTransform: "uppercase", color: g.ink || IOS.tertiary }}>{g.label}</Typography>
+              </Box>
+            )}
+            {g.note && <Typography sx={{ px: 2.5, pl: 4, fontSize: 11.5, color: IOS.tertiary, lineHeight: 1.3, mb: 0.5 }}>{g.note}</Typography>}
             {g.items.map((it) => {
               const active = it.id === current.id;
               return (
                 <ButtonBase
                   key={it.id}
                   onClick={() => navigate(`/hq/${it.id}`)}
-                  sx={{ display: "block", textAlign: "left", width: "calc(100% - 16px)", mx: 1, px: 1.5, py: 0.85, borderRadius: "8px", fontSize: 14.5, fontWeight: active ? 700 : 500, color: active ? IOS.ink : IOS.secondary, bgcolor: active ? IOS.fill : "transparent", "&:hover": { bgcolor: IOS.fill } }}
+                  sx={{
+                    display: "block",
+                    textAlign: "left",
+                    width: "calc(100% - 16px)",
+                    mx: 1,
+                    px: 1.5,
+                    py: 0.85,
+                    borderRadius: "8px",
+                    fontSize: 14.5,
+                    fontWeight: active ? 700 : 500,
+                    color: active ? IOS.ink : IOS.secondary,
+                    bgcolor: active ? (g.color ? `${g.color}1F` : IOS.fill) : "transparent",
+                    boxShadow: active && g.color ? `inset 3px 0 0 ${g.color}` : "none",
+                    "&:hover": { bgcolor: g.color ? `${g.color}14` : IOS.fill },
+                  }}
                 >
                   {it.label}
                 </ButtonBase>
@@ -172,7 +205,7 @@ export default function HqPage() {
         {/* Menu (phone) */}
         <TextField data-hq-chrome select size="small" fullWidth value={current.id} onChange={(e) => navigate(`/hq/${e.target.value}`)} sx={{ display: { md: "none" }, mb: 2, bgcolor: IOS.surface }}>
           {GROUPS.flatMap((g) => [
-            <MenuItem key={`h-${g.label || "top"}`} disabled sx={{ fontSize: 12, fontWeight: 700, opacity: "1 !important", color: IOS.tertiary }}>
+            <MenuItem key={`h-${g.label || "top"}`} disabled sx={{ fontSize: 12, fontWeight: 700, opacity: "1 !important", color: g.ink || IOS.tertiary }}>
               {(g.label || "Home").toUpperCase()}
             </MenuItem>,
             ...g.items.map((it) => (
@@ -184,7 +217,7 @@ export default function HqPage() {
         </TextField>
 
         {currentGroup?.label && (
-          <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: IOS.tertiary }}>
+          <Typography sx={{ fontSize: 12, fontWeight: 750, letterSpacing: "0.06em", textTransform: "uppercase", color: currentGroup.ink || IOS.tertiary }}>
             {currentGroup.label}
             {currentGroup.note ? ` · ${currentGroup.note}` : ""}
           </Typography>

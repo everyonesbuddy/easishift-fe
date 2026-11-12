@@ -9,6 +9,7 @@ import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import { FiDownload } from "react-icons/fi";
 import api from "./hqApi";
 import { IOS } from "../../theme/ios";
 import { Section, Stat, Tag, Empty } from "./HqBits";
@@ -271,6 +272,45 @@ function PaymentCell({ p }) {
   );
 }
 
+/**
+ * The year's profit and loss as a CSV file (opens in Excel or Google Sheets):
+ * a row per line (sales, refunds, fees, income, each expense, total expenses,
+ * profit), a column per month, and "So far" (months that have happened).
+ */
+function downloadPnl(data, year) {
+  const months = data.months || [];
+  const csvCell = (v) => {
+    const t = v === null || v === undefined ? "" : typeof v === "number" ? v.toFixed(2) : String(v);
+    return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  const past = months.filter((m) => !m.future);
+  const sum = (rows, get) => rows.reduce((a, m) => a + (Number(get(m)) || 0), 0);
+  const row = (label, get, { blankFuture = false } = {}) => [label, ...months.map((m) => (blankFuture && m.future ? "" : Number(get(m)) || 0)), sum(past, get)];
+  const lines = [
+    [`WiserShifts profit and loss, ${year}`],
+    [`Downloaded ${new Date().toLocaleString()}. Income is WiserShifts customers' Stripe payments; months still to come show expected costs only.`],
+    [],
+    ["", ...months.map((m) => `${m.label} ${year}${m.future ? " (expected)" : ""}`), "So far"],
+    row("Sales", (m) => m.gross, { blankFuture: true }),
+    row("Refunds", (m) => m.refunds, { blankFuture: true }), // already negative, as on the page
+    row("Stripe fees", (m) => -m.fees, { blankFuture: true }),
+    row("Income", (m) => m.net, { blankFuture: true }),
+    [],
+    ["Expenses"],
+    ...(data.expenses || []).map((e) => row(`  ${e.name}${e.category ? ` (${e.category})` : ""}`, (m) => -(m.byExpense?.[e._id] || 0))),
+    row("Total expenses", (m) => -m.expenses),
+    [],
+    row("Profit", (m) => m.profit, { blankFuture: true }),
+  ];
+  const csv = lines.map((l) => l.map(csvCell).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: `WiserShifts-profit-and-loss-${year}.csv` });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export default function HqMoney() {
   const nowYear = new Date().getFullYear();
   const [year, setYear] = useState(nowYear);
@@ -438,7 +478,13 @@ export default function HqMoney() {
               st.left?.count || st.left?.subscriptions
                 ? ` Left out as not WiserShifts: ${st.left.count ? `${st.left.count} payment${st.left.count === 1 ? "" : "s"}, refund${st.left.count === 1 ? "" : "s"} or fee${st.left.count === 1 ? "" : "s"} (${usd(st.left.amount)})` : ""}${st.left.count && st.left.subscriptions ? " and " : ""}${st.left.subscriptions ? `${st.left.subscriptions} older subscription${st.left.subscriptions === 1 ? "" : "s"}` : ""}.`
                 : ""
-            }`} sx={{ mb: 2.5 }}>
+            }`}
+            right={
+              <Button size="small" startIcon={<FiDownload />} onClick={() => downloadPnl(data, year)} sx={{ textTransform: "none", borderRadius: IOS.radius.round }}>
+                Download (Excel / Sheets)
+              </Button>
+            }
+            sx={{ mb: 2.5 }}>
             <Box sx={{ overflowX: "auto", mx: { xs: -2, md: -2.5 }, px: { xs: 2, md: 2.5 } }}>
               <Box component="table" sx={{ borderCollapse: "collapse", width: "100%", minWidth: 980 }}>
                 <thead>

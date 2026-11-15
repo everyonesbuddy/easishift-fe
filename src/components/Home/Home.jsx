@@ -470,7 +470,7 @@ export default function Home() {
                       lineHeight: 1.55,
                     }}
                   >
-                    Work out your hours per resident day, the full-time positions
+                    Work out your staff hours per resident per day, the full-time positions
                     your schedule needs, and what call-outs and overtime add up
                     to. Your own numbers, with the math shown.
                   </Typography>
@@ -727,7 +727,7 @@ export default function Home() {
               />
               <Feature
                 icon={<FiTarget size={21} />}
-                title="Hours per resident day vs budget"
+                title="Staff hours per resident per day vs budget"
                 tag="Starter"
                 text="Staffed hours against your target every week, with the math written out and how much of a gap is open shifts."
               />

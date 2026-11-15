@@ -10,7 +10,7 @@ const fmt = (n, digits = 1) => Number(n).toLocaleString(undefined, { maximumFrac
 /**
  * A small line over the weeks. Finished weeks are solid; the current week
  * (still filling in) is a hollow dot on a dashed segment. Optional target
- * line (hours per resident day).
+ * line (staff hours per resident per day).
  */
 function Spark({ points, target = null, color }) {
   const W = 260;
@@ -84,7 +84,7 @@ function TrendCard({ title, value, unit, points, target, color, lowerIsBetter = 
 
 /**
  * Last 12 weeks, so leadership can see whether things are getting better:
- * hours per resident day against the target, overtime hours, call-outs and
+ * staff hours per resident per day against the target, overtime hours, call-outs and
  * no-shows, and labor cost for owners/admins.
  */
 export default function LaborTrends({ endWeek, canSeeCosts, reloadKey }) {
@@ -116,7 +116,7 @@ export default function LaborTrends({ endWeek, canSeeCosts, reloadKey }) {
     <>
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: `repeat(${showCost ? 4 : 3}, 1fr)` }, gap: 1 }}>
         <TrendCard
-          title="Hours per resident day"
+          title="Staff hours per resident per day"
           value={hasPPD ? lastDone.ppd ?? "–" : "–"}
           unit={target !== null && hasPPD ? `target ${target}` : ""}
           points={series("ppd")}

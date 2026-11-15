@@ -11,7 +11,7 @@ import { AUDIENCES, postDate } from "./blogFormat";
 export default function BlogIndex() {
   usePageMetadata(
     "Blog | WiserShifts",
-    "Practical notes on scheduling, overtime, call-outs and hours per resident day for people who run and schedule care buildings.",
+    "Practical notes on scheduling, overtime, call-outs and staff hours per resident per day for people who run and schedule care buildings.",
   );
   const [params, setParams] = useSearchParams();
   const audience = params.get("for") || "";
@@ -41,7 +41,7 @@ export default function BlogIndex() {
               Staffing math for people who run care buildings
             </Typography>
             <Typography sx={{ mt: 2, color: "rgba(255,255,255,0.75)", fontSize: "1.1rem", maxWidth: 700, lineHeight: 1.6 }}>
-              Overtime, call-outs, hours per resident day and schedules that hold up. Written for schedulers, directors, administrators and operators of 24/7 care teams.
+              Overtime, call-outs, staff hours per resident per day and schedules that hold up. Written for schedulers, directors, administrators and operators of 24/7 care teams.
             </Typography>
           </Container>
         </Box>

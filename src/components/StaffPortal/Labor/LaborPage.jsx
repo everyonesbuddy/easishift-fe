@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Box, Button, ButtonBase, Container, IconButton, Typography } from "@mui/material";
-import { FiAlertTriangle, FiCheckCircle, FiChevronLeft, FiChevronRight, FiPrinter, FiSettings } from "react-icons/fi";
+import { FiAlertTriangle, FiCheckCircle, FiChevronDown, FiChevronLeft, FiChevronRight, FiPrinter, FiSettings } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
@@ -25,6 +25,8 @@ const TONE = { good: IOS.greenText, warn: IOS.orangeText, bad: IOS.redText, none
 
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+// Sections under "More detail" (it opens before scrolling to one).
+const DETAIL_TARGETS = new Set(["labor-credentials", "labor-watch", "labor-callouts"]);
 
 /** What needs someone's attention this week, most urgent first. */
 function attentionItems(d) {
@@ -69,7 +71,7 @@ const localMonth = () => {
 const fmt = (n, digits = 1) => Number(n).toLocaleString(undefined, { maximumFractionDigits: digits });
 
 /**
- * Hours per resident day against the target, written so an administrator
+ * Staff hours per resident per day against the target, written so an administrator
  * or VP can follow it: the number, a bar with the target marked (and how
  * far filling the open shifts would get you), a plain verdict, and the math.
  */
@@ -77,7 +79,7 @@ function BudgetGauge({ budget, hoursInfo, canManage, onSetup, periodWord = "week
   if (!budget || budget.targetPPD === null) {
     return (
       <Box sx={{ p: 2, borderRadius: IOS.radius.cell, bgcolor: IOS.canvas }}>
-        <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Hours per resident day</Typography>
+        <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Staff hours per resident per day</Typography>
         <Typography sx={{ color: IOS.secondary, fontSize: 13.5, mt: 0.5 }}>
           {budget ? `${budget.scheduledPPD} this ${periodWord}. ` : ""}
           Set your usual number of residents and a target to compare staffing against your budget.
@@ -109,7 +111,7 @@ function BudgetGauge({ budget, hoursInfo, canManage, onSetup, periodWord = "week
   return (
     <Box sx={{ p: 2, borderRadius: IOS.radius.cell, bgcolor: IOS.canvas }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 1 }}>
-        <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Hours per resident day</Typography>
+        <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Staff hours per resident per day</Typography>
         <Typography sx={{ fontWeight: 700, fontSize: 26, color: over ? IOS.redText : under ? IOS.orangeText : IOS.greenText, ...num }}>
           {value}
           <Box component="span" sx={{ fontSize: 14, color: IOS.secondary, fontWeight: 600, ml: 0.75 }}>of {target}</Box>
@@ -118,7 +120,7 @@ function BudgetGauge({ budget, hoursInfo, canManage, onSetup, periodWord = "week
       <Box
         sx={{ position: "relative", height: 12, borderRadius: 6, bgcolor: IOS.fill, mt: 1.25 }}
         role="img"
-        aria-label={`${value} hours per resident day against a target of ${target}${ifFilled ? `; ${ifFilled} if every open shift is filled` : ""}`}
+        aria-label={`${value} staff hours per resident per day against a target of ${target}${ifFilled ? `; ${ifFilled} if every open shift is filled` : ""}`}
       >
         {ifFilled && (
           <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(ifFilled / max) * 100}%`, borderRadius: 6, bgcolor: tint(color, 0.3) }} />
@@ -219,6 +221,29 @@ export default function LaborPage() {
   const [error, setError] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reload, setReload] = useState(0);
+  // "More detail" open or closed, remembered in this browser.
+  const [showMore, setShowMoreState] = useState(() => {
+    try {
+      return localStorage.getItem("labor.showMore") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setShowMore = (v) => {
+    setShowMoreState(v);
+    try {
+      localStorage.setItem("labor.showMore", v ? "1" : "0");
+    } catch {
+      /* private window: just don't remember */
+    }
+  };
+  // Jump to a section, opening "More detail" first if it's in there.
+  const goTo = (id) => {
+    if (DETAIL_TARGETS.has(id) && !showMore) {
+      setShowMore(true);
+      setTimeout(() => scrollTo(id), 80);
+    } else scrollTo(id);
+  };
 
   const load = useCallback(
     ({ period, key }) =>
@@ -256,7 +281,7 @@ export default function LaborPage() {
           See where your labor hours and dollars go, every week.
         </Typography>
         <Typography sx={{ color: IOS.secondary, mt: 1.5, fontSize: 16, maxWidth: 560, lineHeight: 1.55 }}>
-          Hours against your budget per resident day, overtime before it reaches payroll, call-outs by shift, open
+          Staff hours per resident per day against your budget, overtime before it reaches payroll, call-outs by shift, open
           shifts, certifications about to expire, and who's at risk of leaving. Plus a Monday email for your
           administrator and regional VP.
         </Typography>
@@ -375,7 +400,7 @@ export default function LaborPage() {
                   {attention.map((a) => (
                     <ButtonBase
                       key={a.text}
-                      onClick={() => scrollTo(a.target)}
+                      onClick={() => goTo(a.target)}
                       sx={{
                         display: "inline-flex",
                         alignItems: "center",
@@ -467,7 +492,7 @@ export default function LaborPage() {
               value={d.attendance.callOuts}
               tone={d.attendance.callOuts ? "warn" : "good"}
               detail={d.attendance.noShows ? `and ${plural(d.attendance.noShows, "no-show")}` : "No no-shows"}
-              onClick={d.attendance.callOuts + d.attendance.noShows ? () => scrollTo("labor-callouts") : undefined}
+              onClick={d.attendance.callOuts + d.attendance.noShows ? () => goTo("labor-callouts") : undefined}
             />
             <Figure
               label="Spots filled"
@@ -488,13 +513,8 @@ export default function LaborPage() {
             </Typography>
           )}
 
-          {/* Trends */}
-          <Section title="Last 12 weeks" note="Is it getting better? Each point is one week." sx={{ mt: 1.5 }}>
-            <LaborTrends endWeek={!isMonth && d.weekStart < d.thisWeek ? d.weekStart : null} canSeeCosts={d.canSeeCosts} reloadKey={reload} />
-          </Section>
-
-          {/* Overtime + certifications */}
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.2fr 1fr" }, gap: 1.5, mt: 1.5 }}>
+          {/* The basics: overtime coming and open spots */}
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.4fr 1fr" }, gap: 1.5, mt: 1.5, alignItems: "start" }}>
             <Section
               id="labor-overtime"
               title={isMonth ? "Overtime" : "Overtime coming"}
@@ -562,117 +582,136 @@ export default function LaborPage() {
                 <Quiet>No one goes over {threshold} hours in a week this {periodWord}.</Quiet>
               )}
             </Section>
-
-            <Section
-              id="labor-credentials"
-              title="Certifications"
-              note="Expired, or expiring in the next 30 days. Add expiry dates on each person's certifications in Staff."
-            >
-              {d.credentials.expired.length + d.credentials.expiringSoon.length ? (
-                [...d.credentials.expired, ...d.credentials.expiringSoon].map((c) => (
-                  <PersonLine
-                    key={`${c.staffId}:${c.tag}`}
-                    name={c.name}
-                    color={c.daysLeft <= 0 ? IOS.red : IOS.orange}
-                    detail={`${certLabel(c.tag)}, ${c.daysLeft <= 0 ? "expired" : "expires"} ${dayLabel(c.expiresAt.slice(0, 10), { month: "short", day: "numeric", year: "numeric" })}`}
-                    right={c.daysLeft <= 0 ? "Expired" : `${c.daysLeft} days`}
-                    rightTone={c.daysLeft <= 0 ? "bad" : "warn"}
-                  />
-                ))
-              ) : (
-                <Quiet>Nothing expired or expiring in the next 30 days.</Quiet>
-              )}
-            </Section>
-          </Box>
-
-          {/* Who to check in with + call-outs + shifts */}
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.2fr 1fr" }, gap: 1.5, mt: 1.5 }}>
-            <Section
-              id="labor-watch"
-              title="People to check in with"
-              note="Call-outs, no-shows, repeated overtime or hours falling off over the last 4 weeks: signs of burnout or drifting away. A short conversation now is cheaper than replacing them."
-            >
-              {d.turnoverWatch.length ? (
-                d.turnoverWatch.map((w) => (
-                  <PersonLine key={w.staffId} name={w.name} color={roleColor(w.role, roles)} detail={`${roleLabel(w.role)}: ${w.reasons.join(", ")}`} />
-                ))
-              ) : (
-                <Quiet>No one stands out right now.</Quiet>
-              )}
-            </Section>
-
-            <Box sx={{ display: "grid", gap: 1.5, alignContent: "start" }}>
-              <Section id="labor-callouts" title="Call-outs and no-shows by shift">
-                {d.attendance.byShift.length ? (
-                  d.attendance.byShift.map((s) => (
-                    <BarRow
-                      key={s.key}
-                      label={s.label}
-                      value={s.callOuts + s.noShows}
-                      max={shiftMax}
-                      color={s.noShows ? IOS.red : IOS.orange}
-                      display={s.noShows ? `${s.callOuts} + ${s.noShows}` : s.callOuts}
-                    />
-                  ))
-                ) : (
-                  <Quiet>No call-outs or no-shows this {periodWord}.</Quiet>
-                )}
-              </Section>
-              <Section id="labor-shifts" title="Spots" note={d.openShifts.drafted ? `${d.openShifts.drafted} of the filled spots are in a draft that isn't published yet.` : undefined}>
-                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1 }}>
-                  {[
-                    ["Filled", d.openShifts.filled, "good"],
-                    ["Still open", d.openShifts.openUpcoming, d.openShifts.openUpcoming ? "warn" : "none"],
-                    ["Went unfilled", d.openShifts.unfilledPast, d.openShifts.unfilledPast ? "bad" : "none"],
-                  ].map(([label, value, tone]) => (
-                    <Box key={label} sx={{ p: 1.5, borderRadius: IOS.radius.cell, bgcolor: IOS.canvas }}>
-                      <Typography sx={{ fontSize: 22, fontWeight: 700, color: TONE[tone], ...num }}>{value}</Typography>
-                      <Typography sx={{ fontSize: 13, color: IOS.secondary }}>{label}</Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </Section>
-            </Box>
-          </Box>
-
-          {/* Where the hours went */}
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1.2fr" }, gap: 1.5, mt: 1.5 }}>
-            <Section title="Hours by role">
-              {d.hours.byRole.length ? (
-                d.hours.byRole.map((r) => (
-                  <BarRow key={r.role} label={roleLabel(r.role)} value={r.scheduled} max={roleMax} color={roleColor(r.role, roles)} display={r.drafted ? `${hours(r.scheduled)} (${hours(r.drafted)} drafted)` : hours(r.scheduled)} />
-                ))
-              ) : (
-                <Quiet>No shifts this {periodWord}.</Quiet>
-              )}
-            </Section>
-
-            <Section title="Hours by day" note={hasTarget ? "The dark line on each day is the budget for that day's residents." : undefined}>
-              <Box sx={{ display: "grid", gridTemplateColumns: `repeat(${d.days.length}, 1fr)`, gap: isMonth ? { xs: "2px", md: "4px" } : { xs: 0.75, md: 1.5 }, alignItems: "end", height: 170 }}>
-                {d.hours.byDay.map((day) => {
-                  const budgetH = dayBudget(day);
-                  const over = budgetH !== null && day.scheduled > budgetH * 1.03;
-                  return (
-                    <Box key={day.date} sx={{ display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
-                      {!isMonth && <Typography sx={{ fontSize: 12, fontWeight: 700, mb: 0.5, ...num }}>{Math.round(day.scheduled)}</Typography>}
-                      <Box sx={{ position: "relative", width: "100%", maxWidth: 44, height: 120, display: "flex", alignItems: "flex-end" }}>
-                        <Box
-                          title={isMonth ? `${dayLabel(day.date)}: ${Math.round(day.scheduled)} h` : undefined}
-                          sx={{ width: "100%", height: `${(day.scheduled / dayMax) * 100}%`, minHeight: 2, borderRadius: isMonth ? "3px 3px 1px 1px" : "6px 6px 2px 2px", bgcolor: over ? IOS.orange : IOS.blue }}
-                        />
-                        {budgetH !== null && (
-                          <Box sx={{ position: "absolute", left: isMonth ? -1 : -4, right: isMonth ? -1 : -4, bottom: `${(budgetH / dayMax) * 100}%`, height: 2, bgcolor: IOS.ink, borderRadius: 1 }} />
-                        )}
-                      </Box>
-                      <Typography sx={{ fontSize: isMonth ? 10 : 12, color: IOS.secondary, mt: 0.75, ...num }}>
-                        {isMonth ? (Number(day.date.slice(8)) % 7 === 1 ? Number(day.date.slice(8)) : "\u00a0") : dayLabel(day.date, { weekday: "short" })}
-                      </Typography>
-                    </Box>
-                  );
-                })}
+            <Section id="labor-shifts" title="Spots" note={d.openShifts.drafted ? `${d.openShifts.drafted} of the filled spots are in a draft that isn't published yet.` : undefined}>
+              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1 }}>
+                {[
+                  ["Filled", d.openShifts.filled, "good"],
+                  ["Still open", d.openShifts.openUpcoming, d.openShifts.openUpcoming ? "warn" : "none"],
+                  ["Went unfilled", d.openShifts.unfilledPast, d.openShifts.unfilledPast ? "bad" : "none"],
+                ].map(([label, value, tone]) => (
+                  <Box key={label} sx={{ p: 1.5, borderRadius: IOS.radius.cell, bgcolor: IOS.canvas }}>
+                    <Typography sx={{ fontSize: 22, fontWeight: 700, color: TONE[tone], ...num }}>{value}</Typography>
+                    <Typography sx={{ fontSize: 13, color: IOS.secondary }}>{label}</Typography>
+                  </Box>
+                ))}
               </Box>
             </Section>
           </Box>
+
+          {/* Everything else, folded away until someone wants it */}
+          <ButtonBase
+            onClick={() => setShowMore(!showMore)}
+            aria-expanded={showMore}
+            sx={{ ...surface, mt: 1.5, width: "100%", px: { xs: 2, md: 2.5 }, py: 1.6, display: "flex", alignItems: "center", gap: 1.5, textAlign: "left", justifyContent: "flex-start" }}
+          >
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: 16 }}>{showMore ? "Less detail" : "More detail"}</Typography>
+              <Typography sx={{ fontSize: 13.5, color: IOS.secondary }}>Last 12 weeks, certifications, people to check in with, call-outs by shift, and hours by role and day</Typography>
+            </Box>
+            <FiChevronDown size={20} style={{ transform: showMore ? "rotate(180deg)" : "none", transition: "transform .15s", color: IOS.secondary, flexShrink: 0 }} />
+          </ButtonBase>
+
+          {showMore && (
+            <>
+              {/* Trends */}
+              <Section title="Last 12 weeks" note="Is it getting better? Each point is one week." sx={{ mt: 1.5 }}>
+                <LaborTrends endWeek={!isMonth && d.weekStart < d.thisWeek ? d.weekStart : null} canSeeCosts={d.canSeeCosts} reloadKey={reload} />
+              </Section>
+
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.2fr 1fr" }, gap: 1.5, mt: 1.5, alignItems: "start" }}>
+                <Section
+                  id="labor-watch"
+                  title="People to check in with"
+                  note="Call-outs, no-shows, repeated overtime or hours falling off over the last 4 weeks: signs of burnout or drifting away. A short conversation now is cheaper than replacing them."
+                >
+                  {d.turnoverWatch.length ? (
+                    d.turnoverWatch.map((w) => (
+                      <PersonLine key={w.staffId} name={w.name} color={roleColor(w.role, roles)} detail={`${roleLabel(w.role)}: ${w.reasons.join(", ")}`} />
+                    ))
+                  ) : (
+                    <Quiet>No one stands out right now.</Quiet>
+                  )}
+                </Section>
+                <Box sx={{ display: "grid", gap: 1.5, alignContent: "start" }}>
+                <Section
+                  id="labor-credentials"
+                  title="Certifications"
+                  note="Expired, or expiring in the next 30 days. Add expiry dates on each person's certifications in Staff."
+                >
+                  {d.credentials.expired.length + d.credentials.expiringSoon.length ? (
+                    [...d.credentials.expired, ...d.credentials.expiringSoon].map((c) => (
+                      <PersonLine
+                        key={`${c.staffId}:${c.tag}`}
+                        name={c.name}
+                        color={c.daysLeft <= 0 ? IOS.red : IOS.orange}
+                        detail={`${certLabel(c.tag)}, ${c.daysLeft <= 0 ? "expired" : "expires"} ${dayLabel(c.expiresAt.slice(0, 10), { month: "short", day: "numeric", year: "numeric" })}`}
+                        right={c.daysLeft <= 0 ? "Expired" : `${c.daysLeft} days`}
+                        rightTone={c.daysLeft <= 0 ? "bad" : "warn"}
+                      />
+                    ))
+                  ) : (
+                    <Quiet>Nothing expired or expiring in the next 30 days.</Quiet>
+                  )}
+                </Section>
+                  <Section id="labor-callouts" title="Call-outs and no-shows by shift">
+                    {d.attendance.byShift.length ? (
+                      d.attendance.byShift.map((s) => (
+                        <BarRow
+                          key={s.key}
+                          label={s.label}
+                          value={s.callOuts + s.noShows}
+                          max={shiftMax}
+                          color={s.noShows ? IOS.red : IOS.orange}
+                          display={s.noShows ? `${s.callOuts} + ${s.noShows}` : s.callOuts}
+                        />
+                      ))
+                    ) : (
+                      <Quiet>No call-outs or no-shows this {periodWord}.</Quiet>
+                    )}
+                  </Section>
+                </Box>
+              </Box>
+
+              {/* Where the hours went */}
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1.2fr" }, gap: 1.5, mt: 1.5 }}>
+                <Section title="Hours by role">
+                  {d.hours.byRole.length ? (
+                    d.hours.byRole.map((r) => (
+                      <BarRow key={r.role} label={roleLabel(r.role)} value={r.scheduled} max={roleMax} color={roleColor(r.role, roles)} display={r.drafted ? `${hours(r.scheduled)} (${hours(r.drafted)} drafted)` : hours(r.scheduled)} />
+                    ))
+                  ) : (
+                    <Quiet>No shifts this {periodWord}.</Quiet>
+                  )}
+                </Section>
+
+                <Section title="Hours by day" note={hasTarget ? "The dark line on each day is the budget for that day's residents." : undefined}>
+                  <Box sx={{ display: "grid", gridTemplateColumns: `repeat(${d.days.length}, 1fr)`, gap: isMonth ? { xs: "2px", md: "4px" } : { xs: 0.75, md: 1.5 }, alignItems: "end", height: 170 }}>
+                    {d.hours.byDay.map((day) => {
+                      const budgetH = dayBudget(day);
+                      const over = budgetH !== null && day.scheduled > budgetH * 1.03;
+                      return (
+                        <Box key={day.date} sx={{ display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
+                          {!isMonth && <Typography sx={{ fontSize: 12, fontWeight: 700, mb: 0.5, ...num }}>{Math.round(day.scheduled)}</Typography>}
+                          <Box sx={{ position: "relative", width: "100%", maxWidth: 44, height: 120, display: "flex", alignItems: "flex-end" }}>
+                            <Box
+                              title={isMonth ? `${dayLabel(day.date)}: ${Math.round(day.scheduled)} h` : undefined}
+                              sx={{ width: "100%", height: `${(day.scheduled / dayMax) * 100}%`, minHeight: 2, borderRadius: isMonth ? "3px 3px 1px 1px" : "6px 6px 2px 2px", bgcolor: over ? IOS.orange : IOS.blue }}
+                            />
+                            {budgetH !== null && (
+                              <Box sx={{ position: "absolute", left: isMonth ? -1 : -4, right: isMonth ? -1 : -4, bottom: `${(budgetH / dayMax) * 100}%`, height: 2, bgcolor: IOS.ink, borderRadius: 1 }} />
+                            )}
+                          </Box>
+                          <Typography sx={{ fontSize: isMonth ? 10 : 12, color: IOS.secondary, mt: 0.75, ...num }}>
+                            {isMonth ? (Number(day.date.slice(8)) % 7 === 1 ? Number(day.date.slice(8)) : "\u00a0") : dayLabel(day.date, { weekday: "short" })}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Section>
+              </Box>
+            </>
+          )}
 
           {!d.hours.timeClockUsed && (
             <Typography sx={{ color: IOS.secondary, fontSize: 13, mt: 2 }}>

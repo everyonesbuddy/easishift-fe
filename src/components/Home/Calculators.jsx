@@ -15,10 +15,10 @@ const NAVBAR_HEIGHT = 80;
 
 const CALCULATORS = [
   {
-    title: "Hours per Resident Day Calculator",
+    title: "Staff Hours per Resident per Day (HPRD) Calculator",
     description:
-      "Work out your hours per resident day from who's on each shift, compare it to your budget, and see what every 0.1 costs a year.",
-    cta: "Calculate Hours per Resident Day",
+      "Work out your staff hours per resident per day from who's on each shift, compare it to your budget, and see what every 0.1 costs a year.",
+    cta: "Calculate your staff hours per resident",
     to: "/calculators/hours-per-resident-day-calculator",
     icon: <FiTarget size={18} />,
     tag: "For administrators and directors",

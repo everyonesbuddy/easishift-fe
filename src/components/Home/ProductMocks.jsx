@@ -114,7 +114,7 @@ export function OvertimeMock() {
   );
 }
 
-/** Hours per resident day against budget, with the math. */
+/** Staff hours per resident per day against budget, with the math. */
 export function BudgetMock() {
   const value = 3.62;
   const target = 3.85;
@@ -122,7 +122,7 @@ export function BudgetMock() {
   return (
     <Box sx={card}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <Typography sx={{ fontWeight: 800, fontSize: 15 }}>Hours per resident day</Typography>
+        <Typography sx={{ fontWeight: 800, fontSize: 15 }}>Staff hours per resident per day</Typography>
         <Typography sx={{ fontWeight: 800, fontSize: 26, color: "#B45309", ...num }}>
           {value} <Box component="span" sx={{ fontSize: 13, color: "#667085", fontWeight: 600 }}>of {target}</Box>
         </Typography>
@@ -151,7 +151,7 @@ export function BudgetMock() {
 export function MondayEmailMock() {
   const rows = [
     ["Hours scheduled", "1,267 h of 1,339 h needed"],
-    ["Hours per resident day", "3.62 (target 3.85)"],
+    ["Staff hours per resident per day", "3.62 (target 3.85)"],
     ["Overtime", "16 h, 2 people"],
     ["Call-outs", "5, and 1 no-show"],
     ["Certifications", "1 expired, 2 expiring soon"],
@@ -180,7 +180,7 @@ export function MondayEmailMock() {
   );
 }
 
-/** Twelve weeks of hours per resident day against the target. */
+/** Twelve weeks of staff hours per resident per day against the target. */
 export function TrendMock() {
   const points = [3.98, 3.95, 4.02, 3.91, 3.88, 3.93, 3.84, 3.8, 3.86, 3.77, 3.7, 3.62];
   const W = 280;
@@ -192,7 +192,7 @@ export function TrendMock() {
   return (
     <Box sx={card}>
       <Typography sx={label}>Last 12 weeks</Typography>
-      <Typography sx={{ fontWeight: 800, fontSize: 15, mt: 0.25 }}>Hours per resident day</Typography>
+      <Typography sx={{ fontWeight: 800, fontSize: 15, mt: 0.25 }}>Staff hours per resident per day</Typography>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} aria-hidden style={{ display: "block", marginTop: 8 }}>
         <line x1="6" x2={W - 6} y1={y(3.85)} y2={y(3.85)} stroke="#111827" strokeDasharray="4 4" opacity="0.5" />
         <path d={points.map((v, i) => `${i ? "L" : "M"}${x(i)},${y(v)}`).join(" ")} fill="none" stroke="#2563EB" strokeWidth="2.25" strokeLinejoin="round" />

@@ -13,13 +13,13 @@ const DEFAULT_ROWS = [
 const f2 = (n) => (Math.round(n * 100) / 100).toFixed(2);
 
 /**
- * Hours per resident day from the visitor's own staffing pattern. Pure
+ * Staff hours per resident per day from the visitor's own staffing pattern. Pure
  * arithmetic, no industry averages: hours on the floor per day ÷ residents.
  */
 export default function HoursPerResidentDayCalculator() {
   usePageMetadata(
-    "Hours per Resident Day Calculator | WiserShifts",
-    "Work out your hours per resident day from your own staffing pattern, compare it to your budget, and see what each 0.1 costs a year.",
+    "Staff Hours per Resident per Day (HPRD) Calculator | WiserShifts",
+    "Work out your staff hours per resident per day from your own staffing pattern, compare it to your budget, and see what each 0.1 costs a year.",
   );
   const [residents, setResidents] = useState(50);
   const [shiftLength, setShiftLength] = useState(8);
@@ -56,11 +56,11 @@ export default function HoursPerResidentDayCalculator() {
     <CalculatorLayout
       capture={{
         source: "hours-per-resident-day",
-        summary: `${f2(r.ppd)} hours per resident day, ${residents} residents${r.target !== null ? `, target ${r.target}` : ""}`,
+        summary: `${f2(r.ppd)} staff hours per resident per day, ${residents} residents${r.target !== null ? `, target ${r.target}` : ""}`,
       }}
-      eyebrow="Hours per resident day calculator"
-      title="What are your hours per resident day?"
-      intro="Put in your residents and who's on each shift. See your hours per resident day, how it compares to your budget, and what every 0.1 costs a year. Your numbers only, no industry averages."
+      eyebrow="Staff hours per resident per day (HPRD) calculator"
+      title="How many staff hours per resident per day are you scheduling?"
+      intro="Put in your residents and who's on each shift. See your staff hours per resident per day, how it compares to your budget, and what every 0.1 costs a year. Your numbers only, no industry averages."
       inputs={
         <>
           <CalculatorInput label="Residents" value={residents} onChange={setResidents} min={1} max={500} step={1} helper="Your usual census." />
@@ -78,8 +78,8 @@ export default function HoursPerResidentDayCalculator() {
               value={target}
               onChange={(e) => setTarget(e.target.value)}
               placeholder="e.g. 3.85"
-              inputProps={{ min: 0, max: 24, step: 0.01, "aria-label": "Budget target, hours per resident day" }}
-              helperText="Hours per resident day from your budget."
+              inputProps={{ min: 0, max: 24, step: 0.01, "aria-label": "Budget target, staff hours per resident per day" }}
+              helperText="Staff hours per resident per day from your budget."
               sx={{ width: 200 }}
             />
           </Box>
@@ -87,7 +87,7 @@ export default function HoursPerResidentDayCalculator() {
       }
       result={
         <>
-          <Typography sx={{ color: "#667085", fontWeight: 700, fontSize: 14 }}>Your hours per resident day</Typography>
+          <Typography sx={{ color: "#667085", fontWeight: 700, fontSize: 14 }}>Your staff hours per resident per day</Typography>
           <Typography sx={{ fontSize: { xs: 48, md: 60 }, fontWeight: 900, letterSpacing: "-0.04em", color: tone, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>
             {f2(r.ppd)}
           </Typography>
@@ -103,7 +103,7 @@ export default function HoursPerResidentDayCalculator() {
           <Box sx={{ mt: 2, p: 2, borderRadius: "14px", bgcolor: "#EFF6FF" }}>
             <Typography sx={{ fontWeight: 800, color: "#1E3A8A" }}>Every 0.1 is worth {formatMoney(r.tenthCost)} a year</Typography>
             <Typography sx={{ color: "#1E40AF", fontSize: 14, mt: 0.25 }}>
-              At {residents} residents, 0.1 hours per resident day is {formatNumber(r.tenthHoursDay)} hours a day, or {formatNumber(r.tenthHoursYear)} hours a year.
+              At {residents} residents, 0.1 staff hours per resident per day is {formatNumber(r.tenthHoursDay)} hours a day, or {formatNumber(r.tenthHoursYear)} hours a year.
             </Typography>
           </Box>
           <Box sx={{ mt: 2 }}>
@@ -124,7 +124,7 @@ export default function HoursPerResidentDayCalculator() {
             </MathLine>
           ))}
           <MathLine strong>
-            {formatNumber(r.dailyHours)} h a day ÷ {residents} residents = {f2(r.ppd)} hours per resident day
+            {formatNumber(r.dailyHours)} h a day ÷ {residents} residents = {f2(r.ppd)} staff hours per resident per day
           </MathLine>
           {r.target !== null && (
             <MathLine>
@@ -139,7 +139,7 @@ export default function HoursPerResidentDayCalculator() {
       note="Wages only, before overtime, taxes and benefits. Count the roles your budget counts; add a row for others (activities, housekeeping) if yours includes them."
       pitch={{
         title: "Track it every week, not once a year.",
-        text: "WiserShifts works out hours per resident day from your real schedule each week, against your budget, with overtime and open shifts alongside. Your administrator and regional VP get it by email every Monday.",
+        text: "WiserShifts works out staff hours per resident per day from your real schedule each week, against your budget, with overtime and open shifts alongside. Your administrator and regional VP get it by email every Monday.",
       }}
     />
   );

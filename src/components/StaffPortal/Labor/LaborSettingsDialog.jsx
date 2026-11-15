@@ -277,8 +277,8 @@ export default function LaborSettingsDialog({ onClose, onSaved, roles }) {
                 <NumberCell label="Usual number of residents" value={form.typicalCensus} onChange={(v) => update({ typicalCensus: v })} step={1} width={80} />
               </Line>
               <Line>
-                <Typography sx={{ flex: 1, fontSize: 15, fontWeight: 500 }}>Target hours per resident day</Typography>
-                <NumberCell label="Target hours per resident day" value={form.budget} onChange={(v) => update({ budget: v })} step={0.05} width={80} />
+                <Typography sx={{ flex: 1, fontSize: 15, fontWeight: 500 }}>Target staff hours per resident per day</Typography>
+                <NumberCell label="Target staff hours per resident per day" value={form.budget} onChange={(v) => update({ budget: v })} step={0.05} width={80} />
               </Line>
             </Group>
             <Box sx={{ p: 2, borderRadius: IOS.radius.cell, bgcolor: dailyTarget !== null ? IOS.surface : "transparent", border: dailyTarget !== null ? `1px solid ${IOS.hairline}` : "none" }}>
@@ -294,7 +294,7 @@ export default function LaborSettingsDialog({ onClose, onSaved, roles }) {
                 </>
               ) : (
                 <Typography sx={{ color: IOS.secondary, fontSize: 13.5, lineHeight: 1.5 }}>
-                  Hours per resident day is the standard way to budget care staff: total care hours divided by
+                  Staff hours per resident per day (often written HPRD) is the standard way to budget care staff: total care hours divided by
                   residents. Enter both numbers to see your daily budget. Update the residents when occupancy changes.
                 </Typography>
               )}

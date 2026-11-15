@@ -75,7 +75,7 @@ export default function BlogPost() {
               <Box sx={{ mt: 6, p: { xs: 3, md: 4 }, borderRadius: "22px", bgcolor: "#0F172A", color: "#fff" }}>
                 <Typography sx={{ fontWeight: 900, fontSize: "1.5rem", letterSpacing: "-0.02em" }}>See your own numbers</Typography>
                 <Typography sx={{ color: "rgba(255,255,255,0.72)", mt: 1, lineHeight: 1.55 }}>
-                  WiserShifts is scheduling software for care facilities: open shifts, call-outs, overtime and hours per resident day in one place. Free to start.
+                  WiserShifts is scheduling software for care facilities: open shifts, call-outs, overtime and staff hours per resident per day in one place. Free to start.
                 </Typography>
                 <Typography sx={{ color: "rgba(255,255,255,0.5)", mt: 1, fontSize: "0.85rem" }}>{NOT_AN_AGENCY}</Typography>
                 <Button variant="contained" endIcon={<FiArrowRight />} onClick={() => navigate("/signup-tenant")} sx={{ mt: 2, borderRadius: "11px", bgcolor: "#2563EB", fontWeight: 800, textTransform: "none" }}>

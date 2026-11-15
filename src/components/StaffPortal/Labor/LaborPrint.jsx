@@ -46,7 +46,7 @@ export default function LaborPrint({ d, facilityName }) {
     ...(d.canSeeCosts && d.costs && !d.costs.needsRates
       ? [["Labor cost (scheduled)", money(d.costs.scheduled), d.costs.overtimePremium ? `${money(d.costs.overtimePremium)} overtime pay` : "No overtime pay"]]
       : []),
-    ["Hours per resident day", b ? String(b.scheduledPPD) : "–", b?.targetPPD !== null && b?.targetPPD !== undefined ? `target ${b.targetPPD}` : "no target set"],
+    ["Staff hours per resident per day", b ? String(b.scheduledPPD) : "–", b?.targetPPD !== null && b?.targetPPD !== undefined ? `target ${b.targetPPD}` : "no target set"],
     ["Overtime", hours(d.overtime.totalOvertimeHours), `${d.overtime.people.length} ${d.overtime.people.length === 1 ? "person" : "people"}`],
     ["Call-outs / no-shows", `${d.attendance.callOuts} / ${d.attendance.noShows}`, ""],
     ["Spots filled", `${d.openShifts.filled} of ${d.openShifts.required}`, `${d.openShifts.unfilledPast} went unfilled`],
@@ -87,7 +87,7 @@ export default function LaborPrint({ d, facilityName }) {
 
         {b && b.targetPPD !== null && (
           <>
-            <H>Budget: hours per resident day</H>
+            <H>Budget: staff hours per resident per day</H>
             <div style={{ fontSize: 11, lineHeight: 1.6 }}>
               {fmt(d.hours.scheduled)} h staffed ÷ {fmt(b.residentDays, 0)} resident days ({fmt(b.residentsPerDay)} residents × {b.countedDays} days) = <b>{b.scheduledPPD}</b>
               <br />

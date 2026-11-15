@@ -1,5 +1,5 @@
 // "memory_care" -> "Memory Care", "cna" -> "CNA", "med pass" -> "Med Pass".
-const ACRONYMS = new Set(["cna", "lpn", "lvn", "rn", "np", "cma", "cmt", "hha", "pca", "qmap", "don", "adon", "cpr", "bls", "acls"]);
+const ACRONYMS = new Set(["cna", "lpn", "lvn", "rn", "np", "cma", "cmt", "hha", "pca", "qmap", "don", "adon", "cpr", "bls", "acls", "dsp", "bht", "idd"]);
 
 export const toLabel = (value) =>
   String(value || "")

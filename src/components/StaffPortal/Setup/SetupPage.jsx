@@ -29,6 +29,9 @@ const TYPE_NOTES = {
   assisted_living: "Caregivers and med techs around the clock",
   memory_care: "Secured units, usually staffed more heavily",
   skilled_nursing: "CNAs with LPN and RN coverage on every shift",
+  group_home: "Direct support professionals day, evening and awake overnight",
+  behavioral_health: "Behavioral health techs with RN coverage",
+  hospice_house: "RNs and hospice aides on every shift",
   home_care: "Caregivers on day and overnight visits",
   other: "Start blank and set your own roles",
 };

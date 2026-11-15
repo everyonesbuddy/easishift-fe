@@ -42,18 +42,18 @@ import { DEMO_URL, FAQ, NOT_AN_AGENCY } from "./roleContent";
 const NAVBAR_HEIGHT = 80;
 
 const HEALTHCARE_SETTINGS = [
-  { label: "Assisted Living", icon: <FiHome size={18} /> },
-  { label: "Memory Care", icon: <FiHeart size={18} /> },
+  { label: "Senior Living", icon: <FiHome size={18} /> },
   { label: "Skilled Nursing", icon: <FiUsers size={18} /> },
-  { label: "Home Care", icon: <FiHome size={18} /> },
-  { label: "Small Clinics", icon: <FiCheckCircle size={18} /> },
+  { label: "Group Homes & IDD", icon: <FiHome size={18} /> },
+  { label: "Behavioral Health", icon: <FiHeart size={18} /> },
+  { label: "Hospice Houses", icon: <FiCheckCircle size={18} /> },
 ];
 
 const STEPS = [
   {
     icon: <FiLayers size={22} />,
     title: "Set your weekly needs once",
-    text: "Say how many CNAs, med techs or nurses you need on each shift. Every new week starts from it.",
+    text: "Say how many aides, DSPs, techs or nurses you need on each shift. Every new week starts from it.",
   },
   {
     icon: <FiCalendar size={22} />,
@@ -245,7 +245,7 @@ export default function Home() {
                       bgcolor: "#60A5FA",
                     }}
                   />
-                  Software for senior living teams
+                  Software for 24/7 care teams
                 </Typography>
                 <Typography
                   component="h1"
@@ -263,7 +263,7 @@ export default function Home() {
                     },
                   }}
                 >
-                  Scheduling and labor software for senior living.
+                  Scheduling and time tracking for 24/7 care teams.
                 </Typography>
                 <Typography
                   sx={{
@@ -274,10 +274,9 @@ export default function Home() {
                     mt: 3,
                   }}
                 >
-                  Your schedulers build and send the week in minutes. Your DON
-                  sees overtime and open shifts before payroll. Your
-                  administrator and regional VP get hours per resident day
-                  against budget every Monday.
+                  For senior living, nursing homes, group homes, behavioral
+                  health and hospice. Build and send the week in minutes, fill
+                  call-outs by text, and see overtime before payroll does.
                 </Typography>
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
@@ -503,7 +502,7 @@ export default function Home() {
               <SectionTitle
                 eyebrow="Built for your role"
                 title="One schedule. What each person needs from it."
-                subtitle="Schedulers get the week out. DONs and administrators keep it on budget. Regional teams see every building's numbers on Monday."
+                subtitle="Schedulers get the week out. Directors and administrators keep it on budget. Regional teams see every building's numbers on Monday."
               />
             </Box>
             <RoleShowcase />
@@ -685,7 +684,7 @@ export default function Home() {
               <Feature
                 icon={<FiLayers size={21} />}
                 title="Send everyone, or just one unit"
-                text="Publish the whole week, or only Memory Care, or only the med techs, when one part is ready first."
+                text="Publish the whole week, or just one unit or house, or just one role, when that part is ready first."
               />
               <Feature
                 icon={<FiAlertTriangle size={21} />}

@@ -33,7 +33,7 @@ export const ROLES = [
     subtitle:
       "Set your weekly needs once. Build the week by hand or with auto-fill, send everyone their own link, and fill call-outs from your phone.",
     points: [
-      { icon: FiLayers, title: "Weekly Needs, reused every week", text: "How many CNAs, med techs and nurses each shift needs. Every new week starts from it." },
+      { icon: FiLayers, title: "Weekly Needs, reused every week", text: "How many aides, DSPs, techs and nurses each shift needs. Every new week starts from it." },
       { icon: FiSend, title: "Sent in one click", text: "Each person gets their own link by text or email and sees just their shifts. No app or password for your staff." },
       { icon: FiAlertTriangle, title: "Open spots and call-outs in one place", text: "Today shows what's still open for the next three days. Tap Fill to see who on your team is qualified and free." },
       { icon: FiShuffle, title: "Swaps without the group text", text: "Your staff ask to swap or pick up a shift from their link. You approve it in one tap." },
@@ -44,9 +44,9 @@ export const ROLES = [
   },
   {
     slug: "directors",
-    tab: "DONs and administrators",
-    tabShort: "DONs & admins",
-    eyebrow: "For directors of nursing and administrators",
+    tab: "Directors and administrators",
+    tabShort: "Directors & admins",
+    eyebrow: "For directors of nursing, program directors and administrators",
     title: "Catch overtime and open shifts before payroll does.",
     subtitle:
       "Your building's labor at a glance: hours per resident day against budget, overtime coming, call-outs by shift, certifications about to expire, and who's showing signs of burning out.",
@@ -85,6 +85,10 @@ export const ROLES = [
 export const roleBySlug = (slug) => ROLES.find((r) => r.slug === slug) || null;
 
 export const FAQ = [
+  {
+    q: "Is WiserShifts only for senior living?",
+    a: "No. It's built for any team that covers shifts around the clock: senior living and nursing homes, group homes and IDD residences, behavioral health residential programs and hospice houses. Setup starts you with typical roles and shifts for your type of care, and you change them to match yours.",
+  },
   {
     q: "Is WiserShifts a staffing agency?",
     a: "No. WiserShifts is software for scheduling and running your own team. We don't supply staff, and we don't take a cut of anyone's hours.",

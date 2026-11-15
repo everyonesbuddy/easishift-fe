@@ -101,7 +101,7 @@ export default function RoleShowcase() {
             onClick={() => navigate(`/for/${role.slug}`)}
             sx={{ mt: 3, px: 0, textTransform: "none", fontWeight: 800, fontSize: "1rem" }}
           >
-            More for {role.tab.toLowerCase().replace("dons", "DONs")}
+            More for {role.tab.toLowerCase()}
           </Button>
         </Box>
         <RoleMocks names={role.mocks} />

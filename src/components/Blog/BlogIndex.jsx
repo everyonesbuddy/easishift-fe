@@ -41,7 +41,7 @@ export default function BlogIndex() {
               Staffing math for people who run care buildings
             </Typography>
             <Typography sx={{ mt: 2, color: "rgba(255,255,255,0.75)", fontSize: "1.1rem", maxWidth: 700, lineHeight: 1.6 }}>
-              Overtime, call-outs, hours per resident day and schedules that hold up. Written for schedulers, DONs, administrators and operators.
+              Overtime, call-outs, hours per resident day and schedules that hold up. Written for schedulers, directors, administrators and operators of 24/7 care teams.
             </Typography>
           </Container>
         </Box>

@@ -24,7 +24,7 @@ const TERMS_VERSION = "1.0";
 // Optional; helps us know who we're talking to and which marketing works.
 const ROLES = [
   ["scheduler", "I make the schedule"],
-  ["don", "Director of Nursing / clinical lead"],
+  ["don", "Director of Nursing / program director / clinical lead"],
   ["executive_director", "Executive Director"],
   ["administrator", "Administrator"],
   ["regional", "Regional / corporate (several buildings)"],

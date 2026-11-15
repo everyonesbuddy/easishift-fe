@@ -21,7 +21,7 @@ const CALCULATORS = [
     cta: "Calculate Hours per Resident Day",
     to: "/calculators/hours-per-resident-day-calculator",
     icon: <FiTarget size={18} />,
-    tag: "For administrators and DONs",
+    tag: "For administrators and directors",
     question: "Are we staffed to budget?",
     details: ["Your census", "Your shifts", "Your target"],
     accent: "#1D4ED8",
@@ -35,7 +35,7 @@ const CALCULATORS = [
     cta: "Calculate Positions Needed",
     to: "/calculators/schedule-coverage-calculator",
     icon: <FiUsers size={18} />,
-    tag: "For DONs and operators",
+    tag: "For directors and operators",
     question: "Do we have enough people for this schedule?",
     details: ["Shift pattern", "Time away", "Positions short"],
     accent: "#4338CA",
@@ -322,7 +322,7 @@ export default function Calculators() {
           >
             <FiUsers size={18} />
             <Typography sx={{ fontSize: "0.92rem" }}>
-              Built for healthcare operators who need a faster read on labor
+              Built for 24/7 care operators who need a faster read on labor
               decisions.
             </Typography>
           </Box>

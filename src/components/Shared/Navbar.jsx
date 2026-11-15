@@ -44,7 +44,7 @@ export default function Navbar({ onMobileOpen }) {
   // Who it's for first (one page per buyer), then the features.
   const featureLinks = [
     { label: "For schedulers", to: "/for/schedulers", icon: FiCalendar },
-    { label: "For DONs and administrators", to: "/for/directors", icon: FiUsers },
+    { label: "For directors and administrators", to: "/for/directors", icon: FiUsers },
     { label: "For regional operators", to: "/for/operators", icon: FiTrendingUp },
     {
       label: "Employee Scheduling",

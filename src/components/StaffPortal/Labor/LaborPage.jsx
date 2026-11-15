@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Box, Button, ButtonBase, Container, IconButton, Typography } from "@mui/material";
-import { FiAlertTriangle, FiCheckCircle, FiChevronDown, FiChevronLeft, FiChevronRight, FiPrinter, FiSettings } from "react-icons/fi";
+import { FiAlertTriangle, FiCheckCircle, FiChevronLeft, FiChevronRight, FiPrinter, FiSettings } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
-import { IOS, roleColor, tint } from "../../../theme/ios";
+import { IOS, tint } from "../../../theme/ios";
 import LaborSettingsDialog from "./LaborSettingsDialog";
-import LaborTrends from "./LaborTrends";
 import LaborPrint from "./LaborPrint";
 import OvertimeFixDrawer from "./OvertimeFixDrawer";
 import { certLabel, dayLabel, hours, money, periodLabel, printLaborSummary, roleLabel } from "./laborFormat";
@@ -25,8 +24,6 @@ const TONE = { good: IOS.greenText, warn: IOS.orangeText, bad: IOS.redText, none
 
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-// Sections under "More detail" (it opens before scrolling to one).
-const DETAIL_TARGETS = new Set(["labor-credentials", "labor-watch", "labor-callouts"]);
 
 /** What needs someone's attention this week, most urgent first. */
 function attentionItems(d) {
@@ -41,7 +38,6 @@ function attentionItems(d) {
   }
   if (d.openShifts.openUpcoming) items.push({ tone: "warn", text: `${plural(d.openShifts.openUpcoming, "spot")} still open`, target: "labor-shifts" });
   if (soon) items.push({ tone: "warn", text: `${plural(soon, "certification")} expiring soon`, target: "labor-credentials" });
-  if (d.turnoverWatch.length) items.push({ tone: "warn", text: `${plural(d.turnoverWatch.length, "person", "people")} to check in with`, target: "labor-watch" });
   return items;
 }
 
@@ -172,19 +168,6 @@ function Figure({ label, value, detail, tone = "none", onClick }) {
   );
 }
 
-/** A labeled horizontal bar (hours by role, call-outs by shift). */
-function BarRow({ label, value, max, color, display }) {
-  return (
-    <Box sx={{ display: "grid", gridTemplateColumns: "minmax(90px, 140px) 1fr auto", alignItems: "center", gap: 1.5, py: 0.75 }}>
-      <Typography sx={{ fontSize: 14, fontWeight: 600 }} noWrap>{label}</Typography>
-      <Box sx={{ height: 8, borderRadius: 4, bgcolor: IOS.fill, overflow: "hidden" }}>
-        <Box sx={{ height: "100%", width: `${max ? (value / max) * 100 : 0}%`, bgcolor: color, borderRadius: 4 }} />
-      </Box>
-      <Typography sx={{ fontSize: 14, fontWeight: 700, minWidth: 56, textAlign: "right", ...num }}>{display}</Typography>
-    </Box>
-  );
-}
-
 function PersonLine({ name, color, detail, right, rightTone }) {
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1.1, "& + &": { borderTop: `1px solid ${IOS.hairline}` } }}>
@@ -221,29 +204,6 @@ export default function LaborPage() {
   const [error, setError] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reload, setReload] = useState(0);
-  // "More detail" open or closed, remembered in this browser.
-  const [showMore, setShowMoreState] = useState(() => {
-    try {
-      return localStorage.getItem("labor.showMore") === "1";
-    } catch {
-      return false;
-    }
-  });
-  const setShowMore = (v) => {
-    setShowMoreState(v);
-    try {
-      localStorage.setItem("labor.showMore", v ? "1" : "0");
-    } catch {
-      /* private window: just don't remember */
-    }
-  };
-  // Jump to a section, opening "More detail" first if it's in there.
-  const goTo = (id) => {
-    if (DETAIL_TARGETS.has(id) && !showMore) {
-      setShowMore(true);
-      setTimeout(() => scrollTo(id), 80);
-    } else scrollTo(id);
-  };
 
   const load = useCallback(
     ({ period, key }) =>
@@ -307,11 +267,7 @@ export default function LaborPage() {
   const canFix = d && !isMonth && d.canFixOvertime && d.weekStart >= d.thisWeek;
   const go = (key) => setView((v) => ({ ...v, key }));
   const attention = d ? attentionItems(d) : [];
-  const roleMax = d ? Math.max(1, ...d.hours.byRole.map((r) => r.scheduled)) : 1;
-  const shiftMax = d ? Math.max(1, ...d.attendance.byShift.map((s) => s.callOuts + s.noShows)) : 1;
-  const hasTarget = d?.budget?.targetPPD !== null && d?.budget?.targetPPD !== undefined;
-  const dayBudget = (day) => (hasTarget && day.residents ? d.budget.targetPPD * day.residents : null);
-  const dayMax = d ? Math.max(1, ...d.hours.byDay.map((x) => Math.max(x.scheduled, dayBudget(x) || 0))) : 1;
+  const hasBudget = Boolean(d?.budget && d.budget.targetPPD !== null && d.budget.targetPPD !== undefined);
   const threshold = d?.overtime.thresholdHours || 40;
   const otMax = d ? Math.max(threshold * 1.25, ...d.overtime.people.map((o) => o.projectedHours)) : threshold;
 
@@ -385,7 +341,7 @@ export default function LaborPage() {
       {d && (
         <>
           {/* What needs attention + budget */}
-          <Box sx={{ ...surface, mt: 2.5, p: { xs: 2, md: 3 }, display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.5fr 1fr" }, gap: { xs: 2, md: 4 }, alignItems: "center" }}>
+          <Box sx={{ ...surface, mt: 2.5, p: { xs: 2, md: 3 }, display: "grid", gridTemplateColumns: { xs: "1fr", md: hasBudget ? "1.5fr 1fr" : "1fr" }, gap: { xs: 2, md: 4 }, alignItems: "center" }}>
             <Box>
               <Typography sx={{ color: IOS.secondary, fontSize: 14, fontWeight: 600 }}>
                 {isCurrent ? `This ${periodWord}` : isMonth ? periodLabel(d) : `Week of ${periodLabel(d)}`}
@@ -400,7 +356,7 @@ export default function LaborPage() {
                   {attention.map((a) => (
                     <ButtonBase
                       key={a.text}
-                      onClick={() => goTo(a.target)}
+                      onClick={() => scrollTo(a.target)}
                       sx={{
                         display: "inline-flex",
                         alignItems: "center",
@@ -426,14 +382,17 @@ export default function LaborPage() {
                 </Typography>
               )}
             </Box>
-            <BudgetGauge
-              budget={d.budget}
-              hoursInfo={d.hours}
-              canManage={d.canManage}
-              onSetup={() => setSettingsOpen(true)}
-              periodWord={periodWord}
-              dayCount={d.days.length}
-            />
+            {/* Only for workspaces that budget by staff hours per resident per day (set in Settings). */}
+            {hasBudget && (
+              <BudgetGauge
+                budget={d.budget}
+                hoursInfo={d.hours}
+                canManage={d.canManage}
+                onSetup={() => setSettingsOpen(true)}
+                periodWord={periodWord}
+                dayCount={d.days.length}
+              />
+            )}
           </Box>
 
           {d.draft?.any && (
@@ -492,7 +451,6 @@ export default function LaborPage() {
               value={d.attendance.callOuts}
               tone={d.attendance.callOuts ? "warn" : "good"}
               detail={d.attendance.noShows ? `and ${plural(d.attendance.noShows, "no-show")}` : "No no-shows"}
-              onClick={d.attendance.callOuts + d.attendance.noShows ? () => goTo("labor-callouts") : undefined}
             />
             <Figure
               label="Spots filled"
@@ -513,7 +471,7 @@ export default function LaborPage() {
             </Typography>
           )}
 
-          {/* The basics: overtime coming and open spots */}
+          {/* The four things that matter: overtime coming, open spots, certifications (and the numbers above) */}
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.4fr 1fr" }, gap: 1.5, mt: 1.5, alignItems: "start" }}>
             <Section
               id="labor-overtime"
@@ -582,136 +540,43 @@ export default function LaborPage() {
                 <Quiet>No one goes over {threshold} hours in a week this {periodWord}.</Quiet>
               )}
             </Section>
-            <Section id="labor-shifts" title="Spots" note={d.openShifts.drafted ? `${d.openShifts.drafted} of the filled spots are in a draft that isn't published yet.` : undefined}>
-              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1 }}>
-                {[
-                  ["Filled", d.openShifts.filled, "good"],
-                  ["Still open", d.openShifts.openUpcoming, d.openShifts.openUpcoming ? "warn" : "none"],
-                  ["Went unfilled", d.openShifts.unfilledPast, d.openShifts.unfilledPast ? "bad" : "none"],
-                ].map(([label, value, tone]) => (
-                  <Box key={label} sx={{ p: 1.5, borderRadius: IOS.radius.cell, bgcolor: IOS.canvas }}>
-                    <Typography sx={{ fontSize: 22, fontWeight: 700, color: TONE[tone], ...num }}>{value}</Typography>
-                    <Typography sx={{ fontSize: 13, color: IOS.secondary }}>{label}</Typography>
-                  </Box>
-                ))}
-              </Box>
-            </Section>
-          </Box>
-
-          {/* Everything else, folded away until someone wants it */}
-          <ButtonBase
-            onClick={() => setShowMore(!showMore)}
-            aria-expanded={showMore}
-            sx={{ ...surface, mt: 1.5, width: "100%", px: { xs: 2, md: 2.5 }, py: 1.6, display: "flex", alignItems: "center", gap: 1.5, textAlign: "left", justifyContent: "flex-start" }}
-          >
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 700, fontSize: 16 }}>{showMore ? "Less detail" : "More detail"}</Typography>
-              <Typography sx={{ fontSize: 13.5, color: IOS.secondary }}>Last 12 weeks, certifications, people to check in with, call-outs by shift, and hours by role and day</Typography>
-            </Box>
-            <FiChevronDown size={20} style={{ transform: showMore ? "rotate(180deg)" : "none", transition: "transform .15s", color: IOS.secondary, flexShrink: 0 }} />
-          </ButtonBase>
-
-          {showMore && (
-            <>
-              {/* Trends */}
-              <Section title="Last 12 weeks" note="Is it getting better? Each point is one week." sx={{ mt: 1.5 }}>
-                <LaborTrends endWeek={!isMonth && d.weekStart < d.thisWeek ? d.weekStart : null} canSeeCosts={d.canSeeCosts} reloadKey={reload} />
-              </Section>
-
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.2fr 1fr" }, gap: 1.5, mt: 1.5, alignItems: "start" }}>
-                <Section
-                  id="labor-watch"
-                  title="People to check in with"
-                  note="Call-outs, no-shows, repeated overtime or hours falling off over the last 4 weeks: signs of burnout or drifting away. A short conversation now is cheaper than replacing them."
-                >
-                  {d.turnoverWatch.length ? (
-                    d.turnoverWatch.map((w) => (
-                      <PersonLine key={w.staffId} name={w.name} color={roleColor(w.role, roles)} detail={`${roleLabel(w.role)}: ${w.reasons.join(", ")}`} />
-                    ))
-                  ) : (
-                    <Quiet>No one stands out right now.</Quiet>
-                  )}
-                </Section>
-                <Box sx={{ display: "grid", gap: 1.5, alignContent: "start" }}>
-                <Section
-                  id="labor-credentials"
-                  title="Certifications"
-                  note="Expired, or expiring in the next 30 days. Add expiry dates on each person's certifications in Staff."
-                >
-                  {d.credentials.expired.length + d.credentials.expiringSoon.length ? (
-                    [...d.credentials.expired, ...d.credentials.expiringSoon].map((c) => (
-                      <PersonLine
-                        key={`${c.staffId}:${c.tag}`}
-                        name={c.name}
-                        color={c.daysLeft <= 0 ? IOS.red : IOS.orange}
-                        detail={`${certLabel(c.tag)}, ${c.daysLeft <= 0 ? "expired" : "expires"} ${dayLabel(c.expiresAt.slice(0, 10), { month: "short", day: "numeric", year: "numeric" })}`}
-                        right={c.daysLeft <= 0 ? "Expired" : `${c.daysLeft} days`}
-                        rightTone={c.daysLeft <= 0 ? "bad" : "warn"}
-                      />
-                    ))
-                  ) : (
-                    <Quiet>Nothing expired or expiring in the next 30 days.</Quiet>
-                  )}
-                </Section>
-                  <Section id="labor-callouts" title="Call-outs and no-shows by shift">
-                    {d.attendance.byShift.length ? (
-                      d.attendance.byShift.map((s) => (
-                        <BarRow
-                          key={s.key}
-                          label={s.label}
-                          value={s.callOuts + s.noShows}
-                          max={shiftMax}
-                          color={s.noShows ? IOS.red : IOS.orange}
-                          display={s.noShows ? `${s.callOuts} + ${s.noShows}` : s.callOuts}
-                        />
-                      ))
-                    ) : (
-                      <Quiet>No call-outs or no-shows this {periodWord}.</Quiet>
-                    )}
-                  </Section>
+            <Box sx={{ display: "grid", gap: 1.5, alignContent: "start" }}>
+              <Section id="labor-shifts" title="Spots" note={d.openShifts.drafted ? `${d.openShifts.drafted} of the filled spots are in a draft that isn't published yet.` : undefined}>
+                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1 }}>
+                  {[
+                    ["Filled", d.openShifts.filled, "good"],
+                    ["Still open", d.openShifts.openUpcoming, d.openShifts.openUpcoming ? "warn" : "none"],
+                    ["Went unfilled", d.openShifts.unfilledPast, d.openShifts.unfilledPast ? "bad" : "none"],
+                  ].map(([label, value, tone]) => (
+                    <Box key={label} sx={{ p: 1.5, borderRadius: IOS.radius.cell, bgcolor: IOS.canvas }}>
+                      <Typography sx={{ fontSize: 22, fontWeight: 700, color: TONE[tone], ...num }}>{value}</Typography>
+                      <Typography sx={{ fontSize: 13, color: IOS.secondary }}>{label}</Typography>
+                    </Box>
+                  ))}
                 </Box>
-              </Box>
-
-              {/* Where the hours went */}
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1.2fr" }, gap: 1.5, mt: 1.5 }}>
-                <Section title="Hours by role">
-                  {d.hours.byRole.length ? (
-                    d.hours.byRole.map((r) => (
-                      <BarRow key={r.role} label={roleLabel(r.role)} value={r.scheduled} max={roleMax} color={roleColor(r.role, roles)} display={r.drafted ? `${hours(r.scheduled)} (${hours(r.drafted)} drafted)` : hours(r.scheduled)} />
-                    ))
-                  ) : (
-                    <Quiet>No shifts this {periodWord}.</Quiet>
-                  )}
-                </Section>
-
-                <Section title="Hours by day" note={hasTarget ? "The dark line on each day is the budget for that day's residents." : undefined}>
-                  <Box sx={{ display: "grid", gridTemplateColumns: `repeat(${d.days.length}, 1fr)`, gap: isMonth ? { xs: "2px", md: "4px" } : { xs: 0.75, md: 1.5 }, alignItems: "end", height: 170 }}>
-                    {d.hours.byDay.map((day) => {
-                      const budgetH = dayBudget(day);
-                      const over = budgetH !== null && day.scheduled > budgetH * 1.03;
-                      return (
-                        <Box key={day.date} sx={{ display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
-                          {!isMonth && <Typography sx={{ fontSize: 12, fontWeight: 700, mb: 0.5, ...num }}>{Math.round(day.scheduled)}</Typography>}
-                          <Box sx={{ position: "relative", width: "100%", maxWidth: 44, height: 120, display: "flex", alignItems: "flex-end" }}>
-                            <Box
-                              title={isMonth ? `${dayLabel(day.date)}: ${Math.round(day.scheduled)} h` : undefined}
-                              sx={{ width: "100%", height: `${(day.scheduled / dayMax) * 100}%`, minHeight: 2, borderRadius: isMonth ? "3px 3px 1px 1px" : "6px 6px 2px 2px", bgcolor: over ? IOS.orange : IOS.blue }}
-                            />
-                            {budgetH !== null && (
-                              <Box sx={{ position: "absolute", left: isMonth ? -1 : -4, right: isMonth ? -1 : -4, bottom: `${(budgetH / dayMax) * 100}%`, height: 2, bgcolor: IOS.ink, borderRadius: 1 }} />
-                            )}
-                          </Box>
-                          <Typography sx={{ fontSize: isMonth ? 10 : 12, color: IOS.secondary, mt: 0.75, ...num }}>
-                            {isMonth ? (Number(day.date.slice(8)) % 7 === 1 ? Number(day.date.slice(8)) : "\u00a0") : dayLabel(day.date, { weekday: "short" })}
-                          </Typography>
-                        </Box>
-                      );
-                    })}
-                  </Box>
-                </Section>
-              </Box>
-            </>
-          )}
+              </Section>
+              <Section
+                id="labor-credentials"
+                title="Certifications"
+                note="Expired, or expiring in the next 30 days. Add expiry dates on each person's certifications in Staff."
+              >
+                {d.credentials.expired.length + d.credentials.expiringSoon.length ? (
+                  [...d.credentials.expired, ...d.credentials.expiringSoon].map((c) => (
+                    <PersonLine
+                      key={`${c.staffId}:${c.tag}`}
+                      name={c.name}
+                      color={c.daysLeft <= 0 ? IOS.red : IOS.orange}
+                      detail={`${certLabel(c.tag)}, ${c.daysLeft <= 0 ? "expired" : "expires"} ${dayLabel(c.expiresAt.slice(0, 10), { month: "short", day: "numeric", year: "numeric" })}`}
+                      right={c.daysLeft <= 0 ? "Expired" : `${c.daysLeft} days`}
+                      rightTone={c.daysLeft <= 0 ? "bad" : "warn"}
+                    />
+                  ))
+                ) : (
+                  <Quiet>Nothing expired or expiring in the next 30 days.</Quiet>
+                )}
+              </Section>
+            </Box>
+          </Box>
 
           {!d.hours.timeClockUsed && (
             <Typography sx={{ color: IOS.secondary, fontSize: 13, mt: 2 }}>

@@ -4,7 +4,7 @@ export const ADMIN_ROLES = ["admin", "owner"];
 export const FACILITY_BASELINE_ROLE = "staff";
 
 // Care credentials people write in capitals.
-const ACRONYMS = new Set(["cna", "lpn", "lvn", "rn", "np", "cma", "cmt", "hha", "pca", "qmap", "don", "adon", "cpr", "bls", "acls"]);
+const ACRONYMS = new Set(["cna", "lpn", "lvn", "rn", "np", "cma", "cmt", "hha", "pca", "qmap", "don", "adon", "cpr", "bls", "acls", "dsp", "bht", "qidp"]);
 
 const toDisplayLabel = (value) =>
   String(value || "")

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Box,
   Button,
@@ -60,25 +61,20 @@ function printWeek() {
   window.print();
 }
 
-// Only while printing the week (ScheduleList hides the rest of the page).
+// The printout is rendered straight into <body>, outside the app's
+// scrolling frame, so every row prints (not just what fits on screen).
 const PRINT_STYLES = {
+  "#week-print-root": { display: "none" },
   "@media print": {
-    "html:has(body.printing-week), body.printing-week": { background: "#fff !important" },
-    "body.printing-week *": { visibility: "hidden" },
-    "body.printing-week #week-print-section, body.printing-week #week-print-section *": { visibility: "visible" },
-    "body.printing-week #week-print-section": {
-      position: "absolute",
-      top: 0,
-      left: 0,
-      right: 0,
-      width: "100%",
-      margin: "0 !important",
-      background: "#fff",
+    "body.printing-week > *:not(#week-print-root)": { display: "none !important" },
+    "html:has(body.printing-week), body.printing-week": {
+      background: "#fff !important",
+      height: "auto !important",
+      minHeight: "0 !important",
+      overflow: "visible !important",
     },
-    "body.printing-week #week-print-section *": { printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" },
-    "body.printing-week #week-print-section .no-print, body.printing-week .week-print-frame": { display: "none !important" },
-    "body.printing-week #week-print-section .print-only": { display: "block !important" },
-    "body.printing-week #week-print-section table.print-only": { display: "table !important" },
+    "body.printing-week #week-print-root": { display: "block", fontFamily: "Helvetica, Arial, sans-serif", padding: "0 2px", boxSizing: "border-box" },
+    "body.printing-week #week-print-root *": { printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" },
   },
 };
 
@@ -160,7 +156,7 @@ function OpenPill({ count = 1 }) {
   );
 }
 
-function Cell({ row, people, callOuts, color, onOpen, onAdd, canEdit, isPast, showAll = false }) {
+function Cell({ row, people, callOuts, color, onOpen, onAdd, canEdit, isPast }) {
   if (!row) {
     return (
       <Box
@@ -194,7 +190,7 @@ function Cell({ row, people, callOuts, color, onOpen, onAdd, canEdit, isPast, sh
   const short = Math.max(0, needed - filled);
   const open = ended ? 0 : short;
   const extra = Math.max(0, filled - needed);
-  const MAX_PEOPLE = showAll ? Infinity : 4;
+  const MAX_PEOPLE = 4;
   const hidden = Math.max(0, people.length - MAX_PEOPLE);
 
   return (
@@ -404,19 +400,9 @@ export default function WeekGrid({ week, onChanged, onCallOut, filter, onFilterC
   };
 
   return (
-    <Box sx={{ mt: 2 }} id="week-print-section">
+    <Box sx={{ mt: 2 }}>
       <GlobalStyles styles={PRINT_STYLES} />
-      <Box className="print-only" sx={{ display: "none", mb: 1 }}>
-        <Typography sx={{ fontSize: 16, fontWeight: 700, color: IOS.ink }}>
-          {tenant?.branding?.displayName || tenant?.name || "Schedule"} · Week of {weekRange(days)}
-        </Typography>
-        <Typography sx={{ fontSize: 11, color: IOS.secondary }}>
-          {isPublished ? "Published" : "Not published yet"}
-          {filtered ? ` · Shown: ${shownLines.length} of ${lines.length} rows` : ""} · Dashed = not sent yet, orange dashed = open · Printed{" "}
-          {new Date().toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
-        </Typography>
-      </Box>
-      <Box className="no-print" sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5, gap: 2, flexWrap: "wrap" }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5, gap: 2, flexWrap: "wrap" }}>
         <Box sx={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
           {onFilterChange && (
             <ViewFilter
@@ -469,8 +455,7 @@ export default function WeekGrid({ week, onChanged, onCallOut, filter, onFilterC
       </Box>
 
       <Box
-        className="week-print-frame"
-        sx={{
+                sx={{
           overflowX: "auto",
           borderRadius: IOS.radius.card,
           bgcolor: IOS.surface,
@@ -653,15 +638,31 @@ export default function WeekGrid({ week, onChanged, onCallOut, filter, onFilterC
         </Box>
       </Box>
 
-      <PrintTable
-        days={days}
-        groups={groups}
-        byKey={byKey}
-        dayTotals={dayTotals}
-        peopleByCoverage={peopleByCoverage}
-        callOutsByCoverage={callOutsByCoverage}
-        roleList={roleList}
-      />
+      {createPortal(
+        <div id="week-print-root">
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: IOS.ink }}>
+              {tenant?.branding?.displayName || tenant?.name || "Schedule"} · Week of {weekRange(days)}
+            </div>
+            <div style={{ fontSize: 10, color: IOS.secondary }}>
+              {isPublished ? "Published" : "Not published yet"}
+              {filtered ? ` · Shown: ${shownLines.length} of ${lines.length} rows` : ""} · Dashed = not sent yet · Orange = open · Printed{" "}
+              {new Date().toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+            </div>
+          </div>
+          <PrintTable
+            days={days}
+            groups={groups}
+            byKey={byKey}
+            dayTotals={dayTotals}
+            peopleByCoverage={peopleByCoverage}
+            callOutsByCoverage={callOutsByCoverage}
+            roleList={roleList}
+            today={today}
+          />
+        </div>,
+        document.body,
+      )}
 
       <SlotDrawer
         open={Boolean(openRow)}
@@ -744,12 +745,12 @@ export default function WeekGrid({ week, onChanged, onCallOut, filter, onFilterC
  * The same week as a plain table, for paper only: the day header repeats
  * on every page and a row never splits across pages.
  */
-function PrintTable({ days, groups, byKey, dayTotals, peopleByCoverage, callOutsByCoverage, roleList }) {
+function PrintTable({ days, groups, byKey, dayTotals, peopleByCoverage, callOutsByCoverage, roleList, today }) {
   const border = `1px solid ${IOS.separator}`;
   const th = { border, padding: "4px 6px", textAlign: "left", verticalAlign: "bottom", fontWeight: 600, fontSize: 11, color: IOS.ink, background: IOS.canvas };
   const td = { border, padding: 3, verticalAlign: "top" };
   return (
-    <Box component="table" className="print-only" sx={{ display: "none", width: "100%", borderCollapse: "collapse", tableLayout: "fixed", "& tr": { breakInside: "avoid", pageBreakInside: "avoid" } }}>
+    <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
       <colgroup>
         <col style={{ width: "13%" }} />
         {days.map((d) => (
@@ -781,7 +782,7 @@ function PrintTable({ days, groups, byKey, dayTotals, peopleByCoverage, callOuts
           {group.lines.map((line, li) => {
             const color = roleColor(line.role, roleList);
             return (
-              <tr key={line.key}>
+              <tr key={line.key} style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
                 <td style={{ ...td, padding: "4px 6px", borderLeft: `4px solid ${color}` }}>
                   {/* Every row names its shift, so a row at the top of a page still makes sense. */}
                   <div style={{ fontSize: 10, color: IOS.secondary, fontWeight: li === 0 ? 700 : 500, marginBottom: 2 }}>
@@ -799,15 +800,12 @@ function PrintTable({ days, groups, byKey, dayTotals, peopleByCoverage, callOuts
                   return (
                     <td key={day} style={td}>
                       {row && (
-                        <Cell
+                        <PrintCell
                           row={row}
                           color={color}
                           people={peopleByCoverage.get(String(row._id)) || []}
                           callOuts={callOutsByCoverage.get(String(row._id)) || 0}
-                          canEdit={false}
-                          isPast={false}
-                          showAll
-                          onOpen={() => {}}
+                          isPast={day < today}
                         />
                       )}
                     </td>
@@ -818,7 +816,51 @@ function PrintTable({ days, groups, byKey, dayTotals, peopleByCoverage, callOuts
           })}
         </tbody>
       ))}
-    </Box>
+    </table>
+  );
+}
+
+/** One cell on paper: every name in full (no "…"), open spots, call-outs. */
+function PrintCell({ row, people, callOuts, color, isPast }) {
+  const ended = row.isPast ?? isPast;
+  const short = Math.max(0, row.requiredCount - row.assignedCount);
+  const open = ended ? 0 : short;
+  const extra = Math.max(0, row.assignedCount - row.requiredCount);
+  const chip = { fontSize: 10, lineHeight: "13px", padding: "1px 4px", borderRadius: 4, marginBottom: 2, wordBreak: "break-word" };
+  return (
+    <div>
+      {people.map((s) => {
+        const draft = s.state === "draft";
+        const noShow = s.status === "no_show";
+        return (
+          <div
+            key={s._id}
+            style={{
+              ...chip,
+              color: noShow ? IOS.redText : IOS.ink,
+              background: noShow ? tint(IOS.red, 0.1) : tint(color, draft ? 0.06 : 0.14),
+              borderLeft: `3px solid ${noShow ? IOS.red : color}`,
+              outline: draft ? `1px dashed ${tint(color, 0.7)}` : "none",
+              outlineOffset: -1,
+              textDecoration: noShow ? "line-through" : "none",
+            }}
+          >
+            {shortName(s.staffId?.name)}
+          </div>
+        );
+      })}
+      {open > 0 && (
+        <div style={{ ...chip, color: IOS.orangeText, background: tint(IOS.orange, 0.06), border: `1px dashed ${tint(IOS.orange, 0.7)}`, textAlign: "center" }}>
+          {open > 1 ? `${open} open` : "Open"}
+        </div>
+      )}
+      {(ended && short > 0) || extra > 0 || callOuts > 0 ? (
+        <div style={{ fontSize: 9, color: IOS.secondary }}>
+          {[ended && short > 0 ? `${short} short` : "", extra > 0 ? `+${extra} extra` : "", callOuts > 0 ? `${callOuts} called out` : ""].filter(Boolean).join(" · ")}
+        </div>
+      ) : null}
+      {row.requiredCount === 0 && people.length === 0 && <div style={{ fontSize: 9, color: IOS.tertiary }}>None needed</div>}
+    </div>
   );
 }
 

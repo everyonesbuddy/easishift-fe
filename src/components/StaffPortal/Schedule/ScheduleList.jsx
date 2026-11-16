@@ -71,8 +71,7 @@ import {
   FiChevronRight,
 } from "react-icons/fi";
 import { MdDragIndicator } from "react-icons/md";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import { calendarPdf, compactRange, openShiftsPdf, rosterPdf } from "./scheduleExports";
 import ExcelJS from "exceljs";
 import ScheduleForm from "./ScheduleForm";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
@@ -169,7 +168,7 @@ const getScheduleTourSteps = ({
 };
 
 export default function ScheduleList() {
-  const { user, can, facilityPreferences } = useAuth();
+  const { user, can, facilityPreferences, tenant } = useAuth();
   const rc = (role) => roleColor(role, facilityPreferences?.roleFamilies);
   const displayTimeZone = getDisplayTimeZone(facilityPreferences);
   const canManageSchedules = can("schedule.manage");
@@ -226,6 +225,37 @@ export default function ScheduleList() {
   const [manualCoverageFromAuto, setManualCoverageFromAuto] = useState(null);
   // Schedulers land on the week grid (needs vs people); others on the list.
   const [view, setView] = useState(canManageSchedules ? "week" : "table");
+
+  // Ctrl+P / Cmd+P in Week prints the week grid (landscape), like the Print
+  // week button. Other views print the page as it is; the month roster is too
+  // wide for paper, so Export → Roster PDF is the printable one.
+  useEffect(() => {
+    let added = null;
+    let page = null;
+    const before = () => {
+      const body = document.body.classList;
+      if (body.contains("printing-week") || body.contains("printing-roster")) return;
+      added = view === "week" && canManageSchedules ? "printing-week" : null;
+      if (!added) return;
+      body.add(added);
+      page = document.createElement("style");
+      page.textContent = "@page { size: landscape; margin: 8mm; }";
+      document.head.appendChild(page);
+    };
+    const after = () => {
+      if (added) document.body.classList.remove(added);
+      page?.remove();
+      added = null;
+      page = null;
+    };
+    window.addEventListener("beforeprint", before);
+    window.addEventListener("afterprint", after);
+    return () => {
+      window.removeEventListener("beforeprint", before);
+      window.removeEventListener("afterprint", after);
+      after();
+    };
+  }, [view, canManageSchedules]);
   // Roles / areas this scheduler chose to see on the week view (saved on their account).
   const [weekFilter, setWeekFilter] = useViewFilter("schedule");
   const [weekBoard, setWeekBoard] = useState(null);
@@ -682,33 +712,6 @@ export default function ScheduleList() {
         : `${unitLabel} \u2022 ${getShiftBlockLabel(best.sample)}`,
     };
   };
-
-  // Export cell text mirrors the on-screen roster card; unit area lives in the group header row
-  const getExportShiftCellText = (shift) =>
-    [
-      getRoleDisplayName(shift.role),
-      formatScheduleTimeRange(shift, { withNextDayHint: true }),
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-  const getExportCoverageCellText = (gap, role) => {
-    if (!gap) return "";
-    return [
-      `Needs ${getRoleDisplayName(role)}`,
-      gap.startTime || gap.endTime ? formatScheduleTimeRange(gap) : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
-  };
-
-  const getExportEmployeeCellText = (member) =>
-    [
-      member.name || "Unknown",
-      member.groupIsRotating ? "Rotating shifts" : member.rolesLabel,
-    ]
-      .filter(Boolean)
-      .join("\n");
 
   const getExportEmployeeRolesText = (member) =>
     member.groupIsRotating ? "Rotating shifts" : member.rolesLabel || "";
@@ -1992,16 +1995,6 @@ export default function ScheduleList() {
     return `${year}-${month}-${day}`;
   };
 
-  const calendarWeekdayLabels = [
-    "Sun",
-    "Mon",
-    "Tue",
-    "Wed",
-    "Thu",
-    "Fri",
-    "Sat",
-  ];
-
   const visibleCalendarDays = useMemo(() => {
     if (!calendarRange.start || !calendarRange.end) {
       return [];
@@ -2021,61 +2014,6 @@ export default function ScheduleList() {
     }
     return days;
   }, [calendarRange]);
-
-  const calendarGridWeeks = useMemo(() => {
-    if (visibleCalendarDays.length === 0) return [];
-
-    const schedulesByDay = new Map();
-    filteredSchedules.forEach((schedule) => {
-      const dayKey = getLocalDateKey(schedule.startTime);
-      if (!schedulesByDay.has(dayKey)) {
-        schedulesByDay.set(dayKey, []);
-      }
-      schedulesByDay.get(dayKey).push(schedule);
-    });
-
-    const cells = visibleCalendarDays.map((date) => {
-      const dayKey = getLocalDateKey(date);
-      const shifts = (schedulesByDay.get(dayKey) || []).sort(
-        (a, b) =>
-          new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-      );
-
-      const lines = shifts.map((shift) => {
-        const start = new Date(shift.startTime);
-        const end = new Date(shift.endTime);
-        const startTime = Number.isNaN(start.getTime())
-          ? ""
-          : start.toLocaleTimeString(undefined, {
-              hour: "numeric",
-              minute: "2-digit",
-              hour12: true,
-              ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
-            });
-        const endTime = Number.isNaN(end.getTime())
-          ? ""
-          : end.toLocaleTimeString(undefined, {
-              hour: "numeric",
-              minute: "2-digit",
-              hour12: true,
-              ...(displayTimeZone ? { timeZone: displayTimeZone } : {}),
-            });
-        const unit = getUnitAreaDisplayName(shift.unitArea) || "No unit";
-        return `${shift.staffId?.name || "Unknown"} (${startTime}-${endTime}, ${unit})`;
-      });
-
-      return {
-        dayNumber: date.getDate(),
-        text: [`${date.getDate()}`, ...lines].join("\n"),
-      };
-    });
-
-    const weeks = [];
-    for (let i = 0; i < cells.length; i += 7) {
-      weeks.push(cells.slice(i, i + 7));
-    }
-    return weeks;
-  }, [filteredSchedules, visibleCalendarDays]);
 
   // Coverage gaps within the calendar's visible date range, styled like Roster's "Needs Coverage" cells
   const calendarCoverageGapEvents = useMemo(() => {
@@ -2156,7 +2094,7 @@ export default function ScheduleList() {
         }),
       ];
 
-      sheet.addRow([`${monthYear} Roster`]);
+      sheet.addRow([`${exportFacility ? `${exportFacility} · ` : ""}Roster · ${monthYear}`]);
       sheet.mergeCells(1, 1, 1, headers.length);
       sheet.getRow(1).height = 24;
       sheet.getRow(1).font = {
@@ -2166,7 +2104,11 @@ export default function ScheduleList() {
       };
       sheet.getRow(1).alignment = { vertical: "middle", horizontal: "left" };
 
-      sheet.addRow([""]);
+      const noteRow = sheet.addRow([
+        `Printed ${new Date().toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })} · Red = called out · Orange = open · Italic = not sent to staff yet`,
+      ]);
+      sheet.mergeCells(noteRow.number, 1, noteRow.number, headers.length);
+      noteRow.getCell(1).font = { size: 9, color: { argb: "64748B" } };
 
       const headerRow = sheet.addRow(headers);
       headerRow.height = 22;
@@ -2183,7 +2125,7 @@ export default function ScheduleList() {
         cell.fill = {
           type: "pattern",
           pattern: "solid",
-          fgColor: { argb: isWeekendCol ? "FEF9C3" : "BDD7EE" },
+          fgColor: { argb: isWeekendCol ? "FFFBEB" : "F1F5F9" },
         };
         cell.alignment = {
           vertical: "middle",
@@ -2200,7 +2142,7 @@ export default function ScheduleList() {
 
       monthRosterGroupedRows.forEach((item) => {
         if (item.type === "header") {
-          const groupRow = sheet.addRow([item.label]);
+          const groupRow = sheet.addRow([cleanGroupLabel(item.label)]);
           sheet.mergeCells(groupRow.number, 1, groupRow.number, headers.length);
           groupRow.height = 20;
           const groupCell = groupRow.getCell(1);
@@ -2208,7 +2150,7 @@ export default function ScheduleList() {
           groupCell.fill = {
             type: "pattern",
             pattern: "solid",
-            fgColor: { argb: "BDD7EE" },
+            fgColor: { argb: "F1F5F9" },
           };
           groupCell.alignment = { vertical: "middle", horizontal: "left" };
           return;
@@ -2216,10 +2158,10 @@ export default function ScheduleList() {
 
         if (item.type === "coverage") {
           const dayCells = monthDays.map((day) =>
-            getExportCoverageCellText(item.gapsByDay[day], item.role),
+            rosterOpenText(item.gapsByDay[day], item.role),
           );
 
-          const coverageRow = sheet.addRow(["", ...dayCells]);
+          const coverageRow = sheet.addRow(["Open spots", ...dayCells]);
           coverageRow.eachCell((cell, colNumber) => {
             const isDayCell = colNumber > 1;
             cell.alignment = {
@@ -2240,13 +2182,15 @@ export default function ScheduleList() {
                 parseDateKeyToLocalDate(day).getDay(),
               );
               cell.font = gap
-                ? { size: 8, color: { argb: "B91C1C" } }
-                : { size: 8, color: { argb: "334155" } };
+                ? { size: 9, bold: true, color: { argb: "C2410C" } }
+                : { size: 9, color: { argb: "334155" } };
               cell.fill = {
                 type: "pattern",
                 pattern: "solid",
-                fgColor: { argb: isWeekendCol ? "FEF9C3" : "FFFFFF" },
+                fgColor: { argb: isWeekendCol ? "FFFBEB" : "FFFFFF" },
               };
+            } else {
+              cell.font = { size: 9, bold: true, color: { argb: "C2410C" } };
             }
           });
           return;
@@ -2256,9 +2200,7 @@ export default function ScheduleList() {
         const dayCells = monthDays.map((day) => {
           const shifts = member.shiftsByDay?.[day] || [];
           if (shifts.length === 0) return "";
-          return shifts
-            .map((shift) => getExportShiftCellText(shift))
-            .join("\n");
+          return shifts.map((shift) => rosterShift(shift).text).join("\n");
         });
 
         const worksheetRow = sheet.addRow(["", ...dayCells]);
@@ -2266,13 +2208,13 @@ export default function ScheduleList() {
         worksheetRow.getCell(1).value = {
           richText: [
             {
-              font: { bold: true, size: 8, color: { argb: "111827" } },
+              font: { bold: true, size: 9, color: { argb: "111827" } },
               text: member.name || "Unknown",
             },
             ...(getExportEmployeeRolesText(member)
               ? [
                   {
-                    font: { size: 8, color: { argb: "475569" } },
+                    font: { size: 9, color: { argb: "64748B" } },
                     text: `\n${getExportEmployeeRolesText(member)}`,
                   },
                 ]
@@ -2297,8 +2239,12 @@ export default function ScheduleList() {
             const isWeekendCol = [0, 6].includes(
               parseDateKeyToLocalDate(day).getDay(),
             );
-            const bg = isWeekendCol ? "FEF9C3" : "FFFFFF";
-            cell.font = { size: 8, color: { argb: "334155" } };
+            const shifts = member.shiftsByDay?.[day] || [];
+            const tones = shifts.map((shift) => rosterShift(shift).tone);
+            const out = shifts.length > 0 && tones.every((t) => t === "out");
+            const draft = shifts.length > 0 && tones.every((t) => t === "draft");
+            const bg = out ? "FEF2F2" : isWeekendCol ? "FFFBEB" : "FFFFFF";
+            cell.font = { size: 9, italic: draft, color: { argb: out ? "B91C1C" : "334155" } };
             cell.fill = {
               type: "pattern",
               pattern: "solid",
@@ -2311,7 +2257,7 @@ export default function ScheduleList() {
       sheet.columns = [
         { width: 24 },
         ...monthDays.map(() => ({
-          width: 20,
+          width: 14,
           style: {
             alignment: { wrapText: true, vertical: "top" },
           },
@@ -2319,6 +2265,18 @@ export default function ScheduleList() {
       ];
 
       sheet.getRow(3).height = 22;
+      // Printing from Excel: landscape, about 10 days per page, dates and names on every page.
+      sheet.pageSetup = {
+        orientation: "landscape",
+        paperSize: 1,
+        fitToPage: true,
+        fitToWidth: 3,
+        fitToHeight: 0,
+        printTitlesRow: "3:3",
+        printTitlesColumn: "A:A",
+        margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 },
+      };
+      sheet.headerFooter = { oddFooter: "&LWiserShifts&RPage &P of &N" };
 
       const buffer = await workbook.xlsx.writeBuffer();
 
@@ -2334,466 +2292,123 @@ export default function ScheduleList() {
     }
   };
 
+  // ---- Printable exports (laid out in scheduleExports.js) ----
+  const exportFacility = tenant?.branding?.displayName || tenant?.name || "";
+  const shortPersonName = (name) => {
+    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "Someone";
+    return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0];
+  };
+  const exportRange = (item) => compactRange(item?.startTime, item?.endTime, displayTimeZone);
+  /** One shift in a roster cell: "CNA 7a–3p", or "Called out". */
+  const rosterShift = (shift) => {
+    if (shift.status === "call_out") return { text: "Called out", tone: "out" };
+    if (shift.status === "no_show") return { text: "No-show", tone: "out" };
+    return {
+      text: [getRoleDisplayName(shift.role), exportRange(shift)].filter(Boolean).join(" "),
+      tone: shift.state === "draft" ? "draft" : undefined,
+    };
+  };
+  // "No Unit Area • 7:00 AM–3:00 PM" reads as just the shift on paper.
+  const cleanGroupLabel = (label) => String(label || "").replace(/^No Unit Area\s*\u2022\s*/, "");
+  const rosterOpenText = (gap, role) =>
+    gap ? `${gap.spotsRemaining > 1 ? `${gap.spotsRemaining} open` : "Open"}: ${getRoleDisplayName(role)} ${exportRange(gap)}`.trim() : "";
+
   const exportRosterToPdf = () => {
     try {
       closeExportMenu();
-      const generatedAt = new Date();
-      const doc = new jsPDF({
-        orientation: "landscape",
-        unit: "pt",
-        format: "a4",
-      });
-
-      const headers = [
-        "Employee",
-        ...monthDays.map((day) => {
-          const date = parseDateKeyToLocalDate(day);
-          const weekday = date.toLocaleDateString(undefined, {
-            weekday: "short",
-          });
-          const monthDay = date.toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric",
-          });
-          return `${monthDay} (${weekday})`;
-        }),
-      ];
-
-      const isWeekendByDay = monthDays.map((day) =>
-        [0, 6].includes(parseDateKeyToLocalDate(day).getDay()),
-      );
-
-      const pdfBody = [];
-      const pdfBodyMeta = [];
-
-      monthRosterGroupedRows.forEach((item) => {
-        if (item.type === "header") {
-          pdfBody.push([
-            {
-              content: item.label,
-              colSpan: headers.length,
-              styles: { halign: "left", fontStyle: "bold" },
-            },
-          ]);
-          pdfBodyMeta.push({ type: "header" });
-          return;
-        }
-
+      const rows = monthRosterGroupedRows.map((item) => {
+        if (item.type === "header") return { type: "header", label: cleanGroupLabel(item.label) };
         if (item.type === "coverage") {
-          const dayCells = monthDays.map((day) =>
-            getExportCoverageCellText(item.gapsByDay[day], item.role),
-          );
-          const dayHasGap = monthDays.map((day) =>
-            Boolean(item.gapsByDay[day]),
-          );
-
-          pdfBody.push(["", ...dayCells]);
-          pdfBodyMeta.push({ type: "coverage", dayHasGap });
-          return;
+          return { type: "coverage", cells: Object.fromEntries(monthDays.map((day) => [day, rosterOpenText(item.gapsByDay[day], item.role)])) };
         }
-
         const member = item.member;
-        const dayCells = monthDays.map((day) => {
-          const shifts = member.shiftsByDay?.[day] || [];
-          if (shifts.length === 0) return "";
-          return shifts
-            .map((shift) => getExportShiftCellText(shift))
-            .join("\n");
-        });
-        const dayStatuses = monthDays.map((day) => {
-          const shifts = member.shiftsByDay?.[day] || [];
-          return shifts[0]?.status || null;
-        });
-
-        pdfBody.push([getExportEmployeeCellText(member), ...dayCells]);
-        pdfBodyMeta.push({
-          type: "data",
-          dayStatuses,
+        return {
+          type: "person",
           name: member.name || "Unknown",
-          roles: getExportEmployeeRolesText(member),
-        });
+          sub: getExportEmployeeRolesText(member),
+          cells: Object.fromEntries(monthDays.map((day) => [day, (member.shiftsByDay?.[day] || []).map(rosterShift)])),
+        };
       });
-
-      const drawRosterHeader = () => {
-        doc.setFillColor(17, 24, 39);
-        doc.rect(18, 16, doc.internal.pageSize.getWidth() - 36, 34, "F");
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(14);
-        doc.setFont(undefined, "bold");
-        doc.text(`Roster - ${monthYear}`, 30, 37);
-        doc.setFontSize(8.5);
-        doc.setFont(undefined, "normal");
-        doc.text(
-          `Generated ${generatedAt.toLocaleString()}`,
-          doc.internal.pageSize.getWidth() - 30,
-          37,
-          { align: "right" },
-        );
-      };
-
-      drawRosterHeader();
-
-      autoTable(doc, {
-        startY: 58,
-        head: [headers],
-        body: pdfBody,
-        styles: {
-          fontSize: 5.4,
-          cellPadding: 2.2,
-          overflow: "linebreak",
-          valign: "top",
-          textColor: [51, 65, 85],
-          lineColor: [229, 231, 235],
-          lineWidth: 0.15,
-        },
-        headStyles: {
-          fillColor: [189, 215, 238],
-          textColor: [15, 23, 42],
-          fontSize: 5.6,
-          fontStyle: "bold",
-          halign: "center",
-        },
-        alternateRowStyles: {
-          fillColor: [248, 250, 252],
-        },
-        columnStyles: {
-          0: { cellWidth: 96, textColor: [17, 24, 39] },
-          ...monthDays.reduce((acc, _day, index) => {
-            acc[index + 1] = { cellWidth: 68 };
-            return acc;
-          }, {}),
-        },
-        horizontalPageBreak: true,
-        horizontalPageBreakRepeat: [0],
-        margin: { left: 18, right: 18, top: 62, bottom: 24 },
-        didParseCell: (data) => {
-          if (data.section === "head") {
-            if (
-              data.column.index > 0 &&
-              isWeekendByDay[data.column.index - 1]
-            ) {
-              data.cell.styles.fillColor = [254, 249, 195];
-              data.cell.styles.textColor = [17, 24, 39];
-            }
-            return;
-          }
-
-          const meta = pdfBodyMeta[data.row.index];
-          if (!meta) return;
-
-          if (meta.type === "header") {
-            data.cell.styles.fillColor = [189, 215, 238];
-            data.cell.styles.textColor = [15, 23, 42];
-            data.cell.styles.fontStyle = "bold";
-            data.cell.styles.halign = "left";
-            return;
-          }
-
-          if (meta.type === "coverage") {
-            if (data.column.index > 0) {
-              const hasGap = meta.dayHasGap[data.column.index - 1];
-              const isWeekendCol = isWeekendByDay[data.column.index - 1];
-              data.cell.styles.fillColor = isWeekendCol
-                ? [254, 249, 195]
-                : [255, 255, 255];
-              data.cell.styles.textColor = hasGap
-                ? [185, 28, 28]
-                : [71, 85, 105];
-              data.cell.styles.minCellHeight = 24;
-            } else {
-              data.cell.styles.fillColor = [255, 255, 255];
-            }
-            return;
-          }
-
-          if (data.column.index > 0) {
-            const isWeekendCol = isWeekendByDay[data.column.index - 1];
-            data.cell.styles.fillColor = isWeekendCol
-              ? [254, 249, 195]
-              : [255, 255, 255];
-            data.cell.styles.textColor = [71, 85, 105];
-            data.cell.styles.minCellHeight = 24;
-          }
-
-          if (data.column.index === 0) {
-            data.cell.styles.fillColor = [239, 246, 255];
-            // Drawn manually in didDrawCell so the name can be bold and roles regular
-            data.cell.text = [];
-            data.cell.styles.minCellHeight = 24;
-          }
-        },
-        didDrawCell: (data) => {
-          if (data.section !== "body" || data.column.index !== 0) return;
-          const meta = pdfBodyMeta[data.row.index];
-          if (!meta || meta.type !== "data") return;
-
-          const textX = data.cell.x + 2.2;
-          let textY = data.cell.y + 6.4;
-
-          doc.setFontSize(5.8);
-          doc.setFont(undefined, "bold");
-          doc.setTextColor(17, 24, 39);
-          doc.text(meta.name, textX, textY);
-
-          if (meta.roles) {
-            textY += 6;
-            doc.setFontSize(5.4);
-            doc.setFont(undefined, "normal");
-            doc.setTextColor(100, 116, 139);
-            doc.text(meta.roles, textX, textY, {
-              maxWidth: data.cell.width - 4.4,
-            });
-          }
-        },
-        didDrawPage: (data) => {
-          drawRosterHeader();
-          doc.setTextColor(100, 116, 139);
-          doc.setFontSize(8);
-          doc.text(
-            `Page ${doc.internal.getNumberOfPages()}`,
-            data.settings.margin.left,
-            doc.internal.pageSize.getHeight() - 14,
-          );
-        },
-      });
-
-      doc.save(`roster-${getMonthFileStamp()}.pdf`);
+      rosterPdf({ facility: exportFacility, period: monthYear, days: monthDays, rows }).save(`roster-${getMonthFileStamp()}.pdf`);
     } catch (error) {
       console.error("Failed to export roster to PDF", error);
       window.alert("Unable to export roster to PDF. Please try again.");
     }
   };
 
-  // Printable sign-up sheet: one line per unfilled slot with a blank rule for a name
+  // Printable sign-up sheet: one line per open spot, with room for a name and phone
   const exportOpenCoverageToPdf = () => {
     try {
       closeExportMenu();
-
-      const slots = [];
+      const spots = [];
       coverageGaps.forEach((coverage) => {
         const start = new Date(coverage.startTime);
-        if (
-          Number.isNaN(start.getTime()) ||
-          start.getFullYear() !== monthDate.getFullYear() ||
-          start.getMonth() !== monthDate.getMonth()
-        ) {
-          return;
-        }
-        for (let i = 0; i < coverage.spotsRemaining; i += 1) {
-          slots.push(coverage);
-        }
+        if (Number.isNaN(start.getTime()) || start.getFullYear() !== monthDate.getFullYear() || start.getMonth() !== monthDate.getMonth()) return;
+        for (let i = 0; i < coverage.spotsRemaining; i += 1) spots.push(coverage);
       });
-
-      if (slots.length === 0) {
-        window.alert("No open coverage to export for this month.");
+      if (spots.length === 0) {
+        window.alert("No open shifts to print for this month.");
         return;
       }
-
-      slots.sort((a, b) => {
-        const timeCompare =
-          new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
-        if (timeCompare !== 0) return timeCompare;
-        const unitCompare = getUnitAreaDisplayName(a.unitArea).localeCompare(
-          getUnitAreaDisplayName(b.unitArea),
-        );
-        if (unitCompare !== 0) return unitCompare;
-        return getRoleDisplayName(a.role).localeCompare(
-          getRoleDisplayName(b.role),
-        );
-      });
-
-      const slotsByDay = new Map();
-      slots.forEach((slot) => {
-        const dayKey = getLocalDateKey(slot.startTime);
-        if (!slotsByDay.has(dayKey)) slotsByDay.set(dayKey, []);
-        slotsByDay.get(dayKey).push(slot);
-      });
-
-      const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "pt",
-        format: "a4",
-      });
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const marginX = 42;
-      const bottomLimit = pageHeight - 46;
-      const nameLineWidth = 150;
-      let y = 0;
-
-      const drawPageHeader = () => {
-        doc.setFillColor(17, 24, 39);
-        doc.rect(0, 0, pageWidth, 62, "F");
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(15);
-        doc.setFont(undefined, "bold");
-        doc.text(`Open Shifts - ${monthYear}`, marginX, 30);
-        doc.setFontSize(8.5);
-        doc.setFont(undefined, "normal");
-        doc.text("Write your name next to a shift you can cover.", marginX, 46);
-        y = 92;
-      };
-
-      const ensureSpace = (needed) => {
-        if (y + needed <= bottomLimit) return;
-        doc.addPage();
-        drawPageHeader();
-      };
-
-      drawPageHeader();
-
-      Array.from(slotsByDay.keys()).forEach((dayKey) => {
-        const date = parseDateKeyToLocalDate(dayKey);
-        ensureSpace(40);
-
-        doc.setFontSize(10);
-        doc.setFont(undefined, "bold");
-        doc.setTextColor(15, 23, 42);
-        doc.text(
-          date.toLocaleDateString(undefined, {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          }),
-          marginX,
-          y,
-        );
-        doc.setDrawColor(203, 213, 225);
-        doc.setLineWidth(0.6);
-        doc.line(marginX, y + 4, pageWidth - marginX, y + 4);
-        y += 20;
-
-        slotsByDay.get(dayKey).forEach((slot) => {
-          ensureSpace(22);
-
-          doc.setFontSize(9);
-          doc.setFont(undefined, "normal");
-          doc.setTextColor(51, 65, 85);
-
-          const label = [
-            getRoleDisplayName(slot.role),
-            slot.unitArea ? getUnitAreaDisplayName(slot.unitArea) : "",
-            formatScheduleTimeRange(slot),
-          ]
-            .filter(Boolean)
-            .join("  |  ");
-
-          doc.text(`-  ${label}`, marginX + 6, y);
-
-          doc.setDrawColor(148, 163, 184);
-          doc.setLineWidth(0.5);
-          doc.line(
-            pageWidth - marginX - nameLineWidth,
-            y + 2,
-            pageWidth - marginX,
-            y + 2,
-          );
-
-          y += 22;
-        });
-
-        y += 8;
-      });
-
-      doc.save(`open-shifts-${getMonthFileStamp()}.pdf`);
+      spots.sort(
+        (a, b) =>
+          new Date(a.startTime) - new Date(b.startTime) ||
+          getUnitAreaDisplayName(a.unitArea).localeCompare(getUnitAreaDisplayName(b.unitArea)) ||
+          getRoleDisplayName(a.role).localeCompare(getRoleDisplayName(b.role)),
+      );
+      openShiftsPdf({
+        facility: exportFacility,
+        period: monthYear,
+        spots: spots.map((slot) => ({
+          dayKey: getLocalDateKey(slot.startTime),
+          time: exportRange(slot),
+          role: getRoleDisplayName(slot.role),
+          area: slot.unitArea ? getUnitAreaDisplayName(slot.unitArea) : "",
+        })),
+      }).save(`open-shifts-${getMonthFileStamp()}.pdf`);
     } catch (error) {
       console.error("Failed to export open coverage to PDF", error);
-      window.alert("Unable to export open coverage. Please try again.");
+      window.alert("Unable to export open shifts. Please try again.");
     }
   };
 
   const exportCalendarToPdf = () => {
     try {
       closeExportMenu();
-
-      if (calendarGridWeeks.length === 0) {
+      if (visibleCalendarDays.length === 0) {
         window.alert("No calendar data to export for this view.");
         return;
       }
-
-      const doc = new jsPDF({
-        orientation: "landscape",
-        unit: "pt",
-        format: "a4",
+      // Each day: its shifts grouped by time and area, then open spots.
+      const byDay = new Map();
+      filteredSchedules.forEach((shift) => {
+        if (shift.status === "call_out") return;
+        const key = getLocalDateKey(shift.startTime);
+        if (!byDay.has(key)) byDay.set(key, new Map());
+        const area = shift.unitArea ? getUnitAreaDisplayName(shift.unitArea) : "";
+        const time = exportRange(shift);
+        const groupKey = `${new Date(shift.startTime).getTime()}|${time}|${area}`;
+        const groups = byDay.get(key);
+        if (!groups.has(groupKey)) groups.set(groupKey, { time, area, names: [], at: new Date(shift.startTime).getTime() });
+        groups.get(groupKey).names.push(shortPersonName(shift.staffId?.name));
       });
-
-      const generatedAt = new Date();
-      const drawCalendarHeader = () => {
-        doc.setFillColor(15, 23, 42);
-        doc.rect(18, 16, doc.internal.pageSize.getWidth() - 36, 34, "F");
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(14);
-        doc.setFont(undefined, "bold");
-        doc.text(
-          `Calendar Export${calendarRange.title ? ` - ${calendarRange.title}` : ""}`,
-          30,
-          37,
-        );
-        doc.setFontSize(8.5);
-        doc.setFont(undefined, "normal");
-        doc.text(
-          `Generated ${generatedAt.toLocaleString()}`,
-          doc.internal.pageSize.getWidth() - 30,
-          37,
-          { align: "right" },
-        );
-      };
-
-      drawCalendarHeader();
-
-      autoTable(doc, {
-        startY: 58,
-        head: [calendarWeekdayLabels],
-        body: calendarGridWeeks.map((week) => week.map((cell) => cell.text)),
-        styles: {
-          fontSize: 6.2,
-          cellPadding: 3,
-          lineColor: [229, 231, 235],
-          lineWidth: 0.15,
-          overflow: "linebreak",
-          valign: "top",
-          minCellHeight: 88,
-        },
-        headStyles: {
-          fillColor: [30, 41, 59],
-          textColor: [255, 255, 255],
-          fontStyle: "bold",
-          halign: "center",
-        },
-        theme: "grid",
-        margin: { left: 20, right: 20, top: 62, bottom: 24 },
-        didParseCell: (data) => {
-          if (data.section === "head") {
-            return;
-          }
-
-          const columnIndex = data.column.index;
-          if (columnIndex === 0 || columnIndex === 6) {
-            data.cell.styles.fillColor = [239, 246, 255];
-          } else {
-            data.cell.styles.fillColor = [248, 250, 252];
-          }
-
-          if (typeof data.cell.raw === "string") {
-            const lines = data.cell.raw.split("\n");
-            if (lines.length > 0) {
-              data.cell.styles.fontStyle = lines.length > 1 ? "normal" : "bold";
-            }
-          }
-        },
-        didDrawPage: () => {
-          drawCalendarHeader();
-          doc.setTextColor(100, 116, 139);
-          doc.setFontSize(8);
-          doc.text(
-            `Page ${doc.internal.getNumberOfPages()}`,
-            20,
-            doc.internal.pageSize.getHeight() - 14,
-          );
-        },
+      const openByDay = new Map();
+      calendarCoverageGapEvents.forEach((event) => {
+        const coverage = event.extendedProps.coverage;
+        const key = getLocalDateKey(coverage.startTime);
+        if (!openByDay.has(key)) openByDay.set(key, []);
+        openByDay.get(key).push(`${coverage.spotsRemaining} open · ${getRoleDisplayName(coverage.role)} ${exportRange(coverage)}`);
       });
-
-      doc.save(`calendar-${getCalendarFileStamp()}.pdf`);
+      const days = visibleCalendarDays.map((date) => {
+        const key = getLocalDateKey(date);
+        return {
+          key,
+          entries: [...(byDay.get(key)?.values() || [])].sort((a, b) => a.at - b.at),
+          open: openByDay.get(key) || [],
+        };
+      });
+      calendarPdf({ facility: exportFacility, period: calendarRange.title || monthYear, days }).save(`calendar-${getCalendarFileStamp()}.pdf`);
     } catch (error) {
       console.error("Failed to export calendar to PDF", error);
       window.alert("Unable to export calendar to PDF. Please try again.");
@@ -3049,7 +2664,6 @@ export default function ScheduleList() {
             "@page": {
               margin: "0",
             },
-            "body:not(.printing-roster):not(.printing-week) *": { visibility: "hidden" },
             "body.printing-roster *": { visibility: "hidden" },
             "body.printing-roster #roster-print-section, body.printing-roster #roster-print-section *":
               { visibility: "visible" },

@@ -3049,7 +3049,7 @@ export default function ScheduleList() {
             "@page": {
               margin: "0",
             },
-            "body:not(.printing-roster) *": { visibility: "hidden" },
+            "body:not(.printing-roster):not(.printing-week) *": { visibility: "hidden" },
             "body.printing-roster *": { visibility: "hidden" },
             "body.printing-roster #roster-print-section, body.printing-roster #roster-print-section *":
               { visibility: "visible" },

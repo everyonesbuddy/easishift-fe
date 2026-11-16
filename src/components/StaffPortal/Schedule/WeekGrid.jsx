@@ -5,6 +5,7 @@ import {
   Checkbox,
   CircularProgress,
   Dialog,
+  GlobalStyles,
   DialogActions,
   DialogContent,
   DialogTitle,
@@ -13,7 +14,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { FiPlus, FiZap } from "react-icons/fi";
+import { FiPlus, FiPrinter, FiZap } from "react-icons/fi";
 import { toast } from "react-toastify";
 import api from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
@@ -40,8 +41,54 @@ import ViewFilter from "./ViewFilter";
  * The week, as needs vs people. Rows are shift + role (+ area), columns are
  * days. Each cell shows a colored pill per person on the shift and a dashed
  * "Open" pill per empty spot. Click a cell to fill it, change that day's
- * count or handle a call-out.
+ * count or handle a call-out. Print puts this same grid on paper (landscape,
+ * every name, the day header on each page).
  */
+
+/** Print just the week grid, landscape, then put the page back. */
+function printWeek() {
+  const page = document.createElement("style");
+  page.textContent = "@page { size: landscape; margin: 8mm; }";
+  document.head.appendChild(page);
+  document.body.classList.add("printing-week");
+  const done = () => {
+    document.body.classList.remove("printing-week");
+    page.remove();
+    window.removeEventListener("afterprint", done);
+  };
+  window.addEventListener("afterprint", done);
+  window.print();
+}
+
+// Only while printing the week (ScheduleList hides the rest of the page).
+const PRINT_STYLES = {
+  "@media print": {
+    "html:has(body.printing-week), body.printing-week": { background: "#fff !important" },
+    "body.printing-week *": { visibility: "hidden" },
+    "body.printing-week #week-print-section, body.printing-week #week-print-section *": { visibility: "visible" },
+    "body.printing-week #week-print-section": {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      width: "100%",
+      margin: "0 !important",
+      background: "#fff",
+    },
+    "body.printing-week #week-print-section *": { printColorAdjust: "exact", WebkitPrintColorAdjust: "exact" },
+    "body.printing-week #week-print-section .no-print, body.printing-week .week-print-frame": { display: "none !important" },
+    "body.printing-week #week-print-section .print-only": { display: "block !important" },
+    "body.printing-week #week-print-section table.print-only": { display: "table !important" },
+  },
+};
+
+const weekRange = (days) => {
+  if (!days.length) return "";
+  const first = keyToDate(days[0]);
+  const last = keyToDate(days[days.length - 1]);
+  const opts = { month: "short", day: "numeric" };
+  return `${first.toLocaleDateString(undefined, opts)} – ${last.toLocaleDateString(undefined, { ...opts, year: "numeric" })}`;
+};
 
 const keyToDate = (key) => {
   const [y, m, d] = String(key).split("-").map(Number);
@@ -113,7 +160,7 @@ function OpenPill({ count = 1 }) {
   );
 }
 
-function Cell({ row, people, callOuts, color, onOpen, onAdd, canEdit, isPast }) {
+function Cell({ row, people, callOuts, color, onOpen, onAdd, canEdit, isPast, showAll = false }) {
   if (!row) {
     return (
       <Box
@@ -147,9 +194,8 @@ function Cell({ row, people, callOuts, color, onOpen, onAdd, canEdit, isPast }) 
   const short = Math.max(0, needed - filled);
   const open = ended ? 0 : short;
   const extra = Math.max(0, filled - needed);
-  const MAX_PEOPLE = 4;
-  const shown = people.slice(0, MAX_PEOPLE);
-  const hidden = people.length - shown.length;
+  const MAX_PEOPLE = showAll ? Infinity : 4;
+  const hidden = Math.max(0, people.length - MAX_PEOPLE);
 
   return (
     <Box
@@ -175,7 +221,7 @@ function Cell({ row, people, callOuts, color, onOpen, onAdd, canEdit, isPast }) 
         "&:focus-visible": { boxShadow: `0 0 0 2px ${IOS.blue}` },
       }}
     >
-      {shown.map((s) => (
+      {people.slice(0, MAX_PEOPLE).map((s) => (
         <PersonPill key={s._id} schedule={s} color={color} />
       ))}
       {hidden > 0 && (
@@ -212,7 +258,7 @@ function Cell({ row, people, callOuts, color, onOpen, onAdd, canEdit, isPast }) 
 }
 
 export default function WeekGrid({ week, onChanged, onCallOut, filter, onFilterChange }) {
-  const { facilityPreferences, can } = useAuth();
+  const { facilityPreferences, can, tenant } = useAuth();
   const canEdit = can("schedule.manage");
   const [openRowId, setOpenRowId] = useState(null);
   const [addFor, setAddFor] = useState(null); // { date, shiftType, shiftTag, role, unitArea } | {}
@@ -358,8 +404,19 @@ export default function WeekGrid({ week, onChanged, onCallOut, filter, onFilterC
   };
 
   return (
-    <Box sx={{ mt: 2 }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5, gap: 2, flexWrap: "wrap" }}>
+    <Box sx={{ mt: 2 }} id="week-print-section">
+      <GlobalStyles styles={PRINT_STYLES} />
+      <Box className="print-only" sx={{ display: "none", mb: 1 }}>
+        <Typography sx={{ fontSize: 16, fontWeight: 700, color: IOS.ink }}>
+          {tenant?.branding?.displayName || tenant?.name || "Schedule"} · Week of {weekRange(days)}
+        </Typography>
+        <Typography sx={{ fontSize: 11, color: IOS.secondary }}>
+          {isPublished ? "Published" : "Not published yet"}
+          {filtered ? ` · Shown: ${shownLines.length} of ${lines.length} rows` : ""} · Dashed = not sent yet, orange dashed = open · Printed{" "}
+          {new Date().toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+        </Typography>
+      </Box>
+      <Box className="no-print" sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5, gap: 2, flexWrap: "wrap" }}>
         <Box sx={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
           {onFilterChange && (
             <ViewFilter
@@ -373,8 +430,18 @@ export default function WeekGrid({ week, onChanged, onCallOut, filter, onFilterC
           <Legend kind="draft" label="Not sent yet" />
           <Legend kind="open" label="Open" />
         </Box>
-        {canEdit && (
-          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+          <Button
+            size="small"
+            startIcon={<FiPrinter />}
+            disabled={!shownLines.length}
+            onClick={printWeek}
+            sx={{ borderRadius: "10px", px: 1.5, color: IOS.ink, bgcolor: IOS.fill, "&:hover": { bgcolor: tint(IOS.ink, 0.08) } }}
+          >
+            Print week
+          </Button>
+          {canEdit && (
+          <>
           <Button
             size="small"
             startIcon={<FiZap />}
@@ -396,11 +463,13 @@ export default function WeekGrid({ week, onChanged, onCallOut, filter, onFilterC
           >
             Add a one-off need
           </Button>
-          </Box>
-        )}
+          </>
+          )}
+        </Box>
       </Box>
 
       <Box
+        className="week-print-frame"
         sx={{
           overflowX: "auto",
           borderRadius: IOS.radius.card,
@@ -584,6 +653,16 @@ export default function WeekGrid({ week, onChanged, onCallOut, filter, onFilterC
         </Box>
       </Box>
 
+      <PrintTable
+        days={days}
+        groups={groups}
+        byKey={byKey}
+        dayTotals={dayTotals}
+        peopleByCoverage={peopleByCoverage}
+        callOutsByCoverage={callOutsByCoverage}
+        roleList={roleList}
+      />
+
       <SlotDrawer
         open={Boolean(openRow)}
         row={openRow}
@@ -657,6 +736,88 @@ export default function WeekGrid({ week, onChanged, onCallOut, filter, onFilterC
           onChanged?.();
         }}
       />
+    </Box>
+  );
+}
+
+/**
+ * The same week as a plain table, for paper only: the day header repeats
+ * on every page and a row never splits across pages.
+ */
+function PrintTable({ days, groups, byKey, dayTotals, peopleByCoverage, callOutsByCoverage, roleList }) {
+  const border = `1px solid ${IOS.separator}`;
+  const th = { border, padding: "4px 6px", textAlign: "left", verticalAlign: "bottom", fontWeight: 600, fontSize: 11, color: IOS.ink, background: IOS.canvas };
+  const td = { border, padding: 3, verticalAlign: "top" };
+  return (
+    <Box component="table" className="print-only" sx={{ display: "none", width: "100%", borderCollapse: "collapse", tableLayout: "fixed", "& tr": { breakInside: "avoid", pageBreakInside: "avoid" } }}>
+      <colgroup>
+        <col style={{ width: "13%" }} />
+        {days.map((d) => (
+          <col key={d} />
+        ))}
+      </colgroup>
+      <thead style={{ display: "table-header-group" }}>
+        <tr>
+          <th style={th}>Shift / role</th>
+          {days.map((day, i) => {
+            const t = dayTotals[i];
+            const open = t?.open || 0;
+            return (
+              <th key={day} style={th}>
+                <div style={{ textTransform: "uppercase", letterSpacing: "0.05em", color: IOS.secondary, fontSize: 10 }}>
+                  {keyToDate(day).toLocaleDateString(undefined, { weekday: "short" })}
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 600 }}>{keyToDate(day).getDate()}</div>
+                <div style={{ fontSize: 10, color: open ? IOS.orangeText : IOS.greenText }}>
+                  {t?.needed ? (open ? `${open} open` : "Filled") : "No needs"}
+                </div>
+              </th>
+            );
+          })}
+        </tr>
+      </thead>
+      {groups.map((group) => (
+        <tbody key={group.key}>
+          {group.lines.map((line, li) => {
+            const color = roleColor(line.role, roleList);
+            return (
+              <tr key={line.key}>
+                <td style={{ ...td, padding: "4px 6px", borderLeft: `4px solid ${color}` }}>
+                  {/* Every row names its shift, so a row at the top of a page still makes sense. */}
+                  <div style={{ fontSize: 10, color: IOS.secondary, fontWeight: li === 0 ? 700 : 500, marginBottom: 2 }}>
+                    {group.label.name} {group.label.time}
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: IOS.ink }}>{getRoleDisplayName(line.role)}</div>
+                  {(line.unitArea || line.certs.size > 0) && (
+                    <div style={{ fontSize: 10, color: IOS.secondary }}>
+                      {[line.unitArea && titleCase(line.unitArea), ...[...line.certs].map(titleCase)].filter(Boolean).join(" · ")}
+                    </div>
+                  )}
+                </td>
+                {days.map((day) => {
+                  const row = byKey.get(`${line.key}|${day}`);
+                  return (
+                    <td key={day} style={td}>
+                      {row && (
+                        <Cell
+                          row={row}
+                          color={color}
+                          people={peopleByCoverage.get(String(row._id)) || []}
+                          callOuts={callOutsByCoverage.get(String(row._id)) || 0}
+                          canEdit={false}
+                          isPast={false}
+                          showAll
+                          onOpen={() => {}}
+                        />
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      ))}
     </Box>
   );
 }

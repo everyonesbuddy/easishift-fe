@@ -17,6 +17,7 @@ const PUBLIC_PATHS = new Set([
   "/signup-tenant",
   "/terms-and-conditions",
   "/privacy-policy",
+  "/text-messages",
   "/eula",
   "/calculators/call-out-cost-calculator",
   "/calculators/overtime-cost-calculator",

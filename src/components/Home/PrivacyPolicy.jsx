@@ -1,7 +1,7 @@
 import { Box, Container, Paper, Typography } from "@mui/material";
 import Footer from "../Shared/Footer";
 
-const LAST_UPDATED = "June 8, 2026";
+const LAST_UPDATED = "November 19, 2026";
 
 const intro =
   'This Privacy Policy explains how WiserShifts ("WiserShifts," "we," "us," or "our") collects, uses, discloses, and protects information when you access or use our workforce management platform and related services (the "Service"). By accessing or using the Service, you acknowledge this Privacy Policy.';
@@ -59,6 +59,19 @@ const sections = [
       "Affiliates and corporate entities involved in operating or supporting the Service",
       "Government authorities, regulators, or law enforcement where required by law or valid legal process",
       "Parties involved in a merger, acquisition, financing, or asset sale, subject to confidentiality protections",
+    ],
+    tailParagraphs: [
+      "None of the categories above include text messaging originator opt-in data and consent. This information will not be shared with any third parties.",
+    ],
+    subSections: [
+      {
+        title: "3.1 Text Messages (SMS)",
+        paragraphs: [
+          "When a facility uses WiserShifts, we may text its employees and managers about their work schedule (open shifts, shift reminders, schedule changes and replies to their requests), only after they agree by replying START or ticking the consent box in WiserShifts. We use mobile phone numbers only to send these work texts.",
+          "No mobile information will be shared with third parties or affiliates for marketing or promotional purposes. Text messaging opt-in data and consent are not shared with any third parties. Our text messaging provider receives phone numbers only to deliver the messages.",
+          "Message frequency varies. Message and data rates may apply. Reply STOP to stop, HELP for help, or email info@wisershifts.com. Details: https://wisershifts.com/text-messages",
+        ],
+      },
     ],
   },
   {

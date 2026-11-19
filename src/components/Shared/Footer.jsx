@@ -42,6 +42,9 @@ export default function Footer() {
             <Link component={RouterLink} to="/privacy-policy" underline="hover">
               Privacy Policy
             </Link>
+            <Link component={RouterLink} to="/text-messages" underline="hover">
+              Text Messages
+            </Link>
             <Link component={RouterLink} to="/eula" underline="hover">
               EULA
             </Link>

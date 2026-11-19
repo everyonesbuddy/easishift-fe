@@ -18,6 +18,7 @@ import BlogIndex from "./components/Blog/BlogIndex";
 import BlogPost from "./components/Blog/BlogPost";
 import TermsAndConditions from "./components/Home/TermsAndConditions";
 import PrivacyPolicy from "./components/Home/PrivacyPolicy";
+import TextMessagesPage from "./components/Home/TextMessagesPage";
 import EndUserLicenseAgreement from "./components/Home/EndUserLicenseAgreement";
 import ContactPage from "./components/Home/ContactPage";
 import IntegrationsPage from "./components/Home/IntegrationsPage";
@@ -147,6 +148,7 @@ export default function App() {
               element={<TermsAndConditions />}
             />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/text-messages" element={<TextMessagesPage />} />
             <Route path="/eula" element={<EndUserLicenseAgreement />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/integrations" element={<IntegrationsPage />} />

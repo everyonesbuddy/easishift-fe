@@ -1,7 +1,7 @@
 import { Box, Container, Paper, Typography } from "@mui/material";
 import Footer from "../Shared/Footer";
 
-const LAST_UPDATED = "June 8, 2026";
+const LAST_UPDATED = "November 19, 2026";
 
 const intro =
   'Please read these Terms and Conditions ("Agreement") carefully before accessing or using the WiserShifts platform ("Service"). By registering for, accessing, or using the Service, you agree to be bound by this Agreement. If you do not agree to these terms, you may not use the Service.';
@@ -17,6 +17,17 @@ const sections = [
     title: "2. Description of Service",
     paragraphs: [
       'WiserShifts is a cloud-based workforce management platform that provides tools for employee scheduling, shift management, time tracking, team communication, and related business operations ("Service"). The Service is provided on a subscription basis and may be updated, modified, or discontinued at any time at WiserShifts\' sole discretion.',
+    ],
+    subSections: [
+      {
+        title: "2.1 Text Messages (SMS)",
+        paragraphs: [
+          "Program: WiserShifts Schedule Alerts. Facilities that use WiserShifts can have us text their employees and managers about their work schedule: open shifts, shift reminders, schedule changes, replies to time-off and swap requests, and call-out alerts for managers. We do not send marketing texts.",
+          "You get these texts only after you agree, by replying START to our single invitation text or by ticking the text-message box in WiserShifts. Message frequency varies with your schedule. Message and data rates may apply.",
+          "Reply STOP to any text to opt out; you will get one confirmation and no further texts. Reply START to opt back in. Reply HELP for help, or email info@wisershifts.com. Carriers are not liable for delayed or undelivered messages.",
+          "See https://wisershifts.com/text-messages for examples and our Privacy Policy for how phone numbers are handled.",
+        ],
+      },
     ],
   },
   {

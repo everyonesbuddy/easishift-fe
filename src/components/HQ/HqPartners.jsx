@@ -82,6 +82,18 @@ function FeeTag({ r, percent }) {
   return <Tag color={IOS.tertiary}>{percent ? "Earns from their first payment" : "Fee after 2 paid months"}</Tag>;
 }
 
+/** The percentage deal in words, with a monthly and a yearly example. */
+function percentExample(percent, months) {
+  const pct = Number(percent) || 0;
+  const m = Number(months) || 0;
+  if (!pct || !m) return "Set a percent and a number of months.";
+  // Starter, the smallest paid plan (config/plans.js on the server).
+  const monthly = 500;
+  const yearly = 4800;
+  const perMonth = (monthly * pct) / 100;
+  return `They earn ${pct}% of every payment a client makes in the ${m} months after their first payment (the free month doesn't count). Starter monthly (${money(monthly)}): ${money(perMonth)} a month, about ${money(perMonth * Math.min(m, 12))} over ${Math.min(m, 12)} months. Starter yearly (${money(yearly)}): ${money((yearly * pct) / 100)} as soon as they pay${m > 12 ? ", plus the same again for each renewal inside the window" : ""}. Pay out whenever it's owed.`;
+}
+
 /**
  * The partner's deal: flat fee (default $250 once per client) or a
  * percentage of what each client pays for a number of months. Every
@@ -126,8 +138,8 @@ function DealBox({ p, patch, saving }) {
       </Box>
       <Typography sx={{ fontSize: 12.5, color: IOS.secondary }}>
         {type === "flat"
-          ? "Paid once per client, after they've paid 2 months (the free month doesn't count)."
-          : `They earn ${percent || "?"}% of each payment a client makes in their first ${months || "?"} months. Pay out whenever it's owed.`}{" "}
+          ? `$${fee || "?"} once per client, monthly or yearly: due after a monthly client's 2nd paid month (the free month doesn't count), or as soon as a yearly client pays for the year.`
+          : percentExample(percent, months)}{" "}
         A new deal applies to all their clients from now on; payouts already made stay.
       </Typography>
       {p.dealHistory?.length > 0 && (

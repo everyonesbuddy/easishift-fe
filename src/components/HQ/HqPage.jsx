@@ -87,7 +87,7 @@ const GROUPS = [
     items: [
       { id: "schedulers", label: "To schedulers", Comp: SchedulersPage, title: "Campaigns to schedulers", sub: "Who schedulers are, what we say to them, and each campaign that reaches them: how it runs, its scripts, and this week's count." },
       { id: "leadership", label: "To DONs, EDs & admins", Comp: LeadershipPage, title: "Campaigns to DONs, EDs and admins", sub: "Who the leaders are, what we say to them, and each campaign that reaches them: how it runs, its scripts, and this week's count." },
-      { id: "partners", label: "Referral partners", Comp: HqPartners, title: "Referral partners", sub: "Nurses and consultants who introduce clients: their codes and signup links, who signed up with each code, months paid, fees due, and the scripts." },
+      { id: "partners", label: "Referral partners", Comp: HqPartners, title: "Referral partners", sub: "Anyone who introduces clients (customers, consultants, coaches, payroll firms…): their codes and signup links, who signed up with each code, months paid, fees due, and the scripts." },
       { id: "calendar", label: "Content calendar", Comp: CalendarPage, title: "Content calendar", sub: "Every post, video, email and template that campaigns use: ideas, drafts, what's scheduled and what's out." },
       { id: "scoreboard", label: "Campaign scoreboard", Comp: ScoreboardPage, title: "Campaign scoreboard", sub: "Each campaign's weekly target against the last four weeks, every campaign, and the week's schedule." },
     ],

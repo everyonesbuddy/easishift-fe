@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { firstTouchFrom, roleFromLanding } from "./firstTouch.js";
+import { codeFromHref, firstTouchFrom, roleFromLanding } from "./firstTouch.js";
 
 test("first touch keeps UTMs, landing page and outside referrers only", () => {
   const t = firstTouchFrom("https://wisershifts.com/for/directors?utm_source=linkedin&utm_campaign=oct", "https://www.linkedin.com/feed/");
@@ -16,4 +16,10 @@ test("signup role guessed from the role page they landed on", () => {
   assert.equal(roleFromLanding({ landingPage: "/for/operators" }), "regional");
   assert.equal(roleFromLanding({ landingPage: "/" }), "");
   assert.equal(roleFromLanding(null), "");
+});
+
+test("a partner's code is read from ?code= or ?ref=, cleaned", () => {
+  assert.equal(codeFromHref("https://wisershifts.com/signup-tenant?code=safehands"), "SAFEHANDS");
+  assert.equal(codeFromHref("https://wisershifts.com/?ref=md nurse!"), "MDNURSE");
+  assert.equal(codeFromHref("https://wisershifts.com/pricing"), "");
 });

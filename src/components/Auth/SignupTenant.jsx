@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Box,
@@ -13,11 +13,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../config/api";
 import { useAuth } from "../../context/AuthContext";
 import { trackEvent } from "../../utils/analytics";
-import { getFirstTouch, roleFromLanding } from "../../utils/firstTouch";
+import { getFirstTouch, getReferralCode, roleFromLanding } from "../../utils/firstTouch";
 
 const TERMS_VERSION = "1.0";
 
@@ -70,9 +70,19 @@ const fieldSx = {
  * Free signup: your name, your facility, email, password. Everything else
  * (facility type, shifts, staff) happens in /setup right after.
  */
+/** A partner's code from the link (?code=SAFEHANDS), or from the page they first landed on. */
+const cleanCode = (v) => String(v || "").toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 30);
+function codeFromLink(searchParams) {
+  return cleanCode(searchParams.get("code") || searchParams.get("ref") || getReferralCode());
+}
+
 export default function SignupTenant() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [referralCode, setReferralCode] = useState(() => codeFromLink(searchParams));
+  // { code, valid, partner, offer } once checked; null while typing.
+  const [codeCheck, setCodeCheck] = useState(null);
   const [form, setForm] = useState({
     name: "",
     facilityName: "",
@@ -89,6 +99,28 @@ export default function SignupTenant() {
   const [touched, setTouched] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Check the code shortly after typing stops (and once for a code from a link).
+  useEffect(() => {
+    const code = cleanCode(referralCode);
+    if (!code) {
+      setCodeCheck(null);
+      return undefined;
+    }
+    let live = true;
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await api.get(`/auth/referral-code/${encodeURIComponent(code)}`);
+        if (live) setCodeCheck({ code, ...data });
+      } catch {
+        if (live) setCodeCheck(null);
+      }
+    }, 500);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [referralCode]);
 
   const errors = {
     name: !form.name.trim() ? "Enter your name" : "",
@@ -123,6 +155,7 @@ export default function SignupTenant() {
         signupRole: form.signupRole || undefined,
         heardAbout: form.heardAbout || undefined,
         signupSource: getFirstTouch() || undefined,
+        referralCode: cleanCode(referralCode) || undefined,
       });
       const token = res.data?.token;
       if (token) {
@@ -263,6 +296,22 @@ export default function SignupTenant() {
               </MenuItem>
             ))}
           </TextField>
+
+          <TextField
+            label="Referral or promo code (optional)"
+            value={referralCode}
+            onChange={(e) => setReferralCode(cleanCode(e.target.value))}
+            inputProps={{ maxLength: 30, autoCapitalize: "characters", style: { letterSpacing: "0.04em" } }}
+            helperText={
+              codeCheck?.valid
+                ? `Code from ${codeCheck.partner}: ${codeCheck.offer.toLowerCase()}.`
+                : codeCheck && codeCheck.valid === false
+                  ? "We don't recognize this code. You can still sign up, and enter a code at checkout."
+                  : " "
+            }
+            FormHelperTextProps={{ sx: { color: codeCheck?.valid ? "success.main" : undefined, fontWeight: codeCheck?.valid ? 600 : 400 } }}
+            sx={fieldSx}
+          />
 
           <Box>
             <FormControlLabel

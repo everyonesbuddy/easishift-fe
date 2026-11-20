@@ -33,9 +33,37 @@ export function firstTouchFrom(href, referrer = "") {
   return out;
 }
 
+// A referral partner's code from any link (?code=SAFEHANDS or ?ref=), kept
+// so signup can fill it in even if they land on another page first.
+const CODE_KEY = "ws_ref_code";
+export function codeFromHref(href) {
+  try {
+    const url = new URL(href);
+    return String(url.searchParams.get("code") || url.searchParams.get("ref") || "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9_-]/g, "")
+      .slice(0, 30);
+  } catch {
+    return "";
+  }
+}
+export const getReferralCode = () => {
+  try {
+    return localStorage.getItem(CODE_KEY) || "";
+  } catch {
+    return "";
+  }
+};
+
 /** Call on every page load: keeps the first visit, and the first UTM'd visit if the first had none. */
 export function captureFirstTouch() {
   if (typeof window === "undefined") return;
+  try {
+    const code = codeFromHref(window.location.href);
+    if (code) localStorage.setItem(CODE_KEY, code);
+  } catch {
+    // storage blocked
+  }
   try {
     const now = firstTouchFrom(window.location.href, document.referrer);
     const prev = read();

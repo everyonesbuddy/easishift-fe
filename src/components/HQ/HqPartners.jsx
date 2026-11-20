@@ -1,4 +1,4 @@
-// HQ referral partners: nurses and consultants who introduce clients. They
+// HQ referral partners: anyone owners trust who introduces clients. They
 // don't get an account, just a code (their Stripe promotion code) and a
 // signup link with it. Workspaces that sign up with the code show under the
 // partner, with months paid (from Stripe) and when the fee is due. Calls and
@@ -344,7 +344,7 @@ export default function HqPartners() {
   const [loading, setLoading] = useState(false);
   const [openId, setOpenId] = useState(null);
   const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState({ name: "", type: "nurse", code: "" });
+  const [draft, setDraft] = useState({ name: "", type: "other", code: "" });
   const [showSetup, setShowSetup] = useState(false);
 
   const load = useCallback(async (refresh) => {
@@ -384,7 +384,7 @@ export default function HqPartners() {
     try {
       const { data: p } = await api.post("/hq/partners", draft);
       replace(p);
-      setDraft({ name: "", type: "nurse", code: "" });
+      setDraft({ name: "", type: "other", code: "" });
       setAdding(false);
       setOpenId(p._id);
     } catch (e) {
@@ -421,7 +421,7 @@ export default function HqPartners() {
 
       <Section
         title="Partners"
-        note="People already inside the homes we sell to: delegating nurses, pharmacy and licensing consultants, DDA billing firms. No accounts for them, just a code. Their clients get an extra free month; they get a fee once a client has paid 2 months."
+        note="Anyone owners already trust: happy customers, nurse and pharmacy consultants, coaches, training schools, payroll firms, insurance brokers, software vendors. No accounts for them, just a code. Their clients get an extra free month; they get a fee once a client has paid 2 months."
         right={
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", justifyContent: "flex-end" }}>
             <Button size="small" startIcon={loading ? <CircularProgress size={13} /> : <FiRefreshCw />} disabled={loading} onClick={() => load(true)} sx={{ textTransform: "none", borderRadius: IOS.radius.round }}>
@@ -455,7 +455,7 @@ export default function HqPartners() {
             </Button>
           </Box>
         )}
-        {!data.partners.length && <Empty>No partners yet. Add the first one, like the delegating nurse from the Facebook group.</Empty>}
+        {!data.partners.length && <Empty>No partners yet. Add the first one, like a happy customer or the nurse consultant from the Facebook group.</Empty>}
         {data.partners.map((p) => (
           <ButtonBase
             key={p._id}

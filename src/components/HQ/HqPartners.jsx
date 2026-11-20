@@ -6,6 +6,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  ToggleButton,
+  ToggleButtonGroup,
   Box,
   Button,
   ButtonBase,
@@ -41,7 +43,10 @@ const toInput = (d) => {
   return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
 };
 const fromInput = (v) => (v ? new Date(`${v}T10:00:00`).toISOString() : null);
-const money = (n) => `$${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+const money = (n) => {
+  const v = Number(n || 0);
+  return `$${v.toLocaleString(undefined, { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 })}`;
+};
 
 async function copy(text, what = "Copied") {
   try {
@@ -70,10 +75,74 @@ function StripeCode({ code, stripe }) {
   );
 }
 
-function FeeTag({ r }) {
-  if (r.feeStatus === "paid") return <Tag color={IOS.greenText}>Fee paid {when(r.feePaidAt)}</Tag>;
-  if (r.feeStatus === "due") return <Tag color={IOS.redText}>Fee due: {money(r.feeAmount)}</Tag>;
-  return <Tag color={IOS.tertiary}>Fee after 2 paid months</Tag>;
+function FeeTag({ r, percent }) {
+  if (r.feeStatus === "due") return <Tag color={IOS.redText}>Owed: {money(r.owed)}</Tag>;
+  if (r.feeStatus === "paid") return <Tag color={IOS.greenText}>{percent ? `Paid ${money(r.paidOut)} in full` : `Fee paid ${when(r.feePaidAt)}`}</Tag>;
+  if (r.feeStatus === "running") return <Tag color={IOS.blue}>Earning until {when(r.windowEndsAt)}</Tag>;
+  return <Tag color={IOS.tertiary}>{percent ? "Earns from their first payment" : "Fee after 2 paid months"}</Tag>;
+}
+
+/**
+ * The partner's deal: flat fee (default $250 once per client) or a
+ * percentage of what each client pays for a number of months. Every
+ * change is kept below, with who and when.
+ */
+function DealBox({ p, patch, saving }) {
+  const [type, setType] = useState(p.dealType || "flat");
+  const [fee, setFee] = useState(String(p.fee ?? 250));
+  const [percent, setPercent] = useState(String(p.percent ?? 15));
+  const [months, setMonths] = useState(String(p.percentMonths ?? 12));
+  const [note, setNote] = useState(p.dealNote || "");
+  const changed =
+    type !== (p.dealType || "flat") ||
+    (type === "flat" && Number(fee) !== (p.fee ?? 250)) ||
+    (type === "percent" && (Number(percent) !== (p.percent ?? 15) || Number(months) !== (p.percentMonths ?? 12))) ||
+    note !== (p.dealNote || "");
+  const save = () => patch(type === "flat" ? { dealType: "flat", fee, dealNote: note } : { dealType: "percent", percent, percentMonths: months, dealNote: note }, "deal").then((ok) => ok && toast.success("Deal saved. The change is recorded below."));
+
+  return (
+    <Box sx={{ bgcolor: IOS.canvas, borderRadius: IOS.radius.cell, p: 1.5, display: "grid", gap: 1.25 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1, flexWrap: "wrap", alignItems: "baseline" }}>
+        <Typography sx={{ fontSize: 13, fontWeight: 700, color: IOS.secondary }}>Their deal</Typography>
+        <Typography sx={{ fontSize: 13.5, fontWeight: 650 }}>{p.deal}</Typography>
+      </Box>
+      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
+        <ToggleButtonGroup size="small" exclusive value={type} onChange={(e, v) => v && setType(v)} sx={{ "& .MuiToggleButton-root": { textTransform: "none", px: 1.5 } }}>
+          <ToggleButton value="flat">Flat fee</ToggleButton>
+          <ToggleButton value="percent">% for a time</ToggleButton>
+        </ToggleButtonGroup>
+        {type === "flat" ? (
+          <TextField size="small" type="number" label="Per client ($)" value={fee} onChange={(e) => setFee(e.target.value)} inputProps={{ min: 0, step: 25 }} sx={{ width: 140 }} />
+        ) : (
+          <>
+            <TextField size="small" type="number" label="Percent" value={percent} onChange={(e) => setPercent(e.target.value)} inputProps={{ min: 1, max: 50, step: 1 }} sx={{ width: 110 }} />
+            <TextField size="small" type="number" label="For months" value={months} onChange={(e) => setMonths(e.target.value)} inputProps={{ min: 1, max: 60, step: 1 }} sx={{ width: 120 }} />
+          </>
+        )}
+        <TextField size="small" label="Why (optional)" placeholder="Renegotiated on call, Nov 20" value={note} onChange={(e) => setNote(e.target.value)} sx={{ flex: 1, minWidth: 180 }} />
+        <Button variant="contained" disableElevation disabled={!changed || saving === "deal"} onClick={save} sx={{ textTransform: "none" }}>
+          Save deal
+        </Button>
+      </Box>
+      <Typography sx={{ fontSize: 12.5, color: IOS.secondary }}>
+        {type === "flat"
+          ? "Paid once per client, after they've paid 2 months (the free month doesn't count)."
+          : `They earn ${percent || "?"}% of each payment a client makes in their first ${months || "?"} months. Pay out whenever it's owed.`}{" "}
+        A new deal applies to all their clients from now on; payouts already made stay.
+      </Typography>
+      {p.dealHistory?.length > 0 && (
+        <Box>
+          <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: IOS.secondary }}>Deal changes</Typography>
+          {p.dealHistory.map((h, i) => (
+            <Typography key={`${h.at}:${i}`} sx={{ fontSize: 12.5, color: IOS.secondary }}>
+              {when(h.at)}
+              {h.by ? ` · ${h.by}` : ""}: {h.from} → <Box component="span" sx={{ color: IOS.ink }}>{h.to}</Box>
+            </Typography>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
 }
 
 function PartnerDialog({ p, types, statuses, onClose, onSaved, onRemoved }) {
@@ -162,15 +231,17 @@ function PartnerDialog({ p, types, statuses, onClose, onSaved, onRemoved }) {
         </IconButton>
       </DialogTitle>
       <DialogContent sx={{ display: "grid", gap: 2.5 }}>
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 1.5, pt: 0.5 }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" }, gap: 1.5, pt: 0.5 }}>
           <TextField size="small" select label="Status" value={p.status} onChange={(e) => patch({ status: e.target.value }, "status")}>
             {Object.entries(statuses).map(([k, v]) => (
               <MenuItem key={k} value={k}>{v}</MenuItem>
             ))}
           </TextField>
           <TextField size="small" type="date" label="Next step on" InputLabelProps={{ shrink: true }} value={toInput(p.nextDate)} onChange={(e) => patch({ nextDate: fromInput(e.target.value) }, "next")} />
-          <TextField size="small" type="number" label="Fee per client ($)" defaultValue={p.fee ?? 250} onBlur={(e) => Number(e.target.value) !== p.fee && patch({ fee: e.target.value }, "fee")} />
         </Box>
+
+        {/* Keyed on the saved deal, so it resets after a save. */}
+        <DealBox key={`${p._id}:${p.dealType}:${p.fee}:${p.percent}:${p.percentMonths}:${p.dealNote}`} p={p} patch={patch} saving={saving} />
 
         <Box sx={{ bgcolor: IOS.canvas, borderRadius: IOS.radius.cell, p: 1.5, display: "grid", gap: 1 }}>
           <Typography sx={{ fontSize: 13, fontWeight: 700, color: IOS.secondary }}>Their code</Typography>
@@ -215,19 +286,25 @@ function PartnerDialog({ p, types, statuses, onClose, onSaved, onRemoved }) {
                   {r.paidTotal ? ` (${money(r.paidTotal)})` : ""}
                   {r.subscriptionStatus ? ` · ${r.subscriptionStatus.replace("_", " ")}` : " · not subscribed yet"}
                 </Typography>
+                {(r.earned > 0 || r.paidOut > 0) && (
+                  <Typography sx={{ fontSize: 12.5, color: IOS.secondary }}>
+                    Earned {money(r.earned)} · paid out {money(r.paidOut)}
+                    {r.feePaidAt ? ` (last ${when(r.feePaidAt)})` : ""}
+                  </Typography>
+                )}
               </Box>
-              <FeeTag r={r} />
-              {r.feeStatus === "due" && (
+              <FeeTag r={r} percent={p.dealType === "percent"} />
+              {r.owed > 0 ? (
                 <Button size="small" variant="contained" disableElevation disabled={saving === `fee:${r.tenantId}`} onClick={() => fee(r.tenantId, true)} sx={{ textTransform: "none" }}>
-                  Mark {money(r.feeAmount)} paid
+                  Mark {money(r.owed)} paid
                 </Button>
-              )}
-              {r.feeStatus === "paid" && (
+              ) : r.paidOut > 0 ? (
                 <ButtonBase onClick={() => fee(r.tenantId, false)} sx={{ fontSize: 12, color: IOS.tertiary }}>
-                  Undo
+                  Undo last payout
                 </ButtonBase>
+              ) : (
+                <Box />
               )}
-              {r.feeStatus === "not_yet" && <Box />}
             </Box>
           ))}
         </Box>
@@ -401,7 +478,7 @@ export default function HqPartners() {
         <Stat label="Partners" value={counts.partners} detail={`${counts.active} sending clients`} />
         <Stat label="Clients introduced" value={counts.introduced} detail="signed up with a partner's code" />
         <Stat label="Paying" value={counts.paying} detail="of those clients" />
-        <Stat label="Fees due" value={money(counts.dueAmount)} tone={counts.dueAmount ? IOS.redText : undefined} detail={`${due.length} client${due.length === 1 ? "" : "s"} paid 2 months`} />
+        <Stat label="Fees due" value={money(counts.dueAmount)} tone={counts.dueAmount ? IOS.redText : undefined} detail={`for ${due.length} client${due.length === 1 ? "" : "s"}`} />
       </Box>
 
       {due.length > 0 && (
@@ -409,10 +486,10 @@ export default function HqPartners() {
           {due.map(({ p, r }) => (
             <ButtonBase key={`${p._id}:${r.tenantId}`} onClick={() => setOpenId(p._id)} sx={{ display: "flex", gap: 1, alignItems: "baseline", justifyContent: "flex-start", textAlign: "left", width: "100%", py: 0.6, flexWrap: "wrap" }}>
               <Box component="span" sx={{ fontSize: 14, fontWeight: 650, color: IOS.redText }}>
-                Pay {p.name} {money(r.feeAmount)}
+                Pay {p.name} {money(r.owed)}
               </Box>
               <Box component="span" sx={{ fontSize: 13, color: IOS.secondary }}>
-                {r.name} has paid {r.paidMonths} months
+                {r.name}: earned {money(r.earned)}, paid out {money(r.paidOut)} so far
               </Box>
             </ButtonBase>
           ))}
@@ -421,7 +498,7 @@ export default function HqPartners() {
 
       <Section
         title="Partners"
-        note="Anyone owners already trust: happy customers, nurse and pharmacy consultants, coaches, training schools, payroll firms, insurance brokers, software vendors. No accounts for them, just a code. Their clients get an extra free month; they get a fee once a client has paid 2 months."
+        note="Anyone owners already trust: happy customers, nurse and pharmacy consultants, coaches, training schools, payroll firms, insurance brokers, software vendors. No accounts for them, just a code. Their clients get an extra free month; they get $250 once a client has paid 2 months, or the deal you agree with them."
         right={
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", justifyContent: "flex-end" }}>
             <Button size="small" startIcon={loading ? <CircularProgress size={13} /> : <FiRefreshCw />} disabled={loading} onClick={() => load(true)} sx={{ textTransform: "none", borderRadius: IOS.radius.round }}>
@@ -479,7 +556,7 @@ export default function HqPartners() {
                 <Box component="span" sx={{ color: IOS.orangeText }}>No code yet</Box>
               )}
               <Box component="span" sx={{ color: IOS.secondary }}>
-                {" "}· {p.totals.introduced} introduced · {p.totals.paying} paying
+                {" "}· {p.dealType === "percent" ? `${p.percent}% for ${p.percentMonths} mo` : `$${p.fee ?? 250} flat`} · {p.totals.introduced} introduced · {p.totals.paying} paying
               </Box>
               {p.totals.feesDue > 0 && (
                 <Box component="span" sx={{ color: IOS.redText, fontWeight: 650 }}>

@@ -96,7 +96,14 @@ function Signals({ s }) {
   );
 }
 
-function CustomerDialog({ c, stages, onClose, onSaved }) {
+const NOT_REAL = [
+  ["test", "Test account (ours)"],
+  ["app_review", "App review (Apple / Google)"],
+  ["demo", "Demo account"],
+  ["other", "Not a customer"],
+];
+
+function CustomerDialog({ c, stages, onClose, onSaved, onTagged }) {
   const [saving, setSaving] = useState("");
   const [kind, setKind] = useState("call");
   const [text, setText] = useState("");
@@ -133,6 +140,18 @@ function CustomerDialog({ c, stages, onClose, onSaved }) {
       onSaved(data);
     } catch (e) {
       toast.error(errorText(e, "Couldn't remove it."));
+    }
+  };
+  const tag = async (kind) => {
+    setSaving("tag");
+    try {
+      await api.put(`/hq/signups/${c.tenantId}/tag`, { kind });
+      toast.success("Tagged. It's off the customer list and out of the counts; untag it on Signups.");
+      onTagged(c._id);
+    } catch (e) {
+      toast.error(errorText(e, "Couldn't tag it."));
+    } finally {
+      setSaving("");
     }
   };
   const [label, color, bg] = LEVEL[c.health.level] || LEVEL.unknown;
@@ -238,6 +257,16 @@ function CustomerDialog({ c, stages, onClose, onSaved }) {
           onBlur={() => notes !== (c.notes || "") && patch({ notes }, "notes")}
           placeholder="Melanie (owner) decides. William builds the schedule. They care about overtime and call-outs."
         />
+
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", pt: 1, borderTop: `1px solid ${IOS.hairline}` }}>
+          <Typography sx={{ fontSize: 13, color: IOS.secondary, flex: "1 1 240px" }}>Not a real customer (our test account, an app reviewer, a demo)? Tag it and HQ stops checking in on it.</Typography>
+          <TextField size="small" select value="" disabled={saving === "tag"} onChange={(e) => tag(e.target.value)} SelectProps={{ displayEmpty: true }} sx={{ minWidth: 220 }}>
+            <MenuItem value="" disabled>Tag as…</MenuItem>
+            {NOT_REAL.map(([k, v]) => (
+              <MenuItem key={k} value={k}>{v}</MenuItem>
+            ))}
+          </TextField>
+        </Box>
       </DialogContent>
     </Dialog>
   );
@@ -361,7 +390,18 @@ export default function HqSuccess() {
         ))}
       </Section>
 
-      {open && <CustomerDialog c={open} stages={data.stages} onClose={() => setOpenId(null)} onSaved={(c) => replace(c)} />}
+      {open && (
+        <CustomerDialog
+          c={open}
+          stages={data.stages}
+          onClose={() => setOpenId(null)}
+          onSaved={(c) => replace(c)}
+          onTagged={() => {
+            setOpenId(null);
+            load();
+          }}
+        />
+      )}
     </Box>
   );
 }

@@ -24,6 +24,7 @@ import HqMoney from "./HqMoney";
 import HqCustomerMessages from "./HqCustomerMessages";
 import HqGovernment from "./HqGovernment";
 import HqSuccess from "./HqSuccess";
+import HqTeam from "./HqTeam";
 import HqPartners from "./HqPartners";
 
 const LeadershipPage = (props) => <HqAudience {...props} audiences={["director", "operator"]} />;
@@ -111,6 +112,7 @@ const GROUPS = [
     color: "#34C759",
     ink: "#1E7F3A", // the same color, dark enough for text
     items: [
+      { id: "team", label: "Team activity", Comp: HqTeam, title: "Team activity", sub: "Everyone in a workspace, managers and staff: when they last opened the app or their link, on what device, whether texts reach them, and what they do (shifts, clock-ins, call-outs picked up)." },
       { id: "success", label: "Customer health", Comp: HqSuccess, title: "Customer health", sub: "Every customer we look after: how healthy they are and why, who owns them, the checklist for their stage, and the next check-in." },
       { id: "customer-messages", label: "App alerts & nudges", Comp: HqCustomerMessages, title: "App alerts and nudges", sub: "What WiserShifts sends customers on its own (the 6 a.m. morning summary, next-step nudges, call-out alerts and opt-in texts): send any of them to a workspace's managers to test, see who gets texts, and what texting costs this month." },
     ],

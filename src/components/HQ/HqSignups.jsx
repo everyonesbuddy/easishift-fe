@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, Box, ButtonBase, CircularProgress, MenuItem, TextField, Typography } from "@mui/material";
 import { toast } from "react-toastify";
+import { useNavigate } from "react-router-dom";
 import api from "./hqApi";
 import { IOS } from "../../theme/ios";
 import { Empty, RolePill, Section, Tag } from "./HqBits";
@@ -78,6 +79,7 @@ export default function HqSignups({ reloadKey, onChanged }) {
   const [error, setError] = useState("");
   const [open, setOpen] = useState(null);
   const [showTagged, setShowTagged] = useState(false);
+  const navigate = useNavigate();
   const onTagged = (tenantId, tag) => setData((d) => ({ ...d, workspaces: d.workspaces.map((w) => (w.tenantId === tenantId ? { ...w, tag } : w)) }));
 
   useEffect(() => {
@@ -141,8 +143,11 @@ export default function HqSignups({ reloadKey, onChanged }) {
               </Typography>
             </Box>
           </ButtonBase>
-          <Box sx={{ py: 1.25, pr: 1, pl: { xs: 1, md: 0 } }}>
+          <Box sx={{ py: 1.25, pr: 1, pl: { xs: 1, md: 0 }, display: "grid", gap: 0.5, justifyItems: "end" }}>
             <TagPicker w={w} onTagged={onTagged} />
+            <ButtonBase onClick={() => navigate(`/hq/team?workspace=${w.tenantId}`)} sx={{ fontSize: 12.5, fontWeight: 600, color: IOS.blue, px: 0.5, borderRadius: 1 }}>
+              See their team →
+            </ButtonBase>
           </Box>
           </Box>
         ))}

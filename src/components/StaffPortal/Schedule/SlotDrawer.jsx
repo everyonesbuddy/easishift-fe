@@ -62,7 +62,7 @@ const SOON_MS = 48 * 60 * 60 * 1000;
 // refuses one they clocked in for).
 const AFTER_SHIFT_OUT = new Set(["scheduled", "no_show", "completed"]);
 
-export default function SlotDrawer({ open, row, weekStart, weekPublished, callOuts = 0, people, canEdit, onClose, onChanged, onCallOut }) {
+export default function SlotDrawer({ open, row, weekStart, weekPublished, callOuts = 0, people, calledOut = [], canEdit, onClose, onChanged, onCallOut }) {
   const { facilityPreferences } = useAuth();
   const [candidates, setCandidates] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -323,19 +323,19 @@ export default function SlotDrawer({ open, row, weekStart, weekPublished, callOu
                   <Stack direction="row" spacing={0.5}>
                     {AFTER_SHIFT_OUT.has(s.status) &&
                       (confirmOutId === s._id ? (
-                        <Button size="small" variant="contained" color="error" disabled={busyId === s._id} onClick={() => markOutAfter(s)} sx={{ textTransform: "none" }}>
-                          Yes, called out
-                        </Button>
+                        <>
+                          <Button size="small" onClick={() => setConfirmOutId(null)} sx={{ textTransform: "none", color: GRID.muted }}>
+                            Cancel
+                          </Button>
+                          <Button size="small" variant="contained" color="error" disabled={busyId === s._id} onClick={() => markOutAfter(s)} sx={{ textTransform: "none" }}>
+                            Yes, called out
+                          </Button>
+                        </>
                       ) : (
                         <Button size="small" color="error" startIcon={<FiUserX />} onClick={() => setConfirmOutId(s._id)} sx={{ textTransform: "none" }}>
                           Called out
                         </Button>
                       ))}
-                    {s.status === "call_out" && s.meta?.calloutMarkedAfterShift && (
-                      <Button size="small" disabled={busyId === s._id} onClick={() => undoOut(s)} sx={{ textTransform: "none", color: GRID.muted }}>
-                        Undo
-                      </Button>
-                    )}
                   </Stack>
                 )}
                 {canEdit && !isPast && (
@@ -359,6 +359,42 @@ export default function SlotDrawer({ open, row, weekStart, weekPublished, callOu
               </Box>
             ))}
           </Stack>
+        )}
+
+        {/* Called out: off the shift, but here so a mistake can be undone */}
+        {calledOut.length > 0 && (
+          <>
+            <Typography sx={{ fontWeight: 600, color: IOS.secondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em", mb: 0.75, px: 1.5 }}>
+              Called out ({calledOut.length})
+            </Typography>
+            <Stack divider={<Divider flexItem sx={{ borderColor: IOS.hairline, ml: 7 }} />} sx={{ mb: 2.5, bgcolor: IOS.surface, borderRadius: IOS.radius.cell, overflow: "hidden" }}>
+              {calledOut.map((s) => {
+                const after = Boolean(s.meta?.calloutMarkedAfterShift);
+                return (
+                  <Box key={s._id} sx={{ px: 1.5, py: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+                    <Avatar name={s.staffId?.name} color={IOS.redText} />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontWeight: 600, color: GRID.ink }}>{s.staffId?.name || "Someone"}</Typography>
+                      <Typography sx={{ fontSize: 12, color: IOS.redText }}>
+                        {after ? "Called out (marked after the shift)" : "Called out"}
+                        {s.meta?.callOutReason ? ` · ${s.meta.callOutReason}` : ""}
+                      </Typography>
+                    </Box>
+                    {canEdit && after && (
+                      <Button size="small" disabled={busyId === s._id} onClick={() => undoOut(s)} sx={{ textTransform: "none" }}>
+                        Undo
+                      </Button>
+                    )}
+                  </Box>
+                );
+              })}
+            </Stack>
+            {canEdit && calledOut.some((s) => !s.meta?.calloutMarkedAfterShift) && (
+              <Typography sx={{ fontSize: 12, color: GRID.muted, mt: -1.5, mb: 2.5, px: 1.5 }}>
+                Called out by mistake before the shift? Change it back to Scheduled from the shift's edit form in the list view, and remove anyone you added to cover it.
+              </Typography>
+            )}
+          </>
         )}
 
         {/* Who can take it */}

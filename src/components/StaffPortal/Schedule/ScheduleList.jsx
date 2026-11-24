@@ -178,10 +178,18 @@ export default function ScheduleList() {
   // the "my schedule" actions on this page are switched off.
   const canUsePersonalSchedule = false;
   const [callOutSchedule, setCallOutSchedule] = useState(null);
-  const canCallOut = (s) =>
-    canManageSchedules &&
-    s?.status === "scheduled" &&
-    new Date(s?.endTime).getTime() > Date.now();
+  // Before the shift: mark out and fill it. After it (up to 30 days): just
+  // record that they called in, if it wasn't marked in time.
+  const canCallOut = (s) => {
+    if (!canManageSchedules || !s?.endTime) return false;
+    const end = new Date(s.endTime).getTime();
+    if (end > Date.now()) return s.status === "scheduled";
+    return (
+      s.state !== "draft" &&
+      ["scheduled", "no_show", "completed"].includes(s.status) &&
+      Date.now() - end <= 30 * 86400000
+    );
+  };
   const draftBadge = (s) =>
     s?.state === "draft" ? (
       <Box

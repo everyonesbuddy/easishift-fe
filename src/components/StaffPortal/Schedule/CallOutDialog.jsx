@@ -75,6 +75,13 @@ export default function CallOutDialog({ open, schedule, onClose, onChanged }) {
     setBusy(true);
     try {
       const res = await api.post(`/schedules/${schedule._id}/call-out`);
+      if (res.data.afterShift) {
+        // The shift is over: nothing to fill, it's just on the record now.
+        toast.success(`${name} marked as called out`, { position: "top-right", autoClose: 2500 });
+        onChanged?.();
+        handleClose();
+        return;
+      }
       setCoverage(res.data.coverage);
       setCandidates(res.data.candidates || []);
       setStep("fill");
@@ -137,8 +144,18 @@ export default function CallOutDialog({ open, schedule, onClose, onChanged }) {
       <DialogContent dividers>
         {step === "confirm" ? (
           <Typography sx={{ color: "#334155", lineHeight: 1.6 }}>
-            <strong>{name}</strong> won't be working {shiftLabel(schedule)}.
-            The slot opens up and we'll show you who can cover.
+            {schedule && new Date(schedule.endTime).getTime() <= Date.now() ? (
+              <>
+                <strong>{name}</strong> called out of {shiftLabel(schedule)}?
+                The shift is over, so this just puts it on the record as a
+                call-out instead of a no-show.
+              </>
+            ) : (
+              <>
+                <strong>{name}</strong> won't be working {shiftLabel(schedule)}.
+                The slot opens up and we'll show you who can cover.
+              </>
+            )}
           </Typography>
         ) : (
           <Stack spacing={2}>

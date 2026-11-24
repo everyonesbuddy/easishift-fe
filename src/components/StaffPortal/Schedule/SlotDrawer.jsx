@@ -58,11 +58,16 @@ const errorText = (err, fallback) => err?.response?.data?.message || fallback;
  */
 const SOON_MS = 48 * 60 * 60 * 1000;
 
+// An ended shift can still be marked as a call-out from these (the server
+// refuses one they clocked in for).
+const AFTER_SHIFT_OUT = new Set(["scheduled", "no_show", "completed"]);
+
 export default function SlotDrawer({ open, row, weekStart, weekPublished, callOuts = 0, people, canEdit, onClose, onChanged, onCallOut }) {
   const { facilityPreferences } = useAuth();
   const [candidates, setCandidates] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [confirmRemoveId, setConfirmRemoveId] = useState(null);
+  const [confirmOutId, setConfirmOutId] = useState(null);
   const [showOthers, setShowOthers] = useState(false);
 
   const rowId = row?._id;
@@ -162,6 +167,35 @@ export default function SlotDrawer({ open, row, weekStart, weekPublished, callOu
       onChanged?.();
     } catch (err) {
       if (err?.response?.status !== 402) toast.error(errorText(err, "Couldn't assign"));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // After the shift: they called in, but it wasn't marked in time (it may
+  // have been closed out as a no-show). Record the call-out; nothing to fill.
+  const markOutAfter = async (schedule) => {
+    setBusyId(schedule._id);
+    try {
+      await api.post(`/schedules/${schedule._id}/call-out`);
+      toast.success(`${schedule.staffId?.name || "Shift"} marked as called out`, { autoClose: 2500 });
+      setConfirmOutId(null);
+      onChanged?.();
+    } catch (err) {
+      if (err?.response?.status !== 402) toast.error(errorText(err, "Couldn't mark the call-out"));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const undoOut = async (schedule) => {
+    setBusyId(schedule._id);
+    try {
+      await api.post(`/schedules/${schedule._id}/undo-call-out`);
+      toast.success("Call-out undone", { autoClose: 2500 });
+      onChanged?.();
+    } catch (err) {
+      if (err?.response?.status !== 402) toast.error(errorText(err, "Couldn't undo"));
     } finally {
       setBusyId(null);
     }
@@ -276,9 +310,34 @@ export default function SlotDrawer({ open, row, weekStart, weekPublished, callOu
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography sx={{ fontWeight: 600, color: GRID.ink }}>{s.staffId?.name || "Someone"}</Typography>
                   <Typography sx={{ fontSize: 12, color: s.status === "no_show" ? IOS.redText : s.state === "draft" ? GRID.short : GRID.muted }}>
-                    {s.status === "no_show" ? "No-show (didn't clock in)" : s.state === "draft" ? "Not sent yet" : titleCase(s.status)}
+                    {s.status === "no_show"
+                      ? "No-show (didn't clock in)"
+                      : s.state === "draft"
+                        ? "Not sent yet"
+                        : s.status === "call_out" && s.meta?.calloutMarkedAfterShift
+                          ? "Called out (marked after the shift)"
+                          : titleCase(s.status)}
                   </Typography>
                 </Box>
+                {canEdit && isPast && s.state !== "draft" && (
+                  <Stack direction="row" spacing={0.5}>
+                    {AFTER_SHIFT_OUT.has(s.status) &&
+                      (confirmOutId === s._id ? (
+                        <Button size="small" variant="contained" color="error" disabled={busyId === s._id} onClick={() => markOutAfter(s)} sx={{ textTransform: "none" }}>
+                          Yes, called out
+                        </Button>
+                      ) : (
+                        <Button size="small" color="error" startIcon={<FiUserX />} onClick={() => setConfirmOutId(s._id)} sx={{ textTransform: "none" }}>
+                          Called out
+                        </Button>
+                      ))}
+                    {s.status === "call_out" && s.meta?.calloutMarkedAfterShift && (
+                      <Button size="small" disabled={busyId === s._id} onClick={() => undoOut(s)} sx={{ textTransform: "none", color: GRID.muted }}>
+                        Undo
+                      </Button>
+                    )}
+                  </Stack>
+                )}
                 {canEdit && !isPast && (
                   <Stack direction="row" spacing={0.5}>
                     {s.status === "scheduled" && s.state !== "draft" && onCallOut && (

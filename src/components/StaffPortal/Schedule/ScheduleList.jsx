@@ -66,6 +66,7 @@ import {
   FiX,
   FiFilter,
   FiUserX,
+  FiRotateCcw,
   FiGrid,
   FiChevronLeft,
   FiChevronRight,
@@ -81,6 +82,7 @@ import WeekGrid from "./WeekGrid";
 import useViewFilter from "../../../hooks/useViewFilter";
 import { filterAsSection } from "./sectionUtils";
 import CallOutDialog from "./CallOutDialog";
+import { useUndoCallOut } from "./undoCallOut";
 import { useAuth } from "../../../context/AuthContext";
 import { getPunchLocation } from "../../../utils/geolocation";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -178,6 +180,13 @@ export default function ScheduleList() {
   // the "my schedule" actions on this page are switched off.
   const canUsePersonalSchedule = false;
   const [callOutSchedule, setCallOutSchedule] = useState(null);
+  // Undo a call-out made by mistake (refreshes the list; called after the fetchers exist).
+  const { undo: undoCallOut, dialog: undoCallOutDialog, busy: undoCallOutBusy } = useUndoCallOut({
+    onChanged: () => {
+      fetchSchedules();
+      fetchCoverageGaps();
+    },
+  });
   // Before the shift: mark out and fill it. After it (up to 30 days): just
   // record that they called in, if it wasn't marked in time.
   const canCallOut = (s) => {
@@ -2563,6 +2572,18 @@ export default function ScheduleList() {
                 </IconButton>
               </Tooltip>
             )}
+          {canManageSchedules && s.status === "call_out" && (
+            <Tooltip title="Undo call-out">
+              <IconButton
+                size="small"
+                disabled={undoCallOutBusy}
+                onClick={() => undoCallOut(s)}
+                sx={{ mr: 0.5, color: "#475569" }}
+              >
+                <FiRotateCcw />
+              </IconButton>
+            </Tooltip>
+          )}
           {canCallOut(s) && (
             <Tooltip title="Called out">
               <IconButton
@@ -5065,6 +5086,7 @@ export default function ScheduleList() {
         </DialogContent>
       </Dialog>
 
+      {undoCallOutDialog}
       <CallOutDialog
         open={Boolean(callOutSchedule)}
         schedule={callOutSchedule}

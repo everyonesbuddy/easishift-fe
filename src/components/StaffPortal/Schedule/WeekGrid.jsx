@@ -269,7 +269,7 @@ export default function WeekGrid({ week, onChanged, onCallOut, filter, onFilterC
   const days = data?.days || [];
   const today = todayKey();
 
-  const { lines, byKey, peopleByCoverage, callOutsByCoverage } = useMemo(() => {
+  const { lines, byKey, peopleByCoverage, callOutsByCoverage, calledOutByCoverage } = useMemo(() => {
     const coverage = data?.coverage || [];
     const lineMap = new Map();
     const map = new Map();
@@ -295,11 +295,15 @@ export default function WeekGrid({ week, onChanged, onCallOut, filter, onFilterC
     }
     const people = new Map();
     const outs = new Map();
+    const outPeople = new Map();
     for (const s of data?.schedules || []) {
       if (!s.coverageId) continue;
       const id = String(s.coverageId);
-      if (s.status === "call_out") outs.set(id, (outs.get(id) || 0) + 1);
-      else {
+      if (s.status === "call_out") {
+        outs.set(id, (outs.get(id) || 0) + 1);
+        if (!outPeople.has(id)) outPeople.set(id, []);
+        outPeople.get(id).push(s);
+      } else {
         if (!people.has(id)) people.set(id, []);
         people.get(id).push(s);
       }
@@ -311,7 +315,7 @@ export default function WeekGrid({ week, onChanged, onCallOut, filter, onFilterC
         String(a.role || "").localeCompare(String(b.role || "")) ||
         String(a.unitArea || "").localeCompare(String(b.unitArea || "")),
     );
-    return { lines: sorted, byKey: map, peopleByCoverage: people, callOutsByCoverage: outs };
+    return { lines: sorted, byKey: map, peopleByCoverage: people, callOutsByCoverage: outs, calledOutByCoverage: outPeople };
   }, [data, facilityPreferences]);
 
   // Only the roles / areas this scheduler chose to see.
@@ -671,6 +675,7 @@ export default function WeekGrid({ week, onChanged, onCallOut, filter, onFilterC
         weekPublished={data?.week?.status === "published"}
         callOuts={openRow ? callOutsByCoverage.get(String(openRow._id)) || 0 : 0}
         people={openRow ? peopleByCoverage.get(String(openRow._id)) || [] : []}
+        calledOut={openRow ? calledOutByCoverage.get(String(openRow._id)) || [] : []}
         canEdit={canEdit}
         onClose={() => setOpenRowId(null)}
         onChanged={onChanged}

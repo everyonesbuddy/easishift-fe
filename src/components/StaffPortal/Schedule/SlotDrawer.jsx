@@ -17,6 +17,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { getRoleDisplayName } from "../../../constants/industryRoles";
 import { ineligibleReason } from "../../../utils/deliveryReasons";
 import { GRID, slotLabel, titleCase } from "./weekGridUtils";
+import { toastWithUndo, useUndoCallOut } from "./undoCallOut";
 import { IOS, roleColor, tint } from "../../../theme/ios";
 
 const initials = (name) =>
@@ -62,12 +63,13 @@ const SOON_MS = 48 * 60 * 60 * 1000;
 // refuses one they clocked in for).
 const AFTER_SHIFT_OUT = new Set(["scheduled", "no_show", "completed"]);
 
-export default function SlotDrawer({ open, row, weekStart, weekPublished, callOuts = 0, people, canEdit, onClose, onChanged, onCallOut }) {
+export default function SlotDrawer({ open, row, weekStart, weekPublished, callOuts = 0, people, calledOut = [], canEdit, onClose, onChanged, onCallOut }) {
   const { facilityPreferences } = useAuth();
   const [candidates, setCandidates] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [confirmRemoveId, setConfirmRemoveId] = useState(null);
   const [confirmOutId, setConfirmOutId] = useState(null);
+  const { undo: undoCallOut, dialog: undoDialog, busy: undoBusy } = useUndoCallOut({ onChanged });
   const [showOthers, setShowOthers] = useState(false);
 
   const rowId = row?._id;
@@ -178,24 +180,11 @@ export default function SlotDrawer({ open, row, weekStart, weekPublished, callOu
     setBusyId(schedule._id);
     try {
       await api.post(`/schedules/${schedule._id}/call-out`);
-      toast.success(`${schedule.staffId?.name || "Shift"} marked as called out`, { autoClose: 2500 });
+      toastWithUndo(`${schedule.staffId?.name || "Shift"} marked as called out`, () => undoCallOut(schedule));
       setConfirmOutId(null);
       onChanged?.();
     } catch (err) {
       if (err?.response?.status !== 402) toast.error(errorText(err, "Couldn't mark the call-out"));
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const undoOut = async (schedule) => {
-    setBusyId(schedule._id);
-    try {
-      await api.post(`/schedules/${schedule._id}/undo-call-out`);
-      toast.success("Call-out undone", { autoClose: 2500 });
-      onChanged?.();
-    } catch (err) {
-      if (err?.response?.status !== 402) toast.error(errorText(err, "Couldn't undo"));
     } finally {
       setBusyId(null);
     }
@@ -323,19 +312,19 @@ export default function SlotDrawer({ open, row, weekStart, weekPublished, callOu
                   <Stack direction="row" spacing={0.5}>
                     {AFTER_SHIFT_OUT.has(s.status) &&
                       (confirmOutId === s._id ? (
-                        <Button size="small" variant="contained" color="error" disabled={busyId === s._id} onClick={() => markOutAfter(s)} sx={{ textTransform: "none" }}>
-                          Yes, called out
-                        </Button>
+                        <>
+                          <Button size="small" onClick={() => setConfirmOutId(null)} sx={{ textTransform: "none", color: GRID.muted }}>
+                            Cancel
+                          </Button>
+                          <Button size="small" variant="contained" color="error" disabled={busyId === s._id} onClick={() => markOutAfter(s)} sx={{ textTransform: "none" }}>
+                            Yes, called out
+                          </Button>
+                        </>
                       ) : (
                         <Button size="small" color="error" startIcon={<FiUserX />} onClick={() => setConfirmOutId(s._id)} sx={{ textTransform: "none" }}>
                           Called out
                         </Button>
                       ))}
-                    {s.status === "call_out" && s.meta?.calloutMarkedAfterShift && (
-                      <Button size="small" disabled={busyId === s._id} onClick={() => undoOut(s)} sx={{ textTransform: "none", color: GRID.muted }}>
-                        Undo
-                      </Button>
-                    )}
                   </Stack>
                 )}
                 {canEdit && !isPast && (
@@ -359,6 +348,39 @@ export default function SlotDrawer({ open, row, weekStart, weekPublished, callOu
               </Box>
             ))}
           </Stack>
+        )}
+
+        {undoDialog}
+
+        {/* Called out: off the shift, but here so a mistake can be undone */}
+        {calledOut.length > 0 && (
+          <>
+            <Typography sx={{ fontWeight: 600, color: IOS.secondary, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em", mb: 0.75, px: 1.5 }}>
+              Called out ({calledOut.length})
+            </Typography>
+            <Stack divider={<Divider flexItem sx={{ borderColor: IOS.hairline, ml: 7 }} />} sx={{ mb: 2.5, bgcolor: IOS.surface, borderRadius: IOS.radius.cell, overflow: "hidden" }}>
+              {calledOut.map((s) => {
+                const after = Boolean(s.meta?.calloutMarkedAfterShift);
+                return (
+                  <Box key={s._id} sx={{ px: 1.5, py: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+                    <Avatar name={s.staffId?.name} color={IOS.redText} />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontWeight: 600, color: GRID.ink }}>{s.staffId?.name || "Someone"}</Typography>
+                      <Typography sx={{ fontSize: 12, color: IOS.redText }}>
+                        {after ? "Called out (marked after the shift)" : "Called out"}
+                        {s.meta?.callOutReason ? ` · ${s.meta.callOutReason}` : ""}
+                      </Typography>
+                    </Box>
+                    {canEdit && (
+                      <Button size="small" disabled={undoBusy} onClick={() => undoCallOut(s)} sx={{ textTransform: "none" }}>
+                        Undo
+                      </Button>
+                    )}
+                  </Box>
+                );
+              })}
+            </Stack>
+          </>
         )}
 
         {/* Who can take it */}

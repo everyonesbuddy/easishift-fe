@@ -19,6 +19,7 @@ import {
   ineligibleReason,
   notSentReason,
 } from "../../../utils/deliveryReasons";
+import { toastWithUndo, useUndoCallOut } from "./undoCallOut";
 
 const shiftLabel = (schedule) => {
   if (!schedule?.startTime) return "";
@@ -50,6 +51,7 @@ export default function CallOutDialog({ open, schedule, onClose, onChanged }) {
   const eligible = candidates.filter((c) => c.eligible);
   const others = candidates.filter((c) => !c.eligible);
   const canText = hasFeature("calloutText");
+  const { undo: undoCallOut, dialog: undoDialog, busy: undoBusy } = useUndoCallOut({ onChanged });
 
   const reset = () => {
     setStep("confirm");
@@ -77,7 +79,8 @@ export default function CallOutDialog({ open, schedule, onClose, onChanged }) {
       const res = await api.post(`/schedules/${schedule._id}/call-out`);
       if (res.data.afterShift) {
         // The shift is over: nothing to fill, it's just on the record now.
-        toast.success(`${name} marked as called out`, { position: "top-right", autoClose: 2500 });
+        const marked = schedule;
+        toastWithUndo(`${name} marked as called out`, () => undoCallOut(marked));
         onChanged?.();
         handleClose();
         return;
@@ -137,6 +140,8 @@ export default function CallOutDialog({ open, schedule, onClose, onChanged }) {
   };
 
   return (
+    <>
+    {undoDialog}
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
       <DialogTitle sx={{ fontWeight: 800 }}>
         {step === "confirm" ? "Mark as called out?" : "Fill the shift"}
@@ -273,6 +278,17 @@ export default function CallOutDialog({ open, schedule, onClose, onChanged }) {
         )}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
+        {step === "fill" && (
+          <Button
+            disabled={undoBusy || busy}
+            onClick={async () => {
+              if (await undoCallOut(schedule)) handleClose();
+            }}
+            sx={{ textTransform: "none", mr: "auto", color: "#64748b" }}
+          >
+            Undo call-out
+          </Button>
+        )}
         <Button onClick={handleClose}>{step === "confirm" ? "Cancel" : "Done"}</Button>
         {step === "confirm" && (
           <Button
@@ -287,5 +303,6 @@ export default function CallOutDialog({ open, schedule, onClose, onChanged }) {
         )}
       </DialogActions>
     </Dialog>
+    </>
   );
 }

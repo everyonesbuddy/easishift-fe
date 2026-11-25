@@ -67,7 +67,7 @@ const sections = [
       {
         title: "3.1 Text Messages (SMS)",
         paragraphs: [
-          "When a facility uses WiserShifts, we may text its employees and managers about their work schedule (open shifts, shift reminders, schedule changes and replies to their requests), only after they agree by replying START or ticking the consent box in WiserShifts. We use mobile phone numbers only to send these work texts.",
+          "When a facility uses WiserShifts, we may text its employees and managers about their work schedule (open shifts, shift reminders, schedule changes and replies to their requests), only after they agree themselves, by texting JOIN or START to our number or ticking the unticked consent box on their schedule page or in WiserShifts. We never text anyone to ask, and we keep a record of when and how each person agreed. Mobile numbers and consent are never shared with third parties or affiliates for marketing. We use mobile phone numbers only to send these work texts.",
           "No mobile information will be shared with third parties or affiliates for marketing or promotional purposes. Text messaging opt-in data and consent are not shared with any third parties. Our text messaging provider receives phone numbers only to deliver the messages.",
           "Message frequency varies. Message and data rates may apply. Reply STOP to stop, HELP for help, or email info@wisershifts.com. Details: https://wisershifts.com/text-messages",
         ],

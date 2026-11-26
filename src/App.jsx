@@ -148,6 +148,9 @@ export default function App() {
               element={<TermsAndConditions />}
             />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            {/* Short forms printed on the texting sign and opt-in boxes */}
+            <Route path="/terms" element={<Navigate to="/terms-and-conditions" replace />} />
+            <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
             <Route path="/text-messages" element={<TextMessagesPage />} />
             <Route path="/eula" element={<EndUserLicenseAgreement />} />
             <Route path="/contact" element={<ContactPage />} />

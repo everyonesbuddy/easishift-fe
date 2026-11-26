@@ -34,6 +34,7 @@ import {
   FiPhone,
   FiSearch,
   FiUsers,
+  FiMessageSquare,
   FiEdit,
   FiArchive,
   FiLink,
@@ -45,6 +46,7 @@ import {
 import { useAuth } from "../../../context/AuthContext";
 import StaffCreateAndEditForm from "./StaffCreateAndEditForm";
 import BulkStaffModal from "./BulkStaffModal";
+import { printTextSignupSign, SMS_NUMBER } from "./textSignupSign";
 import ConfirmDialog from "../../Shared/ConfirmDialog";
 import { notSentReason } from "../../../utils/deliveryReasons";
 import GuideHelpButton from "../../Shared/GuideHelpButton";
@@ -92,14 +94,16 @@ const getStaffListTourSteps = ({ canManageStaff }) => {
   return steps;
 };
 
+// They opt in themselves (text JOIN, or tick the box on their schedule page); we never text first.
 const SMS_STATUS_LABELS = {
   opted_in: { label: "Texts on", color: "#15803D" },
-  pending: { label: "Awaiting START", color: "#B45309" },
+  pending: { label: "Texts not on yet", color: "#B45309" },
+  none: { label: "Texts not on yet", color: "#B45309" },
   opted_out: { label: "Opted out", color: "#B91C1C" },
 };
 
 export default function StaffList() {
-  const { can, facilityPreferences, plan, usage } = useAuth();
+  const { can, facilityPreferences, plan, usage, tenant, hasFeature } = useAuth();
   const theme = useTheme();
   const isCompact = useMediaQuery(theme.breakpoints.down("md"));
 
@@ -562,6 +566,26 @@ export default function StaffList() {
               >
                 Paste or Import List
               </Button>
+              {hasFeature?.("sms") && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<FiMessageSquare />}
+                  onClick={() => {
+                    if (!printTextSignupSign(tenant?.name)) toast.info(`Allow pop-ups to print the sign, or tell staff: text JOIN to ${SMS_NUMBER}.`);
+                  }}
+                  title={`Staff text JOIN to ${SMS_NUMBER} to get their schedule by text`}
+                  sx={{
+                    textTransform: "none",
+                    borderRadius: 2,
+                    px: 3,
+                    whiteSpace: "nowrap",
+                    width: { xs: "100%", md: "auto" },
+                  }}
+                >
+                  Texting sign
+                </Button>
+              )}
               <Button
                 size="small"
                 variant="contained"

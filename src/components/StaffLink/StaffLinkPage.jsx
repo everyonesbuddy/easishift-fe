@@ -23,6 +23,7 @@ import { getPunchLocation } from "../../utils/geolocation";
 import { toLabel } from "../../utils/labels";
 import { IOS, tint } from "../../theme/ios";
 import PinScreen from "./PinScreen";
+import TextConsentCard from "./TextConsentCard";
 
 // This device's PIN pass for this link (only used when the facility
 // requires a PIN). Storage can be blocked; then they just enter the PIN.
@@ -562,10 +563,18 @@ export default function StaffLinkPage() {
 
       <Container maxWidth="sm" sx={{ pb: 6, pt: 2 }}>
 
-        {me.staff?.hasPhone && me.staff?.smsStatus === "opted_out" && (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            You've turned off texts. Reply START to any of our texts to turn them back on.
-          </Alert>
+        {me.features?.texts && me.staff?.hasPhone && me.staff?.smsStatus !== "opted_in" && (
+          <TextConsentCard
+            client={client}
+            staff={me.staff}
+            onChanged={(smsStatus, confirmationSent) => {
+              setMe((m) => ({ ...m, staff: { ...m.staff, smsStatus } }));
+              setNotice({
+                severity: "success",
+                text: confirmationSent ? "Texts are on. A confirmation text is on its way." : "Texts are on.",
+              });
+            }}
+          />
         )}
         {notice && (
           <Alert severity={notice.severity} sx={{ mb: 2 }} onClose={() => setNotice(null)}>

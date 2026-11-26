@@ -76,6 +76,30 @@ function Phone({ caption, children }) {
   );
 }
 
+/** A picture of a consent box as it appears in the app: always unticked. */
+const ConsentBox = ({ title, wording, phone, button, caption }) => (
+  <Box sx={{ maxWidth: 440 }}>
+    <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: "14px", p: 2, bgcolor: "#fff" }}>
+      <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 1 }}>{title}</Typography>
+      {phone && (
+        <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: "8px", px: 1.5, py: 1, fontSize: 14, mb: 1.5 }}>{phone}</Box>
+      )}
+      <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5 }}>
+        <Checkbox checked={false} readOnly size="small" sx={{ p: 0.5 }} inputProps={{ "aria-label": "Example consent checkbox, unticked" }} />
+        <Typography sx={{ fontSize: 13.5, color: "text.secondary", pt: 0.5 }}>{wording}</Typography>
+      </Box>
+      {button && (
+        <Box sx={{ mt: 1.5, display: "inline-block", px: 2, py: 0.75, borderRadius: "8px", bgcolor: "#e5e7eb", color: "#6b7280", fontSize: 14, fontWeight: 600 }}>
+          {button}
+        </Box>
+      )}
+    </Box>
+    <Typography variant="body2" sx={{ color: "text.secondary", mt: 1 }}>
+      {caption}
+    </Typography>
+  </Box>
+);
+
 const H = ({ children }) => (
   <Typography variant="h6" component="h2" sx={{ fontWeight: 700, mt: 4, mb: 1 }}>
     {children}
@@ -108,52 +132,71 @@ export default function TextMessagesPage() {
             </P>
 
             <H>How people agree to get texts</H>
-            <P>Nobody gets these texts without saying yes first.</P>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
-              Staff: reply START
-            </Typography>
             <P>
-              An employee gives their mobile number to their employer (the facility) as part of their job. The facility adds it in WiserShifts.
-              We then send that number one text asking whether they want schedule texts. Nothing else is sent unless they reply START. If they
-              don&apos;t reply, they get no further texts.
-            </P>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, mt: 2 }}>
-              Managers: tick the box in WiserShifts
-            </Typography>
-            <P>
-              A manager signed in to WiserShifts can add their own mobile number and tick the box below, then gets a text confirming it. They
-              can also reply START to the text above.
+              We never text anyone who hasn&apos;t agreed first, not even to ask. Each person opts in themselves, in one of three ways, and we
+              keep a record of when and how they did. An employer adding someone&apos;s number to the schedule does not opt them in.
             </P>
 
-            <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap", mt: 2, mb: 1 }}>
-              <Phone caption="The only text a new number gets. Nothing else is sent until they reply START.">
-                <Bubble>
-                  Maple Grove uses WiserShifts to send your work schedule. Reply START to get schedule texts. Msg &amp; data rates may apply.
-                  Reply STOP to opt out, HELP for help.
-                </Bubble>
-                <Bubble from="me">START</Bubble>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+              1. Staff text JOIN to {NUMBER}
+            </Typography>
+            <P>
+              Facilities post a sign in the staff room and tell staff in person. Texting JOIN (or START) from the number their workplace has
+              on file subscribes them, and we reply with a confirmation. A number no workplace has added is told to ask their scheduler.
+            </P>
+            <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap", mt: 1, mb: 3 }}>
+              <Box sx={{ flex: "1 1 260px", minWidth: 0, maxWidth: 340, border: "2px solid", borderColor: "text.primary", borderRadius: "14px", p: 2.5, bgcolor: "#fff", textAlign: "center" }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "text.secondary" }}>
+                  Staff room sign
+                </Typography>
+                <Typography sx={{ fontSize: 22, fontWeight: 800, mt: 1, lineHeight: 1.2 }}>Get your schedule by text</Typography>
+                <Typography sx={{ fontSize: 16, mt: 1 }}>
+                  Text <strong>JOIN</strong> to <strong>{NUMBER}</strong>
+                </Typography>
+                <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 1.5, lineHeight: 1.5 }}>
+                  WiserShifts Schedule Alerts from your workplace: shift reminders, schedule changes and open shifts. Msg frequency varies.
+                  Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help. Terms: wisershifts.com/terms · Privacy:
+                  wisershifts.com/privacy
+                </Typography>
+              </Box>
+              <Phone caption="They text us first. Nothing is sent before this.">
+                <Bubble from="me">JOIN</Bubble>
                 <Bubble>
                   You&apos;re subscribed to WiserShifts schedule texts from Maple Grove. Your schedule: wisershifts.com/s/… Msg frequency varies.
                   Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help.
                 </Bubble>
               </Phone>
-              <Box sx={{ flex: "1 1 300px", minWidth: 0 }}>
-                <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: "14px", p: 2, bgcolor: "#fff" }}>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 1 }}>Mobile phone</Typography>
-                  <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: "8px", px: 1.5, py: 1, fontSize: 14, mb: 1.5 }}>(555) 201-4477</Box>
-                  <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5 }}>
-                    <Checkbox checked readOnly size="small" sx={{ p: 0.5 }} inputProps={{ "aria-label": "Example consent checkbox" }} />
-                    <Typography sx={{ fontSize: 13.5, color: "text.secondary", pt: 0.5 }}>
-                      Text me when someone calls out or asks for time off, plus a short morning summary. Msg &amp; data rates may apply; reply
-                      STOP any time.
-                    </Typography>
-                  </Box>
-                </Box>
-                <Typography variant="body2" sx={{ color: "text.secondary", mt: 1 }}>
-                  The box a manager ticks in WiserShifts (Settings → Members). It starts unticked.
-                </Typography>
-              </Box>
             </Box>
+
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
+              2. Staff tick the box on their schedule page
+            </Typography>
+            <P>
+              Every employee has a personal schedule page (shared by email, or by their scheduler in person). It has this box. It starts
+              unticked, and nothing is sent until they tick it and press the button. We then send one confirmation text.
+            </P>
+            <ConsentBox
+              title="Text me my schedule"
+              wording="Text me my schedule: shift reminders, schedule changes, open shifts I can pick up and replies to my requests. Msg frequency varies. Msg & data rates may apply. Reply STOP to opt out, HELP for help."
+              button="Text me"
+              phone="Texts go to (•••) •••-4477"
+              caption="On each employee's own schedule page. The box starts unticked."
+            />
+
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5, mt: 3 }}>
+              3. Managers tick the box in WiserShifts
+            </Typography>
+            <P>
+              A manager signed in to WiserShifts can add their own mobile number in Settings → Members and tick this box (also unticked to
+              start). Only the person themselves can tick it, never someone else. They can also text JOIN.
+            </P>
+            <ConsentBox
+              title="Mobile phone"
+              wording="Text me when someone calls out or asks for time off, plus a short morning summary. Msg & data rates may apply; reply STOP any time."
+              phone="(555) 201-4477"
+              caption="Settings → Members, on the manager's own number. The box starts unticked."
+            />
+            <Box sx={{ mb: 3 }} />
 
             <H>What we text</H>
             <Box component="ul" sx={{ pl: 3, color: "text.secondary", mt: 0 }}>

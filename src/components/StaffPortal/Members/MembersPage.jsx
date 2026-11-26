@@ -161,14 +161,15 @@ export default function MembersPage() {
         setOwnerTarget({ ...member, ...res.data });
         return;
       }
-      const askedToText = res.data?.textStatus === "pending" && member.textStatus !== "pending";
+      const phoneChanged = (details.userPhone || "") !== (member.userPhone || "");
+      const emailedHowTo = !isMe && phoneChanged && details.userPhone && res.data?.textStatus !== "opted_in" && res.data?.email;
       const textsOn = res.data?.textStatus === "opted_in" && member.textStatus !== "opted_in";
       const newEmail = res.data?.email && res.data.email !== member.email;
       toast.success(
         textsOn
           ? "Saved. Texts are on; a confirmation text is on its way."
-          : askedToText
-          ? `Saved. ${isMe ? "You'll" : `${res.data.name.split(" ")[0]} will`} get a text asking to reply START.`
+          : emailedHowTo
+          ? `Saved. We emailed ${res.data.name.split(" ")[0]} how to turn on texts (we don't text anyone until they say yes).`
           : newEmail && member.invitePending
             ? `Saved. The invite went to ${res.data.email}.`
             : newEmail && isMe
@@ -464,7 +465,7 @@ export default function MembersPage() {
           <Typography color="text.secondary" sx={{ fontSize: 13, mt: 2, mb: 1 }}>
             {phoneTarget && String(phoneTarget._id) === String(user?._id)
               ? "Your mobile, for texts when someone calls out or asks for time off, and a short morning summary."
-              : "Mobile, for texts when someone calls out or asks for time off, and a short morning summary. A new number gets one text asking them to reply START."}
+              : "Mobile, for texts when someone calls out or asks for time off, and a short morning summary. We don't text them until they say yes: we'll email them how (tick the box in Settings, or text JOIN to (855) 449-8584)."}
           </Typography>
           <Stack direction="row" spacing={1}>
             <TextField
@@ -543,7 +544,7 @@ export default function MembersPage() {
                 value={invite.userPhone}
                 onChange={(e) => setInvite({ ...invite, userPhone: e.target.value })}
                 placeholder="(470) 555-0100"
-                helperText="For texts about call-outs and time off. They'll get one text asking them to reply START."
+                helperText="For texts about call-outs and time off. We don't text them until they say yes; we'll email them how."
                 fullWidth
               />
             </Stack>
